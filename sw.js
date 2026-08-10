@@ -1,0 +1,49 @@
+// Service worker: lets Hoop Shot open with no internet connection.
+// Bump CACHE when you change the game so phones pick up the new version.
+const CACHE = "hoop-shot-v49";
+const FILES = [
+  "./",
+  "./index.html",
+  "./hoop-shot-3d.html",
+  "./three.min.js",
+  "./manifest.webmanifest",
+  "./icon.svg",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./icon-512-maskable.png",
+  "./icon-180.png"
+];
+
+self.addEventListener("install", function (e) {
+  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(FILES); }));
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", function (e) {
+  e.waitUntil(
+    caches.keys().then(function (keys) {
+      return Promise.all(keys.map(function (k) {
+        if (k !== CACHE) return caches.delete(k);
+      }));
+    }).then(function () { return self.clients.claim(); })
+  );
+});
+
+// Network first, cache second. This way your edits show up straight away when
+// you are online, but the game still opens when you are not.
+self.addEventListener("fetch", function (e) {
+  if (e.request.method !== "GET") return;
+  e.respondWith(
+    fetch(e.request)
+      .then(function (res) {
+        const copy = res.clone();
+        caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
+        return res;
+      })
+      .catch(function () {
+        return caches.match(e.request).then(function (hit) {
+          return hit || caches.match("./index.html");
+        });
+      })
+  );
+});

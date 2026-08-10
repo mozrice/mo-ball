@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hoop Shot 3D</title>
+<meta name="theme-color" content="#12232e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hoop Shot">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0e1a22;
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #f4f7f9; }
+  #title { position: absolute; top: 10px; width: 100%; text-align: center;
+    font-size: 20px; letter-spacing: 4px; text-transform: uppercase; color: #7fb2c9; }
+  #score { position: absolute; top: 40px; width: 100%; text-align: center;
+    font-size: 40px; font-weight: bold; color: #ffcf5c; }
+  #stats { position: absolute; top: 58px; left: 16px; font-size: 14px;
+    letter-spacing: 1px; color: #9fc0d0; }
+  #fouls { position: absolute; top: 78px; left: 16px; font-size: 14px;
+    letter-spacing: 1px; color: #9fc0d0; }
+  #dogscore { position: absolute; top: 78px; left: 16px; font-size: 14px;
+    letter-spacing: 1px; color: #f0a58f; }
+  #msg { position: absolute; top: 92px; width: 100%; text-align: center;
+    font-size: 22px; font-weight: bold; letter-spacing: 2px; color: #ffcf5c;
+    text-transform: uppercase; opacity: 0; transition: opacity .1s; }
+  #hint { position: absolute; bottom: 96px; width: 100%; text-align: center;
+    font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: #9fc0d0; }
+  /* power meter */
+  #meter { position: absolute; bottom: 54px; left: 50%; transform: translateX(-50%);
+    width: 280px; height: 22px; border-radius: 6px; background: #0e1a22;
+    border: 2px solid #5b6b76; overflow: hidden; }
+  #green { position: absolute; top: 0; height: 100%; background: #2f7d4f; }
+  #fill  { position: absolute; top: 0; left: 0; height: 100%; width: 0; background: #ffcf5c; }
+  /* buttons */
+  .btn { pointer-events: auto; position: absolute; font: inherit; font-size: 14px;
+    font-weight: bold; letter-spacing: 2px; text-transform: uppercase; padding: 9px 18px;
+    border-radius: 999px; border: none; background: #ff8b2c; color: #2a1200; cursor: pointer;
+    box-shadow: 0 4px 0 #b85c12; }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #b85c12; }
+  #backBtn { top: 12px; left: 12px; background: #1b2f3c; color: #9fc0d0;
+    border: 2px solid #2f4a5c; box-shadow: none; }
+  #musicBtn { top: 12px; right: 12px; background: #1b2f3c; color: #9fc0d0;
+    border: 2px solid #2f4a5c; box-shadow: none; }
+  #viewBtn { top: 12px; left: 92px; background: #1b2f3c; color: #9fc0d0;
+    border: 2px solid #2f4a5c; box-shadow: none; }
+  #shootBtn { bottom: 10px; left: 50%; transform: translateX(-50%); }
+  #toBtn { bottom: 10px; left: 12px; background: #7fd0ff; color: #082430; box-shadow: 0 4px 0 #3f7f9f; }
+  #modeBtn { bottom: 10px; right: 12px; background: #6bd18a; color: #06280f; box-shadow: 0 4px 0 #3a8f56; }
+  #rebBtn { bottom: 58px; right: 12px; background: #f6c945; color: #3a2a00; box-shadow: 0 4px 0 #b8922a; }
+  #dunkBtn { bottom: 106px; right: 12px; background: #ff5a3c; color: #fff2ee; box-shadow: 0 4px 0 #b83a26; }
+  #stealBtn { bottom: 154px; right: 12px; background: #4fd0c0; color: #06322c; box-shadow: 0 4px 0 #2f8f83; }
+  #dblBtn { bottom: 202px; right: 12px; background: #9b8cff; color: #14103a; box-shadow: 0 4px 0 #6a5cc0; }
+  #blockBtn { bottom: 58px; left: 12px; background: #ef8f7a; color: #3a0c00; box-shadow: 0 4px 0 #b85a49; }
+  #fourDBtn { bottom: 106px; left: 12px; background: #c89bf0; color: #2a0c40; box-shadow: 0 4px 0 #8a5fb0; }
+  #halfBtn { display: none; bottom: 200px; left: 50%; transform: translateX(-50%);
+    font-size: 18px; padding: 14px 30px; background: #6bd18a; color: #06280f; box-shadow: 0 5px 0 #3a8f56; }
+  #halfBtn:active { transform: translateX(-50%) translateY(3px); box-shadow: 0 2px 0 #3a8f56; }
+  #buyBtn { pointer-events: auto; position: absolute; top: 120px; left: 16px; font: inherit;
+    font-size: 12px; font-weight: bold; letter-spacing: 1px; padding: 5px 12px; border-radius: 999px;
+    border: none; background: #ffd84a; color: #3a2a00; box-shadow: 0 3px 0 #b8922a; cursor: pointer; }
+  #buyBtn:active { transform: translateY(2px); box-shadow: 0 1px 0 #b8922a; }
+  /* move-the-shooter D-pad (for touch screens; keyboard arrows/WASD also work) */
+  .pad { pointer-events: auto; position: absolute; width: 46px; height: 46px; border-radius: 12px;
+    background: rgba(120,150,170,0.28); border: 2px solid rgba(210,228,240,0.45); color: #eaf2f7;
+    font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: center;
+    -webkit-user-select: none; user-select: none; }
+  .pad:active { background: rgba(140,175,200,0.55); }
+  #pad-up { left: 56px; bottom: 250px; }
+  #pad-down { left: 56px; bottom: 150px; }
+  #pad-left { left: 10px; bottom: 200px; }
+  #pad-right { left: 102px; bottom: 200px; }
+  #gclock { position: absolute; top: 44px; right: 18px; font-size: 30px; font-weight: bold;
+    letter-spacing: 1px; color: #cfe0ea; }
+  #gclock.low { color: #e5533d; }
+  #clock { position: absolute; top: 82px; right: 18px; font-size: 26px; font-weight: bold;
+    letter-spacing: 1px; color: #ff8b2c; }
+  #clock.low { color: #e5533d; }
+  #coins { position: absolute; top: 98px; left: 16px; font-size: 17px; font-weight: bold;
+    letter-spacing: 1px; color: #ffd84a; }
+  #coins.pop { animation: coinpop 0.4s ease-out; }
+  @keyframes coinpop { 0%{transform:scale(1);} 40%{transform:scale(1.35);} 100%{transform:scale(1);} }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="title">Hoop Shot 3D</div>
+  <div id="score">0</div>
+  <div id="stats">Made 0 / 0</div>
+  <div id="dogscore">Puppies: 0</div>
+  <div id="coins">&#128176; $0.00</div>
+  <button id="buyBtn">&#128722; Buy 30</button>
+  <div id="msg"></div>
+  <div id="hint">Move with arrows &middot; hold to shoot</div>
+  <div id="meter"><div id="green"></div><div id="fill"></div></div>
+  <button id="backBtn" class="btn">&#8592; 2D</button>
+  <button id="viewBtn" class="btn">&#128065; View</button>
+  <button id="musicBtn" class="btn">&#9834; Music</button>
+  <div id="gclock">10:00</div>
+  <div id="clock">0:24</div>
+  <button id="shootBtn" class="btn">HOLD TO SHOOT</button>
+  <button id="toBtn" class="btn">&#9200; Time Out</button>
+  <button id="modeBtn" class="btn">&#127919; Practice</button>
+  <button id="rebBtn" class="btn">&#128587; Rebound</button>
+  <button id="blockBtn" class="btn">&#9995; Block</button>
+  <button id="fourDBtn" class="btn">&#128266; 4D</button>
+  <button id="halfBtn" class="btn">&#9654; Back to Play</button>
+  <button id="dunkBtn" class="btn">&#128293; Dunk</button>
+  <button id="stealBtn" class="btn">&#9994; Steal</button>
+  <button id="dblBtn" class="btn">&#128101; Double Team</button>
+  <button id="pad-up" class="pad">&#9650;</button>
+  <button id="pad-left" class="pad">&#9664;</button>
+  <button id="pad-right" class="pad">&#9654;</button>
+  <button id="pad-down" class="pad">&#9660;</button>
+</div>
+
+<script src="three.min.js"></script>
+<script>
+(function () {
+  const T = window.THREE;
+  if (!T) { document.body.innerHTML = "<p style='color:#fff;padding:20px'>3D engine did not load. Open this through the Hoop Shot server (start-game.cmd) or refresh.</p>"; return; }
+
+  // ---- renderer / scene / camera ----
+  const renderer = new T.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = T.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  const scene = new T.Scene();
+  scene.background = new T.Color(0x12232e);
+  scene.fog = new T.Fog(0x12232e, 18, 34);
+
+  const camera = new T.PerspectiveCamera(54, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(6.2, 5.2, 9.5);   // elevated corner view: both hoops in frame
+  camera.lookAt(0, 1.9, -1);
+
+  // ---- camera views you can flip between with the View button ----
+  const VIEWS = [
+    { name: "COURTSIDE", pos: [6.2, 5.2, 9.5], look: [0, 1.9, -1], drift: true },
+    { name: "BEHIND",    pos: [0, 4.6, 10.5],  look: [0, 2.2, -4] },
+    { name: "TOP DOWN",  pos: [0, 17, 1.6],    look: [0, 0, 0.6] },
+    { name: "HOOP CAM",  pos: [0.2, 4.2, -1.6],look: [0, 3, -5.6] },
+    { name: "SIDELINE",  pos: [10.5, 3.4, 1],  look: [0, 2, 0] }
+  ];
+  let viewIdx = 0;
+
+  // ---- lights ----
+  scene.add(new T.HemisphereLight(0xbfe0f0, 0x2a5060, 0.9));
+  const sun = new T.DirectionalLight(0xffffff, 1.0);
+  sun.position.set(4, 10, 6);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.near = 1; sun.shadow.camera.far = 30;
+  sun.shadow.camera.left = -10; sun.shadow.camera.right = 10;
+  sun.shadow.camera.top = 12; sun.shadow.camera.bottom = -4;
+  scene.add(sun);
+
+  // ---- pro-style court ----
+  const HOOP_Z = -5.6, RIM_Y = 3.05, RIM_R = 0.34;
+  let scoreR = 0.52;           // how forgiving the "went in" test is (bigger on free throws)
+  const THREE_R = 4.6;
+  const NEAR_HOOP = 7.4;
+
+  // dark arena floor, then the polished wood court on top
+  const arena = new T.Mesh(new T.BoxGeometry(40, 0.3, 46),
+    new T.MeshStandardMaterial({ color: 0x0c151c, roughness: 1 }));
+  arena.position.set(0, -0.32, 0); arena.receiveShadow = true; scene.add(arena);
+  const floor = new T.Mesh(new T.BoxGeometry(13.4, 0.4, 18.5),
+    new T.MeshStandardMaterial({ color: 0xd6934a, roughness: 0.45, metalness: 0.05 }));
+  floor.position.set(0, -0.2, 0.9); floor.receiveShadow = true; scene.add(floor);
+
+  // white paint lines
+  const lineMat = new T.MeshStandardMaterial({ color: 0xf5ecda, roughness: 0.6 });
+  function ln(x, z, w, d) {
+    const m = new T.Mesh(new T.BoxGeometry(w, 0.02, d), lineMat);
+    m.position.set(x, 0.015, z); scene.add(m);
+  }
+  function ring(x, z, rIn, rOut) {
+    const m = new T.Mesh(new T.RingGeometry(rIn, rOut, 64), lineMat);
+    m.rotation.x = -Math.PI / 2; m.position.set(x, 0.015, z); scene.add(m);
+  }
+  function ringArc(x, z, r, dir) {
+    const m = new T.Mesh(new T.RingGeometry(r - 0.07, r + 0.07, 64, 1, 0, Math.PI), lineMat);
+    m.rotation.x = dir * Math.PI / 2; m.position.set(x, 0.015, z); scene.add(m);
+  }
+
+  const BASE_FAR = HOOP_Z - 1.3, BASE_NEAR = NEAR_HOOP + 1.3, MIDZ = (HOOP_Z + NEAR_HOOP) / 2;
+  const HALF_W = 6.0;
+  // boundary
+  ln(-HALF_W, MIDZ, 0.1, BASE_NEAR - BASE_FAR); ln(HALF_W, MIDZ, 0.1, BASE_NEAR - BASE_FAR);
+  ln(0, BASE_FAR, HALF_W * 2, 0.1); ln(0, BASE_NEAR, HALF_W * 2, 0.1);
+  // half-court line + centre circle
+  ln(0, MIDZ, HALF_W * 2, 0.1);
+  ring(0, MIDZ, 1.72, 1.82);
+
+  // everything at one end: painted key, free-throw line + circle, 3-pt line, restricted area
+  function buildEnd(z0, dir) {
+    const baseZ = z0 - dir * 1.3, ftZ = z0 + dir * 5.0;
+    const midKey = (baseZ + ftZ) / 2, keyLen = Math.abs(ftZ - baseZ);
+    const paint = new T.Mesh(new T.BoxGeometry(3.6, 0.02, keyLen),
+      new T.MeshStandardMaterial({ color: 0x2c6f97, roughness: 0.7 }));
+    paint.position.set(0, 0.01, midKey); scene.add(paint);
+    ln(-1.8, midKey, 0.09, keyLen); ln(1.8, midKey, 0.09, keyLen);
+    ln(0, ftZ, 3.72, 0.09);
+    ring(0, ftZ, 1.72, 1.82);
+    ringArc(0, z0, THREE_R, dir);
+    ln(-THREE_R, z0 - dir * 0.65, 0.09, 1.3); ln(THREE_R, z0 - dir * 0.65, 0.09, 1.3);
+    ringArc(0, z0, 1.25, dir);      // restricted-area arc under the rim
+  }
+  buildEnd(HOOP_Z, 1);
+  buildEnd(NEAR_HOOP, -1);
+
+  // arena back wall (stands)
+  const wall = new T.Mesh(new T.BoxGeometry(38, 20, 0.4),
+    new T.MeshStandardMaterial({ color: 0x14232e, roughness: 1 }));
+  wall.position.set(0, 9, BASE_FAR - 1.6); wall.receiveShadow = true; scene.add(wall);
+
+  // ---- sideline: a bench for the players, food + water for the puppies ----
+  // where everyone gathers during a time out
+  const benchSpots = [[-7.4, -1.9], [-7.4, -0.8], [-7.4, 0.3], [-7.4, 1.4], [-7.4, 2.5]];
+  const bowlSpots  = [[7.4, -1.9], [7.4, -0.8], [7.4, 0.3], [7.4, 1.4], [7.4, 2.5]];
+
+  (function buildBench() {
+    const g = new T.Group(); g.position.set(-8.15, 0, 0.9); scene.add(g);
+    const wood = new T.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.75 });
+    const seat = new T.Mesh(new T.BoxGeometry(0.55, 0.12, 5.0), wood);
+    seat.position.set(0, 0.45, 0); seat.castShadow = true; seat.receiveShadow = true; g.add(seat);
+    const back = new T.Mesh(new T.BoxGeometry(0.12, 0.62, 5.0), wood);
+    back.position.set(-0.24, 0.78, 0); back.castShadow = true; g.add(back);
+    for (const zz of [-2.2, 0, 2.2]) {
+      const leg = new T.Mesh(new T.BoxGeometry(0.5, 0.42, 0.12),
+        new T.MeshStandardMaterial({ color: 0x5b3a1c }));
+      leg.position.set(0, 0.21, zz); g.add(leg);
+    }
+  })();
+
+  (function buildDogArea() {
+    const g = new T.Group(); g.position.set(8.1, 0, 0.9); scene.add(g);
+    const mat = new T.Mesh(new T.BoxGeometry(1.7, 0.03, 2.6),
+      new T.MeshStandardMaterial({ color: 0x3a6b45, roughness: 0.9 }));
+    mat.position.set(0, 0.02, 0); mat.receiveShadow = true; g.add(mat);
+    function bowl(x, z, bowlColor, fillColor, fillY) {
+      const b = new T.Mesh(new T.CylinderGeometry(0.3, 0.22, 0.2, 20),
+        new T.MeshStandardMaterial({ color: bowlColor, roughness: 0.5 }));
+      b.position.set(x, 0.11, z); b.castShadow = true; g.add(b);
+      const fill = new T.Mesh(new T.CylinderGeometry(0.25, 0.25, 0.06, 20),
+        new T.MeshStandardMaterial({ color: fillColor, roughness: 0.4 }));
+      fill.position.set(x, fillY, z); g.add(fill);
+    }
+    bowl(-0.35, -0.5, 0xcc4433, 0x6a4a2a, 0.19);   // red bowl of food
+    bowl(0.35, 0.6, 0x3366aa, 0x66b3ff, 0.19);     // blue bowl of water
+    // a little bone by the food bowl
+    const boneMat = new T.MeshStandardMaterial({ color: 0xf2ecd8, roughness: 0.6 });
+    const bone = new T.Mesh(new T.CylinderGeometry(0.04, 0.04, 0.34, 8), boneMat);
+    bone.rotation.z = Math.PI / 2; bone.position.set(-0.35, 0.05, -1.1); g.add(bone);
+    for (const s of [-1, 1]) for (const e of [-1, 1]) {
+      const k = new T.Mesh(new T.SphereGeometry(0.07, 8, 8), boneMat);
+      k.position.set(-0.35 + s * 0.17, 0.05, -1.1 + e * 0.07); g.add(k);
+    }
+  })();
+
+  // ---- hoops at both ends ----
+  const poleMat = new T.MeshStandardMaterial({ color: 0x5b6b76, roughness: 0.6, metalness: 0.2 });
+  // dir = +1 : rim opening faces +z (toward the player).  dir = -1 : faces -z.
+  function makeHoop(z, dir) {
+    const g = new T.Group(); scene.add(g);
+    const pole = new T.Mesh(new T.CylinderGeometry(0.09, 0.09, 3.9, 16), poleMat);
+    pole.position.set(0, 1.95, z - 1.0 * dir); pole.castShadow = true; g.add(pole);
+    const arm = new T.Mesh(new T.BoxGeometry(0.1, 0.1, 1.0), poleMat);
+    arm.position.set(0, 3.4, z - 0.5 * dir); g.add(arm);
+    const board = new T.Mesh(new T.BoxGeometry(1.9, 1.15, 0.06),
+      new T.MeshStandardMaterial({ color: 0xeef3f6, roughness: 0.3 }));
+    board.position.set(0, 3.4, z - 0.05 * dir); board.castShadow = true; g.add(board);
+    const boardBox = new T.Mesh(new T.BoxGeometry(0.62, 0.46, 0.07),
+      new T.MeshStandardMaterial({ color: 0xe5533d }));
+    boardBox.position.set(0, 3.15, z - 0.02 * dir); g.add(boardBox);
+    const rim = new T.Mesh(new T.TorusGeometry(RIM_R, 0.028, 12, 32),
+      new T.MeshStandardMaterial({ color: 0xe5533d, roughness: 0.4, metalness: 0.3 }));
+    rim.rotation.x = Math.PI / 2; rim.position.set(0, RIM_Y, z + 0.34 * dir);
+    rim.castShadow = true; g.add(rim);
+    const net = new T.Mesh(
+      new T.CylinderGeometry(RIM_R * 0.95, RIM_R * 0.5, 0.5, 16, 1, true),
+      new T.MeshStandardMaterial({ color: 0xf2f5f7, wireframe: true, transparent: true, opacity: 0.85 }));
+    net.position.set(0, RIM_Y - 0.25, z + 0.34 * dir); g.add(net);
+    return z + 0.34 * dir;
+  }
+  const NEAR_Z = 7.4;
+  makeHoop(HOOP_Z, 1);      // the hoop you shoot at (far end)
+  makeHoop(NEAR_Z, -1);     // the other end of the court
+  const RIM = new T.Vector3(0, RIM_Y, HOOP_Z + 0.34);        // your hoop (far end)
+  const NEAR_RIM = new T.Vector3(0, RIM_Y, NEAR_Z - 0.34);   // the puppies' hoop (near end)
+  const DOG_SHOOT_SPOT = new T.Vector3(0, 0, 5.0);           // where a puppy pulls up to shoot
+
+  // ---- a simple 3D character on the same idea as the 2D boy ----
+  function makePlayer() {
+    const g = new T.Group();
+    const skin = new T.MeshStandardMaterial({ color: 0xf0b27a, roughness: 0.7 });
+    const jersey = new T.MeshStandardMaterial({ color: 0xffcf5c, roughness: 0.6 });
+    const shorts = new T.MeshStandardMaterial({ color: 0x2b6cb0, roughness: 0.6 });
+    const torso = new T.Mesh(new T.CapsuleGeometry(0.32, 0.5, 4, 12), jersey);
+    torso.position.y = 1.15; torso.castShadow = true; g.add(torso);
+    const head = new T.Mesh(new T.SphereGeometry(0.26, 20, 16), skin);
+    head.position.y = 1.75; head.castShadow = true; g.add(head);
+    const hair = new T.Mesh(new T.SphereGeometry(0.27, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.55),
+      new T.MeshStandardMaterial({ color: 0x4a2c15 }));
+    hair.position.y = 1.78; g.add(hair);
+    // face (eyes + a smile) on the front of the head
+    const eyeMat = new T.MeshStandardMaterial({ color: 0x2a1a10 });
+    for (const s of [-1, 1]) {
+      const eye = new T.Mesh(new T.SphereGeometry(0.038, 10, 10), eyeMat);
+      eye.position.set(s * 0.1, 1.79, 0.225); g.add(eye);
+    }
+    const mouth = new T.Mesh(new T.TorusGeometry(0.07, 0.014, 8, 16, Math.PI),
+      new T.MeshStandardMaterial({ color: 0x7a3b2a }));
+    mouth.rotation.z = Math.PI; mouth.position.set(0, 1.70, 0.235); g.add(mouth);   // smile
+    for (const s of [-1, 1]) {
+      const leg = new T.Mesh(new T.CapsuleGeometry(0.13, 0.6, 4, 8), shorts);
+      leg.position.set(s * 0.16, 0.45, 0); leg.castShadow = true; g.add(leg);
+      const arm = new T.Mesh(new T.CapsuleGeometry(0.09, 0.74, 4, 8), skin);
+      arm.position.set(s * 0.4, 1.0, 0); arm.castShadow = true; g.add(arm);   // straight arms down the sides
+      arm.userData.arm = true; arm.userData.side = s;
+    }
+    return g;
+  }
+
+  function makePuppy() {
+    const g = new T.Group();
+    const fur = new T.MeshStandardMaterial({ color: 0xf7f4ee, roughness: 1 });
+    const body = new T.Mesh(new T.SphereGeometry(0.42, 18, 14), fur);
+    body.position.y = 0.55; body.scale.set(1, 0.95, 1.05); body.castShadow = true; g.add(body);
+    // lots of fluff
+    for (let i = 0; i < 14; i++) {
+      const a = i / 14 * Math.PI * 2;
+      const p = new T.Mesh(new T.SphereGeometry(0.16, 8, 8), fur);
+      p.position.set(Math.cos(a) * 0.42, 0.55 + Math.sin(a) * 0.32, 0.1);
+      g.add(p);
+    }
+    const head = new T.Mesh(new T.SphereGeometry(0.34, 16, 14), fur);
+    head.position.set(0, 1.15, 0.18); head.castShadow = true; g.add(head);
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * Math.PI * 2;
+      const p = new T.Mesh(new T.SphereGeometry(0.13, 8, 8), fur);
+      p.position.set(Math.cos(a) * 0.32, 1.2 + Math.sin(a) * 0.28, 0.16); g.add(p);
+    }
+    const earMat = new T.MeshStandardMaterial({ color: 0xd6ccb9, roughness: 1 });
+    for (const s of [-1, 1]) {
+      const ear = new T.Mesh(new T.SphereGeometry(0.15, 10, 10), earMat);
+      ear.position.set(s * 0.3, 1.1, 0.14); ear.scale.set(0.7, 1.2, 0.7); g.add(ear);
+    }
+    const nose = new T.Mesh(new T.SphereGeometry(0.07, 10, 10),
+      new T.MeshStandardMaterial({ color: 0xef9ab4 }));
+    nose.position.set(0, 1.12, 0.5); g.add(nose);
+    const eyeMat = new T.MeshStandardMaterial({ color: 0x2a1a10 });
+    for (const s of [-1, 1]) {
+      const eye = new T.Mesh(new T.SphereGeometry(0.045, 8, 8), eyeMat);
+      eye.position.set(s * 0.12, 1.2, 0.44); g.add(eye);
+    }
+    for (const [x, z] of [[-0.2, 0.2], [0.2, 0.2], [-0.2, -0.2], [0.2, -0.2]]) {
+      const leg = new T.Mesh(new T.CylinderGeometry(0.1, 0.1, 0.35, 8), fur);
+      leg.position.set(x, 0.17, z); leg.castShadow = true; g.add(leg);
+    }
+    return g;
+  }
+
+  const player = makePlayer(); player.position.set(-0.2, 0, 0.9); scene.add(player);
+  const playerArms = player.children.filter(function (c) { return c.userData && c.userData.arm; });
+
+  // YOUR TEAM: one more person alongside the shooter (2-on-2)
+  const team = [];
+  const teamSpots = [[-3.0, 2.3]];
+  for (let i = 0; i < teamSpots.length; i++) {
+    const m = makePlayer(); m.position.set(teamSpots[i][0], 0, teamSpots[i][1]);
+    m.userData.ph = i * 0.8; scene.add(m); team.push(m);
+  }
+
+  // THE OTHER TEAM: two dogs down near the far hoop (2-on-2)
+  const dogs = [];
+  const dogSpots = [[-2.2, -2.6], [2.2, -2.6]];
+  for (let i = 0; i < dogSpots.length; i++) {
+    const d = makePuppy(); d.position.set(dogSpots[i][0], 0, dogSpots[i][1]);
+    d.scale.setScalar(0.78);            // little puppies
+    d.rotation.y = (i - 2) * 0.12; d.userData.ph = i * 0.7; scene.add(d); dogs.push(d);
+  }
+
+  // ---- the ball ----
+  const ball = new T.Mesh(new T.SphereGeometry(0.16, 20, 16),
+    new T.MeshStandardMaterial({ color: 0xdd6a15, roughness: 0.6 }));
+  ball.castShadow = true; scene.add(ball);
+  // seams
+  for (let i = 0; i < 2; i++) {
+    const seam = new T.Mesh(new T.TorusGeometry(0.16, 0.006, 8, 24),
+      new T.MeshStandardMaterial({ color: 0x5a2a08 }));
+    if (i === 1) seam.rotation.y = Math.PI / 2;
+    ball.add(seam);
+  }
+  const HANDS = new T.Vector3(0.12, 1.35, 0.35);
+  ball.position.copy(HANDS);
+
+  // the team passes the one ball around; hand positions follow the moving players
+  const passGroups = [player].concat(team);
+  const _hA = new T.Vector3(), _hB = new T.Vector3();
+  function handOf(i, out) {
+    if (i === 0) return out.copy(HANDS);
+    const g = passGroups[i];
+    return out.set(g.position.x + 0.15, 1.35, g.position.z + 0.25);
+  }
+  let passIdx = 0, passNext = 1, passT = 0, passWait = 0.5;
+
+  // ---- roaming + rebounding ----
+  const movers = team.concat(dogs);
+  function newTarget(g) {
+    g.userData.tx = -5.5 + Math.random() * 11;
+    g.userData.tz = g.userData.zmin + Math.random() * (g.userData.zmax - g.userData.zmin);
+  }
+  // both teams roam the FULL court, so they cross paths end to end and bump
+  for (const m of team) { m.userData.spd = 1.3 + Math.random() * 0.9; m.userData.zmin = -6.2; m.userData.zmax = 8.0; m.userData.rebound = false; newTarget(m); }
+  for (const d of dogs) { d.userData.spd = 1.5 + Math.random() * 1.0; d.userData.zmin = -6.2; d.userData.zmax = 8.0; d.userData.rebound = false; newTarget(d); }
+
+  let reboundAssigned = false;
+  let foulCooldown = 0;      // stops a single bump from calling many fouls
+  let timeOut = false, timeOutT = 0;   // TIME OUT: everyone rests at the bench / dog bowls
+  let mode = "game";                   // "game" = 2-on-2, "practice" = just you and the hoop
+  // a PUPPY goes after your rebound (nearest puppy to the ball)
+  function assignRebounder() {
+    let best = null, bd = 1e9;
+    for (const g of dogs) { const dd = Math.hypot(g.position.x - ball.position.x, g.position.z - ball.position.z); if (dd < bd) { bd = dd; best = g; } }
+    if (best) best.userData.rebound = true;
+    reboundAssigned = true;
+  }
+  function moveChar(g, dt, now) {
+    let tx = g.userData.tx, tz = g.userData.tz;
+    if (g.userData.rebound) { tx = ball.position.x; tz = ball.position.z; }
+    const dx = tx - g.position.x, dz = tz - g.position.z, dist = Math.hypot(dx, dz);
+    if (dist < 0.18) {
+      if (g.userData.rebound) {
+        // a puppy grabs the loose ball -> it takes off toward its own hoop
+        if (state === "dead") { g.userData.rebound = false; dogTakeover(g); }
+      }
+      else if (!timeOut) newTarget(g);   // during a time out they stay put at the bench / bowls
+      g.position.y = 0;
+    } else {
+      const step = Math.min(dist, g.userData.spd * dt);
+      g.position.x += dx / dist * step; g.position.z += dz / dist * step;
+      g.rotation.y = Math.atan2(dx, dz);                    // face the way they walk
+      g.position.y = Math.abs(Math.sin(now / 110)) * 0.06;  // walking bob
+    }
+  }
+
+  // ---- shooting physics ----
+  const G = 9.8, FLIGHT = 1.12;
+  const GRAV_COMP = new T.Vector3(0, 0.5 * G * FLIGHT, 0);
+  // the shooter can move, so the launch is worked out from wherever her hands are now:
+  // this always reaches the rim at t=FLIGHT when strength = 1 (so the green band still holds).
+  function launchVel(out) { return out.copy(RIM).sub(HANDS).multiplyScalar(1 / FLIGHT).add(GRAV_COMP); }
+
+  let state = "held";          // held | flying | dead
+  const vel = new T.Vector3();
+  let scored = false, deadT = 0, bounces = 0, pendingFoul = false;
+  let freeThrows = 0, shotIsFT = false;
+  let shotClock = 24;                                 // 24-second shot clock
+  let gameClock = 600;                                // 10-minute quarter (seconds)
+  let gameOver3d = false;                             // has the whole game ended?
+  let quarter = 1;                                    // two 15-minute halves (1 or 2)
+  let halftime = false;                               // clock stopped for the halftime break
+  let halftimeClock = 900;                            // 15-minute halftime countdown
+  let shotForDogs = false;                            // whose shot is in the air
+  let shotRim = RIM;                                  // which hoop this shot is aimed at
+  let dogCarrier = null;                              // the puppy currently running the ball
+  let dogScore = 0;
+  let isDunk = false;                                 // (kept for compatibility)
+
+  // ---- SLAM DUNK: jump up to the rim, hang on it, slam the ball through ----
+  let dunkT = 0, dunkScored = false;
+  const _dunkStart = new T.Vector3();
+  const DUNK_HANG = new T.Vector3(0.1, 1.25, HOOP_Z + 0.85);   // floating up at the rim, hanging on
+  const DUNK_LAND = new T.Vector3(0, 0, HOOP_Z + 2.6);         // where he drops back down to
+  const DUNK_RISE = 0.45, DUNK_HOLD = 0.95, DUNK_DROP = 0.45;  // phase lengths (seconds)
+  function slamDunk() {
+    if (timeOut || gameOver3d || halftime || state !== "held" || charging) return;
+    state = "dunk"; dunkT = 0; dunkScored = false;
+    _dunkStart.copy(player.position);
+    shotClock = 24;
+    flash("SLAM DUNK!", "#ffcf5c");
+  }
+
+  function shoot(strength) {
+    if (state !== "held") return;
+    launchVel(vel).multiplyScalar(strength);          // aim at the rim from wherever she stands
+    isDunk = false;
+    state = "flying"; scored = false; bounces = 0;
+    shotForDogs = false; shotRim = RIM;               // your shot, your hoop
+    attempts++; updateStats();
+    shotIsFT = freeThrows > 0;                        // this shot is a free throw
+    pendingFoul = false;                              // fouls are turned off
+    shotClock = 24;                                   // a shot resets the clock
+    // the puppies go after the rebound the moment you let it fly
+    if (mode === "game" && !shotIsFT) { reboundAssigned = false; assignRebounder(); }
+    // little jump on the player
+    player.userData.jump = 0.25;
+  }
+
+  // a puppy grabbed your miss: it takes off toward its own hoop to shoot
+  function dogTakeover(g) {
+    dogCarrier = g; reboundAssigned = false;
+    for (const d of dogs) d.userData.rebound = false;
+    state = "dogcarry";
+    flash("PUPPY GOT IT!", "#e5533d"); ding(360, 0);
+  }
+
+  // the puppy pulls up and shoots at the other hoop (sometimes misses so you can win)
+  function dogShoot() {
+    const from = ball.position.clone();
+    const rnd = 0.9 + Math.random() * 0.22;           // a little wobble -> not every one goes in
+    vel.copy(NEAR_RIM).sub(from).multiplyScalar(1 / FLIGHT)
+      .add(new T.Vector3(0, 0.5 * G * FLIGHT, 0)).multiplyScalar(rnd);
+    state = "flying"; scored = false; bounces = 0;
+    shotForDogs = true; shotRim = NEAR_RIM;
+    dogCarrier = null;
+    flash("PUPPY SHOOTS!", "#e5533d"); ding(520, 0);
+  }
+
+  // called when a shot has come to rest
+  function onShotEnd() {
+    if (shotIsFT) {
+      shotIsFT = false; freeThrows = Math.max(0, freeThrows - 1); updateFT();
+      flash(scored ? "FREE THROW GOOD!" : "MISSED FT", scored ? "#ffcf5c" : "#e5533d");
+      resetBall();
+    } else {
+      resolveFoul();   // did this shot draw a foul? -> lines up free throws
+    }
+  }
+
+  function resetBall() {
+    ball.position.copy(HANDS); vel.set(0, 0, 0); state = "held";
+    passIdx = 0; passNext = 1; passT = 0; passWait = 0.5;   // resume passing from the shooter
+    reboundAssigned = false; shotForDogs = false; shotRim = RIM; dogCarrier = null;
+    shotClock = 24;                                        // fresh 24 on each new possession
+    for (const g of movers) g.userData.rebound = false;
+  }
+
+  // One small fixed physics step. Sub-stepping keeps the rim/floor checks
+  // accurate no matter the frame rate.
+  function stepBall(h) {
+    const prevY = ball.position.y;
+    vel.y -= G * h;
+    ball.position.addScaledVector(vel, h);
+    // dropping through the rim?
+    if (!scored && vel.y < 0 && prevY > RIM_Y && ball.position.y <= RIM_Y) {
+      const dx = ball.position.x - shotRim.x, dz = ball.position.z - shotRim.z;
+      if (dx * dx + dz * dz < scoreR * scoreR) {
+        scored = true;
+        vel.x *= 0.2; vel.z *= 0.2; vel.y *= 0.5;
+        if (shotForDogs) {
+          dogScore += 2; if (dogScoreEl) dogScoreEl.textContent = "Puppies: " + dogScore;
+          flash("PUPPIES SCORE! +2", "#e5533d"); ding(300, 0); ding(240, 0.12); rumble();
+        } else {
+          const pts = shotIsFT ? 1 : ((Math.hypot(HANDS.x, HANDS.z - HOOP_Z) > THREE_R) ? 3 : 2);
+          score += pts; scoreEl.textContent = score;
+          makes++; updateStats();
+          flash((isDunk ? "SLAM DUNK! +" : "SWISH! +") + pts, "#ffcf5c"); swishSound();
+          crowdCheer(isDunk || pts === 3); rumble();   // 4D: the arena erupts (big roar for a dunk or three)
+          isDunk = false;
+          addCoins(30);                     // 30 cents for every basket you make
+        }
+      }
+    }
+    // floor
+    if (ball.position.y <= 0.16) {
+      ball.position.y = 0.16;
+      if (bounces < 2 && Math.abs(vel.y) > 1.2) { vel.y = -vel.y * 0.5; vel.x *= 0.6; vel.z *= 0.6; bounces++; }
+      else { vel.set(0, 0, 0); if (state !== "dead") { state = "dead"; deadT = 0; if (!scored) flash("MISS", "#e5533d"); onShotEnd(); } }
+    }
+    // room walls
+    if (Math.abs(ball.position.x) > 6.5) vel.x *= -0.4;
+    if (ball.position.z < HOOP_Z - 1.2) vel.z *= -0.4;
+    if (ball.position.z > NEAR_Z + 1.2) vel.z *= -0.4;   // wall behind the puppies' hoop
+  }
+
+  // ---- power meter (oscillates, let go on the green) ----
+  let charging = false, power = 0, dir = 1;
+  const METER_SPEED = 1.0;     // how fast the bar fills
+  const fillEl = document.getElementById("fill");
+  const greenEl = document.getElementById("green");
+  const METER_W = 280;
+  // green band maps to strengths that go in; free throws widen it and the rim
+  const G_LO_N = 0.42, G_HI_N = 0.57;   // narrower green = more of a skill shot
+  const hintEl = document.getElementById("hint");
+  function setGreen(lo, hi) { greenEl.style.left = (lo * METER_W) + "px"; greenEl.style.width = ((hi - lo) * METER_W) + "px"; }
+  function updateFT() {
+    if (freeThrows > 0) { scoreR = 1.15; setGreen(0.14, 0.86); hintEl.textContent = "FREE THROW · " + freeThrows + " left · hold to shoot"; }
+    else { scoreR = 0.52; setGreen(G_LO_N, G_HI_N); hintEl.textContent = "Move: arrows / WASD · hold to shoot"; }
+  }
+  setGreen(G_LO_N, G_HI_N);
+  // compressed so the whole bar spans just short..just long, and the green
+  // middle maps to the strengths that actually go in.
+  function strengthFromPower(p) { return 0.90 + p * 0.20; }
+
+  const halfBtn = document.getElementById("halfBtn");
+  function startSecondHalf() {
+    halftime = false; halfBtn.style.display = "none";
+    flash("2ND HALF!", "#ffcf5c"); ding(659, 0);
+    hintEl.textContent = "Move: arrows / WASD · hold to shoot";
+  }
+  halfBtn.addEventListener("click", startSecondHalf);
+  function startCharge() {
+    if (timeOut || gameOver3d) return;
+    if (halftime) { startSecondHalf(); return; }       // first tap starts the 2nd half early
+    if (state !== "held" || charging) return;
+    charging = true; power = 0; dir = 1;
+  }
+  function release() {
+    if (!charging) return; charging = false;
+    fillEl.style.width = "0px";
+    shoot(strengthFromPower(power));
+  }
+
+  // ---- input ----
+  const shootBtn = document.getElementById("shootBtn");
+  shootBtn.addEventListener("pointerdown", function (e) { e.preventDefault(); startCharge(); });
+  renderer.domElement.addEventListener("pointerdown", startCharge);
+  window.addEventListener("pointerup", release);
+  window.addEventListener("keydown", function (e) { if (e.code === "Space" && !e.repeat) { e.preventDefault(); startCharge(); } });
+  window.addEventListener("keyup", function (e) { if (e.code === "Space") { e.preventDefault(); release(); } });
+  document.getElementById("backBtn").addEventListener("click", function () { location.href = "index.html"; });
+  document.getElementById("viewBtn").addEventListener("click", function () {
+    viewIdx = (viewIdx + 1) % VIEWS.length;                 // flip to the next camera angle
+    flash(VIEWS[viewIdx].name + " VIEW", "#7fb2c9"); ding(700, 0);
+  });
+
+  // ---- move the shooter around the court (arrow keys / WASD, or the on-screen pad) ----
+  const moveKeys = {};
+  const MOVE_CODES = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
+                       KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right" };
+  window.addEventListener("keydown", function (e) { if (MOVE_CODES[e.code]) { moveKeys[MOVE_CODES[e.code]] = 1; e.preventDefault(); } });
+  window.addEventListener("keyup", function (e) { if (MOVE_CODES[e.code]) { moveKeys[MOVE_CODES[e.code]] = 0; e.preventDefault(); } });
+  // on-screen arrow pad (for tablets/phones with no keyboard)
+  function padHold(dir, on) { moveKeys[dir] = on ? 1 : 0; }
+  ["up", "down", "left", "right"].forEach(function (dir) {
+    const el = document.getElementById("pad-" + dir);
+    if (!el) return;
+    el.addEventListener("pointerdown", function (e) { e.preventDefault(); padHold(dir, true); });
+    el.addEventListener("pointerup", function (e) { e.preventDefault(); padHold(dir, false); });
+    el.addEventListener("pointerleave", function () { padHold(dir, false); });
+    el.addEventListener("pointercancel", function () { padHold(dir, false); });
+  });
+  const MOVE_SPD = 3.4;
+  // keep the ball in the shooter's hands wherever he moves to
+  function updateHands() { HANDS.set(player.position.x + 0.32, 1.35, player.position.z - 0.55); }
+  function moveShooter(dt, now) {
+    if (state === "flying" || state === "dunk" || timeOut || gameOver3d || halftime) return;   // stand still during a shot / stoppage
+    let dx = (moveKeys.right ? 1 : 0) - (moveKeys.left ? 1 : 0);
+    let dz = (moveKeys.down ? 1 : 0) - (moveKeys.up ? 1 : 0);   // up = toward the far hoop (-z)
+    if (dx === 0 && dz === 0) { if (!player.userData.jump) player.position.y = 0; return; }
+    const n = Math.hypot(dx, dz); dx /= n; dz /= n;
+    player.position.x = Math.max(-5.5, Math.min(5.5, player.position.x + dx * MOVE_SPD * dt));
+    player.position.z = Math.max(-3.4, Math.min(7.8, player.position.z + dz * MOVE_SPD * dt));
+    player.rotation.y = Math.atan2(dx, dz);                    // face the way he runs
+    if (!player.userData.jump) player.position.y = Math.abs(Math.sin(now / 110)) * 0.06;  // run bob
+  }
+
+  // ---- time out: send the players to the bench and the puppies to their bowls ----
+  const toBtn = document.getElementById("toBtn");
+  function endTimeout() {
+    timeOut = false; toBtn.innerHTML = "&#9200; Time Out";
+    flash("BACK TO PLAY!", "#ffcf5c"); ding(659, 0);
+    for (const d of dogs) d.rotation.x = 0;   // stop eating, stand back up
+    for (const g of movers) newTarget(g);
+    updateFT();                       // restore the normal hint text
+  }
+  function callTimeout() {
+    if (mode === "practice") return;          // no time outs in practice
+    if (timeOut) { endTimeout(); return; }   // tap again to come back early
+    timeOut = true; timeOutT = 60;   // a full one-minute time out
+    toBtn.innerHTML = "&#9654; Resume";
+    for (let i = 0; i < team.length; i++) {
+      team[i].userData.tx = benchSpots[i][0]; team[i].userData.tz = benchSpots[i][1];
+      team[i].userData.rebound = false;
+    }
+    for (let i = 0; i < dogs.length; i++) {
+      dogs[i].userData.tx = bowlSpots[i][0]; dogs[i].userData.tz = bowlSpots[i][1];
+      dogs[i].userData.rebound = false;
+    }
+    flash("TIME OUT!", "#7fd0ff"); ding(523, 0); ding(392, 0.16);
+  }
+  toBtn.addEventListener("click", callTimeout);
+  window.addEventListener("keydown", function (e) { if (e.code === "KeyT" && !e.repeat) callTimeout(); });
+
+  // ---- practice mode: just you and the hoop, no defenders, no fouls ----
+  const modeBtn = document.getElementById("modeBtn");
+  const clockEl = document.getElementById("clock");
+  const gclockEl = document.getElementById("gclock");
+  function applyMode(m) {
+    mode = m;
+    const practice = (m === "practice");
+    for (const g of team) g.visible = !practice;      // hide teammates + puppies in practice
+    for (const d of dogs) d.visible = !practice;
+    freeThrows = 0; pendingFoul = false; timeOut = false;
+    halftime = false; halfBtn.style.display = "none";
+    shotClock = 24;
+    if (!practice) { gameClock = 600; gameOver3d = false; quarter = 1; score = 0; dogScore = 0; scoreEl.textContent = "0"; if (dogScoreEl) dogScoreEl.textContent = "Puppies: 0"; }  // fresh game, 1st half
+    toBtn.style.display = practice ? "none" : "";      // no time outs in practice
+    clockEl.style.display = practice ? "none" : "";    // no shot clock in practice
+    gclockEl.style.display = practice ? "none" : "";   // no game clock in practice
+    modeBtn.innerHTML = practice ? "&#127936; Play 2v2" : "&#127919; Practice";
+    resetBall(); updateFT();
+    if (practice) hintEl.textContent = "PRACTICE · move + hold to shoot";
+    flash(practice ? "PRACTICE MODE" : "2-ON-2 GAME", "#7fd0ff"); ding(587, 0);
+  }
+  modeBtn.addEventListener("click", function () {
+    if (mode === "game") { applyMode("practice"); return; }       // leaving a game is free
+    if (coins < GAME_COST) { flash("NEED 30 COINS · SCORE IN PRACTICE", "#ffd84a"); ding(200, 0); return; }
+    spendCoins(GAME_COST); applyMode("game"); flash("PAID 30 COINS · GAME ON!", "#6bd18a");
+  });
+
+  // pretend coin shop: tap to get 30 coins (play money only - no real charges)
+  document.getElementById("buyBtn").addEventListener("click", function () {
+    initAudio(); addCoins(30);
+    flash("BOUGHT 30 COINS! (pretend money)", "#ffd84a");
+  });
+
+  // ---- rebound: grab the loose ball and bring it straight back to shoot again ----
+  function grabRebound() {
+    // only when the ball is genuinely loose (in the air or on the floor), before a puppy carries it off
+    if (timeOut || freeThrows > 0 || !(state === "flying" || state === "dead")) return;
+    resetBall();                                                 // ball comes back to your hands
+    shotClock = 24;
+    flash("REBOUND!", "#6bd18a"); ding(784, 0);
+  }
+  document.getElementById("rebBtn").addEventListener("click", grabRebound);
+  window.addEventListener("keydown", function (e) { if (e.code === "KeyR" && !e.repeat) grabRebound(); });
+
+  // ---- block: a big defensive leap; swats a shot in the air and grabs a loose ball ----
+  function doBlock() {
+    if (timeOut) return;
+    player.userData.jump = 0.45;                 // a bigger jump than a normal shot
+    flash("BLOCK!", "#7fd0ff"); ding(300, 0); ding(220, 0.09);
+    if (state === "flying" && !scored) {          // swat the ball down out of the air (incl. a puppy's shot)
+      vel.y = Math.min(vel.y, -3); vel.x *= 0.3; vel.z *= 0.3;
+    } else if (state === "dead" && freeThrows === 0) {
+      resetBall(); shotClock = 24;                // grab the loose ball after the block
+    }
+  }
+  document.getElementById("blockBtn").addEventListener("click", doBlock);
+  window.addEventListener("keydown", function (e) { if (e.code === "KeyB" && !e.repeat) doBlock(); });
+  document.getElementById("dunkBtn").addEventListener("click", slamDunk);
+  window.addEventListener("keydown", function (e) { if (e.code === "KeyE" && !e.repeat) slamDunk(); });
+
+  // ---- steal: swipe the ball away from a puppy that's carrying it ----
+  function doSteal() {
+    if (timeOut || gameOver3d || halftime) return;
+    if (state === "dogcarry" || state === "dead") {   // take it off the puppy (or grab a loose ball)
+      resetBall(); shotClock = 24;
+      flash("STEAL!", "#6bd18a"); ding(880, 0); ding(1180, 0.08);
+    }
+  }
+  document.getElementById("stealBtn").addEventListener("click", doSteal);
+  window.addEventListener("keydown", function (e) { if (e.code === "KeyF" && !e.repeat) doSteal(); });
+
+  // ---- double team: two of your players swarm the puppy and force the turnover ----
+  function doubleTeam() {
+    if (timeOut || gameOver3d || halftime) return;
+    // works while a puppy carries the ball, or is shooting it, or it's loose
+    if (state === "dogcarry" || (state === "flying" && shotForDogs && !scored) || state === "dead") {
+      for (const m of team) { m.userData.tx = ball.position.x; m.userData.tz = ball.position.z; m.userData.rebound = false; }
+      resetBall(); shotClock = 24;                    // swarmed! the ball is yours
+      flash("DOUBLE TEAM!", "#9b8cff"); ding(700, 0); ding(500, 0.1); ding(900, 0.2);
+    }
+  }
+  document.getElementById("dblBtn").addEventListener("click", doubleTeam);
+  window.addEventListener("keydown", function (e) { if (e.code === "KeyG" && !e.repeat) doubleTeam(); });
+
+  // ---- sound + music (Web Audio, no files -> stays offline) ----
+  let actx = null, musicOn = true, musicTimer = null, musicStep = 0;
+  function initAudio() {
+    if (actx) return;
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+    if (actx.state === "suspended") actx.resume();
+    if (musicOn) startMusic();
+  }
+  window.addEventListener("pointerdown", initAudio); window.addEventListener("keydown", initAudio);
+  function ding(f, when) {
+    if (!actx) return; const t = actx.currentTime + (when || 0);
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = "triangle"; o.frequency.value = f; o.connect(g); g.connect(actx.destination);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.14, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18); o.start(t); o.stop(t + 0.2);
+  }
+  function swishSound() { ding(880, 0); ding(1320, 0.08); }
+
+  // ---- 4D: a real arena. Crowd roar + a low rumble you can feel. ----
+  let crowdOn = true;
+  let noiseBuf = null;
+  function getNoise() {
+    if (noiseBuf || !actx) return noiseBuf;
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return noiseBuf;
+  }
+  // a crowd cheer: filtered noise that swells up like a roar (bigger = louder/longer)
+  function crowdCheer(big) {
+    if (!actx || !crowdOn) return;
+    const t = actx.currentTime, dur = big ? 2.2 : 1.4, peak = big ? 0.5 : 0.32;
+    const src = actx.createBufferSource(); src.buffer = getNoise(); src.loop = true;
+    const bp = actx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 900; bp.Q.value = 0.6;
+    const g = actx.createGain();
+    src.connect(bp); bp.connect(g); g.connect(actx.destination);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(peak, t + 0.25);      // roar swells up
+    g.gain.linearRampToValueAtTime(peak * 0.8, t + dur * 0.5);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur); // then dies down
+    bp.frequency.linearRampToValueAtTime(1500, t + 0.4);
+    src.start(t); src.stop(t + dur + 0.05);
+    if (big) { for (let i = 0; i < 6; i++) whistle(t + 0.2 + Math.random() * dur * 0.6); }
+  }
+  function whistle(at) {
+    if (!actx) return; const o = actx.createOscillator(), g = actx.createGain();
+    o.type = "sine"; o.frequency.value = 2000 + Math.random() * 800;
+    o.connect(g); g.connect(actx.destination);
+    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.05, at + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.2); o.start(at); o.stop(at + 0.22);
+  }
+  // a deep rumble you can feel in the floor
+  function rumble() {
+    if (!actx || !crowdOn) return;
+    const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = "sine"; o.frequency.setValueAtTime(52, t); o.frequency.exponentialRampToValueAtTime(32, t + 0.7);
+    o.connect(g); g.connect(actx.destination);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.45, t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.8); o.start(t); o.stop(t + 0.85);
+  }
+
+  // a cheery looping tune, same idea as the 2D game
+  // new bouncy tune
+  // new punchy tune
+  const MELODY = [784,0,784,659, 880,0,880,784, 587,659,784,880, 988,880,784,0];
+  const BASS   = [196,0,131,0,   220,0,147,0,   147,0,196,0,     131,0,196,0];
+  function musicNote(freq, dur, type, vol) {
+    if (!actx || !freq) return;
+    const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq; o.connect(g); g.connect(actx.destination);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.start(t); o.stop(t + dur + 0.03);
+  }
+  function musicTick() {
+    musicNote(MELODY[musicStep], 0.18, "triangle", 0.07);
+    musicNote(BASS[musicStep], 0.22, "square", 0.045);
+    musicStep = (musicStep + 1) % MELODY.length;
+  }
+  function startMusic() { if (actx && musicOn && !musicTimer) musicTimer = setInterval(musicTick, 210); }
+  function stopMusic() { if (musicTimer) { clearInterval(musicTimer); musicTimer = null; } }
+  document.getElementById("musicBtn").addEventListener("click", function () {
+    musicOn = !musicOn; this.style.opacity = musicOn ? 1 : 0.5;
+    this.textContent = musicOn ? "♪ Music" : "♪ Off";
+    if (musicOn) { initAudio(); startMusic(); } else { stopMusic(); }
+  });
+  document.getElementById("fourDBtn").addEventListener("click", function () {
+    crowdOn = !crowdOn; this.style.opacity = crowdOn ? 1 : 0.5;
+    this.innerHTML = crowdOn ? "&#128266; 4D" : "&#128263; 4D";   // speaker on / muted
+    if (crowdOn) { initAudio(); crowdCheer(false); }              // little cheer to preview it
+  });
+
+  // ---- HUD helpers ----
+  let score = 0, makes = 0, attempts = 0, fouls = 0;
+  const scoreEl = document.getElementById("score");
+  const statsEl = document.getElementById("stats");
+  const foulsEl = document.getElementById("fouls");
+  const dogScoreEl = document.getElementById("dogscore");
+
+  // ---- coins: earn by scoring, spend to play games; saved + shared with the 2D game ----
+  const COIN_VALUE = 0.30;       // each coin is worth 30 cents
+  const GAME_COST = 30;          // a game costs 30 coins to play
+  const coinsEl = document.getElementById("coins");
+  let coins = 30;                // start with enough for one game
+  try { const s = localStorage.getItem("hoopCoins"); if (s !== null) coins = parseInt(s, 10) || 0; } catch (e) {}
+  function saveCoins() { try { localStorage.setItem("hoopCoins", coins); } catch (e) {} }
+  function renderCoins() { if (coinsEl) coinsEl.textContent = "🪙 " + coins + " · $" + (coins * COIN_VALUE).toFixed(2); }
+  function addCoins(n) {
+    coins += n; saveCoins(); renderCoins();
+    if (coinsEl) { coinsEl.className = ""; void coinsEl.offsetWidth; coinsEl.className = "pop"; }
+    ding(1046, 0); ding(1318, 0.08);            // shiny coin chime
+  }
+  function spendCoins(n) { coins = Math.max(0, coins - n); saveCoins(); renderCoins(); }
+  renderCoins();
+  function updateStats() { statsEl.textContent = "Made " + makes + " / " + attempts; }
+  // a foul gives a free-throw bonus point (an "and one" if the shot went in)
+  function resolveFoul() {
+    if (!pendingFoul) return; pendingFoul = false;
+    fouls++; foulsEl.textContent = "Fouls " + fouls;
+    freeThrows += scored ? 1 : 2;        // and-one = 1 shot; foul on a miss = 2 shots
+    flash(scored ? "AND ONE! FREE THROW" : "FOULED! 2 SHOTS", "#ff8b2c");
+    ding(660, 0); ding(880, 0.1);
+    updateFT();
+  }
+  const msgEl = document.getElementById("msg");
+  let msgT = 0;
+  function flash(text, color) { msgEl.textContent = text; msgEl.style.color = color; msgEl.style.opacity = 1; msgT = 1.1; }
+
+  // ---- main loop ----
+  let last = performance.now();
+  function tick(now) {
+    const dt = Math.min((now - last) / 1000, 0.05); last = now;
+
+    // move the shooter, then keep the ball in his hands
+    moveShooter(dt, now);
+    updateHands();
+
+    // time out countdown -> then everyone goes back to playing
+    if (timeOut) {
+      timeOutT -= dt;
+      // once a puppy reaches its bowl it dips its head down to eat + drink (nom nom)
+      for (const d of dogs) {
+        const dd = Math.hypot(d.position.x - d.userData.tx, d.position.z - d.userData.tz);
+        d.rotation.x = (dd < 0.35) ? 0.4 + Math.abs(Math.sin(now / 90)) * 0.3 : 0;
+      }
+      const s = Math.max(0, Math.ceil(timeOutT));
+      hintEl.textContent = "TIME OUT · 0:" + (s < 10 ? "0" + s : s) + " · tap Resume to play";
+      if (timeOutT <= 0) endTimeout();
+    }
+
+    // 10-minute game clock (game mode only; pauses on time outs, halftime, and when it's over)
+    if (mode === "game" && !timeOut && !gameOver3d && !halftime) {
+      gameClock -= dt;
+      if (gameClock <= 0) {
+        if (quarter < 4) {
+          // end of a quarter -> next one, scores carry over
+          quarter++; gameClock = 600; shotClock = 24;
+          resetBall();
+          if (quarter === 3) {
+            // start of the 3rd quarter = 2nd half -> HALFTIME break, clock stops
+            halftime = true; halftimeClock = 900;         // 15-minute halftime break
+            halfBtn.style.display = "block";               // show the Back to Play button
+            flash("HALFTIME!", "#7fd0ff"); ding(523, 0); ding(392, 0.16);
+          } else {
+            flash("QUARTER " + quarter + "!", "#7fd0ff"); ding(660, 0); ding(880, 0.12);
+          }
+        } else {
+          // end of the 4th quarter -> the whole game is over
+          gameClock = 0; gameOver3d = true;
+          const win = score > dogScore ? "YOU WIN! 🏀" : (score < dogScore ? "PUPPIES WIN!" : "IT'S A TIE!");
+          flash("FINAL! " + win, score >= dogScore ? "#ffcf5c" : "#e5533d");
+          hintEl.textContent = "GAME OVER · You " + score + " · Puppies " + dogScore + " · tap Practice then Play again";
+          ding(660, 0); ding(520, 0.15); ding(400, 0.3);
+          if (score > dogScore) { crowdCheer(true); rumble(); }   // 4D: crowd goes wild if you win
+        }
+      }
+    }
+    // halftime break: a 15-minute countdown; tap Shoot to start the 2nd half early
+    if (halftime && mode === "game" && !gameOver3d) {
+      halftimeClock -= dt;
+      const hs = Math.max(0, Math.ceil(halftimeClock));
+      hintEl.textContent = "HALFTIME · You " + score + " · Puppies " + dogScore +
+        " · " + Math.floor(hs / 60) + ":" + (hs % 60 < 10 ? "0" : "") + (hs % 60) + " · tap Back to Play to start now";
+      if (halftimeClock <= 0) startSecondHalf();
+    }
+    if (gclockEl) {
+      if (halftime) {
+        const hs = Math.max(0, Math.ceil(halftimeClock));
+        gclockEl.textContent = "HT " + Math.floor(hs / 60) + ":" + (hs % 60 < 10 ? "0" : "") + (hs % 60);
+        gclockEl.className = "low";
+      }
+      else {
+        const gs = Math.max(0, Math.ceil(gameClock));
+        gclockEl.textContent = "Q" + quarter + " " + Math.floor(gs / 60) + ":" + (gs % 60 < 10 ? "0" : "") + (gs % 60);
+        gclockEl.className = gs <= 60 ? "low" : "";       // last minute goes red
+      }
+    }
+
+    // 24-second shot clock: counts down all through the possession (pauses only on
+    // time outs / free throws / halftime / game over). Resets to 24 on every shot you take.
+    if (mode === "game" && !timeOut && !gameOver3d && !halftime && freeThrows === 0) {
+      shotClock -= dt;
+      if (shotClock <= 0) {
+        shotClock = 24;
+        // ran out with the ball still in your hands -> shot-clock violation, turnover
+        if (state === "held" && !charging) {
+          flash("SHOT CLOCK! 24", "#e5533d"); ding(1500, 0); ding(1100, 0.14);
+          resetBall();
+        }
+      }
+    }
+    if (clockEl) clockEl.classList.toggle("low", shotClock <= 5);
+    if (clockEl) clockEl.textContent = "0:" + (Math.ceil(Math.max(0, shotClock)) < 10 ? "0" : "") + Math.ceil(Math.max(0, shotClock));
+
+    // meter
+    if (charging) {
+      power += dir * METER_SPEED * dt;
+      if (power >= 1) { power = 1; dir = -1; }
+      if (power <= 0) { power = 0; dir = 1; }
+      fillEl.style.width = (power * METER_W) + "px";
+    }
+
+    // ball
+    if (state === "flying") {
+      const steps = Math.max(1, Math.ceil(dt / 0.004));   // fixed small sub-steps
+      const h = dt / steps;
+      for (let i = 0; i < steps && state === "flying"; i++) stepBall(h);
+      ball.rotation.x += vel.z * dt * 2; ball.rotation.z -= vel.x * dt * 2;
+    } else if (state === "dead") {
+      deadT += dt;
+      if (freeThrows > 0) { resetBall(); }        // go to the line for the free throw
+      else if (mode === "practice") { if (deadT > 1.0) resetBall(); }   // ball comes right back to you
+      else if (shotForDogs) { if (deadT > 0.7) { flash("YOUR BALL", "#ffcf5c"); resetBall(); } }  // after a puppy shot, back to you
+      else { if (!reboundAssigned && !timeOut) assignRebounder(); if (deadT > 7) resetBall(); }
+    } else if (state === "dogcarry") {
+      // the puppy dribbles the loose ball up to its own hoop, then pulls up and shoots
+      if (dogCarrier) {
+        const dx = DOG_SHOOT_SPOT.x - dogCarrier.position.x, dz = DOG_SHOOT_SPOT.z - dogCarrier.position.z;
+        const dd = Math.hypot(dx, dz);
+        if (dd > 0.3) {
+          const step = Math.min(dd, 3.4 * dt);
+          dogCarrier.position.x += dx / dd * step; dogCarrier.position.z += dz / dd * step;
+          dogCarrier.rotation.y = Math.atan2(dx, dz);
+          dogCarrier.position.y = Math.abs(Math.sin(now / 90)) * 0.06;
+          const bb = Math.abs(Math.sin(now / 130));
+          ball.position.set(dogCarrier.position.x, 0.16 + bb * 0.5, dogCarrier.position.z + 0.28);
+        } else { dogShoot(); }
+      } else { resetBall(); }
+    } else if (state === "dunk") {
+      // SLAM DUNK: jump up to the rim (rise), hang on it while the ball slams through (hold), drop back
+      dunkT += dt;
+      if (dunkT < DUNK_RISE) {
+        const e = 1 - (1 - dunkT / DUNK_RISE) * (1 - dunkT / DUNK_RISE);   // ease out
+        player.position.lerpVectors(_dunkStart, DUNK_HANG, e);
+        player.rotation.y = 0; player.rotation.x = 0;
+        for (const a of playerArms) { a.rotation.z = -a.userData.side * 2.5 * e; a.position.y = 1.0 + 0.4 * e; }
+        ball.position.set(player.position.x, player.position.y + 1.5, player.position.z - 0.2);
+      } else if (dunkT < DUNK_RISE + DUNK_HOLD) {
+        player.position.set(DUNK_HANG.x, DUNK_HANG.y + Math.sin(now / 90) * 0.05, DUNK_HANG.z);   // hang + sway
+        for (const a of playerArms) { a.rotation.z = -a.userData.side * 2.5; a.position.y = 1.4; }
+        if (!dunkScored) {
+          dunkScored = true;
+          score += 2; scoreEl.textContent = score; makes++; attempts++; updateStats(); addCoins(30);
+          flash("SLAM DUNK! +2", "#ffcf5c"); swishSound(); crowdCheer(true); rumble();
+        }
+        const bt = (dunkT - DUNK_RISE) / DUNK_HOLD;                       // ball slams down through the net
+        ball.position.set(DUNK_HANG.x, Math.max(0.16, RIM_Y - bt * 3.2), HOOP_Z + 0.34);
+      } else if (dunkT < DUNK_RISE + DUNK_HOLD + DUNK_DROP) {
+        const e = (dunkT - DUNK_RISE - DUNK_HOLD) / DUNK_DROP;
+        player.position.lerpVectors(DUNK_HANG, DUNK_LAND, e * e);
+        for (const a of playerArms) { a.rotation.z = -a.userData.side * 2.5 * (1 - e); a.position.y = 1.4 - 0.4 * e; }
+      } else {
+        for (const a of playerArms) { a.rotation.z = 0; a.position.y = 1.0; }   // arms back to sides
+        player.position.y = 0; player.rotation.x = 0;
+        state = "held"; resetBall();
+      }
+    } else {
+      // hold the ball to shoot; on free throws you keep it; otherwise the team passes it
+      if (charging || freeThrows > 0 || timeOut || mode === "practice") {
+        ball.position.copy(HANDS);
+      } else if (passWait > 0) {
+        // whoever holds the ball dribbles it (bounces it) before passing
+        passWait -= dt; handOf(passIdx, _hA);
+        const bb = Math.abs(Math.sin(now / 1000 * Math.PI * 3));   // 0=floor, 1=hand
+        ball.position.set(_hA.x, 0.16 + (_hA.y - 0.16) * bb, _hA.z);
+      } else {
+        passT += dt / 0.5;                       // ~half a second per pass
+        if (passT >= 1) {
+          passIdx = passNext; passNext = (passIdx + 1) % passGroups.length;
+          passT = 0; passWait = 0.35; handOf(passIdx, _hA); ball.position.copy(_hA);
+        } else {
+          handOf(passIdx, _hA); handOf(passNext, _hB);
+          ball.position.lerpVectors(_hA, _hB, passT);
+          ball.position.y += Math.sin(passT * Math.PI) * 0.7;   // a little arc
+        }
+      }
+    }
+
+    // little player jump + arms up on release/defense idle
+    if (player.userData.jump) {
+      player.userData.jump -= dt;
+      player.position.y = Math.max(0, Math.sin(Math.max(0, player.userData.jump) * 6) * 0.35);
+      if (player.userData.jump <= 0) { player.userData.jump = 0; player.position.y = 0; }
+    }
+    // teammates and puppies roam the court (and chase loose balls to rebound)
+    if (mode === "game") for (let i = 0; i < movers.length; i++) {
+      const g = movers[i];
+      if (g !== dogCarrier) moveChar(g, dt, now);
+      // play out a punch (puncher leans in) or a recoil (victim gets knocked back)
+      if (g.userData.punch > 0) {
+        g.userData.punch -= dt;
+        g.rotation.x = -0.6 * Math.sin(Math.max(0, g.userData.punch) / 0.35 * Math.PI);
+        g.position.x += (g.userData.pdx || 0) * dt * 1.2; g.position.z += (g.userData.pdz || 0) * dt * 1.2;
+        if (g.userData.punch <= 0) g.rotation.x = 0;
+      } else if (g.userData.recoil > 0) {
+        g.userData.recoil -= dt;
+        g.rotation.x = 0.8 * (Math.max(0, g.userData.recoil) / 0.4);
+        g.position.x += (g.userData.rdx || 0) * dt * 2.2; g.position.z += (g.userData.rdz || 0) * dt * 2.2;
+        if (g.userData.recoil <= 0) g.rotation.x = 0;
+      }
+    }
+
+    // PUNCH FOUL: two players run into each other and one throws a punch -> free throws
+    foulCooldown -= dt;
+    if (foulCooldown <= 0 && !timeOut && freeThrows === 0 && mode === "game" && state !== "dogcarry") {
+      let a = null, b = null;
+      for (let i = 0; i < movers.length && !a; i++)
+        for (let j = i + 1; j < movers.length && !a; j++) {
+          const m = movers[i], n = movers[j];
+          if (Math.hypot(m.position.x - n.position.x, m.position.z - n.position.z) < 0.8) { a = m; b = n; }
+        }
+      if (a) {
+        // direction from the puncher (a) toward the victim (b)
+        let dx = (b.position.x - a.position.x) || 0.1, dz = (b.position.z - a.position.z) || 0.1;
+        const d = Math.hypot(dx, dz); dx /= d; dz /= d;
+        a.userData.punch = 0.35; a.userData.pdx = dx; a.userData.pdz = dz;      // jab forward
+        b.userData.recoil = 0.4; b.userData.rdx = dx; b.userData.rdz = dz;      // knocked back
+        newTarget(a); newTarget(b);
+        ding(180, 0); ding(150, 0.12);                                          // a low "POW"
+        // it draws a foul: 2 easy free throws if the ball is in your hands
+        if (state === "held" && !charging) { freeThrows += 2; flash("PUNCH FOUL! 2 SHOTS", "#ff5a3c"); updateFT(); }
+        else flash("PUNCH FOUL!", "#ff5a3c");
+        foulCooldown = 3.0;
+      }
+    }
+
+    // message fade
+    if (msgT > 0) { msgT -= dt; if (msgT <= 0) msgEl.style.opacity = 0; }
+
+    // camera: use the chosen view (courtside gets a gentle drift for a 3D feel)
+    const V = VIEWS[viewIdx];
+    camera.position.set(V.pos[0] + (V.drift ? Math.sin(now / 4000) * 0.7 : 0), V.pos[1], V.pos[2]);
+    camera.lookAt(V.look[0], V.look[1], V.look[2]);
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(tick);
+  }
+  applyMode("practice");        // start free in Practice; tap Play 2v2 (30 coins) for a game
+  requestAnimationFrame(tick);
+
+  window.addEventListener("resize", function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+})();
+</script>
+</body>
+</html>
