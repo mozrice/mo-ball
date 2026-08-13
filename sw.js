@@ -1,6 +1,6 @@
 // Service worker: lets Hoop Shot open with no internet connection.
 // Bump CACHE when you change the game so phones pick up the new version.
-const CACHE = "hoop-shot-v49";
+const CACHE = "hoop-shot-v56";
 const FILES = [
   "./",
   "./index.html",
