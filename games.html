@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MO ARCADE — All Games</title>
+<style>
+  :root{ --bg:#0e1424; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;min-height:100%;background:radial-gradient(1200px 800px at 50% -10%, #22314f, #0e1424 70%);font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;}
+  header{text-align:center;padding:26px 14px 6px;}
+  header h1{margin:0;font-size:34px;letter-spacing:1px;color:#ffcf5a;text-shadow:0 3px 0 #0007;}
+  header p{margin:6px 0 0;color:#bcd0ea;font-size:15px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;max-width:1000px;margin:20px auto;padding:0 16px 40px;}
+  a.card{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:#12203a;
+    background:linear-gradient(#ffffff,#dfe8f4);border-radius:18px;padding:18px 10px;min-height:120px;box-shadow:0 6px 0 #0006, 0 10px 24px #0006;transition:transform .08s;}
+  a.card:active{transform:translateY(4px);box-shadow:0 2px 0 #0006, 0 6px 14px #0006;}
+  a.card .emo{font-size:44px;line-height:1;}
+  a.card .name{margin-top:10px;font-weight:bold;font-size:15px;text-align:center;color:#16233c;}
+  a.card .tag{position:absolute;top:8px;right:8px;background:#e0453a;color:#fff;font-size:10px;font-weight:bold;padding:3px 7px;border-radius:20px;}
+  a.card.big{background:linear-gradient(#ffe07a,#f0b429);}
+  footer{text-align:center;color:#8ea4c4;font-size:12px;padding:0 0 30px;}
+</style>
+</head>
+<body>
+  <header>
+    <h1>🏀 MO ARCADE</h1>
+    <p>Tap a game to play! Made by Morgan 🎮</p>
+  </header>
+  <div class="grid" id="grid"></div>
+  <footer>MO ARCADE • all your games in one place</footer>
+<script>
+  var GAMES=[
+    {u:"index.html", e:"🏀", n:"Hoop Shot", big:1},
+    {u:"hoop-shot-3d.html", e:"🏀", n:"Hoop Shot 3D", big:1},
+    {u:"mo-city-walk-3d/mo-city-walk-3d.html", e:"🏙️", n:"Mo City 3D", tag:"NEW"},
+    {u:"mo-hoop-builder/mo-hoop-builder.html", e:"🏀", n:"Hoop Builder", tag:"NEW"},
+    {u:"mo-draw/mo-draw.html", e:"🎨", n:"Mo Draw", tag:"NEW"},
+    {u:"mo-subway/mo-subway.html", e:"🚇", n:"Mo Subway"},
+    {u:"mo-court-build/mo-court-build.html", e:"🏀", n:"Court Builder"},
+    {u:"mo-1on1/mo-1on1.html", e:"🤾", n:"Mo 1-on-1"},
+    {u:"mo-football/mo-football.html", e:"🏈", n:"Mo Football"},
+    {u:"mo-soccer/mo-soccer.html", e:"⚽", n:"Mo Soccer"},
+    {u:"mo-swim/mo-swim.html", e:"🏊", n:"Mo Swim"},
+    {u:"mo-drive/mo-drive.html", e:"🚗", n:"Mo Drive"},
+    {u:"mo-plane-3d/mo-plane-3d.html", e:"✈️", n:"Mo Plane 3D"},
+    {u:"mo-flyer/mo-flyer.html", e:"🛩️", n:"Mo Flyer"},
+    {u:"mo-boat-3d/mo-boat-3d.html", e:"⛵", n:"Mo Boat 3D"},
+    {u:"mo-bus-3d/mo-bus-3d.html", e:"🚌", n:"Mo Bus 3D"},
+    {u:"mo-train-city-3d/mo-train-city-3d.html", e:"🚆", n:"Mo Train City"},
+    {u:"mo-city-3d/mo-city-3d.html", e:"🌆", n:"Mo City 3D (old)"},
+    {u:"mo-city-open/mo-city-open.html", e:"🗺️", n:"Mo City Open"},
+    {u:"mohouse-build/mohouse-build.html", e:"🏠", n:"House Builder"},
+    {u:"mo-build/mo-build.html", e:"🧱", n:"Mo Build"},
+    {u:"mo-chef/mo-chef.html", e:"👨‍🍳", n:"Mo Chef"},
+    {u:"mo-garden/mo-garden.html", e:"🌻", n:"Mo Garden"},
+    {u:"mo-jigsaw/mo-jigsaw.html", e:"🧩", n:"Mo Jigsaw"},
+    {u:"mo-sling/mo-sling.html", e:"🎯", n:"Mo Sling"},
+    {u:"mo-stars/mo-stars.html", e:"⭐", n:"Mo Stars"},
+    {u:"mo-crowd/mo-crowd.html", e:"👥", n:"Mo Crowd"},
+    {u:"mo/mo.html", e:"🟠", n:"Mo"}
+  ];
+  var g=document.getElementById("grid");
+  GAMES.forEach(function(x){ var a=document.createElement("a"); a.href=x.u; a.className="card"+(x.big?" big":"");
+    a.innerHTML=(x.tag?'<span class="tag">'+x.tag+'</span>':'')+'<span class="emo">'+x.e+'</span><span class="name">'+x.n+'</span>';
+    g.appendChild(a); });
+</script>
+</body>
+</html>
