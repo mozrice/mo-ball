@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>MO STARS</title>
+<style>
+  html,body { margin:0; height:100%; background:#0a0a24; overflow:hidden; font-family:'Trebuchet MS',system-ui,sans-serif; }
+  #stage { position:absolute; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; touch-action:manipulation; }
+  #hud { position:absolute; top:12px; left:0; right:0; z-index:3; text-align:center; pointer-events:none; color:#fff; }
+  #big { font-size:clamp(30px,9vw,64px); font-weight:900; text-shadow:0 0 18px #ffe45c99, 0 3px 4px #000; color:#ffe45c; }
+  #rate { font-size:16px; font-weight:bold; opacity:.92; text-shadow:0 2px 3px #000; }
+  #shop { position:absolute; left:0; right:0; bottom:0; z-index:4; display:flex; gap:8px; overflow-x:auto;
+    padding:10px 10px calc(10px + env(safe-area-inset-bottom)); background:linear-gradient(#161636,#0c0c22); border-top:3px solid #33336a; }
+  .up { flex:0 0 auto; width:132px; border:none; border-radius:14px; padding:9px 8px; cursor:pointer; color:#fff; text-align:center;
+    background:linear-gradient(#2a2a5a,#1a1a40); box-shadow:0 4px 0 #101030; }
+  .up:active { transform:translateY(3px); box-shadow:0 1px 0 #101030; }
+  .up:disabled { filter:grayscale(.6) brightness(.7); cursor:default; }
+  .up .ti { font-size:14px; font-weight:800; }
+  .up .ds { font-size:11px; opacity:.85; margin:2px 0; }
+  .up .co { font-size:13px; font-weight:800; color:#ffe45c; }
+  .up .lv { font-size:10px; opacity:.8; }
+  .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; z-index:6; background:#06061acc; }
+  .overlay.hide { display:none; }
+  .card { background:#161636ee; border:3px solid #ffe45c; border-radius:22px; padding:22px 26px; max-width:90%; color:#fff; box-shadow:0 20px 60px #000a; }
+  .card h1 { margin:0 0 6px; font-size:30px; color:#ffe45c; text-shadow:0 0 14px #ffe45c66; }
+  .card p { margin:8px 0; line-height:1.35; }
+  .big2 { margin-top:14px; padding:14px 28px; font-size:20px; font-weight:bold; background:linear-gradient(#ffe07a,#f0b429); color:#5a3d00;
+    border:none; border-radius:14px; box-shadow:0 4px 0 #b8922a; cursor:pointer; }
+  .big2:active { transform:translateY(4px); box-shadow:0 1px 0 #b8922a; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hud"><div id="big">0</div><div id="rate">tap the star! ⭐</div></div>
+  <div id="shop"></div>
+  <div class="overlay" id="startOv">
+    <div class="card">
+      <h1>⭐ MO STARS ⭐</h1>
+      <p>Tap the giant star to collect stars!</p>
+      <p>Buy <b>upgrades</b> to earn faster — go from thousands to millions, billions, trillions… all the way to <b>GAZILLIONS!</b> 🌌</p>
+      <button class="big2" id="startBtn">▶ START TAPPING</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), ctx=cv.getContext("2d"), stage=document.getElementById("stage");
+  var DPR=Math.min(2, window.devicePixelRatio||1);
+  var W=0,H=0;
+  function resize(){ W=stage.clientWidth; H=stage.clientHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener("resize",resize); resize();
+
+  var AC=null; function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||"sine"; o.frequency.value=f; g.gain.value=v||0.06; o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1)); o.stop(a.currentTime+(d||0.1)+0.02); }
+  function tapSfx(){ beep(880+Math.random()*300,0.05,"triangle",0.05); }
+  function buySfx(){ beep(660,0.07,"square",0.07); setTimeout(function(){beep(990,0.09,"square",0.07);},70); }
+  function miloSfx(){ beep(523,0.1,"sine",0.09); setTimeout(function(){beep(659,0.1,"sine",0.09);},110); setTimeout(function(){beep(784,0.1,"sine",0.09);},220); setTimeout(function(){beep(1046,0.16,"sine",0.09);},330); }
+
+  // ---- huge-number formatting ----
+  var SUF=["","K","M","B","T","Qa","Qi","Sx","Sp","Oc","No","Dc","UDc","DDc","TDc","QaDc","QiDc","SxDc","SpDc","OcDc","NoDc","Vg","UVg","DVg","TVg","QaVg","QiVg","SxVg","SpVg","OcVg","NoVg","Tg"];
+  var NICK={5:"quadrillion",8:"septillion",11:"decillion",14:"quattuordecillion",21:"vigintillion"};
+  function fmt(n){ if(n<1000) return Math.floor(n).toLocaleString();
+    var i=Math.floor(Math.log10(n)/3); if(i<0)i=0;
+    if(i<SUF.length){ var s=n/Math.pow(10,i*3); return (s>=100?s.toFixed(0):s.toFixed(2))+SUF[i]; }
+    return n.toExponential(2).replace("e+","e"); }
+
+  var mode="start";
+  var stars, perClick, perSec, mult, parts, floats, tier, banner, bannerT, starPh, tapPop;
+  var UPS=[
+    {id:"tap",  ti:"✨ Bigger Taps", ds:"+1 per tap",  base:15,   g:1.15, lv:0, per:function(){ perClick+=1; }},
+    {id:"auto", ti:"🤖 Auto Catcher",ds:"+1 / sec",    base:60,   g:1.15, lv:0, per:function(){ perSec+=1; }},
+    {id:"mag",  ti:"🧲 Star Magnet", ds:"+15 / sec",   base:1200, g:1.17, lv:0, per:function(){ perSec+=15; }},
+    {id:"gal",  ti:"🌌 Galaxy Farm", ds:"+400 / sec",  base:60000,g:1.19, lv:0, per:function(){ perSec+=400; }},
+    {id:"rkt",  ti:"🚀 Rocket x2",   ds:"×2 EVERYTHING",base:25000,g:6,    lv:0, per:function(){ mult*=2; }},
+    {id:"bang", ti:"💥 Big Bang x5", ds:"×5 EVERYTHING",base:5e6,  g:10,   lv:0, per:function(){ mult*=5; }}
+  ];
+  function load(){ try{ var s=JSON.parse(localStorage.getItem("moStars")); if(s){ stars=s.stars||0; UPS.forEach(function(u){ u.lv=(s.lv&&s.lv[u.id])||0; }); return true; } }catch(e){} return false; }
+  function save(){ try{ var lv={}; UPS.forEach(function(u){ lv[u.id]=u.lv; }); localStorage.setItem("moStars",JSON.stringify({stars:stars,lv:lv})); }catch(e){} }
+
+  function recompute(){ perClick=1; perSec=0; mult=1;
+    UPS.forEach(function(u){ for(var i=0;i<u.lv;i++) u.per(); }); }
+  function cost(u){ return Math.floor(u.base*Math.pow(u.g,u.lv)); }
+
+  function init(){ stars=0; parts=[]; floats=[]; tier=0; banner=""; bannerT=0; starPh=0; tapPop=0;
+    UPS.forEach(function(u){ u.lv=0; }); load(); recompute(); buildShop(); refreshShop(); }
+
+  // shop
+  var shopEl=document.getElementById("shop");
+  function buildShop(){ shopEl.innerHTML=""; UPS.forEach(function(u){ var b=document.createElement("button"); b.className="up"; b.dataset.id=u.id;
+    b.innerHTML='<div class="ti">'+u.ti+'</div><div class="ds">'+u.ds+'</div><div class="co" data-co></div><div class="lv" data-lv></div>';
+    b.onclick=function(){ buy(u); }; shopEl.appendChild(u._el=b); }); }
+  function refreshShop(){ UPS.forEach(function(u){ if(!u._el)return; u._el.querySelector("[data-co]").textContent="🪙 "+fmt(cost(u)); u._el.querySelector("[data-lv]").textContent=(u.id==="rkt"||u.id==="bang")?("owned "+u.lv):("Lv "+u.lv); u._el.disabled = stars<cost(u); }); }
+  function buy(u){ var c=cost(u); if(stars<c) return; ac(); stars-=c; u.lv++; recompute(); buySfx(); save(); refreshShop();
+    floats.push({x:W/2,y:H*0.30,txt:u.ti.replace(/^[^ ]+ /,"")+"!",col:"#8fd3ff",life:40}); }
+
+  document.getElementById("startBtn").onclick=function(){ ac(); mode="play"; document.getElementById("startOv").classList.add("hide"); };
+
+  // tap the star
+  function starHit(x,y){ var r=Math.min(W,H)*0.20; var cx=W/2, cy=H*0.46; return (x-cx)*(x-cx)+(y-cy)*(y-cy) < r*r*1.3; }
+  function doTap(x,y){ if(mode!=="play") return;
+    var gain=perClick*mult; stars+=gain; tapSfx(); tapPop=8; starPh+=0.5;
+    floats.push({x:x,y:y,txt:"+"+fmt(gain),col:"#ffe45c",life:34});
+    for(var i=0;i<8;i++){ var a=Math.random()*6.28, sp=2+Math.random()*4; parts.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,life:22+Math.random()*14,r:3+Math.random()*4,col:["#ffe45c","#fff","#ffd24a","#8fd3ff"][Math.floor(Math.random()*4)]}); }
+    refreshShop();
+  }
+  function relXY(e){ var r=cv.getBoundingClientRect(); var t=e.touches&&e.touches[0]?e.touches[0]:e; return {x:(t.clientX-r.left)*(W/r.width), y:(t.clientY-r.top)*(H/r.height)}; }
+  stage.addEventListener("mousedown",function(e){ ac(); var p=relXY(e); if(starHit(p.x,p.y)) doTap(p.x,p.y); });
+  stage.addEventListener("touchstart",function(e){ ac(); var p=relXY(e); if(starHit(p.x,p.y)){ doTap(p.x,p.y); } },{passive:true});
+
+  var last=0, acc=0, saveT=0;
+  function frame(ts){ var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts;
+    if(mode==="play"){
+      stars += (perSec*mult)*(dt/60);
+      if(tapPop>0)tapPop-=dt; starPh+=0.02*dt;
+      // milestone when crossing a new suffix tier
+      var t = stars>=1000 ? Math.floor(Math.log10(stars)/3) : 0;
+      if(t>tier){ tier=t; banner=fmt(Math.pow(10,tier*3))+" STARS!"; bannerT=140; miloSfx();
+        for(var i=0;i<50;i++){ var a=Math.random()*6.28, sp=2+Math.random()*5; parts.push({x:W/2,y:H*0.30,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:50+Math.random()*30,r:3+Math.random()*4,col:["#ffe45c","#fff","#8fd3ff","#ff8ad0","#8fe27a"][Math.floor(Math.random()*5)]}); } }
+      if(bannerT>0)bannerT-=dt;
+      for(var p=parts.length-1;p>=0;p--){ var pa=parts[p]; pa.x+=pa.vx*dt; pa.y+=pa.vy*dt; pa.vy+=0.14*dt; pa.life-=dt; if(pa.life<=0)parts.splice(p,1); }
+      for(var f=floats.length-1;f>=0;f--){ var fl=floats[f]; fl.y-=1.0*dt; fl.life-=dt; if(fl.life<=0)floats.splice(f,1); }
+      acc+=dt; if(acc>6){ acc=0; refreshShop(); }
+      saveT+=dt; if(saveT>180){ saveT=0; save(); }
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  function render(){
+    // deep-space gradient
+    var g=ctx.createRadialGradient(W/2,H*0.46,10,W/2,H*0.5,Math.max(W,H)*0.8); g.addColorStop(0,"#1a1a4e"); g.addColorStop(1,"#06061a"); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // starfield
+    for(var s=0;s<70;s++){ var sx=(s*137.5)%W, sy=(s*89.3)%(H*0.9); var tw=0.4+0.6*Math.abs(Math.sin(last/500+s)); ctx.globalAlpha=tw*0.7; ctx.fillStyle="#fff"; ctx.fillRect(sx,sy,2,2); } ctx.globalAlpha=1;
+
+    // particles (behind star)
+    for(var p=0;p<parts.length;p++){ var pa=parts[p]; ctx.globalAlpha=Math.max(0,pa.life/40); drawStar(pa.x,pa.y,pa.r,pa.r*0.5,pa.col); } ctx.globalAlpha=1;
+
+    // giant star
+    var cx=W/2, cy=H*0.46, R=Math.min(W,H)*0.20*(1+(tapPop>0?Math.sin((8-tapPop)/8*Math.PI)*0.10:0));
+    ctx.save(); ctx.globalCompositeOperation="lighter"; var gl=ctx.createRadialGradient(cx,cy,R*0.4,cx,cy,R*2.1); gl.addColorStop(0,"rgba(255,228,92,0.5)"); gl.addColorStop(1,"rgba(255,228,92,0)"); ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(cx,cy,R*2.1,0,7); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(Math.sin(starPh)*0.06);
+    drawStar(0,0,R,R*0.45,"#ffe45c","#f0b429");
+    // face
+    ctx.fillStyle="#7a5410"; ctx.beginPath(); ctx.arc(-R*0.18,-R*0.05,R*0.06,0,7); ctx.arc(R*0.18,-R*0.05,R*0.06,0,7); ctx.fill();
+    ctx.strokeStyle="#7a5410"; ctx.lineWidth=R*0.05; ctx.beginPath(); ctx.arc(0,R*0.05,R*0.22,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle="rgba(255,255,255,0.9)"; ctx.font="bold "+Math.round(R*0.22)+"px 'Trebuchet MS',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("TAP!", cx, cy+R*1.35);
+
+    // floating +N
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    for(var f=0;f<floats.length;f++){ var fl=floats[f]; ctx.globalAlpha=Math.max(0,fl.life/40); ctx.font="bold 20px 'Trebuchet MS',sans-serif"; ctx.lineWidth=5; ctx.strokeStyle="#06061a"; ctx.strokeText(fl.txt,fl.x,fl.y); ctx.fillStyle=fl.col; ctx.fillText(fl.txt,fl.x,fl.y); } ctx.globalAlpha=1;
+
+    // milestone banner
+    if(bannerT>0){ ctx.save(); ctx.globalAlpha=Math.min(1,bannerT/25); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.font="bold 30px 'Trebuchet MS',sans-serif";
+      ctx.lineWidth=7; ctx.strokeStyle="#06061a"; ctx.strokeText("🎉 "+banner,W/2,H*0.20); ctx.fillStyle="#ffe45c"; ctx.fillText("🎉 "+banner,W/2,H*0.20); ctx.restore(); }
+
+    // HUD numbers
+    document.getElementById("big").textContent = fmt(stars);
+    document.getElementById("rate").textContent = "⭐ "+fmt(perSec*mult)+"/sec   •   +"+fmt(perClick*mult)+" per tap";
+  }
+  function drawStar(x,y,ro,ri,fill,stroke){ ctx.beginPath(); for(var i=0;i<10;i++){ var r=(i%2?ri:ro), a=i*Math.PI/5-Math.PI/2; ctx.lineTo(x+Math.cos(a)*r,y+Math.sin(a)*r); } ctx.closePath(); ctx.fillStyle=fill; ctx.fill(); if(stroke){ctx.strokeStyle=stroke; ctx.lineWidth=ro*0.08; ctx.stroke();} }
+
+  init(); mode="start";
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

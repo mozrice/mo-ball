@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>MO DRAW</title>
+<style>
+  html,body { margin:0; height:100%; background:#12101c; overflow:hidden; font-family:'Trebuchet MS',system-ui,sans-serif; -webkit-user-select:none; user-select:none; touch-action:none; }
+  #wrap { position:absolute; inset:0; display:flex; flex-direction:column; }
+  #top { display:flex; align-items:center; gap:8px; padding:8px 12px; background:linear-gradient(#2a2440,#1a1630); color:#fff; }
+  #top h1 { margin:0; font-size:20px; color:#ffd93d; }
+  #top .sp { margin-left:auto; }
+  .tbtn { padding:8px 12px; border:none; border-radius:12px; font-weight:bold; font-size:15px; cursor:pointer; color:#fff; box-shadow:0 3px 0 #0005; }
+  .tbtn:active { transform:translateY(3px); box-shadow:0 0 0 #0005; }
+  #clearBtn { background:#e0453a; } #saveBtn { background:#37b06a; } #fillBtn { background:#3a86e0; } #undoBtn { background:#8a63d2; }
+  #stage { flex:1; position:relative; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; background:#fff; }
+  #tools { display:flex; flex-wrap:wrap; align-items:center; gap:7px; padding:8px 10px; background:linear-gradient(#1a1630,#2a2440); }
+  .sw { width:34px; height:34px; border-radius:50%; border:3px solid #ffffff44; cursor:pointer; box-shadow:0 2px 4px #0006; }
+  .sw.sel { border-color:#fff; transform:scale(1.16); }
+  .tool { min-width:40px; height:38px; padding:0 10px; border:none; border-radius:12px; background:#3a3450; color:#fff; font-size:19px; font-weight:bold; cursor:pointer; }
+  .tool.sel { background:#ffd93d; color:#3a2a00; }
+  .size { width:38px; height:38px; border-radius:50%; border:none; background:#3a3450; color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .size.sel { background:#ffd93d; }
+  .size i { display:block; border-radius:50%; background:currentColor; color:#fff; }
+  .size.sel i { color:#3a2a00; }
+  #hint { position:absolute; top:8px; left:50%; transform:translateX(-50%); background:#0009; color:#fff; padding:6px 14px; border-radius:20px; font-size:13px; pointer-events:none; transition:opacity .5s; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="top">
+    <h1>🎨 MO DRAW</h1>
+    <button class="tbtn" id="undoBtn">↩ Undo</button>
+    <button class="tbtn" id="fillBtn">🪣 Fill</button>
+    <button class="tbtn" id="clearBtn">🗑 Clear</button>
+    <span class="sp"></span>
+    <button class="tbtn" id="saveBtn">💾 Save</button>
+  </div>
+  <div id="stage">
+    <canvas id="c"></canvas>
+    <div id="hint">Draw with your finger or mouse! ✏️</div>
+  </div>
+  <div id="tools"></div>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById("c"), ctx=cv.getContext("2d"), stage=document.getElementById("stage");
+  var DPR=Math.max(1,Math.min(2,window.devicePixelRatio||1)), W=0,H=0;
+  var snaps=[]; // undo history (data urls)
+  function resize(){
+    // preserve drawing across resize
+    var prev=null; if(W>0){ try{ prev=document.createElement("canvas"); prev.width=cv.width; prev.height=cv.height; prev.getContext("2d").drawImage(cv,0,0);}catch(e){} }
+    W=stage.clientWidth; H=stage.clientHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    if(prev){ ctx.drawImage(prev,0,0,prev.width,prev.height,0,0,W,H); } else { ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,W,H); }
+  }
+  window.addEventListener("resize",resize);
+
+  var COLORS=["#000000","#ffffff","#e0453a","#ff7f27","#ffd93d","#37b06a","#2f8f5a","#3a86e0","#1f4fa0","#8a63d2","#e86bb0","#8a5a2a","#b8b8c0","#00c8c8"];
+  var color="#000000", size=8, tool="brush", rainbow=false, stamp=null, hue=0;
+  var STAMPS=["⭐","🏀","❤️","😀","🌈","🌟","⚡","🐶","🍕","🎈","🌸","🦋"];
+
+  var tools=document.getElementById("tools");
+  // colors
+  COLORS.forEach(function(c,i){ var d=document.createElement("div"); d.className="sw"+(i===0?" sel":""); d.style.background=c; d.dataset.c=c;
+    d.onclick=function(){ selColor(c,d); }; tools.appendChild(d); });
+  function selColor(c,el){ color=c; tool="brush"; rainbow=false; stamp=null; document.querySelectorAll(".sw").forEach(function(s){s.classList.remove("sel");}); if(el)el.classList.add("sel"); syncTools(); }
+  // rainbow
+  var rb=document.createElement("button"); rb.className="tool"; rb.textContent="🌈"; rb.title="Rainbow"; rb.onclick=function(){ rainbow=true; tool="brush"; stamp=null; syncTools(); }; tools.appendChild(rb);
+  // eraser
+  var er=document.createElement("button"); er.className="tool"; er.textContent="🧽"; er.title="Eraser"; er.onclick=function(){ tool="eraser"; rainbow=false; stamp=null; syncTools(); }; tools.appendChild(er);
+  // sizes
+  [4,8,16,30].forEach(function(s,i){ var b=document.createElement("button"); b.className="size"+(i===1?" sel":""); b.dataset.s=s;
+    var dot=Math.min(26,s+4); b.innerHTML='<i style="width:'+dot+'px;height:'+dot+'px"></i>';
+    b.onclick=function(){ size=s; document.querySelectorAll(".size").forEach(function(x){x.classList.remove("sel");}); b.classList.add("sel"); }; tools.appendChild(b); });
+  // stamps
+  STAMPS.forEach(function(s){ var b=document.createElement("button"); b.className="tool"; b.textContent=s; b.onclick=function(){ stamp=s; tool="stamp"; rainbow=false; syncTools(); }; tools.appendChild(b); });
+
+  function syncTools(){ rb.classList.toggle("sel",rainbow); er.classList.toggle("sel",tool==="eraser");
+    document.querySelectorAll(".tool").forEach(function(t){ if(t!==rb&&t!==er) t.classList.toggle("sel", tool==="stamp"&&stamp===t.textContent); }); }
+
+  function pushSnap(){ try{ snaps.push(cv.toDataURL()); if(snaps.length>25) snaps.shift(); }catch(e){} }
+
+  var drawing=false, lx=0, ly=0, moved=false;
+  function pos(e){ var r=cv.getBoundingClientRect(); var t=e.touches&&e.touches[0]?e.touches[0]:e; return {x:(t.clientX-r.left), y:(t.clientY-r.top)}; }
+  function start(e){ if(e.cancelable)e.preventDefault(); var p=pos(e); pushSnap(); hideHint();
+    if(tool==="stamp"&&stamp){ drawStamp(p.x,p.y); return; }
+    drawing=true; lx=p.x; ly=p.y; moved=false; dot(p.x,p.y);
+  }
+  function move(e){ if(!drawing)return; if(e.cancelable)e.preventDefault(); var p=pos(e); moved=true; line(lx,ly,p.x,p.y); lx=p.x; ly=p.y; }
+  function end(){ drawing=false; }
+  function strokeStyle(){ if(tool==="eraser") return "#ffffff"; if(rainbow){ hue=(hue+8)%360; return "hsl("+hue+",85%,55%)"; } return color; }
+  function dot(x,y){ ctx.fillStyle=strokeStyle(); ctx.beginPath(); ctx.arc(x,y,size/2,0,7); ctx.fill(); }
+  function line(x1,y1,x2,y2){ ctx.strokeStyle=strokeStyle(); ctx.lineWidth=size; ctx.lineCap="round"; ctx.lineJoin="round"; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
+  function drawStamp(x,y){ ctx.font=(size*3.4+18)+"px serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(stamp,x,y); }
+
+  cv.addEventListener("mousedown",start); window.addEventListener("mousemove",move); window.addEventListener("mouseup",end);
+  cv.addEventListener("touchstart",start,{passive:false}); cv.addEventListener("touchmove",move,{passive:false}); window.addEventListener("touchend",end);
+
+  document.getElementById("clearBtn").onclick=function(){ pushSnap(); ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,W,H); };
+  document.getElementById("fillBtn").onclick=function(){ pushSnap(); ctx.fillStyle=(tool==="eraser"?"#ffffff":color); ctx.fillRect(0,0,W,H); };
+  document.getElementById("undoBtn").onclick=function(){ if(!snaps.length)return; var d=snaps.pop(); var img=new Image(); img.onload=function(){ ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cv.width,cv.height); ctx.drawImage(img,0,0); ctx.setTransform(DPR,0,0,DPR,0,0); }; img.src=d; };
+  document.getElementById("saveBtn").onclick=function(){ try{ var a=document.createElement("a"); a.download="mo-drawing.png"; a.href=cv.toDataURL("image/png"); a.click(); }catch(e){ alert("Saved to your screen — long-press the picture to save it!"); } };
+
+  var hint=document.getElementById("hint"), ht=setTimeout(hideHint,4000);
+  function hideHint(){ hint.style.opacity="0"; clearTimeout(ht); }
+
+  resize();
+})();
+</script>
+</body>
+</html>

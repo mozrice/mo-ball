@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>MO BOAT 3D</title>
+<style>
+  html,body { margin:0; height:100%; background:#08243a; overflow:hidden; font-family:'Trebuchet MS',system-ui,sans-serif; }
+  #stage { position:absolute; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+  #hud { position:absolute; top:10px; left:12px; right:12px; z-index:3; display:flex; gap:10px; align-items:center; color:#fff; font-weight:bold; text-shadow:0 2px 3px #0009; }
+  #hud .pill { background:linear-gradient(#0e3a5ecc,#082439cc); padding:6px 12px; border-radius:20px; border:1px solid #ffffff22; font-size:16px; pointer-events:none; }
+  #sailBtn { margin-left:auto; border:none; border-radius:20px; padding:9px 18px; font-size:16px; font-weight:800; cursor:pointer;
+    background:linear-gradient(#5ec06a,#2f8a3e); color:#fff; box-shadow:0 3px 0 #1f6e2e; }
+  #sailBtn:active { transform:translateY(3px); box-shadow:0 1px 0 #1f6e2e; }
+  #panel { position:absolute; left:0; right:0; bottom:0; z-index:4; background:linear-gradient(#0e2a42,#08202f); border-top:3px solid #205074;
+    padding:8px 8px calc(8px + env(safe-area-inset-bottom)); }
+  #panel.hide { display:none; }
+  #parts { display:flex; gap:7px; overflow-x:auto; }
+  .p { flex:0 0 auto; width:70px; border:none; border-radius:12px; padding:6px 4px; cursor:pointer; color:#fff; text-align:center; background:linear-gradient(#1e4560,#0e2536); box-shadow:0 3px 0 #06131e; }
+  .p.on { outline:3px solid #ffe45c; }
+  .p:active { transform:translateY(3px); box-shadow:0 1px 0 #06131e; }
+  .p .ic { font-size:24px; } .p .nm { font-size:10px; font-weight:800; }
+  .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; z-index:6; background:#04141fcc; }
+  .overlay.hide { display:none; }
+  .card { background:#0e2a42ee; border:3px solid #6cd0ff; border-radius:22px; padding:22px 26px; max-width:90%; color:#fff; box-shadow:0 20px 60px #000a; }
+  .card h1 { margin:0 0 6px; font-size:28px; color:#8fe3ff; }
+  .card p { margin:8px 0; line-height:1.35; }
+  .big { margin-top:14px; padding:14px 28px; font-size:20px; font-weight:bold; background:linear-gradient(#ffe07a,#f0b429); color:#5a3d00; border:none; border-radius:14px; box-shadow:0 4px 0 #b8922a; cursor:pointer; }
+  .big:active { transform:translateY(4px); box-shadow:0 1px 0 #b8922a; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hud">
+    <div class="pill" id="parts0">🚢 MO BOAT 3D</div>
+    <button id="sailBtn">⛵ SAIL!</button>
+  </div>
+  <div id="panel"><div id="parts"></div></div>
+  <div class="overlay" id="startOv">
+    <div class="card">
+      <h1>🚢 MO BOAT 3D</h1>
+      <p>Build your own 3D boat, then set sail!</p>
+      <p>Tap a part (hull, deck, cabin, ⛵ sail, flag, cannon, captain…) then tap the sea to place it. Drag to build fast.<br>Hit <b>⛵ SAIL!</b> to cruise the waves — <b>🔧 BUILD</b> to keep working.</p>
+      <button class="big" id="startBtn">▶ START BUILDING</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), ctx=cv.getContext("2d"), stage=document.getElementById("stage");
+  var DPR=Math.min(2, window.devicePixelRatio||1);
+  var W=0,H=0, N=10, TW=64, TH=32, ox=0, oy=0, panelH=110;
+  function layout(){ panelH=(sailing?0:(document.getElementById("panel").offsetHeight||110)); var avail=H-panelH; TW=Math.max(30,Math.min(70, Math.floor(W/(N+1)))); TH=TW/2; ox=W/2; oy=Math.max(TH*3,(avail-N*TH)/2+TH*3); }
+  function resize(){ W=stage.clientWidth; H=stage.clientHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0); layout(); }
+  window.addEventListener("resize",resize);
+
+  var AC=null; function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||"sine"; o.frequency.value=f; g.gain.value=v||0.05; o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.08)); o.stop(a.currentTime+(d||0.08)+0.02); }
+  function placeSfx(){ beep(500,0.05,"square",0.05); setTimeout(function(){beep(720,0.05,"square",0.04);},45); }
+  function removeSfx(){ beep(200,0.12,"sawtooth",0.06); }
+  function hornSfx(){ beep(150,0.5,"sawtooth",0.08); setTimeout(function(){beep(120,0.5,"sawtooth",0.07);},120); }
+
+  var PARTS=[
+    {id:"hull",  nm:"Hull",   ic:"🟫", floors:1, wall:"#7a4a24"},
+    {id:"deck",  nm:"Deck",   ic:"🪵", ground:true, deck:true},
+    {id:"cabin", nm:"Cabin",  ic:"🛖", floors:1, wall:"#c8945a", window:true},
+    {id:"sail",  nm:"Sail",   ic:"⛵", floors:3, wall:"#6a4a2a", sail:true},
+    {id:"wheel", nm:"Helm",   ic:"☸️", prop:"☸️"},
+    {id:"barrel",nm:"Barrel", ic:"🛢️", prop:"🛢️"},
+    {id:"cannon",nm:"Cannon", ic:"💣", prop:"💣"},
+    {id:"flag",  nm:"Flag",   ic:"🚩", prop:"🚩"},
+    {id:"ring",  nm:"Ring",   ic:"🛟", prop:"🛟"},
+    {id:"cap",   nm:"Captain",ic:"🧑‍✈️", prop:"🧑‍✈️"},
+    {id:"anchor",nm:"Anchor", ic:"⚓", prop:"⚓"},
+    {id:"buldz", nm:"Remove", ic:"🚜", tool:true}
+  ];
+  var PMAP={}; PARTS.forEach(function(p){ PMAP[p.id]=p; });
+
+  var mode="start", sel="hull", grid={}, painting=false, lastCell=null, sailing=false, sailX=0, gulls=[];
+  function key(r,c){ return r+"_"+c; }
+  function hash(r,c){ return Math.abs(Math.sin((r*12.9+c*78.2))*43758.5)%1; }
+  function load(){ try{ var s=JSON.parse(localStorage.getItem("moBoat3d")); if(s&&s.grid) grid=s.grid; }catch(e){} }
+  var saveT=0; function save(){ try{ localStorage.setItem("moBoat3d",JSON.stringify({grid:grid})); }catch(e){} }
+  load(); resize();
+
+  var partsEl=document.getElementById("parts");
+  PARTS.forEach(function(p){ var d=document.createElement("button"); d.className="p"+(p.id===sel?" on":""); d.innerHTML='<div class="ic">'+p.ic+'</div><div class="nm">'+p.nm+'</div>';
+    d.onclick=function(){ ac(); sel=p.id; document.querySelectorAll(".p").forEach(function(x){x.classList.remove("on");}); d.classList.add("on"); };
+    partsEl.appendChild(d); });
+  document.getElementById("startBtn").onclick=function(){ ac(); mode="build"; document.getElementById("startOv").classList.add("hide"); };
+  document.getElementById("sailBtn").onclick=function(){ ac(); sailing=!sailing;
+    document.getElementById("sailBtn").textContent = sailing?"🔧 BUILD":"⛵ SAIL!";
+    document.getElementById("panel").classList.toggle("hide", sailing);
+    if(sailing){ hornSfx(); sailX=0; gulls=[{x:W*0.2,y:H*0.12,v:0.5},{x:W*0.6,y:H*0.08,v:0.7},{x:W*0.85,y:H*0.16,v:0.4}]; }
+    layout();
+  };
+
+  function tileCenter(r,c){ return { x:ox+(c-r)*TW/2, y:oy+(c+r)*TH/2 }; }
+  function screenToCell(sx,sy){ var u=(sx-ox)/(TW/2), v=(sy-oy)/(TH/2); var c=Math.round((u+v)/2), r=Math.round((v-u)/2); if(r<0||c<0||r>=N||c>=N) return null; return {r:r,c:c}; }
+  function relXY(e){ var rr=cv.getBoundingClientRect(); var t=e.touches&&e.touches[0]?e.touches[0]:e; return {x:(t.clientX-rr.left)*(W/rr.width), y:(t.clientY-rr.top)*(H/rr.height)}; }
+  function place(cc){ if(!cc)return; var k=key(cc.r,cc.c), b=PMAP[sel]; if(b.tool){ if(grid[k]){ delete grid[k]; removeSfx(); } return; } if(grid[k]!==sel){ grid[k]=sel; placeSfx(); } }
+  function down(e){ if(mode!=="build"||sailing)return; ac(); painting=true; var p=relXY(e); var cc=screenToCell(p.x,p.y); lastCell=cc&&key(cc.r,cc.c); place(cc); save(); }
+  function move(e){ if(!painting||sailing)return; var p=relXY(e); var cc=screenToCell(p.x,p.y); if(!cc)return; var k=key(cc.r,cc.c); if(k!==lastCell){ lastCell=k; place(cc); } }
+  function up(){ if(painting){ painting=false; save(); } }
+  cv.onmousedown=down; cv.onmousemove=move; window.addEventListener("mouseup",up);
+  cv.addEventListener("touchstart",function(e){ e.preventDefault(); down(e); },{passive:false});
+  cv.addEventListener("touchmove",function(e){ e.preventDefault(); move(e); },{passive:false});
+  window.addEventListener("touchend",up);
+
+  var last=0;
+  function frame(ts){ var dt=Math.min(3,((ts-last)/16.67)||1); last=ts;
+    if(sailing){ sailX+=dt; for(var i=0;i<gulls.length;i++){ gulls[i].x-=gulls[i].v*dt; if(gulls[i].x<-30) gulls[i].x=W+30; } }
+    render(); requestAnimationFrame(frame);
+  }
+
+  function render(){
+    // sky + sea
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,"#8fd3f4"); g.addColorStop(0.42,"#cdeefb"); g.addColorStop(0.421,"#2f86c8"); g.addColorStop(1,"#0e4a80"); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // sun
+    ctx.save(); ctx.globalCompositeOperation="lighter"; var sg=ctx.createRadialGradient(W*0.18,H*0.12,4,W*0.18,H*0.12,110); sg.addColorStop(0,"rgba(255,245,200,0.7)"); sg.addColorStop(1,"rgba(255,245,200,0)"); ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(W*0.18,H*0.12,110,0,7); ctx.fill(); ctx.restore();
+    // horizon sea sparkle lines
+    ctx.strokeStyle="rgba(255,255,255,0.18)"; ctx.lineWidth=2;
+    for(var i=0;i<10;i++){ var yy=H*0.45+i*((H*0.55)/10); var off=(sailing? sailX*2:last/20)%40; ctx.beginPath(); for(var x=-20;x<W+20;x+=20){ ctx.lineTo(x, yy+Math.sin((x+off)*0.05+i)*3); } ctx.stroke(); }
+
+    var gullsAbove = gulls.slice();
+
+    // bob the whole boat in sail mode
+    ctx.save();
+    var bob = sailing? Math.sin(sailX*0.06)*5 : 0, roll = sailing? Math.sin(sailX*0.045)*0.02 : 0;
+    ctx.translate(ox, oy); ctx.rotate(roll); ctx.translate(-ox, -oy+bob);
+
+    // sea tiles under the boat (deck grid area) — draw water diamonds only where empty? draw full grid as water
+    for(var r=0;r<N;r++){ for(var c=0;c<N;c++){ if(!grid[key(r,c)]) continue; } }
+    // draw ground/deck tiles first
+    for(var r2=0;r2<N;r2++){ for(var c2=0;c2<N;c2++){ var id=grid[key(r2,c2)]; if(!id)continue; var b=PMAP[id]; if(b.ground||!b.floors && !b.tool){ drawGround(r2,c2,b); } } }
+    // buildings/props back-to-front
+    var cells=[]; for(var k in grid){ var pr=k.split("_"); cells.push({r:+pr[0],c:+pr[1],id:grid[k]}); }
+    cells.sort(function(a,b){ return (a.r+a.c)-(b.r+b.c); });
+    for(var ci=0;ci<cells.length;ci++){ var cb=PMAP[cells[ci].id]; if(cb.ground) continue; if(cb.floors) drawBox(cells[ci].r,cells[ci].c,cb); else if(cb.prop) drawProp(cells[ci].r,cells[ci].c,cb); }
+
+    // wake behind the boat in sail mode
+    if(sailing){ var bc=tileCenter(N-1,N-1); ctx.fillStyle="rgba(255,255,255,0.5)"; for(var wq=0;wq<8;wq++){ var wx=bc.x-30-wq*22 - (sailX*2)%22, wy=bc.y+10+wq*4; ctx.globalAlpha=0.5*(1-wq/8); ctx.beginPath(); ctx.ellipse(wx,wy,10,4,0,0,7); ctx.fill(); } ctx.globalAlpha=1; }
+    ctx.restore();
+
+    // if empty boat, hint
+    if(mode==="build" && !sailing && Object.keys(grid).length===0){ ctx.fillStyle="#08304e"; ctx.font="bold 18px 'Trebuchet MS',sans-serif"; ctx.textAlign="center"; ctx.fillText("🔨 Tap the sea to start building your boat!", W/2, oy+ N*TH/2); }
+
+    // seagulls (in front, sky)
+    ctx.font="18px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle"; for(var gi=0;gi<gullsAbove.length;gi++){ ctx.fillText("🕊️", gullsAbove[gi].x, gullsAbove[gi].y+Math.sin(last/300+gi)*4); }
+
+    if(sailing){ ctx.fillStyle="#fff"; ctx.font="bold 26px 'Trebuchet MS',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.lineWidth=6; ctx.strokeStyle="#08304e"; ctx.strokeText("⚓ Bon Voyage, Captain Mo! ⛵", W/2, H*0.30); ctx.fillText("⚓ Bon Voyage, Captain Mo! ⛵", W/2, H*0.30); }
+  }
+
+  function diamond(cx,cy,dy){ ctx.beginPath(); ctx.moveTo(cx,cy-TH/2+dy); ctx.lineTo(cx+TW/2,cy+dy); ctx.lineTo(cx,cy+TH/2+dy); ctx.lineTo(cx-TW/2,cy+dy); ctx.closePath(); }
+  function drawGround(r,c,b){ var p=tileCenter(r,c); diamond(p.x,p.y,0);
+    if(b&&b.deck){ ctx.fillStyle="#d0a568"; ctx.fill(); ctx.strokeStyle="rgba(90,50,20,0.4)"; ctx.lineWidth=1; ctx.stroke(); ctx.beginPath(); ctx.moveTo(p.x-TW/2,p.y); ctx.lineTo(p.x+TW/2,p.y); ctx.stroke(); }
+    else { ctx.fillStyle="#2f86c8"; ctx.fill(); }
+  }
+  function shade(hex,f){ var n=parseInt(hex.slice(1),16), R=(n>>16)&255,G=(n>>8)&255,B=n&255; return "rgb("+Math.min(255,Math.round(R*f))+","+Math.min(255,Math.round(G*f))+","+Math.min(255,Math.round(B*f))+")"; }
+  function drawBox(r,c,b){ var p=tileCenter(r,c), cx=p.x, cy=p.y, floorH=Math.max(10,TH*0.6), h=b.floors*floorH;
+    var wall=b.wall, top=shade(wall,1.12), left=shade(wall,0.7), right=shade(wall,0.85);
+    ctx.beginPath(); ctx.moveTo(cx-TW/2,cy); ctx.lineTo(cx,cy+TH/2); ctx.lineTo(cx,cy+TH/2-h); ctx.lineTo(cx-TW/2,cy-h); ctx.closePath(); ctx.fillStyle=left; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx,cy+TH/2); ctx.lineTo(cx+TW/2,cy); ctx.lineTo(cx+TW/2,cy-h); ctx.lineTo(cx,cy+TH/2-h); ctx.closePath(); ctx.fillStyle=right; ctx.fill();
+    diamond(cx,cy,-h); ctx.fillStyle=top; ctx.fill(); ctx.strokeStyle="rgba(0,0,0,0.15)"; ctx.lineWidth=1; ctx.stroke();
+    if(b.window){ ctx.fillStyle="#bfe6ff"; ctx.fillRect(cx-TW*0.28,cy-h*0.55-6,TW*0.14,8); ctx.fillRect(cx+TW*0.12,cy-h*0.55-6+TH*0.13,TW*0.14,8);
+      ctx.strokeStyle="#5a7fa0"; ctx.lineWidth=1; ctx.strokeRect(cx-TW*0.28,cy-h*0.55-6,TW*0.14,8); }
+    if(b.sail){ // mast + big triangular sail + flag
+      ctx.strokeStyle="#5a3a1a"; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(cx,cy-h); ctx.lineTo(cx,cy-h-TH*2.0); ctx.stroke();
+      var sw = sailing? Math.sin(sailX*0.05)*4 : 0;
+      ctx.fillStyle="#fbf3e0"; ctx.beginPath(); ctx.moveTo(cx+2,cy-h-4); ctx.quadraticCurveTo(cx+TW*0.5+sw,cy-h-TH*1.0, cx+2,cy-h-TH*1.9); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle="#d8c8a0"; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.fillStyle="#e0453a"; ctx.beginPath(); ctx.moveTo(cx,cy-h-TH*2.0); ctx.lineTo(cx+16+sw*0.5,cy-h-TH*2.0+5); ctx.lineTo(cx,cy-h-TH*2.0+10); ctx.closePath(); ctx.fill();
+    }
+  }
+  function drawProp(r,c,b){ var p=tileCenter(r,c); ctx.font=Math.floor(TW*0.6)+"px Arial"; ctx.textAlign="center"; ctx.textBaseline="alphabetic"; ctx.fillText(b.prop, p.x, p.y+TH*0.2); }
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

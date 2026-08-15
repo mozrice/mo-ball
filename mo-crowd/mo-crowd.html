@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Mo Crowd</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; overflow:hidden; background:#3a9a4a;
+    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif; color:#fff;
+    user-select:none; -webkit-user-select:none; touch-action:none; -webkit-font-smoothing:antialiased; }
+  #stage { position:fixed; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:absolute; top:10px; left:12px; right:12px; z-index:3; pointer-events:none;
+    display:flex; align-items:center; gap:12px; font-weight:bold; text-shadow:0 2px 3px #0005; }
+  #crowd { font-size:26px; background:linear-gradient(#1a2740cc,#0e1830cc); padding:6px 14px; border-radius:20px; border:1px solid #ffffff22; }
+  #goal { font-size:15px; color:#eafff0; }
+  #best { margin-left:auto; font-size:15px; color:#eafff0; }
+  .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; z-index:5; background:#0a2a0f66; }
+  .overlay.hide { display:none; }
+  .card { background:linear-gradient(#183a24f2,#0e2416f2); border:3px solid #ffd93d; border-radius:22px; padding:24px 28px; max-width:90%; box-shadow:0 20px 60px #000a; }
+  .card h1 { margin:0 0 6px; font-size:32px; color:#ffd93d; text-shadow:0 3px 0 #6a5a1a; }
+  .card p { margin:8px 0; font-size:16px; color:#eaffea; }
+  .big { margin-top:14px; padding:14px 30px; font-size:20px; font-weight:bold; background:linear-gradient(#ffe07a,#f0b429); color:#5a3d00;
+    border:none; border-radius:16px; cursor:pointer; box-shadow:0 5px 0 #b8922a; }
+  .big:active { transform:translateY(4px); box-shadow:0 1px 0 #b8922a; }
+  .hint { font-size:14px; color:#cfeecf; margin-top:10px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hud"><div id="crowd">🧑 1</div><div id="goal">Goal 40</div><div id="best">Best 0</div></div>
+
+  <div class="overlay" id="startOv">
+    <div class="card">
+      <h1>🧑‍🤝‍🧑 MO CROWD</h1>
+      <p>Lead Mo around and bump into people —<br>they join you and <b>you all become one big crowd!</b></p>
+      <p>Gather everyone before time runs out.</p>
+      <button class="big" id="playBtn">▶ PLAY</button>
+      <div class="hint">Drag anywhere (or arrow keys) to move your crowd.</div>
+    </div>
+  </div>
+  <div class="overlay hide" id="overOv">
+    <div class="card">
+      <h1 id="overTitle">ONE BIG CROWD! 🎉</h1>
+      <p id="overP">Crowd: 0</p>
+      <button class="big" id="againBtn">↻ PLAY AGAIN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), ctx=cv.getContext("2d"), stage=document.getElementById("stage");
+  var DPR=Math.max(1,Math.min(3,window.devicePixelRatio||1));
+  var W=0,H=0;
+  function resize(){ W=stage.clientWidth; H=stage.clientHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener("resize",resize); resize();
+
+  var AC=null; function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain();
+    o.type=t||"triangle"; o.frequency.value=f; g.gain.value=v||0.07; o.connect(g); g.connect(a.destination);
+    var n=a.currentTime; o.start(n); g.gain.exponentialRampToValueAtTime(0.0001,n+(d||0.1)); o.stop(n+(d||0.1)+0.02); }
+  function joinSfx(n){ beep(500+Math.min(600,n*12),0.05,"square",0.06); setTimeout(function(){beep(760+Math.min(700,n*12),0.06,"square",0.05);},40); }
+  function winSfx(){ beep(660,0.1,"square",0.1); setTimeout(function(){beep(990,0.1,"square",0.1);},110); setTimeout(function(){beep(1320,0.16,"square",0.1);},220); }
+  function overSfx(){ beep(300,0.2,"sawtooth",0.09); }
+
+  var SKIN=["#f1c9a5","#e0a878","#c68642","#8d5524","#ffdbac","#d9a066"];
+  var HAIR=["#2a1a0a","#3a2312","#5a3a1a","#141414","#7a4a2a","#d8b45a"];
+  function hsh(i){ return Math.abs(Math.sin(i*12.9898)*43758.5453)%1; }
+  function pick(a,i){ return a[Math.floor(hsh(i)*a.length)%a.length]; }
+
+  var MO="#2f7fc0";
+  var mode="start";
+  var leader, follow, grays, parts, timeLeft, goal, best;
+  best=parseInt(localStorage.getItem("moCrowdBest")||"0",10)||0;
+  document.getElementById("best").textContent="Best "+best;
+
+  function reset(){
+    leader={x:W/2,y:H*0.6,seed:0.5};
+    follow=[];
+    grays=[]; var n=goalCount(); for(var i=0;i<n;i++){ grays.push(newGray(i)); }
+    parts=[]; goal=n; timeLeft=45; updateHud();
+  }
+  function goalCount(){ return 40; }
+  function newGray(i){ var a=hsh(i*3+1)*7; var r=Math.min(W,H)*0.32*(0.4+hsh(i*5)*0.6);
+    var x=W/2+Math.cos(a)*r, y=H/2+Math.sin(a)*r*0.8; x=Math.max(30,Math.min(W-30,x)); y=Math.max(70,Math.min(H-30,y));
+    return {x:x,y:y,vx:(Math.random()-0.5)*1.2,vy:(Math.random()-0.5)*1.2,seed:100+i}; }
+  function updateHud(){ document.getElementById("crowd").textContent="🧑 "+(1+follow.length);
+    document.getElementById("goal").textContent="Goal "+goal+"   ·   ⏱ "+Math.ceil(timeLeft); }
+
+  // input
+  var keys={}, pointer=null;
+  window.addEventListener("keydown",function(e){ keys[e.code]=true; if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].indexOf(e.code)>=0)e.preventDefault(); if(e.code==="Space"&&mode!=="play")start(); });
+  window.addEventListener("keyup",function(e){ keys[e.code]=false; });
+  function pp(e){ var r=cv.getBoundingClientRect(); var t=e.touches&&e.touches[0]?e.touches[0]:e; return {x:t.clientX-r.left,y:t.clientY-r.top}; }
+  stage.addEventListener("mousedown",function(e){ ac(); pointer=pp(e); });
+  stage.addEventListener("mousemove",function(e){ if(pointer) pointer=pp(e); });
+  window.addEventListener("mouseup",function(){ pointer=null; });
+  stage.addEventListener("touchstart",function(e){ ac(); pointer=pp(e); },{passive:true});
+  stage.addEventListener("touchmove",function(e){ pointer=pp(e); },{passive:true});
+  window.addEventListener("touchend",function(){ pointer=null; });
+
+  document.getElementById("playBtn").onclick=start; document.getElementById("againBtn").onclick=start;
+  function start(){ ac(); reset(); mode="play"; document.getElementById("startOv").classList.add("hide"); document.getElementById("overOv").classList.add("hide"); }
+  function gameOver(won){ mode="over"; if(won)winSfx(); else overSfx();
+    var sz=1+follow.length; if(sz>best){ best=sz; localStorage.setItem("moCrowdBest",""+best); document.getElementById("best").textContent="Best "+best; }
+    document.getElementById("overTitle").textContent= won? "ONE BIG CROWD! 🎉" : "TIME UP!";
+    document.getElementById("overP").textContent="Crowd: "+sz+(won?"  — you got everyone!":"");
+    document.getElementById("overOv").classList.remove("hide"); }
+
+  var last=0;
+  function frame(ts){ var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(mode==="play") update(dt); render(); requestAnimationFrame(frame); }
+
+  function update(dt){
+    timeLeft-=dt/60; if(timeLeft<=0){ timeLeft=0; gameOver(false); return; }
+    // leader move
+    var mvx=0,mvy=0; if(keys["ArrowLeft"]||keys["KeyA"])mvx-=1; if(keys["ArrowRight"]||keys["KeyD"])mvx+=1; if(keys["ArrowUp"]||keys["KeyW"])mvy-=1; if(keys["ArrowDown"]||keys["KeyS"])mvy+=1;
+    if(pointer){ var dx=pointer.x-leader.x, dy=pointer.y-leader.y, d=Math.hypot(dx,dy); if(d>3){ mvx=dx/d; mvy=dy/d; } else {mvx=0;mvy=0;} }
+    var sp=4.2*dt; leader.x+=mvx*sp; leader.y+=mvy*sp;
+    leader.x=Math.max(18,Math.min(W-18,leader.x)); leader.y=Math.max(60,Math.min(H-18,leader.y));
+    // followers chain
+    var spc=15, prev=leader;
+    for(var i=0;i<follow.length;i++){ var f=follow[i]; var dx2=prev.x-f.x, dy2=prev.y-f.y, d2=Math.hypot(dx2,dy2)||1;
+      if(d2>spc){ var mv=(d2-spc)*0.5*dt; f.x+=dx2/d2*mv; f.y+=dy2/d2*mv; } prev=f; }
+    // grays wander + recruit
+    for(var g=grays.length-1;g>=0;g--){ var gr=grays[g]; gr.x+=gr.vx*dt; gr.y+=gr.vy*dt;
+      if(gr.x<20||gr.x>W-20) gr.vx*=-1; if(gr.y<70||gr.y>H-20) gr.vy*=-1;
+      gr.x=Math.max(20,Math.min(W-20,gr.x)); gr.y=Math.max(70,Math.min(H-20,gr.y));
+      // contact with any crowd member
+      var hit=Math.hypot(gr.x-leader.x,gr.y-leader.y)<20; if(!hit){ for(var j=0;j<follow.length;j++){ if(Math.hypot(gr.x-follow[j].x,gr.y-follow[j].y)<18){ hit=true; break; } } }
+      if(hit){ follow.push({x:gr.x,y:gr.y,seed:gr.seed}); for(var q=0;q<6;q++) parts.push({x:gr.x,y:gr.y,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.6)*5,life:1}); joinSfx(follow.length); grays.splice(g,1); updateHud();
+        if(grays.length===0){ gameOver(true); return; } }
+    }
+    for(var p=parts.length-1;p>=0;p--){ var pp2=parts[p]; pp2.x+=pp2.vx*dt; pp2.y+=pp2.vy*dt; pp2.vy+=0.2*dt; pp2.life-=0.04*dt; if(pp2.life<=0) parts.splice(p,1); }
+    updateHud();
+  }
+
+  function render(){
+    // plaza ground
+    for(var s=0;s<12;s++){ ctx.fillStyle=s%2? "#3a9a4a":"#3f9f4f"; ctx.fillRect(0,s*H/12,W,H/12); }
+    // paths
+    ctx.strokeStyle="#c9b98a"; ctx.lineWidth=Math.min(W,H)*0.12; ctx.globalAlpha=0.5; ctx.beginPath(); ctx.moveTo(W*0.5,0); ctx.lineTo(W*0.5,H); ctx.moveTo(0,H*0.5); ctx.lineTo(W,H*0.5); ctx.stroke(); ctx.globalAlpha=1;
+    // grays
+    for(var g=0;g<grays.length;g++) drawPerson(grays[g].x,grays[g].y,"#9aa1ad",grays[g].seed,false);
+    // crowd followers
+    for(var i=follow.length-1;i>=0;i--) drawPerson(follow[i].x,follow[i].y,MO,follow[i].seed,false);
+    // leader (Mo)
+    drawPerson(leader.x,leader.y,MO,0.5,true);
+    // particles
+    for(var p=0;p<parts.length;p++){ var pp2=parts[p]; ctx.save(); ctx.globalAlpha=Math.max(0,pp2.life); ctx.fillStyle="#ffd93d"; ctx.beginPath(); ctx.arc(pp2.x,pp2.y,3,0,7); ctx.fill(); ctx.restore(); }
+    // vignette
+    var vg=ctx.createRadialGradient(W/2,H*0.46,Math.min(W,H)*0.3,W/2,H*0.5,Math.max(W,H)*0.72); vg.addColorStop(0,"rgba(0,0,0,0)"); vg.addColorStop(1,"rgba(0,0,0,0.30)"); ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
+  }
+  function drawPerson(x,y,col,seed,isLeader){ var s=15, skin=pick(SKIN,seed*3.1), hair=pick(HAIR,seed*1.7);
+    var bob=Math.sin(last/1000*4+seed*6)*2;
+    ctx.save(); ctx.translate(x,y+bob);
+    ctx.fillStyle="#00000033"; ctx.beginPath(); ctx.ellipse(0,s*0.7,s*0.7,s*0.24,0,0,7); ctx.fill();
+    // legs
+    ctx.strokeStyle="#2a3550"; ctx.lineWidth=s*0.22; ctx.lineCap="round"; ctx.beginPath(); ctx.moveTo(-s*0.2,s*0.3); ctx.lineTo(-s*0.2,s*0.7); ctx.moveTo(s*0.2,s*0.3); ctx.lineTo(s*0.2,s*0.7); ctx.stroke();
+    // body
+    ctx.fillStyle=col; ctx.beginPath(); ctx.arc(0,-s*0.05,s*0.5,0,7); ctx.fill();
+    // head
+    ctx.fillStyle=skin; ctx.beginPath(); ctx.arc(0,-s*0.55,s*0.38,0,7); ctx.fill();
+    ctx.fillStyle=hair; ctx.beginPath(); ctx.arc(0,-s*0.62,s*0.4,Math.PI*0.95,Math.PI*2.05); ctx.fill();
+    ctx.fillStyle="#222"; ctx.beginPath(); ctx.arc(-s*0.13,-s*0.53,s*0.06,0,7); ctx.arc(s*0.13,-s*0.53,s*0.06,0,7); ctx.fill();
+    if(isLeader){ ctx.strokeStyle="#ffd93d"; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,-s*0.1,s*0.7,0,7); ctx.stroke(); }
+    ctx.restore(); }
+
+  reset(); mode="start";
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

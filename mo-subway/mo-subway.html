@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Mo Subway</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; overflow:hidden; background:#0e1420;
+    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif; color:#fff;
+    user-select:none; -webkit-user-select:none; touch-action:none;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+  #stations { background:linear-gradient(#1a2740cc,#0e1830cc); padding:6px 12px; border-radius:20px; border:1px solid #ffffff22; }
+  #fare { background:linear-gradient(#4a3a10cc,#2a2408cc); color:#ffd54a; font-weight:800; padding:6px 12px; border-radius:20px; border:1px solid #ffd54a55; }
+  .card { box-shadow:0 20px 60px #000a, inset 0 1px 0 #ffffff22; backdrop-filter:blur(4px);
+    background:linear-gradient(#182a48f2,#0e1a30f2) !important; }
+  .card h1 { background:linear-gradient(#ffe98a,#ffb03a); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  #viewBtn,#micBtn,#hornBtn,#gasBtn,#busBtn,.big { text-shadow:0 1px 1px #0006; }
+  #viewBtn { background:linear-gradient(#43a844,#2e7a30) !important; }
+  #hornBtn { background:linear-gradient(#2d517f,#1c3557) !important; }
+  #micBtn  { background:linear-gradient(#8f57c8,#5f3492) !important; }
+  #gasBtn  { background:linear-gradient(#43c07a,#227a4a) !important; }
+  .big     { background:linear-gradient(#ffe07a,#f0b429) !important; }
+  #stage { position:fixed; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:absolute; top:10px; left:12px; right:12px; z-index:3; pointer-events:none;
+    display:flex; align-items:center; gap:12px; font-weight:bold; text-shadow:0 2px 3px #0008; }
+  #stations { font-size:20px; }
+  #viewBtn { margin-left:auto; pointer-events:auto; border:none; border-radius:14px; padding:10px 14px;
+    font:inherit; font-weight:bold; background:#37933a; color:#fff; box-shadow:0 3px 0 #236326; cursor:pointer; }
+  #micBtn { pointer-events:auto; border:none; border-radius:14px; padding:10px 12px;
+    font:inherit; font-weight:bold; background:#7a4ab0; color:#fff; box-shadow:0 3px 0 #4a2a70; cursor:pointer; }
+  #micBtn:active { transform:translateY(3px); box-shadow:0 0 0 #4a2a70; }
+  #phoneBtn { pointer-events:auto; border:none; border-radius:14px; padding:10px 12px; font:inherit; font-weight:bold; background:#1f7a5a; color:#fff; box-shadow:0 3px 0 #124a37; cursor:pointer; }
+  #phoneBtn:active { transform:translateY(3px); box-shadow:0 0 0 #124a37; }
+  #hornBtn { pointer-events:auto; border:none; border-radius:14px; padding:10px 14px;
+    font:inherit; font-weight:bold; background:#24406a; color:#fff; box-shadow:0 3px 0 #142542; cursor:pointer; }
+  #viewBtn:active,#hornBtn:active { transform:translateY(3px); box-shadow:0 0 0 #142542; }
+  #gasBtn { position:absolute; bottom:20px; right:20px; z-index:4; width:92px; height:92px; border-radius:50%;
+    border:none; font-size:18px; font-weight:bold; color:#06280f; background:#37b06a; box-shadow:0 5px 0 #1f7544; cursor:pointer; display:none; }
+  #gasBtn:active { transform:translateY(4px); box-shadow:0 1px 0 #1f7544; }
+  #padBar { position:absolute; bottom:20px; left:20px; z-index:4; display:none; gap:14px; }
+  #padBar button { width:76px; height:76px; border-radius:50%; border:none; font-size:32px; font-weight:bold; color:#0a2440;
+    background:linear-gradient(#8fd0ff,#3a86e0); box-shadow:0 5px 0 #235f9e; cursor:pointer; text-shadow:0 1px 1px #0004; }
+  #padBar button:active { transform:translateY(4px); box-shadow:0 1px 0 #235f9e; }
+  #vehBar { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); z-index:4; display:none;
+    align-items:center; gap:8px; background:#0a1220dd; padding:8px 12px; border-radius:16px; }
+  #busBtn { border:none; border-radius:12px; padding:10px 14px; font:inherit; font-weight:bold; background:#ffb03a; color:#3a2400; box-shadow:0 3px 0 #b87f20; cursor:pointer; }
+  #busBtn:active { transform:translateY(3px); box-shadow:0 0 0 #b87f20; }
+  #boardBtn { border:none; border-radius:12px; padding:10px 14px; font:inherit; font-weight:bold; background:#3a86e0; color:#04203f; box-shadow:0 3px 0 #235f9e; cursor:pointer; text-shadow:0 1px 1px #0006; }
+  #boardBtn:active { transform:translateY(3px); box-shadow:0 0 0 #235f9e; }
+  #pickLbl { color:#dfe8ff; font-size:13px; font-weight:bold; }
+  #carPick { display:flex; gap:6px; }
+  .cpk { width:26px; height:26px; border-radius:7px; border:3px solid #0000; cursor:pointer; }
+  .cpk.on { border-color:#fff; }
+  .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; z-index:5; background:#06060caa; }
+  .overlay.hide { display:none; }
+  .card { background:#14203aee; border:3px solid #ffd93d; border-radius:22px; padding:24px 28px; max-width:90%; }
+  .card h1 { margin:0 0 6px; font-size:30px; color:#ffd93d; text-shadow:0 3px 0 #7a5a1a; }
+  .card p { margin:8px 0; font-size:16px; color:#dfe8ff; }
+  .big { margin-top:14px; padding:14px 28px; font-size:20px; font-weight:bold; background:#ffd93d; color:#5a3d00;
+    border:none; border-radius:16px; cursor:pointer; box-shadow:0 5px 0 #b8922a; }
+  .big:active { transform:translateY(4px); box-shadow:0 1px 0 #b8922a; }
+  #tapArea { display:flex; align-items:center; justify-content:center; gap:26px; margin:20px 0 8px; }
+  #moCard { width:150px; height:94px; border-radius:14px; cursor:pointer; position:relative;
+    background:linear-gradient(135deg,#ffd93d,#f0932b); box-shadow:0 8px 20px #0007, inset 0 1px 0 #fff8;
+    transition:transform .18s ease; color:#5a3d00; text-align:left; }
+  #moCard.slid { transform:translateX(40px) rotate(-4deg); }
+  #moCard .mc-top { font-weight:900; font-size:16px; padding:10px 0 0 12px; letter-spacing:1px; }
+  #moCard .mc-chip { position:absolute; top:38px; left:14px; width:30px; height:22px; border-radius:5px;
+    background:linear-gradient(135deg,#e9c46a,#b7791f); box-shadow:inset 0 0 0 1px #00000030; }
+  #moCard .mc-bal { position:absolute; bottom:10px; left:12px; font-weight:800; font-size:12px; }
+  #reader { width:80px; height:110px; border-radius:14px; background:linear-gradient(#243149,#141d30);
+    border:2px solid #3ad6ff66; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 20px #0007; }
+  #readerLight { width:54px; height:54px; border-radius:50%; background:#3a4a66; color:#cfe8ff;
+    display:flex; align-items:center; justify-content:center; font-weight:900; font-size:14px; box-shadow:inset 0 0 10px #0008; transition:background .2s; }
+  #readerLight.ok { background:radial-gradient(#7dff9a,#20b24a); color:#063; box-shadow:0 0 22px #4dff7a; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hud"><div id="stations">🚉 0</div><div id="fare">🎟️ $1.00</div><button id="viewBtn">🧑 People</button><button id="phoneBtn">📱</button><button id="micBtn">🎤</button><button id="hornBtn">📢 Horn</button></div>
+  <button id="gasBtn">⛽ GAS</button>
+  <div id="padBar"><button id="backBtn">◀</button><button id="fwdBtn">▶</button></div>
+  <div id="vehBar"><button id="boardBtn">🚇 Board Train Again</button></div>
+
+  <div class="overlay hide" id="homeOv">
+    <div class="card">
+      <h1>🏠 HOME SWEET HOME!</h1>
+      <p id="homeP">You rode 10 stops and took the bus home! 🚌</p>
+      <button class="big" id="rideAgainBtn">↻ RIDE AGAIN</button>
+    </div>
+  </div>
+
+  <div class="overlay hide" id="cardOv">
+    <div class="card" style="border-color:#3ad6ff">
+      <h1 style="font-size:26px">🎫 TAP TO BOARD</h1>
+      <p>Tap your <b>MO CARD</b> on the reader to pay your <b>$1.00</b> and get on the train!</p>
+      <div id="tapArea">
+        <div id="moCard">
+          <div class="mc-top">MO CARD</div>
+          <div class="mc-chip"></div>
+          <div class="mc-bal">$1.00 · ROUND TRIP</div>
+        </div>
+        <div id="reader"><div id="readerLight">TAP</div></div>
+      </div>
+      <p id="cardHint" style="opacity:.8;font-size:14px">👆 Tap the card, then the reader</p>
+    </div>
+  </div>
+  <div class="overlay" id="startOv">
+    <div class="card">
+      <h1>🚇 MO SUBWAY</h1>
+      <p>Drive Mo's train — or ride inside with the people!</p>
+      <p>Tap <b>🧑 People</b> / <b>🚇 Drive</b> to switch between the<br>driver's cab and the inside of the train.<br>It <b>stops at every station</b> — doors open, people walk on and off.</p>
+      <p style="font-weight:800;color:#ffd54a">🎟️ Fare: <b>$1.00</b> — ride as long as you want! Every station throws a hoops celebration. 🏀</p>
+      <button class="big" id="playBtn">▶ START</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), ctx=cv.getContext("2d"), stage=document.getElementById("stage");
+  var DPR=Math.max(1,Math.min(3,window.devicePixelRatio||1));
+  var W=0,H=0;
+  function resize(){ W=stage.clientWidth; H=stage.clientHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener("resize",resize); resize();
+
+  var AC=null; function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain();
+    o.type=t||"triangle"; o.frequency.value=f; g.gain.value=v||0.08; o.connect(g); g.connect(a.destination);
+    var n=a.currentTime; o.start(n); g.gain.exponentialRampToValueAtTime(0.0001,n+(d||0.12)); o.stop(n+(d||0.12)+0.02); }
+  function chime(){ beep(1050,0.14,"sine",0.09); setTimeout(function(){beep(1320,0.16,"sine",0.09);},150); }
+  function hornSfx(){ beep(220,0.2,"sawtooth",0.1); setTimeout(function(){beep(160,0.22,"sawtooth",0.08);},130); }
+  function brakeSfx(){ beep(900,0.5,"sawtooth",0.05); }
+  function doorSfx(){ beep(500,0.1,"square",0.06); setTimeout(function(){beep(380,0.12,"square",0.05);},90); }
+  function coinSfx(){ beep(880,0.05,"square",0.08); setTimeout(function(){beep(1320,0.08,"square",0.08);},45); }
+  function winSfx(){ beep(660,0.1,"square",0.1); setTimeout(function(){beep(990,0.1,"square",0.1);},110); setTimeout(function(){beep(1320,0.16,"square",0.1);},220); }
+  function buzzerSfx(){ beep(170,0.55,"square",0.13); setTimeout(function(){beep(150,0.45,"square",0.11);},120); }
+  function swishSfx(){ beep(1400,0.05,"sine",0.06); setTimeout(function(){beep(1800,0.05,"sine",0.05);},50); }
+  function say(text){ try{ if(window.speechSynthesis){ var u=new SpeechSynthesisUtterance(text); u.rate=0.95; u.pitch=1.05; u.volume=1; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); } }catch(e){} }
+
+  // people palette
+  var SKIN=["#f1c9a5","#e0a878","#c68642","#8d5524","#ffdbac","#d9a066"];
+  var HAIR=["#2a1a0a","#3a2312","#5a3a1a","#141414","#7a4a2a","#d8b45a","#b5651d","#9a9a9a"];
+  var SHIRT=["#e0453a","#2f7fc0","#37b06a","#ffb03a","#8a63d2","#e0679a","#20b0a0","#f0f0f0","#ff7a3c"];
+  function hsh(i){ return Math.abs(Math.sin(i*12.9898)*43758.5453)%1; }
+  // a little picture that matches what the station name says
+  function stationIcon(n){ n=n||"";
+    if(n.indexOf("CHAMPION")>=0) return "🏆";
+    if(n.indexOf("THREE-POINT")>=0) return "🎯";
+    if(n.indexOf("BUZZER")>=0) return "⏰";
+    if(n.indexOf("FASTBREAK")>=0) return "💨";
+    if(n.indexOf("ALLEY")>=0) return "🤾";
+    if(n.indexOf("COURTSIDE")>=0||n.indexOf("COURT")>=0) return "🏟️";
+    if(n.indexOf("FAMILY")>=0||n.indexOf("MORGAN")>=0||n.indexOf("RICE")>=0) return "👨‍👩‍👦";
+    if(n.indexOf("MO STATION")>=0) return "🏠";
+    return "🏀"; }
+  function pick(arr,i){ return arr[Math.floor(hsh(i)*arr.length)%arr.length]; }
+
+  var STATIONS=["MO STATION","HOOP CENTRAL","MORGAN SQUARE","DUNK PARK","BALL STREET","FAMILY PLAZA","SLAM AVENUE","COURTSIDE","RICE ROAD","JUMPSHOT JUNCTION","BUZZER BAY","ALLEY-OOP AVE","TIP-OFF TERMINAL","THREE-POINT PARK","FASTBREAK FIELDS","CHAMPION CROSS"];
+  // different train lines — each a colour, a letter and a destination it goes to
+  var TRAINLINES=[
+    {name:"MO RED LINE",   col:"#e0453a", letter:"R", dest:"DUNK PARK"},
+    {name:"MO BLUE LINE",  col:"#2f7fc0", letter:"B", dest:"RICE ROAD"},
+    {name:"MO GREEN LINE", col:"#37b06a", letter:"G", dest:"COURTSIDE"},
+    {name:"MO GOLD LINE",  col:"#f0b429", letter:"Y", dest:"BUZZER BAY"},
+    {name:"MO PURPLE LINE",col:"#8a63d2", letter:"P", dest:"SLAM AVENUE"}
+  ];
+
+  var mode="start", view="drive", pointerDown=false, pointerX=null;
+  var youRider={x:0, ph:0, moving:false};
+  var phase, phaseT, winSpeed, winPhase, doorT, stationCount, sway, stName, seatSeed, standSeed;
+  var otherTrain={active:false,x:0,dir:1,cool:120,len:0,spd:0,col:"#d0453a"};
+  var walkers=[];
+  function reset(){ phase="riding"; phaseT=300; winSpeed=0; winPhase=0; doorT=0; stationCount=0; sway=0;
+    stName=STATIONS[1]; seatSeed=[]; standSeed=[]; for(var i=0;i<8;i++) seatSeed.push(i*5+2); for(var j=0;j<4;j++) standSeed.push(j*7+3);
+    otherTrain.active=false; otherTrain.cool=70; walkers=[];
+    youRider.x=W*0.22; youRider.ph=0; youRider.moving=false; pointerX=null;
+    document.getElementById("stations").textContent="🚉 0";  hideVeh(); }
+
+  function boardTrain(){ reset(); mode="play"; view="drive"; document.getElementById("viewBtn").textContent="🧑 People"; document.getElementById("cardOv").classList.add("hide"); refreshGas(); say("Card accepted! One dollar round trip. All aboard!"); }
+  document.getElementById("playBtn").onclick=function(){ ac(); document.getElementById("startOv").classList.add("hide"); var c=document.getElementById("moCard"),rl=document.getElementById("readerLight"); c.classList.remove("slid"); rl.classList.remove("ok"); document.getElementById("cardHint").textContent="👆 Tap the card, then the reader"; document.getElementById("cardOv").classList.remove("hide"); say("Tap your Mo Card to get on the train."); };
+  (function(){ var tapped=false; var c=document.getElementById("moCard"), rl=document.getElementById("readerLight"), rd=document.getElementById("reader");
+    function doTap(){ ac(); if(tapped)return; tapped=true; c.classList.add("slid"); setTimeout(function(){ rl.classList.add("ok"); rl.textContent="✓ GO"; chime(); document.getElementById("cardHint").textContent="✓ Beep! Paid $1.00 — enjoy the ride!"; setTimeout(function(){ tapped=false; boardTrain(); }, 850); }, 220); }
+    c.addEventListener("click",doTap); rd.addEventListener("click",doTap);
+  })();
+  document.getElementById("hornBtn").onclick=function(){ if(mode==="play") hornSfx(); };
+  var phoneOpen=false, phoneScore=0, phoneShotT=0, phoneMade=false;
+  document.getElementById("phoneBtn").onclick=function(){ ac(); phoneOpen=!phoneOpen; document.getElementById("phoneBtn").style.filter=phoneOpen?"brightness(1.6)":""; };
+  document.getElementById("viewBtn").onclick=function(){ if(mode!=="play")return; view=view==="drive"?"people":"drive"; document.getElementById("viewBtn").textContent=view==="drive"?"🧑 People":"🚇 Drive";  refreshGas(); };
+  function phoneHit(e){ if(!phoneOpen) return false; var rx=relX(e), ry=relY(e); if(rx>=phoneRect.x&&rx<=phoneRect.x+phoneRect.w&&ry>=phoneRect.y&&ry<=phoneRect.y+phoneRect.h){ shootPhone(); return true; } return false; }
+  stage.addEventListener("mousedown",function(e){ if(phoneHit(e)) return; pointerDown=true; if(mode==="play"&&view==="people") pointerX=relX(e); });
+  stage.addEventListener("mousemove",function(e){ if(pointerDown&&mode==="play"&&view==="people") pointerX=relX(e); });
+  window.addEventListener("mouseup",function(){ pointerDown=false; pointerX=null; });
+  stage.addEventListener("touchstart",function(e){ if(phoneHit(e)) return; pointerDown=true; if(mode==="play"&&view==="people") pointerX=relX(e); },{passive:true});
+  stage.addEventListener("touchmove",function(e){ if(mode==="play"&&view==="people") pointerX=relX(e); },{passive:true});
+  window.addEventListener("touchend",function(){ pointerDown=false; pointerX=null; });
+
+  // on-screen ◀ ▶ forward/back arrow buttons (hold to move)
+  (function(){ var back=document.getElementById("backBtn"), fwd=document.getElementById("fwdBtn");
+    function hold(btn,key){
+      function on(e){ if(e.cancelable)e.preventDefault(); ac(); keyState[key]=true; }
+      function off(){ keyState[key]=false; }
+      btn.addEventListener("mousedown",on); btn.addEventListener("touchstart",on,{passive:false});
+      btn.addEventListener("mouseup",off); btn.addEventListener("mouseleave",off);
+      btn.addEventListener("touchend",off); btn.addEventListener("touchcancel",off);
+      window.addEventListener("mouseup",off);
+    }
+    hold(back,"left"); hold(fwd,"right");
+  })();
+
+  var last=0;
+  function frame(ts){ var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts;
+    if(mode==="play") update(dt); else if(mode==="car") carUpdate(dt); else if(mode==="walk") walkUpdate(dt);
+    if(mode==="car") carRender(); else if(mode==="walk"||mode==="home") walkRender(); else render();
+    drawVignette();
+    if(buzzerT>0){ drawCeleb(dt); buzzerT-=dt; }
+    if(phoneOpen) drawPhone(dt);
+    document.getElementById("padBar").style.display = ((mode==="play"&&view==="people")||mode==="walk")?"flex":"none";
+    requestAnimationFrame(frame); }
+
+  var phoneRect={x:0,y:0,w:0,h:0};
+  function shootPhone(){ if(phoneShotT<=0){ phoneShotT=1; phoneMade=(Math.random()<0.72); } }
+  function drawPhone(dt){
+    var ph=Math.min(H*0.68, W*0.5), pw=ph*0.56, px=W*0.5-pw/2, py=H-ph-6;
+    phoneRect={x:px,y:py,w:pw,h:ph};
+    // phone body
+    ctx.fillStyle="#0a0e16"; rr(px,py,pw,ph,20); ctx.fill(); ctx.strokeStyle="#2a3446"; ctx.lineWidth=3; rr(px,py,pw,ph,20); ctx.stroke();
+    // screen
+    var sx=px+8, sy=py+26, sw=pw-16, sh=ph-52;
+    ctx.save(); rr(sx,sy,sw,sh,12); ctx.clip();
+    var g=ctx.createLinearGradient(0,sy,0,sy+sh); g.addColorStop(0,"#7ec0ff"); g.addColorStop(0.42,"#cf9552"); g.addColorStop(1,"#b3743a"); ctx.fillStyle=g; ctx.fillRect(sx,sy,sw,sh);
+    ctx.strokeStyle="rgba(255,255,255,0.85)"; ctx.lineWidth=2; ctx.strokeRect(sx+8,sy+sh*0.52,sw-16,sh*0.44);
+    ctx.beginPath(); ctx.arc(sx+sw/2,sy+sh*0.52,sw*0.14,0,Math.PI); ctx.stroke();
+    // hoop
+    var hx=sx+sw*0.5, hy=sy+sh*0.24;
+    ctx.fillStyle="#f4f6fa"; rr(hx-26,hy-22,52,28,4); ctx.fill(); ctx.strokeStyle="#e0453a"; ctx.lineWidth=2; ctx.strokeRect(hx-11,hy-4,22,14);
+    ctx.strokeStyle="#ff7a1a"; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(hx-15,hy+11); ctx.lineTo(hx+15,hy+11); ctx.stroke();
+    ctx.strokeStyle="#fff"; ctx.lineWidth=1; for(var n=-3;n<=3;n++){ ctx.beginPath(); ctx.moveTo(hx+n*5,hy+11); ctx.lineTo(hx+n*3,hy+26); ctx.stroke(); }
+    // ball: idle at bottom, or arcing when shot
+    var bx,by;
+    if(phoneShotT>0){ var t=1-phoneShotT; var startX=sx+sw*0.5, startY=sy+sh*0.86, endX=hx, endY=phoneMade?hy+11:hx+sw*0.3;
+      if(phoneMade){ bx=startX+(hx-startX)*t; by=startY+(hy+11-startY)*t - Math.sin(t*Math.PI)*sh*0.4; }
+      else { bx=startX+(sw*0.34)*t; by=startY - Math.sin(t*Math.PI)*sh*0.36 + t*sh*0.1; }
+      phoneShotT-=dt*0.03; if(phoneShotT<=0){ phoneShotT=0; if(phoneMade){ phoneScore+=2; swishSfx(); } }
+    } else { bx=sx+sw*0.5; by=sy+sh*0.86; }
+    ctx.fillStyle="#dd6a15"; ctx.beginPath(); ctx.arc(bx,by,sw*0.075,0,7); ctx.fill();
+    ctx.strokeStyle="#7a3a08"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(bx-sw*0.075,by); ctx.lineTo(bx+sw*0.075,by); ctx.stroke();
+    ctx.restore();
+    // header + score
+    ctx.fillStyle="#fff"; ctx.font="bold 13px 'Trebuchet MS',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("🏀 MO BALL", W*0.5, py+14);
+    ctx.fillStyle="#ffd93d"; ctx.font="bold 13px sans-serif"; ctx.fillText("SCORE "+phoneScore, W*0.5, py+ph-14);
+    // tap hint
+    ctx.fillStyle="rgba(255,255,255,0.85)"; ctx.font="11px sans-serif"; ctx.fillText("Tap the phone to shoot!", W*0.5, sy+sh-12+ (0));
+  }
+
+  function drawCeleb(dt){
+    if(!celeb) return;
+    var p=1-(buzzerT/buzzerMax);           // 0 -> 1 over the celebration
+    var cx=W*0.5, hoopY=H*0.30;
+    // flashing top banner
+    ctx.save(); ctx.globalAlpha=0.5+0.5*Math.sin(last*0.02);
+    ctx.fillStyle= celeb.kind==="trophy" ? "#ffd93d" : "#e0453a"; ctx.fillRect(0,0,W,6); ctx.fillRect(0,H-6,W,6); ctx.restore();
+    if(celeb.kind==="trophy"){
+      // big trophy + confetti
+      ctx.font="70px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText("🏆", cx, hoopY+10 - Math.abs(Math.sin(last*0.006))*8);
+    } else if(celeb.kind==="family"){
+      // basketball hoop + the FAMILY shooting 15 shots
+      ctx.fillStyle="#f4f6fa"; rr(cx-46,hoopY-46,92,58,6); ctx.fill(); ctx.strokeStyle="#c33"; ctx.lineWidth=3; rr(cx-46,hoopY-46,92,58,6); ctx.stroke();
+      ctx.strokeStyle="#ff7a1a"; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(cx-26,hoopY+14); ctx.lineTo(cx+26,hoopY+14); ctx.stroke();
+      ctx.strokeStyle="#eee"; ctx.lineWidth=1.5; for(var nnn=-4;nnn<=4;nnn++){ ctx.beginPath(); ctx.moveTo(cx+nnn*6,hoopY+14); ctx.lineTo(cx+nnn*3,hoopY+34); ctx.stroke(); }
+      // 15 basketballs, each launched at a staggered time from around the court
+      var made=0;
+      for(var s=0;s<15;s++){ var t0=s*0.05; var bt=(p-t0)/0.4; if(bt<=0||bt>1.15) { if(bt>1.15) made++; continue; }
+        var lx=cx + (((s%5)-2))*W*0.11 + (hsh(s*3.1)-0.5)*20, ly=H*0.74;
+        var tt=Math.min(1,bt); var bx2=lx+(cx-lx)*tt, by2=ly+((hoopY+14)-ly)*tt - Math.sin(tt*Math.PI)*H*0.24;
+        ctx.fillStyle="#dd6a15"; ctx.beginPath(); ctx.arc(bx2,by2,11,0,7); ctx.fill();
+        ctx.strokeStyle="#7a3a08"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(bx2-11,by2); ctx.lineTo(bx2+11,by2); ctx.stroke(); }
+      if(!buzzerSaid){ buzzerSaid=true; say("Family shootout! Fifteen shots!"); }
+      // the family cheering along the bottom
+      ctx.font="30px sans-serif"; ctx.textAlign="center"; for(var fm=0;fm<5;fm++){ ctx.fillText(["🧑","👦","👧","👩","👨"][fm], cx+((fm-2))*W*0.12, H*0.80+Math.sin(last*0.01+fm)*3); }
+      // made counter
+      ctx.fillStyle="#ffd93d"; ctx.font="bold 18px 'Trebuchet MS',sans-serif"; ctx.fillText("🏀 "+Math.min(15,made)+" / 15 made!", cx, hoopY-64);
+    } else {
+      // basketball hoop: backboard, rim, net
+      ctx.fillStyle="#f4f6fa"; rr(cx-46,hoopY-46,92,58,6); ctx.fill(); ctx.strokeStyle="#c33"; ctx.lineWidth=3; rr(cx-46,hoopY-46,92,58,6); ctx.stroke();
+      ctx.strokeStyle="#e0453a"; ctx.lineWidth=4; ctx.strokeRect(cx-18,hoopY-28,36,24);
+      ctx.strokeStyle="#ff7a1a"; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(cx-26,hoopY+14); ctx.lineTo(cx+26,hoopY+14); ctx.stroke(); // rim
+      ctx.strokeStyle="#eee"; ctx.lineWidth=1.5; for(var nn=-4;nn<=4;nn++){ ctx.beginPath(); ctx.moveTo(cx+nn*6,hoopY+14); ctx.lineTo(cx+nn*3,hoopY+34); ctx.stroke(); } // net
+      // ball shot animation (path depends on kind)
+      var bt=Math.min(1,p/0.45);
+      var startX,startY;
+      if(celeb.kind==="three"){ startX=W*0.16; startY=H*0.72; }
+      else if(celeb.kind==="dunk"){ startX=cx; startY=hoopY-120; }
+      else if(celeb.kind==="oop"){ startX=W*0.80; startY=H*0.66; }
+      else { startX=W*0.30; startY=H*0.74; }
+      var endX=cx, endY=hoopY+14;
+      var bx, by;
+      if(celeb.kind==="dunk"){ bx=cx; by=startY+(endY-startY)*bt; }
+      else { bx=startX+(endX-startX)*bt; by=startY+(endY-startY)*bt - Math.sin(bt*Math.PI)*H*0.22; }
+      if(bt<1){ ctx.fillStyle="#dd6a15"; ctx.beginPath(); ctx.arc(bx,by,13,0,7); ctx.fill();
+        ctx.strokeStyle="#7a3a08"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(bx-13,by); ctx.lineTo(bx+13,by); ctx.stroke(); ctx.beginPath(); ctx.arc(bx,by,13,-1,1); ctx.stroke(); }
+      else { // swish moment: ball falls through net + flash
+        if(!buzzerSaid){ buzzerSaid=true; swishSfx(); say(celeb.text); }
+        var fy=hoopY+14+(p-0.45)/0.55*H*0.14;
+        ctx.fillStyle="#dd6a15"; ctx.beginPath(); ctx.arc(cx,fy,13,0,7); ctx.fill();
+        ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.fillStyle="rgba(255,220,90,"+(0.5*(1-(p-0.45)/0.55))+")"; ctx.beginPath(); ctx.arc(cx,hoopY+14,40,0,7); ctx.fill(); ctx.restore();
+      }
+    }
+    // confetti after the shot lands
+    if(p>0.45){ for(var c=0;c<26;c++){ var seed=c*2.3+1; var life=(p-0.45)/0.55; var cxp=cx+(hsh(seed)-0.5)*W*0.9; var cyp=hoopY+ life*H*0.6*(0.4+hsh(seed*2)); ctx.fillStyle=["#e0453a","#3a86e0","#37b06a","#ffd93d","#8a63d2"][c%5]; ctx.fillRect(cxp,cyp,6,6); } }
+    // big caption
+    ctx.font="bold 34px 'Trebuchet MS',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    var cap=celeb.emo+" "+celeb.text; var cy2=H*0.60+Math.sin(last*0.01)*3;
+    ctx.lineWidth=6; ctx.strokeStyle="#0a1220"; ctx.strokeText(cap,cx,cy2);
+    ctx.fillStyle= celeb.kind==="trophy" ? "#ffd93d" : "#ffef9f"; ctx.fillText(cap,cx,cy2);
+    ctx.font="bold 15px 'Trebuchet MS',sans-serif"; ctx.fillStyle="#fff"; ctx.strokeText("at "+stName,cx,cy2+28); ctx.fillText("at "+stName,cx,cy2+28);
+  }
+  function drawVignette(){ var g=ctx.createRadialGradient(W/2,H*0.46,Math.min(W,H)*0.28,W/2,H*0.5,Math.max(W,H)*0.72);
+    g.addColorStop(0,"rgba(0,0,0,0)"); g.addColorStop(0.7,"rgba(0,0,0,0.10)"); g.addColorStop(1,"rgba(0,0,0,0.34)");
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="rgba(255,255,255,0.03)"; ctx.fillRect(0,0,W,H*0.5); }
+
+  function update(dt){
+    phaseT-=dt;
+    var target = (phase==="riding")?1 : (phase==="departing")?1 : 0;
+    // winSpeed ease
+    if(phase==="riding"){ var tgt=(view==="drive"&&(pointerDown||gasHeld))?20:14; winSpeed += (tgt - winSpeed)*0.04*dt; }
+    else if(phase==="arriving"){ winSpeed += (0 - winSpeed)*0.05*dt; }
+    else if(phase==="stopped"){ winSpeed += (0 - winSpeed)*0.2*dt; if(winSpeed<0.05)winSpeed=0; }
+    else if(phase==="departing"){ winSpeed += (14 - winSpeed)*0.03*dt; }
+    winPhase += winSpeed*dt;
+    // doors
+    var doorTarget = (phase==="stopped")?1:0; doorT += (doorTarget-doorT)*0.12*dt; if(doorT<0.01)doorT=0;
+    // sway (more when moving)
+    sway = Math.sin(last/1000*3)* (0.6+winSpeed*0.12);
+    // YOU — walk around the car in People view
+    if(view==="people"){ var spd2=W*0.006*dt, moved=false, loX=W*0.08, hiX=W*0.92;
+      if(keyState.left){ youRider.x-=spd2; moved=true; }
+      if(keyState.right){ youRider.x+=spd2; moved=true; }
+      if(pointerX!=null){ var d=pointerX-youRider.x; if(Math.abs(d)>4){ youRider.x+=Math.max(-spd2,Math.min(spd2,d)); moved=true; } }
+      if(youRider.x<loX)youRider.x=loX; if(youRider.x>hiX)youRider.x=hiX;
+      youRider.moving=moved; if(moved) youRider.ph+=0.5*dt;
+      // get off anywhere: actively WALK into the open door while stopped (not just stand there)
+      if(moved && phase==="stopped" && doorT>0.55 && youRider.x>W*0.44 && youRider.x<W*0.58){ doorSfx(); startWalk(stationCount<10); return; } }
+    else youRider.moving=false;
+    // another train passing on the next track
+    if(otherTrain.active){ otherTrain.x += otherTrain.dir*otherTrain.spd*dt;
+      if(otherTrain.x>W+otherTrain.len+30 || otherTrain.x < -otherTrain.len-30){ otherTrain.active=false; otherTrain.cool=140+Math.random()*220; } }
+    else { otherTrain.cool-=dt; if(otherTrain.cool<=0 && phase==="riding" && winSpeed>5){ otherTrain.active=true;
+      otherTrain.dir=Math.random()<0.5?1:-1; otherTrain.len=W*1.15; otherTrain.spd=9+Math.random()*5;
+      otherTrain.x= otherTrain.dir>0? -otherTrain.len : W; otherTrain.col=["#d0453a","#c8ced6","#37933a","#c99a2a","#3a86e0"][Math.floor(hsh(last)*5)%5]; } }
+
+    if(phaseT<=0){
+      if(phase==="riding"){ phase="arriving"; phaseT=150; brakeSfx(); }
+      else if(phase==="arriving"){ phase="stopped"; phaseT=260; stationCount++; document.getElementById("stations").textContent="🚉 "+stationCount; chime(); doorSfx();
+        say("Now arriving at "+stName+". Doors opening.");
+        celeb=stationCeleb(stName); buzzerMax=(celeb.kind==="family")?300:170; buzzerT=buzzerMax; buzzerSaid=false;
+        if(celeb.kind==="buzzer") buzzerSfx(); else if(celeb.kind==="trophy") winSfx(); else swishSfx();
+        // people walk out and in through the doors
+        var dcx=W*0.51, fy=H*0.60;
+        walkers=[ {x:W*0.30,y:fy,tx:dcx,seed:hsh(stationCount*3.3)*900,kind:"out",stage:0,alpha:1},
+                  {x:W*0.72,y:fy,tx:dcx,seed:hsh(stationCount*5.1)*900,kind:"out",stage:0,alpha:1},
+                  {x:dcx,y:H*0.44,tx:W*0.22,seed:hsh(stationCount*7.7)*900,kind:"in"},
+                  {x:dcx,y:H*0.44,tx:W*0.80,seed:hsh(stationCount*9.2)*900,kind:"in"} ];
+        // some seated passengers change (got on/off)
+        for(var k=0;k<3;k++){ seatSeed[Math.floor(hsh(stationCount*3+k)*seatSeed.length)] = Math.floor(hsh(stationCount*7+k)*900); }
+        standSeed[Math.floor(hsh(stationCount)*standSeed.length)] = Math.floor(hsh(stationCount*11)*900); }
+      else if(phase==="stopped"){ phase="departing"; phaseT=150; doorSfx(); }
+      else { phase="riding"; phaseT=280; walkers=[]; var prev=stName, nn;
+        var tries=0; do { nn=STATIONS[Math.floor(hsh(stationCount*13.7+last*0.001+tries*0.37)*STATIONS.length)%STATIONS.length]; tries++; } while(nn===prev && tries<40); stName=nn; }
+    }
+    // move passengers walking in/out at the doors
+    for(var wi=walkers.length-1; wi>=0; wi--){ var w=walkers[wi]; var ox=w.x, oy=w.y;
+      if(w.kind==="out"){ if(w.stage===0){ w.x += (w.tx-w.x)*0.07*dt; if(Math.abs(w.x-w.tx)<8) w.stage=1; }
+        else { w.y += (H*0.30 - w.y)*0.07*dt; w.alpha=(w.alpha==null?1:w.alpha)-0.02*dt; if(w.y<H*0.36||w.alpha<=0){ walkers.splice(wi,1); continue; } } }
+      else { w.x += (w.tx-w.x)*0.06*dt; w.y += (H*0.55 - w.y)*0.06*dt; }
+      var mv=Math.hypot(w.x-ox,w.y-oy); w.ph=(w.ph||0) + mv*0.09; w.moving=mv>0.4;
+    }
+  }
+
+  function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+  // scene seen THROUGH glass / doorway
+  function drawScene(x,y,w,h){
+    ctx.save(); rr(x,y,w,h,4); ctx.clip();
+    var stationView = (phase!=="riding");
+    if(!stationView){ // tunnel rushing by
+      ctx.fillStyle="#0a1220"; ctx.fillRect(x,y,w,h);
+      ctx.strokeStyle="#20406a"; ctx.lineWidth=3;
+      for(var i=-2;i<10;i++){ var sxp=x + ((i*46 + (winPhase*3)%46)) ; ctx.beginPath(); ctx.moveTo(sxp,y); ctx.lineTo(sxp-w*0.5,y+h); ctx.stroke(); }
+      ctx.fillStyle="rgba(255,240,180,0.5)"; for(var l=0;l<4;l++){ var ly=y+ ((l*40 + (winPhase*4)%40)); ctx.fillRect(x+w*0.5,ly,3,10); }
+      // another train passing on the next track (drawn at a fixed world band, clipped per window)
+      if(otherTrain.active){ var ty=H*0.15+H*0.28*0.30, th=H*0.28*0.44, tx=otherTrain.x;
+        ctx.fillStyle=otherTrain.col; ctx.fillRect(tx,ty,otherTrain.len,th);
+        ctx.fillStyle="rgba(0,0,0,0.25)"; ctx.fillRect(tx,ty,otherTrain.len,th*0.14);
+        var wW=34, gp=16;
+        for(var wx=tx+18; wx<tx+otherTrain.len-18; wx+=wW+gp){
+          ctx.fillStyle="#ffe9a8"; ctx.fillRect(wx,ty+th*0.26,wW,th*0.4);
+          ctx.fillStyle="rgba(25,25,35,0.65)"; ctx.beginPath(); ctx.arc(wx+wW*0.5,ty+th*0.5,th*0.1,0,7); ctx.fill(); ctx.fillRect(wx+wW*0.28,ty+th*0.56,wW*0.44,th*0.14); }
+        ctx.fillStyle="#111"; ctx.fillRect(tx,ty+th,otherTrain.len,th*0.12);
+      }
+    } else { // station platform
+      ctx.fillStyle="#8f97a6"; ctx.fillRect(x,y,w,h);
+      ctx.fillStyle="#a7afbd"; for(var t=0;t<6;t++) ctx.fillRect(x, y+t*(h/6), w, 2); // tile lines
+      for(var v=0; v<w; v+=18) ctx.fillRect(x+v, y, 2, h);
+      // platform floor
+      ctx.fillStyle="#5a6070"; ctx.fillRect(x, y+h*0.66, w, h*0.34);
+      ctx.fillStyle="#ffd93d"; ctx.fillRect(x, y+h*0.64, w, 4);
+      // station sign WITH a roundel emblem "thing" beside the name
+      ctx.fillStyle="#1f5aa8"; var sw=Math.min(w*0.86,168), sx=x+w/2-sw/2, sy=y+h*0.16; rr(sx,sy,sw,22,4); ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=2; rr(sx,sy,sw,22,4); ctx.stroke();
+      var ro=sx+14, rc=sy+11;
+      ctx.fillStyle="#e0453a"; ctx.beginPath(); ctx.arc(ro,rc,8,0,7); ctx.fill(); ctx.fillStyle="#1f5aa8"; ctx.beginPath(); ctx.arc(ro,rc,5,0,7); ctx.fill(); ctx.fillStyle="#e0453a"; ctx.fillRect(ro-10,rc-2,20,4);
+      ctx.fillStyle="#fff"; ctx.font="bold 11px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(stName+" "+stationIcon(stName), ro+8+(sx+sw-(ro+8))/2, sy+11);
+      // a pole so the sign hangs on the platform (a 'thing' standing outside)
+      ctx.strokeStyle="#c9ccd2"; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(x+w/2, sy+22); ctx.lineTo(x+w/2, y+h*0.5); ctx.stroke();
+      // waiting people on platform
+      var np=Math.max(2,Math.floor(w/60));
+      for(var p=0;p<np;p++){ var pxp=x + w*(0.12+p*0.76/(np-1||1)); person(pxp, y+h*0.62, Math.min(w,h)*0.16, stationCount*10+p*3, true, null, 0.65); }
+    }
+    // tinted glass overlay + reflection
+    ctx.fillStyle="rgba(40,95,90,0.30)"; ctx.fillRect(x,y,w,h);
+    ctx.fillStyle="rgba(255,255,255,0.10)"; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+w*0.4,y); ctx.lineTo(x+w*0.15,y+h); ctx.lineTo(x,y+h); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    // frame
+    ctx.strokeStyle="#39445a"; ctx.lineWidth=4; rr(x,y,w,h,4); ctx.stroke();
+  }
+
+  function render(){ if(view==="drive") drawDrive(); else drawInside(); }
+
+  function drawDrive(){
+    var wsBot=H*0.60, cx=W/2, cy=H*0.33, station=(phase!=="riding");
+    ctx.fillStyle= station? "#39445c":"#0a0e18"; ctx.fillRect(0,0,W,wsBot);
+    var maxW=W*1.25, maxH=wsBot*1.7;
+    // tunnel bore rings expanding toward you
+    for(var k=0;k<16;k++){ var f=((k/16)+((winPhase*0.006)%(1/16))); f=f%1; if(f<0.03)f=0.03;
+      var ew=(maxW/2)*f, eh=(maxH/2)*f;
+      ctx.strokeStyle="rgba("+(station?"150,160,180":"64,74,104")+","+(0.12+f*0.5)+")"; ctx.lineWidth=1+3*f;
+      ctx.beginPath(); ctx.ellipse(cx,cy,ew,eh,0,0,7); ctx.stroke(); }
+    ctx.fillStyle= station? "rgba(210,220,230,0.9)":"#05070d"; ctx.beginPath(); ctx.ellipse(cx,cy,maxW*0.045,maxH*0.045,0,0,7); ctx.fill();
+    // light bloom down the tunnel
+    var bloom=ctx.createRadialGradient(cx,cy,2,cx,cy,W*0.30);
+    bloom.addColorStop(0, station?"rgba(225,235,245,0.55)":"rgba(120,150,220,0.16)"); bloom.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.fillStyle=bloom; ctx.fillRect(0,0,W,wsBot); ctx.restore();
+    // station platform coming up
+    if(station){ ctx.fillStyle="#8f97a6"; ctx.fillRect(cx-maxW*0.13, cy-4, maxW*0.26, maxH*0.05);
+      ctx.fillStyle="#1f5aa8"; ctx.fillRect(cx-44, cy-30, 88, 15); ctx.strokeStyle="#fff"; ctx.lineWidth=1; ctx.strokeRect(cx-44,cy-30,88,15);
+      ctx.fillStyle="#fff"; ctx.font="bold 9px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(stName,cx,cy-22);
+      for(var pp=0;pp<4;pp++) person(cx-30+pp*20, cy+8, 13, stationCount*4+pp, true, null, 0.85); }
+    // converging rails
+    ctx.strokeStyle="#c6cfda"; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(cx-W*0.24,wsBot); ctx.lineTo(cx-2,cy+4); ctx.moveTo(cx+W*0.24,wsBot); ctx.lineTo(cx+2,cy+4); ctx.stroke();
+    // ties scrolling toward you
+    for(var t=0;t<10;t++){ var tf=((t/10)+((winPhase*0.01)%(1/10)))%1; var yy=cy+(wsBot-cy)*tf; var hw=W*0.24*tf;
+      ctx.strokeStyle="rgba(120,110,90,"+(0.2+tf*0.5)+")"; ctx.lineWidth=1+3*tf; ctx.beginPath(); ctx.moveTo(cx-hw,yy); ctx.lineTo(cx+hw,yy); ctx.stroke(); }
+    // headlight glow
+    var hgg=ctx.createRadialGradient(cx,wsBot,10,cx,wsBot,H*0.4); hgg.addColorStop(0,"rgba(255,248,210,0.16)"); hgg.addColorStop(1,"rgba(255,248,210,0)");
+    ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.fillStyle=hgg; ctx.fillRect(0,cy,W,wsBot-cy); ctx.restore();
+    // real-looking trains driving ahead on the same track
+    var aheadD=[0.66,0.40]; // far first, then nearer
+    for(var ai=0;ai<aheadD.length;ai++){ var d=aheadD[ai]+Math.sin(winPhase*0.02+ai*3)*0.04;
+      var ty=wsBot+(cy-wsBot)*d, sc=Math.max(0.05,1-d*0.85);
+      var bw=W*0.30*sc, bh=H*0.15*sc, bxo=Math.sin(winPhase*0.03+ai)*W*0.01*sc, X=cx+bxo, B=ty; // B = bottom of the rear car
+      // metallic silver rear car
+      var grd=ctx.createLinearGradient(X-bw/2,0,X+bw/2,0); grd.addColorStop(0,"#8b93a2"); grd.addColorStop(0.5,"#d7dde6"); grd.addColorStop(1,"#8b93a2");
+      ctx.fillStyle=grd; rr(X-bw/2,B-bh,bw,bh,6*sc); ctx.fill();
+      ctx.fillStyle="#6b7280"; rr(X-bw/2,B-bh,bw,bh*0.14,6*sc); ctx.fill();                       // roof
+      ctx.fillStyle="#2f7fc0"; ctx.fillRect(X-bw/2,B-bh*0.44,bw,Math.max(1.5,bh*0.08));           // livery stripe
+      // rear windshield (dark glass) with reflection
+      ctx.fillStyle="#0e1a26"; rr(X-bw*0.30,B-bh*0.82,bw*0.60,bh*0.34,3*sc); ctx.fill();
+      ctx.fillStyle="rgba(120,160,200,0.25)"; rr(X-bw*0.30,B-bh*0.82,bw*0.28,bh*0.34,3*sc); ctx.fill();
+      // route number panel
+      ctx.fillStyle="#12305a"; rr(X-bw*0.12,B-bh*0.28,bw*0.24,bh*0.16,2*sc); ctx.fill(); ctx.fillStyle="#fff"; ctx.font="bold "+Math.max(5,bh*0.14)+"px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("MO",X,B-bh*0.20);
+      // red taillights + glow
+      ctx.fillStyle="#ff4a34"; ctx.beginPath(); ctx.arc(X-bw*0.36,B-bh*0.14,Math.max(1.5,bw*0.05),0,7); ctx.arc(X+bw*0.36,B-bh*0.14,Math.max(1.5,bw*0.05),0,7); ctx.fill();
+      ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.fillStyle="rgba(255,70,50,"+(0.3*sc)+")"; ctx.beginPath(); ctx.arc(X-bw*0.36,B-bh*0.14,bw*0.16,0,7); ctx.arc(X+bw*0.36,B-bh*0.14,bw*0.16,0,7); ctx.fill(); ctx.restore();
+      // coupler + gap under the car
+      ctx.fillStyle="#20262f"; ctx.fillRect(X-bw*0.06,B,bw*0.12,bh*0.12);
+      ctx.fillStyle="rgba(0,0,0,0.35)"; rr(X-bw/2,B,bw,bh*0.06,2); ctx.fill();
+    }
+    // cab frame (A-pillars + roof)
+    ctx.fillStyle="#161d2b"; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(W*0.15,0); ctx.lineTo(W*0.05,wsBot); ctx.lineTo(0,wsBot); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(W,0); ctx.lineTo(W*0.85,0); ctx.lineTo(W*0.95,wsBot); ctx.lineTo(W,wsBot); ctx.closePath(); ctx.fill();
+    ctx.fillRect(0,0,W,H*0.035);
+    // dashboard console
+    ctx.fillStyle="#1f2740"; ctx.fillRect(0,wsBot,W,H-wsBot); ctx.fillStyle="#2b3550"; ctx.fillRect(0,wsBot,W,10);
+    // speedometer
+    var mph=Math.round(winSpeed*5.5); var scx=W*0.24, scy=wsBot+(H-wsBot)*0.42, sr=Math.min(W,H)*0.085;
+    ctx.fillStyle="#0d1424"; ctx.beginPath(); ctx.arc(scx,scy,sr,0,7); ctx.fill(); ctx.strokeStyle="#3a4c6a"; ctx.lineWidth=3; ctx.stroke();
+    ctx.strokeStyle="#7fd0ff"; ctx.lineWidth=3; var ang=Math.PI*0.75+(Math.min(winSpeed,22)/22)*Math.PI*1.5;
+    ctx.beginPath(); ctx.moveTo(scx,scy); ctx.lineTo(scx+Math.cos(ang)*sr*0.8, scy+Math.sin(ang)*sr*0.8); ctx.stroke();
+    ctx.fillStyle="#fff"; ctx.font="bold 13px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(mph+" mph", scx, scy+sr+14);
+    // throttle lever
+    var tx=W*0.74, ty=wsBot+14, tw=W*0.12, th=(H-wsBot)*0.5;
+    ctx.fillStyle="#141a28"; rr(tx,ty,tw,th,8); ctx.fill();
+    var lev=ty+8+(th-24)*(1-Math.min(1,winSpeed/16)); ctx.fillStyle=pointerDown?"#37b06a":"#e0453a"; rr(tx-5,lev,tw+10,16,6); ctx.fill();
+    ctx.fillStyle="#9fb0c8"; ctx.font="10px sans-serif"; ctx.fillText("THROTTLE",tx+tw/2,ty+th+13);
+    // GO / STOP light
+    ctx.fillStyle= station? "#ff5a3c":"#37f06a"; ctx.beginPath(); ctx.arc(W*0.5,wsBot+20,7,0,7); ctx.fill();
+    ctx.fillStyle="#9fb0c8"; ctx.font="10px sans-serif"; ctx.fillText(station?"STOP":"GO",W*0.5,wsBot+40);
+    // Mo's hands on the controls
+    ctx.fillStyle="#2f7fc0"; ctx.fillRect(W*0.37,H-20,W*0.26,13);
+    ctx.fillStyle="#e8b98f"; ctx.beginPath(); ctx.arc(W*0.42,H-20,10,0,7); ctx.arc(W*0.58,H-20,10,0,7); ctx.fill();
+    // driver's announcement microphone on the dashboard
+    var mxp=W*0.5, myp=wsBot+ (H-wsBot)*0.30;
+    ctx.strokeStyle="#c9ccd2"; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(mxp,myp+22); ctx.lineTo(mxp,myp+2); ctx.stroke();          // stand
+    ctx.strokeStyle="#3a4c6a"; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(mxp,myp+2); ctx.quadraticCurveTo(mxp+14,myp-6,mxp+10,myp-16); ctx.stroke(); // gooseneck
+    ctx.fillStyle="#20283a"; ctx.beginPath(); ctx.ellipse(mxp+10,myp-20,7,9,0.3,0,7); ctx.fill();                                        // mic head
+    ctx.strokeStyle="#4a5a74"; ctx.lineWidth=1; for(var mg=-2;mg<=2;mg++){ ctx.beginPath(); ctx.moveTo(mxp+10-6,myp-20+mg*3); ctx.lineTo(mxp+10+6,myp-20+mg*3); ctx.stroke(); }
+    ctx.fillStyle="#7a4ab0"; ctx.fillRect(mxp-16,myp+22,32,5);
+    // header
+    driveHeader();
+  }
+  function driveHeader(){
+    var statusTxt = phase==="riding"? ("Next stop: "+stName) : phase==="arriving"? ("Now arriving: "+stName) : phase==="stopped"? (stName+" — doors open") : ("Departing "+stName);
+    ctx.fillStyle="#0a1220cc"; rr(W/2-Math.min(W*0.9,300)/2, H*0.055, Math.min(W*0.9,300),28,8); ctx.fill();
+    ctx.fillStyle="#ffd93d"; ctx.font="bold 15px 'Trebuchet MS',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(statusTxt, W/2, H*0.055+14);
+    ctx.fillStyle="#bfe8ff"; ctx.font="12px sans-serif"; ctx.fillText("Hold to speed up • 📢 horn", W/2, H*0.055+34);
+  }
+
+  function drawInside(){
+    var sx0 = sway; // horizontal sway of whole cabin
+    ctx.save(); ctx.translate(sx0,0);
+    // cabin body
+    ctx.fillStyle="#28324a"; ctx.fillRect(-10,0,W+20,H);
+    // ceiling + lights
+    ctx.fillStyle="#3a4661"; ctx.fillRect(-10,0,W+20,H*0.12);
+    for(var li=0;li<6;li++){ ctx.fillStyle="#fff6cc"; ctx.fillRect(W*(0.08+li*0.16), H*0.045, W*0.10, H*0.028); }
+    // upper wall band under ceiling
+    ctx.fillStyle="#2f3c58"; ctx.fillRect(-10,H*0.12,W+20,H*0.03);
+    // ---- real in-car LED destination sign (scrolling dot-matrix) ----
+    (function(){ var lw=W*0.52, lx=W/2-lw/2, ly=H*0.083, lh=H*0.03;
+      ctx.fillStyle="#0a0d06"; rr(lx-3,ly-3,lw+6,lh+6,4); ctx.fill();
+      ctx.fillStyle="#141608"; rr(lx,ly,lw,lh,3); ctx.fill();
+      var msg = phase==="stopped" ? ("● THIS STOP: "+stName+"  ● DOORS OPEN") : ("► NEXT STATION: "+stName+"   ► MO LINE   ► "+stName+" ");
+      ctx.save(); rr(lx,ly,lw,lh,3); ctx.clip();
+      ctx.fillStyle= phase==="stopped" ? "#7dff9a" : "#ffb020"; ctx.font="bold 13px 'Courier New',monospace"; ctx.textAlign="left"; ctx.textBaseline="middle";
+      var tw2=ctx.measureText(msg).width+40, off=(last*0.12)%tw2;
+      ctx.fillText(msg, lx+8-off, ly+lh/2); ctx.fillText(msg, lx+8-off+tw2, ly+lh/2);
+      ctx.restore(); })();
+
+    // WINDOWS + central DOORS across the top band
+    var wy=H*0.15, wh=H*0.28;
+    var dx0=W*0.40, dx1=W*0.62, dcx=(dx0+dx1)/2;   // door region
+    // left windows (cab window + one)
+    drawScene(W*0.02, wy, W*0.13, wh);              // cab windshield (front)
+    // Mo in cab silhouette over cab window bottom
+    person(W*0.085, wy+wh*0.86, Math.min(W,H)*0.13, 0.5, true, "#2f7fc0", 1);
+    drawScene(W*0.17, wy, dx0-W*0.19, wh);          // left window
+    drawScene(dx1+W*0.02, wy, W*0.96-(dx1+W*0.02), wh); // right window
+    // doorway (behind doors): show platform/tunnel scene full height of door
+    var doorTop=wy, doorBot=H*0.80;
+    drawScene(dx0, doorTop, dx1-dx0, doorBot-doorTop);
+    // door panels (tinted glass on metal) sliding open
+    var open=(dx1-dx0)/2*doorT;
+    doorPanel(dx0, doorTop, dcx-dx0 - open, doorBot-doorTop, -open>=0? dx0 : dx0); // left slides left
+    doorPanel(dcx+open, doorTop, dx1-dcx - open, doorBot-doorTop, 0);
+    // door threshold light
+    ctx.fillStyle="#ffd93d"; ctx.fillRect(dx0, doorBot-4, dx1-dx0, 4);
+
+    // standing area: poles + standing passengers (flanking the doors)
+    ctx.strokeStyle="#c9ccd2"; ctx.lineWidth=6;
+    var poleXs=[W*0.24,W*0.34,W*0.68,W*0.78];
+    for(var pI=0;pI<poleXs.length;pI++){ ctx.beginPath(); ctx.moveTo(poleXs[pI],H*0.15); ctx.lineTo(poleXs[pI],H*0.62); ctx.stroke(); }
+    ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(W*0.18,H*0.17); ctx.lineTo(W*0.98,H*0.17); ctx.stroke();
+    var sp=Math.min(W,H);
+    person(W*0.24,H*0.50,sp*0.15,standSeed[0],true,null,1);
+    person(W*0.34,H*0.51,sp*0.15,standSeed[1],true,null,1);
+    person(W*0.70,H*0.50,sp*0.15,standSeed[2],true,null,1);
+    person(W*0.80,H*0.51,sp*0.15,standSeed[3],true,null,1);
+
+    // nice cushioned bench seats
+    drawSeats();
+    for(var si=0;si<seatSeed.length;si++){ var sxp=W*(0.09+si*0.82/(seatSeed.length-1)); if(sxp>dx0-30 && sxp<dx1+30) continue; person(sxp, H*0.705, sp*0.125, seatSeed[si], false, null, 1); }
+    // floor
+    ctx.fillStyle="#3a445e"; ctx.fillRect(-10,H*0.80,W+20,H*0.20);
+    ctx.fillStyle="#323c54"; for(var fx=0;fx<W;fx+=52) ctx.fillRect(fx,H*0.80,26,H*0.20);
+
+    // passengers walking in / out at the doors (real walking gait)
+    for(var wi=0;wi<walkers.length;wi++){ var w=walkers[wi]; person(w.x,w.y,sp*0.15,w.seed,true,null,w.alpha==null?1:w.alpha, w.moving!==false? (w.ph||0) : null); }
+
+    // YOU — the player as a passenger walking around the car
+    var yrY=H*0.60, yrS=sp*0.165;
+    ctx.save(); ctx.globalAlpha=0.5; ctx.fillStyle="#ffd93d"; ctx.beginPath(); ctx.ellipse(youRider.x, yrY+yrS*0.98, yrS*0.42, yrS*0.13, 0,0,Math.PI*2); ctx.fill(); ctx.restore();
+    person(youRider.x, yrY, yrS, 0.5, true, "#2f7fc0", 1, youRider.moving? youRider.ph : null);
+    ctx.fillStyle="#ffd93d"; ctx.font="bold 12px 'Trebuchet MS',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.strokeStyle="#0a1220"; ctx.lineWidth=3; ctx.strokeText("YOU", youRider.x, yrY-yrS*0.62); ctx.fillText("YOU", youRider.x, yrY-yrS*0.62);
+
+    // when YOU are near the OPEN door → flashing arrow "STEP OFF HERE"
+    if(phase==="stopped" && doorT>0.5 && youRider.x>dx0-W*0.09 && youRider.x<dx1+W*0.09){
+      var acx=(dx0+dx1)/2, bob=Math.sin(last/200)*5, ay=doorTop-2+bob;
+      ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.fillStyle="rgba(125,255,154,0.15)"; ctx.fillRect(dx0,doorTop,dx1-dx0,doorBot-doorTop); ctx.restore();
+      ctx.fillStyle="#7dff9a"; ctx.strokeStyle="#0a1220"; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(acx-15,ay); ctx.lineTo(acx+15,ay); ctx.lineTo(acx+15,ay+14); ctx.lineTo(acx+27,ay+14); ctx.lineTo(acx,ay+34); ctx.lineTo(acx-27,ay+14); ctx.lineTo(acx-15,ay+14); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle="#0a1220dd"; rr(acx-62, ay-26, 124, 20, 8); ctx.fill();
+      ctx.fillStyle="#7dff9a"; ctx.font="bold 12px 'Trebuchet MS',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("STEP OFF HERE", acx, ay-16);
+    }
+
+    ctx.restore();
+
+    // header status
+    var statusTxt = phase==="riding"? ("Next stop: "+stName)
+      : phase==="arriving"? ("Now arriving: "+stName)
+      : phase==="stopped"? (stName+" — doors open")
+      : ("Departing "+stName);
+    ctx.fillStyle="#0a1220cc"; rr(W/2-Math.min(W*0.9,300)/2, H*0.135, Math.min(W*0.9,300),28,8); ctx.fill();
+    ctx.fillStyle="#ffd93d"; ctx.font="bold 15px 'Trebuchet MS',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(statusTxt, W/2, H*0.135+14);
+    ctx.fillStyle=(phase==="stopped")?"#7dff9a":"rgba(255,255,255,0.85)"; ctx.font="12px 'Trebuchet MS',sans-serif";
+    ctx.fillText(phase==="stopped"? "🚪 Doors open — walk into the doorway to get off here!" : "You're a rider! ◀ ▶ or drag to walk around", W/2, H*0.135+38);
+  }
+
+  function drawSeats(){
+    ctx.fillStyle="#20293e"; ctx.fillRect(-10,H*0.58,W+20,H*0.22);
+    var y0=H*0.595, bh=H*0.095, sy=H*0.70, sh=H*0.078;
+    var n=8, gap=6, sw=(W-(n+1)*gap)/n;
+    for(var i=0;i<n;i++){ var x=gap+i*(sw+gap);
+      // backrest cushion
+      ctx.fillStyle=(i%2)?"#2f6fb0":"#2a66a4"; rr(x,y0,sw,bh,8); ctx.fill();
+      ctx.fillStyle="rgba(255,255,255,0.10)"; rr(x,y0,sw,bh*0.42,8); ctx.fill();
+      // seat pad
+      ctx.fillStyle="#357bc4"; rr(x,sy,sw,sh,7); ctx.fill();
+      ctx.strokeStyle="rgba(0,0,0,0.15)"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x+3,sy+4); ctx.lineTo(x+sw-3,sy+4); ctx.stroke();
+      // chrome grab handle on the backrest
+      ctx.strokeStyle="#c9ccd2"; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(x+sw/2,y0-1,7,Math.PI,2*Math.PI); ctx.stroke();
+    }
+  }
+  function doorPanel(x,y,w,h,ref){ if(w<=0) return;
+    // tinted door glass upper, metal lower
+    ctx.fillStyle="#59636f"; rr(x,y,w,h,3); ctx.fill();
+    ctx.save(); rr(x+3,y+6,w-6,h*0.5,4); ctx.clip(); ctx.fillStyle="#1a3a3a"; ctx.fillRect(x,y,w,h*0.6);
+    ctx.fillStyle="rgba(40,95,90,0.4)"; ctx.fillRect(x,y,w,h*0.6);
+    ctx.fillStyle="rgba(255,255,255,0.12)"; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+w*0.5,y); ctx.lineTo(x+w*0.2,y+h*0.6); ctx.lineTo(x,y+h*0.6); ctx.closePath(); ctx.fill(); ctx.restore();
+    ctx.strokeStyle="#39445a"; ctx.lineWidth=3; rr(x,y,w,h,3); ctx.stroke();
+    // handle
+    ctx.fillStyle="#c9ccd2"; ctx.fillRect(x+w*0.5-2, y+h*0.62, 4, h*0.14); }
+
+  // detailed person; platform silhouettes use alpha<1
+  function person(x,y,s,seed,standing,forceShirt,alpha,walkPhase){ if(s<3) return; var skin=pick(SKIN,seed*3.1), hair=pick(HAIR,seed*1.7), shirt=forceShirt||pick(SHIRT,seed*2.3);
+    var walk=(walkPhase!=null);
+    var phone= !walk && seed!==0.5 && hsh(seed*7.3)>0.42;   // many riders are on their phones (not Mo — he's driving)
+    var bob= walk? -Math.abs(Math.sin(walkPhase))*s*0.06 : Math.sin(last/1000*2+seed)*s*0.04;
+    ctx.save(); ctx.globalAlpha=alpha==null?1:alpha; ctx.translate(x,y+bob);
+    // LEGS
+    ctx.strokeStyle="#2a3550"; ctx.lineWidth=s*0.18; ctx.lineCap="round";
+    if(walk){ var swg=Math.sin(walkPhase);
+      ctx.beginPath(); ctx.moveTo(-s*0.05,s*0.52); ctx.lineTo(swg*s*0.26, s*1.06 - Math.max(0,Math.cos(walkPhase))*s*0.07);
+      ctx.moveTo(s*0.05,s*0.52); ctx.lineTo(-swg*s*0.26, s*1.06 - Math.max(0,-Math.cos(walkPhase))*s*0.07); ctx.stroke(); }
+    else if(standing){ ctx.beginPath(); ctx.moveTo(-s*0.16,s*0.55); ctx.lineTo(-s*0.16,s*1.12); ctx.moveTo(s*0.16,s*0.55); ctx.lineTo(s*0.16,s*1.12); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.moveTo(-s*0.15,s*0.55); ctx.lineTo(-s*0.15,s*0.82); ctx.lineTo(-s*0.02,s*0.92); ctx.moveTo(s*0.15,s*0.55); ctx.lineTo(s*0.15,s*0.82); ctx.lineTo(s*0.28,s*0.92); ctx.stroke(); }
+    // TORSO
+    ctx.fillStyle=shirt; rr(-s*0.32,s*0.0,s*0.64,s*0.55,s*0.15); ctx.fill();
+    // ARMS
+    ctx.strokeStyle=shirt; ctx.lineWidth=s*0.17; ctx.lineCap="round";
+    if(walk){ var awg=Math.sin(walkPhase); ctx.beginPath(); ctx.moveTo(-s*0.28,s*0.12); ctx.lineTo(-s*0.34 - awg*s*0.14, s*0.4); ctx.moveTo(s*0.28,s*0.12); ctx.lineTo(s*0.34 + awg*s*0.14, s*0.4); ctx.stroke(); }
+    else if(phone){ ctx.lineWidth=s*0.15; ctx.beginPath(); ctx.moveTo(-s*0.26,s*0.14); ctx.lineTo(-s*0.1,s*0.30); ctx.moveTo(s*0.26,s*0.14); ctx.lineTo(s*0.1,s*0.30); ctx.stroke(); }
+    else if(standing){ ctx.lineWidth=s*0.18; ctx.beginPath(); ctx.moveTo(s*0.08,s*0.1); ctx.lineTo(s*0.14,-s*0.45); ctx.stroke(); }
+    else { ctx.lineWidth=s*0.16; ctx.beginPath(); ctx.moveTo(-s*0.32,s*0.14); ctx.lineTo(-s*0.18,s*0.4); ctx.moveTo(s*0.32,s*0.14); ctx.lineTo(s*0.18,s*0.4); ctx.stroke(); }
+    // ears
+    ctx.fillStyle=skin; ctx.beginPath(); ctx.arc(-s*0.28,-s*0.26,s*0.06,0,7); ctx.arc(s*0.28,-s*0.26,s*0.06,0,7); ctx.fill();
+    // head
+    ctx.fillStyle=skin; ctx.beginPath(); ctx.arc(0,-s*0.28,s*0.29,0,7); ctx.fill();
+    // beard (some)
+    if(hsh(seed*13.3)>0.82){ ctx.fillStyle="rgba(0,0,0,0.18)"; ctx.beginPath(); ctx.arc(0,-s*0.20,s*0.26,0.15,Math.PI-0.15); ctx.fill(); ctx.fillStyle=hair; ctx.globalAlpha=(alpha==null?1:alpha)*0.5; ctx.beginPath(); ctx.arc(0,-s*0.18,s*0.24,0.35,Math.PI-0.35); ctx.fill(); ctx.globalAlpha=alpha==null?1:alpha; }
+    // hair
+    ctx.fillStyle=hair; ctx.beginPath(); ctx.arc(0,-s*0.34,s*0.30,Math.PI*0.92,Math.PI*2.08); ctx.fill(); ctx.fillRect(-s*0.3,-s*0.4,s*0.1,s*0.19); ctx.fillRect(s*0.2,-s*0.4,s*0.1,s*0.19);
+    // cap (some)
+    if(hsh(seed*9.7)>0.76){ var cap=pick(SHIRT,seed*4.1); ctx.fillStyle=cap; ctx.beginPath(); ctx.arc(0,-s*0.36,s*0.31,Math.PI,2*Math.PI); ctx.fill(); ctx.fillRect(-s*0.31,-s*0.37,s*0.62,s*0.06); ctx.fillRect(-s*0.05,-s*0.4,s*0.42,s*0.05); }
+    // eyes
+    ctx.fillStyle="#222"; ctx.beginPath(); ctx.arc(-s*0.1,-s*0.27,s*0.047,0,7); ctx.arc(s*0.1,-s*0.27,s*0.047,0,7); ctx.fill();
+    // glasses (some)
+    if(hsh(seed*5.9)>0.72){ ctx.strokeStyle="#222"; ctx.lineWidth=s*0.03; ctx.beginPath(); ctx.arc(-s*0.1,-s*0.27,s*0.08,0,7); ctx.arc(s*0.1,-s*0.27,s*0.08,0,7); ctx.moveTo(-s*0.02,-s*0.27); ctx.lineTo(s*0.02,-s*0.27); ctx.stroke(); }
+    // smile
+    ctx.strokeStyle="#7a3a2a"; ctx.lineWidth=s*0.04; ctx.beginPath(); ctx.arc(0,-s*0.19,s*0.09,0.2,Math.PI-0.2); ctx.stroke();
+    // looking at a phone
+    if(phone){
+      // hands holding the phone
+      ctx.fillStyle=skin; ctx.beginPath(); ctx.arc(-s*0.1,s*0.31,s*0.055,0,7); ctx.arc(s*0.1,s*0.31,s*0.055,0,7); ctx.fill();
+      // the phone playing a little basketball game
+      ctx.save(); ctx.translate(0,s*0.28); ctx.rotate(-0.12);
+      ctx.fillStyle="#111820"; rr(-s*0.13,-s*0.10,s*0.26,s*0.2,s*0.03); ctx.fill();
+      ctx.save(); rr(-s*0.10,-s*0.07,s*0.20,s*0.14,s*0.02); ctx.clip();
+      ctx.fillStyle="#2f8a44"; ctx.fillRect(-s*0.10,-s*0.07,s*0.20,s*0.14);          // court
+      ctx.fillStyle="#f4f8ff"; ctx.fillRect(-s*0.025,-s*0.055,s*0.05,s*0.012);        // backboard
+      ctx.strokeStyle="#e8552e"; ctx.lineWidth=Math.max(0.6,s*0.012); ctx.beginPath(); ctx.arc(0,-s*0.038,s*0.02,0,Math.PI); ctx.stroke();
+      var bt=((last/380)+seed)%1; var bx=-s*0.055+bt*s*0.06; var by=s*0.03-Math.sin(bt*Math.PI)*s*0.075;  // ball arcs to hoop
+      ctx.fillStyle="#dd6a15"; ctx.beginPath(); ctx.arc(bx,by,s*0.02,0,7); ctx.fill();
+      ctx.restore();
+      ctx.restore();
+      // screen glow on the face
+      ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.fillStyle="rgba(150,220,255,0.18)"; ctx.beginPath(); ctx.arc(0,-s*0.18,s*0.24,0,7); ctx.fill(); ctx.restore();
+    }
+    ctx.restore(); }
+
+  // ================= WALK to the car (stairs) =================
+  var walkMo, carXW, vehicle="car";
+  var walkTrainX=0, walkArr=false, walkDoorO=0, walkArrSaid=false, walkTrain=null;
+  var buzzerT=0, buzzerMax=170, buzzerSaid=false, celeb=null;
+  function stationCeleb(n){ n=n||"";
+    if(n.indexOf("BUZZER")>=0)      return {kind:"buzzer", text:"BUZZER BEATER!", emo:"🚨"};
+    if(n.indexOf("THREE-POINT")>=0) return {kind:"three",  text:"THREE POINTER!", emo:"🎯"};
+    if(n.indexOf("DUNK")>=0||n.indexOf("SLAM")>=0) return {kind:"dunk", text:"SLAM DUNK!", emo:"💥"};
+    if(n.indexOf("FAMILY")>=0||n.indexOf("MORGAN")>=0||n.indexOf("RICE")>=0) return {kind:"family", text:"FAMILY 15 SHOTS!", emo:"👨‍👩‍👦"};
+    if(n.indexOf("CHAMPION")>=0)    return {kind:"trophy", text:"CHAMPIONS!", emo:"🏆"};
+    if(n.indexOf("ALLEY")>=0)       return {kind:"oop",    text:"ALLEY-OOP!", emo:"🤾"};
+    if(n.indexOf("FASTBREAK")>=0)   return {kind:"fast",   text:"FAST BREAK!", emo:"💨"};
+    if(n.indexOf("JUMPSHOT")>=0||n.indexOf("TIP-OFF")>=0) return {kind:"jump", text:"NOTHIN' BUT NET!", emo:"🏀"};
+    return {kind:"swish", text:"SWISH! 2 POINTS!", emo:"🏀"}; }
+  var CARCOLORS=["#e0453a","#3a86e0","#37b06a","#ffb03a","#8a63d2"];
+  function buildCarPick(){ var el=document.getElementById("carPick"); if(!el)return; el.innerHTML=""; CARCOLORS.forEach(function(c){ var d=document.createElement("div"); d.className="cpk"+(carColor===c?" on":""); d.style.background=c; d.onclick=function(){ carColor=c; vehicle="car"; buildCarPick(); }; el.appendChild(d); }); }
+  function showVeh(){ document.getElementById("vehBar").style.display="flex"; }
+  function hideVeh(){ document.getElementById("vehBar").style.display="none"; }
+  function boardAgain(){ hideVeh(); reset(); mode="play"; view="drive"; document.getElementById("viewBtn").textContent="🧑 People"; refreshGas(); chime(); say("All aboard! Let's keep riding."); }
+  document.getElementById("boardBtn").onclick=function(){ if(mode!=="walk")return; boardAgain(); };
+  function startWalk(early){ mode="walk"; view="drive"; refreshGas();
+    say(early ? ("You got off at "+stName+"! Walk to the exit to go home.") : "This is the last stop. Walk to the exit to go home.");
+    vehicle="bus"; carColor="#3a86e0"; showVeh();
+    // pick a different train line + a different platform spot each time
+    var li=Math.floor(hsh(stationCount*2.7+stName.length*0.13)*TRAINLINES.length)%TRAINLINES.length;
+    var spots=[0.16,0.30,0.46,0.60];
+    var sf=spots[Math.floor(hsh(stationCount*4.1+7)*spots.length)%spots.length];
+    walkTrain={col:TRAINLINES[li].col, name:TRAINLINES[li].name, letter:TRAINLINES[li].letter, dest:TRAINLINES[li].dest, sf:sf, fromLeft:(hsh(stationCount*5.3+2)>0.5)};
+    var tw=W*0.46*1.05, restTx=-W*0.05, doorX=restTx+tw*sf+20;
+    carXW=W*0.66; walkMo={x:doorX, ph:0, atCar:false, enterT:0, alpha:1};
+    // train pulls into YOUR spot on the platform (from left or right)
+    walkTrainX = walkTrain.fromLeft ? (-(tw)-W*0.12) : (W+W*0.12); walkArr=false; walkDoorO=0; walkArrSaid=false; brakeSfx(); }
+  function groundYAt(x){ var x0=W*0.46,x1=W*0.68,yLow=H*0.82,yHigh=H*0.54,n=18;
+    if(x<=x0) return yLow; if(x>=x1) return yHigh; var t=(x-x0)/(x1-x0); var step=Math.floor(t*n); return yLow - step*((yLow-yHigh)/n); }
+  function walkUpdate(dt){
+    // train slides in and brakes to a stop at your spot, then doors open
+    if(walkTrainX<-0.5){ walkTrainX += (0 - walkTrainX)*0.055*dt; if(walkTrainX>-0.5) walkTrainX=0; }
+    else { walkTrainX=0; if(!walkArr){ walkArr=true; doorSfx(); }
+      if(walkArr){ walkDoorO += (1 - walkDoorO)*0.09*dt; if(walkDoorO>0.35 && !walkArrSaid){ walkArrSaid=true; say((walkTrain?walkTrain.name+" to "+walkTrain.dest:"Train")+" arriving. Doors opening!"); } } }
+    var go = (pointerDown || keyState.right || keyState.up) && !walkMo.atCar;
+    if(go){ walkMo.x += 3.0*dt; walkMo.ph += 0.28*dt; }
+    if(keyState.left && !walkMo.atCar){ walkMo.x -= 2.4*dt; walkMo.ph += 0.24*dt; if(walkMo.x<W*0.04) walkMo.x=W*0.04; }
+    if(walkMo.x >= carXW-W*0.05){ walkMo.x=carXW-W*0.05; if(!walkMo.atCar){ walkMo.atCar=true; walkMo.enterT=45; doorSfx(); say("Back on the train!"); } }
+    if(walkMo.atCar){ walkMo.enterT-=dt; walkMo.alpha=Math.max(0,walkMo.enterT/45); if(walkMo.enterT<=0) boardAgain(); }
+  }
+  function walkRender(){
+    var pw=W*0.46, floorY=H*0.82;
+    // ---- indoor concourse background (right side is now INSIDE the station) ----
+    var cwg=ctx.createLinearGradient(0,0,0,H); cwg.addColorStop(0,"#c7cdd6"); cwg.addColorStop(0.5,"#b3bbc6"); cwg.addColorStop(1,"#9aa3b0"); ctx.fillStyle=cwg; ctx.fillRect(0,0,W,H);
+    // concourse tiled back wall (large tiles) behind the exit/bus bay
+    ctx.strokeStyle="#a5adb8"; ctx.lineWidth=1;
+    for(var cty=0;cty<H*0.6;cty+=H*0.06){ ctx.beginPath(); ctx.moveTo(pw,cty); ctx.lineTo(W,cty); ctx.stroke(); }
+    for(var ctx0=pw;ctx0<W;ctx0+=W*0.09){ ctx.beginPath(); ctx.moveTo(ctx0,0); ctx.lineTo(ctx0,H*0.6); ctx.stroke(); }
+    // full-width ceiling slab with beams + downlights over the concourse
+    ctx.fillStyle="#2b3444"; ctx.fillRect(pw,0,W-pw,H*0.075);
+    ctx.fillStyle="#202834"; for(var bmx=pw+W*0.06;bmx<W;bmx+=W*0.12){ ctx.fillRect(bmx-3,0,6,H*0.075); }
+    ctx.save(); ctx.globalCompositeOperation="lighter";
+    for(var dl=pw+W*0.08; dl<W; dl+=W*0.16){ ctx.fillStyle="#fff4d4"; ctx.beginPath(); ctx.arc(dl,H*0.06,5,0,7); ctx.fill();
+      var dg=ctx.createRadialGradient(dl,H*0.06,2,dl,H*0.06,W*0.09); dg.addColorStop(0,"rgba(255,244,212,0.20)"); dg.addColorStop(1,"rgba(255,244,212,0)"); ctx.fillStyle=dg; ctx.beginPath(); ctx.arc(dl,H*0.06,W*0.09,0,7); ctx.fill(); }
+    ctx.restore();
+    // a big "MO STATION" concourse sign on the back wall
+    ctx.fillStyle="#12305a"; rr(W*0.58,H*0.12,W*0.3,H*0.07,6); ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=2; rr(W*0.58,H*0.12,W*0.3,H*0.07,6); ctx.stroke();
+    ctx.fillStyle="#fff"; ctx.font="bold 15px 'Trebuchet MS',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(stationIcon(stName)+" "+stName, W*0.73, H*0.155);
+
+    // ===================== PRO SUBWAY STATION (left platform) =====================
+    // ---- coffered / vaulted ceiling with recessed light pools ----
+    var ceilY=H*0.11;
+    var cg=ctx.createLinearGradient(0,0,0,ceilY); cg.addColorStop(0,"#1b2230"); cg.addColorStop(1,"#2b3444"); ctx.fillStyle=cg; ctx.fillRect(0,0,pw,ceilY);
+    // subtle vault ribs
+    ctx.strokeStyle="#141a26"; ctx.lineWidth=2; for(var rib=pw*0.14; rib<pw; rib+=pw*0.2){ ctx.beginPath(); ctx.moveTo(rib,0); ctx.lineTo(rib,ceilY); ctx.stroke(); }
+    // recessed glowing light panels + soft volumetric god-rays
+    ctx.save(); ctx.globalCompositeOperation="lighter";
+    for(var lc=0;lc<3;lc++){ var lx=pw*(0.2+lc*0.3), ly=ceilY*0.55;
+      ctx.fillStyle="#fff6d6"; rr(lx-pw*0.075,ly-4,pw*0.15,8,4); ctx.fill();
+      var gr=ctx.createLinearGradient(0,ly,0,floorY); gr.addColorStop(0,"rgba(255,246,214,0.22)"); gr.addColorStop(1,"rgba(255,246,214,0)");
+      ctx.fillStyle=gr; ctx.beginPath(); ctx.moveTo(lx-pw*0.06,ly); ctx.lineTo(lx+pw*0.06,ly); ctx.lineTo(lx+pw*0.13,floorY); ctx.lineTo(lx-pw*0.13,floorY); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    // ---- glossy white subway-tile wall (offset brick + grout + gloss) ----
+    var wallTop=ceilY, wallBot=floorY;
+    var wg=ctx.createLinearGradient(0,wallTop,0,wallBot); wg.addColorStop(0,"#fbfdff"); wg.addColorStop(0.5,"#eef3f8"); wg.addColorStop(1,"#dfe7ef"); ctx.fillStyle=wg; ctx.fillRect(0,wallTop,pw,wallBot-wallTop);
+    var tileH=15, tileW=30, row=0;
+    ctx.lineWidth=1;
+    for(var ty0=wallTop; ty0<wallBot; ty0+=tileH, row++){
+      var off=(row%2)? -tileW/2 : 0;
+      for(var tx0=off; tx0<pw; tx0+=tileW){
+        // bevel highlight (top/left) + shadow (bottom/right)
+        ctx.strokeStyle="#ffffff"; ctx.beginPath(); ctx.moveTo(tx0+1,ty0+tileH-1); ctx.lineTo(tx0+1,ty0+1); ctx.lineTo(tx0+tileW-1,ty0+1); ctx.stroke();
+        ctx.strokeStyle="#c3cdd8"; ctx.beginPath(); ctx.moveTo(tx0+tileW-1,ty0+1); ctx.lineTo(tx0+tileW-1,ty0+tileH-1); ctx.lineTo(tx0+1,ty0+tileH-1); ctx.stroke();
+      }
+    }
+    // grout gloss sweep across the tiles
+    ctx.save(); ctx.globalAlpha=0.10; var sh=ctx.createLinearGradient(0,wallTop,pw,wallBot); sh.addColorStop(0,"#ffffff"); sh.addColorStop(0.5,"rgba(255,255,255,0)"); sh.addColorStop(1,"#ffffff"); ctx.fillStyle=sh; ctx.fillRect(0,wallTop,pw,wallBot-wallTop); ctx.restore();
+    // colored trim bands (top + mid)
+    ctx.fillStyle="#e0453a"; ctx.fillRect(0,wallTop,pw,6);
+    var accY=H*0.345; ctx.fillStyle="#12305a"; ctx.fillRect(0,accY,pw,H*0.052);
+    ctx.fillStyle="#7ea0d0"; ctx.fillRect(0,accY-2,pw,2); ctx.fillStyle="#0c2038"; ctx.fillRect(0,accY+H*0.052,pw,2);
+    ctx.fillStyle="#bcd2f0"; ctx.font="bold 11px sans-serif"; ctx.textAlign="left"; ctx.textBaseline="middle";
+    for(var rx=8;rx<pw;rx+=W*0.16){ ctx.fillText(stName,rx,accY+H*0.026); }
+
+    // ---- roundel station-name sign (with drop shadow) ----
+    var sgy=H*0.185;
+    ctx.save(); ctx.shadowColor="rgba(0,0,0,0.35)"; ctx.shadowBlur=10; ctx.shadowOffsetY=4;
+    ctx.fillStyle="#12305a"; rr(pw*0.06,sgy-19,pw*0.88,38,8); ctx.fill(); ctx.restore();
+    ctx.strokeStyle="#fff"; ctx.lineWidth=2; rr(pw*0.06,sgy-19,pw*0.88,38,8); ctx.stroke();
+    // roundel: red ring (a thing OUTSIDE the name) with the line letter INSIDE it
+    var rndx=pw*0.17;
+    ctx.fillStyle="#e0453a"; ctx.beginPath(); ctx.arc(rndx,sgy,15,0,7); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(rndx,sgy,10,0,7); ctx.fill();
+    ctx.fillStyle=(walkTrain&&walkTrain.col)||"#e0453a"; ctx.font="bold 13px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText((walkTrain&&walkTrain.letter)||"M", rndx, sgy+1);
+    // the name sits INSIDE the blue bar, with a picture that matches the name
+    ctx.fillStyle="#fff"; ctx.font="bold 14px sans-serif"; ctx.fillText(stationIcon(stName)+" "+stName+" "+stationIcon(stName), pw*0.10+ (pw*0.88)/2, sgy);
+
+    // ---- wall clock (REAL current time) ----
+    var nowD=new Date();
+    var Hh=nowD.getHours(), Mm=nowD.getMinutes(), Ss=nowD.getSeconds();
+    var hAng=((Hh%12)+Mm/60)/12*6.283, mAng=(Mm+Ss/60)/60*6.283, sAng=Ss/60*6.283;
+    var clkX=pw*0.90, clkY=H*0.155, clkR=15;
+    ctx.fillStyle="#0f1622"; ctx.beginPath(); ctx.arc(clkX,clkY,clkR+2,0,7); ctx.fill();
+    ctx.fillStyle="#f6f8fb"; ctx.beginPath(); ctx.arc(clkX,clkY,clkR,0,7); ctx.fill();
+    ctx.fillStyle="#233"; for(var tk=0;tk<12;tk++){ var ta=tk/12*6.283; ctx.fillRect(clkX+Math.sin(ta)*clkR*0.85-0.5, clkY-Math.cos(ta)*clkR*0.85-0.5,1.5,1.5); }
+    ctx.strokeStyle="#233"; ctx.lineWidth=2.2; ctx.beginPath(); ctx.moveTo(clkX,clkY); ctx.lineTo(clkX+Math.sin(hAng)*clkR*0.5, clkY-Math.cos(hAng)*clkR*0.5); ctx.stroke();
+    ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(clkX,clkY); ctx.lineTo(clkX+Math.sin(mAng)*clkR*0.78, clkY-Math.cos(mAng)*clkR*0.78); ctx.stroke();
+    ctx.strokeStyle="#e0453a"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(clkX,clkY); ctx.lineTo(clkX+Math.sin(sAng)*clkR*0.85, clkY-Math.cos(sAng)*clkR*0.85); ctx.stroke();
+    ctx.fillStyle="#e0453a"; ctx.beginPath(); ctx.arc(clkX,clkY,1.6,0,7); ctx.fill();
+
+    // ---- framed ad poster + framed route-map poster ----
+    ctx.save(); ctx.shadowColor="rgba(0,0,0,0.25)"; ctx.shadowBlur=6; ctx.shadowOffsetY=3;
+    ctx.fillStyle="#2a3242"; ctx.fillRect(pw*0.05,H*0.415,pw*0.26,H*0.145); ctx.restore();
+    ctx.fillStyle="#37b06a"; ctx.fillRect(pw*0.065,H*0.425,pw*0.23,H*0.125);
+    ctx.fillStyle="#fff"; ctx.fillRect(pw*0.09,H*0.44,pw*0.18,H*0.016); ctx.fillStyle="#ffd93d"; ctx.beginPath(); ctx.arc(pw*0.18,H*0.505,pw*0.04,0,7); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.font="bold 9px sans-serif"; ctx.textAlign="center"; ctx.fillText("RIDE MO!",pw*0.18,H*0.475);
+    ctx.save(); ctx.shadowColor="rgba(0,0,0,0.25)"; ctx.shadowBlur=6; ctx.shadowOffsetY=3;
+    ctx.fillStyle="#2a3242"; ctx.fillRect(pw*0.63,H*0.415,pw*0.32,H*0.15); ctx.restore();
+    ctx.fillStyle="#eef2f6"; ctx.fillRect(pw*0.645,H*0.425,pw*0.29,H*0.13);
+    ctx.strokeStyle="#9ab"; ctx.lineWidth=1; for(var mmx=0;mmx<4;mmx++){ ctx.beginPath(); ctx.moveTo(pw*0.66,H*0.44+mmx*H*0.028); ctx.lineTo(pw*0.92,H*0.44+mmx*H*0.028); ctx.stroke(); }
+    ctx.strokeStyle="#e0453a"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(pw*0.67,H*0.45); ctx.lineTo(pw*0.9,H*0.55); ctx.stroke();
+    ctx.fillStyle="#e0453a"; for(var stp=0;stp<4;stp++){ ctx.beginPath(); ctx.arc(pw*0.67+stp*(pw*0.077),H*0.45+stp*(H*0.033),3,0,7); ctx.fill(); }
+
+    // ---- digital arrivals board (REAL live countdown, trains every 3 real minutes) ----
+    var abx=pw*0.33, aby=H*0.41, abw=pw*0.30, abh=H*0.15;
+    ctx.fillStyle="#0a0d06"; rr(abx-4,aby-4,abw+8,abh+8,5); ctx.fill();
+    ctx.fillStyle="#141608"; rr(abx,aby,abw,abh,3); ctx.fill();
+    // real current time header (HH:MM:SS)
+    function pad2(n){ return (n<10?"0":"")+n; }
+    ctx.fillStyle="#ffb020"; ctx.font="bold 9px 'Courier New',monospace"; ctx.textAlign="left"; ctx.textBaseline="middle";
+    ctx.fillText("NEXT TRAINS", abx+6, aby+abh*0.14);
+    ctx.textAlign="right"; ctx.fillText(pad2(Hh)+":"+pad2(Mm)+":"+pad2(Ss), abx+abw-6, aby+abh*0.14); ctx.textAlign="left";
+    // live seconds into the current 3-minute cycle from the REAL clock
+    var into=(Mm%3)*60 + Ss + nowD.getMilliseconds()/1000;
+    var t1=180-into; if(t1<0)t1+=180; var t2=t1+180, t3=t1+360;
+    function fmt(t){ var m=Math.floor(t/60), s=Math.floor(t%60); return m+":"+pad2(s); }
+    var lnA=walkTrain?walkTrain.name.replace("MO ","").replace(" LINE",""):"MO";
+    var rows=[[lnA, walkTrain?walkTrain.dest:"MO STATION", t1],["BLUE","RICE ROAD",t2],["GREEN","COURTSIDE",t3]];
+    ctx.font="bold 9px 'Courier New',monospace";
+    for(var ri=0;ri<rows.length;ri++){ var ry=aby+abh*(0.36+ri*0.22);
+      var arriving = rows[ri][2]<15;
+      ctx.fillStyle = arriving ? (Math.floor(last/300)%2? "#7dff9a":"#245a34") : "#ffd24a";
+      ctx.fillText(rows[ri][0], abx+6, ry);
+      ctx.fillText(rows[ri][1].substring(0,9), abx+abw*0.28, ry);
+      ctx.textAlign="right"; ctx.fillText(arriving?"ARRIVING":fmt(rows[ri][2]), abx+abw-6, ry); ctx.textAlign="left"; }
+
+    // ---- solid ground (platform -> stairs -> street) ----
+    ctx.fillStyle="#5f6672"; ctx.beginPath(); ctx.moveTo(0,H);
+    for(var x=0;x<=W;x+=6){ ctx.lineTo(x,groundYAt(x)); } ctx.lineTo(W,H); ctx.closePath(); ctx.fill();
+    // ---- glossy polished platform floor (left) with reflections ----
+    (function(){ ctx.save(); ctx.beginPath(); ctx.rect(0,floorY,pw+W*0.02,H-floorY); ctx.clip();
+      var fg=ctx.createLinearGradient(0,floorY,0,H); fg.addColorStop(0,"#3a4252"); fg.addColorStop(1,"#20242e"); ctx.fillStyle=fg; ctx.fillRect(0,floorY,pw+W*0.02,H-floorY);
+      // soft light pools reflected on the floor
+      ctx.globalCompositeOperation="lighter";
+      for(var lp=pw*0.18; lp<pw; lp+=pw*0.28){ var rg=ctx.createRadialGradient(lp,floorY+6,2,lp,floorY+6,pw*0.16); rg.addColorStop(0,"rgba(255,245,210,0.16)"); rg.addColorStop(1,"rgba(255,245,210,0)"); ctx.fillStyle=rg; ctx.fillRect(lp-pw*0.16,floorY,pw*0.32,H-floorY); }
+      // faint mirrored yellow edge
+      ctx.globalCompositeOperation="source-over"; ctx.globalAlpha=0.18; ctx.fillStyle="#ffd93d"; ctx.fillRect(0,floorY+8,pw,3);
+      ctx.restore(); })();
+    // step edges
+    ctx.strokeStyle="#9aa1ad"; ctx.lineWidth=3; ctx.beginPath(); for(var x2=0;x2<=W;x2+=4){ if(x2===0)ctx.moveTo(x2,groundYAt(x2)); else ctx.lineTo(x2,groundYAt(x2)); } ctx.stroke();
+    ctx.fillStyle="#7a8290"; ctx.fillRect(W*0.68,H*0.54,W*0.32,4);
+    // handrail along the stairs
+    ctx.strokeStyle="#c9ccd2"; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(W*0.46,groundYAt(W*0.46)-46); ctx.lineTo(W*0.68,groundYAt(W*0.68)-46); ctx.stroke();
+    for(var hx=W*0.48;hx<W*0.68;hx+=W*0.04){ ctx.beginPath(); ctx.moveTo(hx,groundYAt(hx)-46); ctx.lineTo(hx,groundYAt(hx)); ctx.stroke(); }
+    // ---- escalator running alongside the stairs (moving treads + handrail) ----
+    (function(){ var ex0=W*0.495, ey0=H*0.815, ex1=W*0.665, ey1=H*0.56;
+      var ang=Math.atan2(ey1-ey0, ex1-ex0), L=Math.hypot(ex1-ex0, ey1-ey0), bh=H*0.055;
+      ctx.save(); ctx.translate(ex0,ey0); ctx.rotate(ang);
+      // side skirt / truss
+      ctx.fillStyle="#3a4456"; ctx.fillRect(0,0,L,bh+20);
+      ctx.fillStyle="#2b3444"; ctx.fillRect(0,bh,L,20);
+      // moving metal treads with chevrons (scrolling up)
+      var step=16, off=(last*0.06)%step;
+      for(var t=-off; t<L; t+=step){ if(t<0)continue;
+        ctx.fillStyle="#5b6678"; ctx.fillRect(t,0,step-2,bh);
+        ctx.strokeStyle="#8b95a6"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(t+2,2); ctx.lineTo(t+2,bh-2); ctx.stroke();
+        ctx.strokeStyle="#ffd24a"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(t+step*0.5,3); ctx.lineTo(t+step*0.5,bh-3); ctx.stroke(); }
+      // moving handrail (dark bar with a travelling highlight)
+      ctx.fillStyle="#14181f"; rr(0,-14,L,12,6); ctx.fill();
+      var hoff=(last*0.09)%40; ctx.save(); ctx.beginPath(); rr(0,-14,L,12,6); ctx.clip(); ctx.fillStyle="rgba(255,255,255,0.35)"; for(var g2=-hoff; g2<L; g2+=40){ ctx.fillRect(g2,-14,10,12); } ctx.restore();
+      // up arrows glowing green at the base
+      ctx.fillStyle="#2fbf5a"; for(var ar=0;ar<3;ar++){ var ay=-(last*0.05+ar*10)%30; ctx.globalAlpha=0.5+0.5*Math.sin(last*0.01+ar); ctx.beginPath(); ctx.moveTo(L*0.06, bh*0.5+8- ((last*0.04+ar*10)%24)); ctx.lineTo(L*0.06-5, bh*0.5+14-((last*0.04+ar*10)%24)); ctx.lineTo(L*0.06+5, bh*0.5+14-((last*0.04+ar*10)%24)); ctx.closePath(); ctx.fill(); }
+      ctx.globalAlpha=1; ctx.restore();
+      // "▲" up sign + rider standing on the escalator
+      var rt=0.5+0.15*Math.sin(last/1400); var rx=ex0+(ex1-ex0)*rt, ryy=ey0+(ey1-ey0)*rt;
+      person(rx, ryy-4, H*0.10, 61, true, null, 1, null);
+    })();
+
+    // ---- foreground: train (2 cars, lit interior, roundel, headlight) ----
+    var pw2=W*0.46, floorY2=H*0.82;
+    (function(){ var ty=H*0.55, th=H*0.26, tw=pw2*1.05, tx=-W*0.05 + walkTrainX;
+      var LC=(walkTrain&&walkTrain.col)||"#2f7fc0", LN=(walkTrain&&walkTrain.name)||"MO LINE", LL=(walkTrain&&walkTrain.letter)||"M", SF=(walkTrain&&walkTrain.sf)||0.28;
+      ctx.save(); ctx.shadowColor="rgba(0,0,0,0.4)"; ctx.shadowBlur=14; ctx.shadowOffsetY=6;
+      var bg=ctx.createLinearGradient(0,ty,0,ty+th); bg.addColorStop(0,"#dfe4ea"); bg.addColorStop(0.5,"#c2c9d3"); bg.addColorStop(1,"#a7afba"); ctx.fillStyle=bg; rr(tx,ty,tw,th,12); ctx.fill(); ctx.restore();
+      ctx.fillStyle="#eef1f5"; rr(tx,ty,tw,th*0.12,12); ctx.fill();
+      // line-coloured livery stripe
+      ctx.fillStyle=LC; ctx.fillRect(tx,ty+th*0.5,tw,8);
+      ctx.fillStyle="#9aa1ad"; ctx.fillRect(tx+tw*0.5-2,ty,4,th);
+      // the door lands right at YOUR spot (varies per train)
+      var dx=tx+tw*SF;
+      // lit windows with interior glow (skip the door zone)
+      for(var wx=tx+14; wx<tx+tw-16; wx+=42){ if(wx>dx-20 && wx<dx+50) continue;
+        ctx.fillStyle="#bfe6ff"; rr(wx,ty+16,30,22,4); ctx.fill(); ctx.fillStyle="rgba(255,255,255,0.5)"; rr(wx+3,ty+18,10,8,2); ctx.fill(); }
+      // route roundel (line colour + letter)
+      ctx.fillStyle=LC; ctx.beginPath(); ctx.arc(tx+tw*0.82,ty+th*0.30,11,0,7); ctx.fill(); ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(tx+tw*0.82,ty+th*0.30,6,0,7); ctx.fill();
+      ctx.fillStyle=LC; ctx.font="bold 9px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(LL,tx+tw*0.82,ty+th*0.30);
+      // front destination sign (line colour)
+      ctx.fillStyle="#101722"; rr(tx+tw*0.03,ty+4,tw*0.22,13,3); ctx.fill(); ctx.fillStyle=LC; ctx.font="bold 8px sans-serif"; ctx.textAlign="center"; ctx.fillText(LL+" · "+(walkTrain?walkTrain.dest:"MO"), tx+tw*0.03+tw*0.11, ty+11);
+      // ---- sliding doors: closed leaves meet in the middle, then slide fully apart ----
+      var dw=52, doy=ty+11, doh=th-20;                 // doorway rect
+      // lit interior visible through the opening
+      ctx.fillStyle="#1a2230"; ctx.fillRect(dx,doy,dw,doh);
+      ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.fillStyle="rgba(255,238,180,0.30)"; ctx.fillRect(dx,doy,dw,doh);
+      // a couple of silhouettes inside the lit car
+      ctx.globalCompositeOperation="source-over"; ctx.fillStyle="rgba(20,26,38,0.55)"; ctx.fillRect(dx+dw*0.18,doy+8,7,doh-8); ctx.fillRect(dx+dw*0.62,doy+6,7,doh-6); ctx.restore();
+      // door pocket frame
+      ctx.strokeStyle=LC; ctx.lineWidth=2; ctx.strokeRect(dx-1,doy-1,dw+2,doh+2);
+      var slide=(dw/2)*Math.min(1,walkDoorO);          // how far each leaf has retracted
+      // left leaf (covers left half when closed, slides left as it opens)
+      var lg=ctx.createLinearGradient(dx-slide,0,dx-slide+dw/2,0); lg.addColorStop(0,"#c2cad4"); lg.addColorStop(0.5,"#eaf0f6"); lg.addColorStop(1,"#c2cad4");
+      ctx.fillStyle=lg; ctx.fillRect(dx-slide, doy, dw/2, doh);
+      // right leaf (covers right half when closed, slides right as it opens)
+      var rgd=ctx.createLinearGradient(dx+dw/2+slide,0,dx+dw+slide,0); rgd.addColorStop(0,"#c2cad4"); rgd.addColorStop(0.5,"#eaf0f6"); rgd.addColorStop(1,"#c2cad4");
+      ctx.fillStyle=rgd; ctx.fillRect(dx+dw/2+slide, doy, dw/2, doh);
+      // leaf windows + rubber edges
+      ctx.fillStyle="#2f7fc0"; rr(dx-slide+5, doy+8, dw/2-10, doh*0.42, 3); ctx.fill(); rr(dx+dw/2+slide+5, doy+8, dw/2-10, doh*0.42, 3); ctx.fill();
+      ctx.fillStyle="#33404f"; ctx.fillRect(dx-slide+dw/2-2, doy, 2, doh); ctx.fillRect(dx+dw/2+slide, doy, 2, doh);
+      // headlight glow at BOTH ends
+      ctx.save(); ctx.globalCompositeOperation="lighter";
+      [tx+8, tx+tw-8].forEach(function(hlx){ var hl=ctx.createRadialGradient(hlx,ty+th*0.7,1,hlx,ty+th*0.7,24); hl.addColorStop(0,"rgba(255,245,200,0.8)"); hl.addColorStop(1,"rgba(255,245,200,0)"); ctx.fillStyle=hl; ctx.beginPath(); ctx.arc(hlx,ty+th*0.7,24,0,7); ctx.fill(); });
+      ctx.restore();
+      // a rider steps off once the doors are open
+      if(walkDoorO>0.5) person(dx+20, ty+th-6, H*0.10, 42, true, null, 1, Math.sin(last/300)); })();
+    // mirrored reflection of the train on the polished platform floor
+    (function(){ var ty=H*0.55, th=H*0.26, tw=pw2*1.05, tx=-W*0.05 + walkTrainX;
+      ctx.save(); ctx.beginPath(); ctx.rect(0,floorY2,pw2+W*0.02,H-floorY2); ctx.clip();
+      ctx.globalAlpha=0.16; ctx.translate(0,floorY2*2-6); ctx.scale(1,-1);
+      ctx.fillStyle="#c2c9d3"; rr(tx,ty,tw,th,12); ctx.fill();
+      ctx.fillStyle="#bfe6ff"; for(var wx=tx+14; wx<tx+tw-72; wx+=42){ if(wx>tx+tw*0.66 && wx<tx+tw*0.9) continue; rr(wx,ty+16,30,22,4); ctx.fill(); }
+      ctx.restore(); })();
+    // platform gap shadow line
+    ctx.fillStyle="rgba(0,0,0,0.35)"; ctx.fillRect(0,floorY2-2,pw2,2);
+
+    // I-beam columns with rivets
+    for(var ci2=0;ci2<2;ci2++){ var colx=pw2*(0.30+ci2*0.44);
+      var clg=ctx.createLinearGradient(colx-9,0,colx+9,0); clg.addColorStop(0,"#2b3444"); clg.addColorStop(0.5,"#48546c"); clg.addColorStop(1,"#2b3444"); ctx.fillStyle=clg; ctx.fillRect(colx-9,ceilY,18,floorY2-ceilY);
+      ctx.fillStyle="#222a38"; ctx.fillRect(colx-13,ceilY,4,floorY2-ceilY); ctx.fillRect(colx+9,ceilY,4,floorY2-ceilY);
+      ctx.fillStyle="#e0453a"; ctx.fillRect(colx-9,H*0.30,18,11); ctx.fillStyle="#fff"; ctx.font="bold 9px sans-serif"; ctx.textAlign="center"; ctx.fillText(""+(ci2+1),colx,H*0.30+6);
+      ctx.fillStyle="#5a6478"; for(var rv=ceilY+10; rv<floorY2; rv+=34){ ctx.beginPath(); ctx.arc(colx-5,rv,1.6,0,7); ctx.fill(); ctx.beginPath(); ctx.arc(colx+5,rv,1.6,0,7); ctx.fill(); } }
+
+    // yellow tactile platform edge (bumps)
+    ctx.fillStyle="#ffd93d"; ctx.fillRect(0,floorY2-6,pw2,5); ctx.fillStyle="#e0b820"; for(var bmp=6;bmp<pw2;bmp+=12) ctx.fillRect(bmp,floorY2-5,4,3);
+
+    // modern benches
+    for(var bI=0;bI<2;bI++){ var bxp=pw2*(0.12+bI*0.30); ctx.fillStyle="#6a7482"; rr(bxp,floorY2-16,pw2*0.15,6,3); ctx.fill(); ctx.fillStyle="#404a58"; ctx.fillRect(bxp+3,floorY2-10,4,10); ctx.fillRect(bxp+pw2*0.13,floorY2-10,4,10); ctx.fillStyle="#6a7482"; rr(bxp,floorY2-28,pw2*0.15,5,3); ctx.fill(); }
+    // trash bin
+    ctx.fillStyle="#2f3a4a"; rr(pw2*0.47,floorY2-30,18,30,4); ctx.fill(); ctx.fillStyle="#1f2733"; ctx.fillRect(pw2*0.47,floorY2-30,18,6);
+    // waiting people (a livelier crowd)
+    person(pw2*0.16, floorY2 - H*0.115, H*0.11, 7, true, null,1, Math.sin(last/360)*0.3);
+    person(pw2*0.28, floorY2 - H*0.075, H*0.10, 15, false, null,1);
+    person(pw2*0.60, floorY2 - H*0.11, H*0.11, 23, true, null,1);
+    person(pw2*0.72, floorY2 - H*0.108, H*0.108, 31, true, null,1, Math.sin(last/300+2)*0.3);
+    person(pw2*0.85, floorY2 - H*0.10, H*0.10, 44, true, null,1);
+
+    // fare-gate turnstiles
+    for(var gi=0;gi<2;gi++){ var gx=W*0.40+gi*W*0.05, gy=groundYAt(gx);
+      ctx.fillStyle="#3a4c6a"; rr(gx-5,gy-40,10,40,2); ctx.fill(); rr(gx+22,gy-40,10,40,2); ctx.fill();
+      ctx.strokeStyle="#c9ccd2"; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(gx+5,gy-16); ctx.lineTo(gx+22,gy-16); ctx.stroke();
+      ctx.fillStyle="#37b06a"; ctx.fillRect(gx-3,gy-30,6,5); }
+    // illuminated WAY OUT sign over the stairs
+    ctx.save(); ctx.shadowColor="rgba(120,255,150,0.5)"; ctx.shadowBlur=10;
+    ctx.fillStyle="#1f7a3a"; rr(W*0.50,H*0.30,W*0.16,26,5); ctx.fill(); ctx.restore();
+    ctx.strokeStyle="#7dff9a"; ctx.lineWidth=1.5; rr(W*0.50,H*0.30,W*0.16,26,5); ctx.stroke();
+    ctx.fillStyle="#fff"; ctx.font="bold 13px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("WAY OUT ▲",W*0.50+W*0.08,H*0.30+13);
+
+    // indoor support pillars in the bus bay (behind the vehicles)
+    for(var bp=0;bp<2;bp++){ var bpx=W*0.74+bp*W*0.17, bpy=groundYAt(bpx);
+      var pg=ctx.createLinearGradient(bpx-11,0,bpx+11,0); pg.addColorStop(0,"#8b939f"); pg.addColorStop(0.5,"#b9c0c9"); pg.addColorStop(1,"#8b939f"); ctx.fillStyle=pg; ctx.fillRect(bpx-11,H*0.075,22,bpy-H*0.075);
+      ctx.fillStyle="#727a86"; ctx.fillRect(bpx-14,H*0.075,3,bpy-H*0.075); ctx.fillRect(bpx+11,H*0.075,3,bpy-H*0.075);
+      ctx.fillStyle="#5a6270"; ctx.fillRect(bpx-15,bpy-8,30,8); }
+    // (bus removed — the exit up the stairs takes you home)
+    // ---- direction arrows guiding Mo to the car/exit ----
+    (function(){ if(walkMo.atCar) return;
+      var ax0=walkMo.x+H*0.10, ax1=carXW-W*0.05, spc=44, off=(last*0.09)%spc;
+      ctx.lineCap="round"; ctx.lineWidth=5;
+      for(var ax=ax0-off; ax<ax1; ax+=spc){ if(ax<ax0-spc) continue;
+        var aY=(ax<W*0.46? floorY2-10 : groundYAt(ax)-9);
+        var a=0.35+0.55*(0.5+0.5*Math.sin(last*0.006 - ax*0.025));
+        ctx.strokeStyle="rgba(255,217,61,"+a.toFixed(2)+")";
+        ctx.beginPath(); ctx.moveTo(ax,aY-9); ctx.lineTo(ax+12,aY); ctx.lineTo(ax,aY+9); ctx.stroke(); }
+      // big bobbing arrow floating above Mo, pointing to the car
+      var bx=walkMo.x, by=groundYAt(walkMo.x)-H*0.13*1.15-20+Math.sin(last/300)*4;
+      ctx.fillStyle="#ffd93d"; ctx.strokeStyle="#0a1220"; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(bx-12,by-5); ctx.lineTo(bx+4,by-5); ctx.lineTo(bx+4,by-11); ctx.lineTo(bx+20,by); ctx.lineTo(bx+4,by+11); ctx.lineTo(bx+4,by+5); ctx.lineTo(bx-12,by+5); ctx.closePath(); ctx.fill(); ctx.stroke();
+    })();
+    // Mo walking
+    var s=H*0.13; person(walkMo.x, groundYAt(walkMo.x)-s*1.05, s, 0.5, true, "#2f7fc0", walkMo.alpha, walkMo.atCar? null : walkMo.ph);
+    // prompt
+    ctx.fillStyle="#0a1220cc"; rr(W/2-Math.min(W*0.9,320)/2, 12, Math.min(W*0.9,320),30,10); ctx.fill();
+    ctx.fillStyle="#ffd93d"; ctx.font="bold 15px 'Trebuchet MS',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(walkMo.atCar? "Heading home…" : "🚶 Hold ▶ to walk to the exit!", W/2, 27);
+    drawVignette();
+  }
+  function drawSideCar(x,gy){ var w=W*0.16,h=w*0.46, y=gy-h-h*0.32;
+    ctx.fillStyle="#00000022"; ctx.beginPath(); ctx.ellipse(x,gy+2,w*0.6,h*0.18,0,0,7); ctx.fill();
+    ctx.fillStyle=carColor; rr(x-w/2,y,w,h,9); ctx.fill();
+    ctx.fillStyle=carColor; rr(x-w*0.24,y-h*0.55,w*0.6,h*0.6,7); ctx.fill(); ctx.fillStyle="rgba(0,0,0,0.18)"; rr(x-w*0.24,y-h*0.55,w*0.6,h*0.6,7); ctx.fill();
+    ctx.fillStyle="#bfe8ff"; rr(x-w*0.2,y-h*0.46,w*0.52,h*0.44,4); ctx.fill();
+    ctx.fillStyle="#111"; ctx.beginPath(); ctx.arc(x-w*0.3,gy,h*0.34,0,7); ctx.arc(x+w*0.3,gy,h*0.34,0,7); ctx.fill();
+    ctx.fillStyle="#888"; ctx.beginPath(); ctx.arc(x-w*0.3,gy,h*0.15,0,7); ctx.arc(x+w*0.3,gy,h*0.15,0,7); ctx.fill();
+    ctx.fillStyle="#fff6b0"; ctx.beginPath(); ctx.arc(x+w*0.46,y+h*0.4,3,0,7); ctx.fill(); }
+
+  // ================= DRIVE HOME (car game after 10 stops) =================
+  var car, carDist, carGoal, carSpeed, carProps, carCoins, carLines, carCoinN, carPX, carColor;
+  var carPeople, carPass, carPeopleT;
+  function boardSfx(n){ beep(560+Math.min(500,n*10),0.05,"square",0.06); setTimeout(function(){beep(820+Math.min(500,n*10),0.06,"square",0.05);},40); }
+  function startCar(){ mode="car"; view="drive"; hideVeh(); say("All aboard the bus! Ride home and pick up people on the way.");
+    document.getElementById("hornBtn").textContent="📢 Honk";
+    car={x:0, tx:0}; carDist=0; carGoal=160000; carSpeed=2; carCoinN=0; carPX=null;
+    carProps=[]; carCoins=[]; carPeople=[]; carPass=0; carPeopleT=45; carLines=[]; for(var i=0;i<12;i++) carLines.push(i*H/8 - H);
+    document.getElementById("gasBtn").style.display="flex"; }
+  var gasHeld=false;
+  function refreshGas(){ var show=(mode==="play"&&view==="drive")||mode==="car"; document.getElementById("gasBtn").style.display=show?"flex":"none"; }
+  function carUpdate(dt){
+    if(carDist>=carGoal){ mode="home"; winSfx(); say("You made it home, Mo! Home sweet home.");
+      document.getElementById("gasBtn").style.display="none"; hideVeh();
+      document.getElementById("homeP").textContent="🎟️ Round trip complete — just $1.00! 🚌  🪙 "+carCoinN+"   🧑 "+carPass+" picked up";
+      document.getElementById("homeOv").classList.remove("hide"); return; }
+    var gas = gasHeld || keyState.up;
+    if(gas) carSpeed += (11-carSpeed)*0.05*dt; else carSpeed += (1.5-carSpeed)*0.06*dt;
+    carDist+=carSpeed*dt;
+    var roadW=Math.min(W*0.62,380), roadX=(W-roadW)/2, minX=-roadW*0.5+26, maxX=roadW*0.5-26;
+    var dir=0; if(keyState.left)dir-=1; if(keyState.right)dir+=1;
+    if(carPX!=null){ car.tx=Math.max(minX,Math.min(maxX,(carPX-W/2))); car.x += (car.tx-car.x)*0.2*dt; }
+    else car.x=Math.max(minX,Math.min(maxX, car.x+dir*6*dt));
+    var sc=carSpeed*dt;
+    for(var l=0;l<carLines.length;l++){ carLines[l]+=sc*1.6; if(carLines[l]>H) carLines[l]-=H*1.5; }
+    for(var p=carProps.length-1;p>=0;p--){ carProps[p].y+=sc*1.4; if(carProps[p].y>H+60) carProps.splice(p,1); }
+    if(carDist<carGoal-500 && (carProps.length<6) && Math.random()<0.06){ carProps.push({side:Math.random()<0.5?-1:1, y:-60, kind:Math.random()<0.5?"house":"tree", col:["#c0685a","#5a7bb0","#6aa06a","#b08a4a"][Math.floor(Math.random()*4)]}); }
+    if(Math.random()<0.05){ carCoins.push({x:(Math.random()-0.5)*roadW*0.8, y:-20}); }
+    for(var c=carCoins.length-1;c>=0;c--){ var co=carCoins[c]; co.y+=sc*1.6;
+      if(co.y>H+20){ carCoins.splice(c,1); continue; }
+      if(Math.abs((W/2+co.x)-(W/2+car.x))<26 && Math.abs(co.y-(H*0.78))<28){ carCoinN++; coinSfx(); carCoins.splice(c,1); } }
+    // people to pick up along the way — drive into them and they hop on (become one of your crowd)
+    if(carDist<carGoal-500){ carPeopleT-=dt; if(carPeopleT<=0){ carPeople.push({x:(Math.random()-0.5)*roadW*0.7, y:-30, seed:100+Math.random()*900, board:false, bt:0}); carPeopleT=36+Math.random()*46; } }
+    for(var pe=carPeople.length-1;pe>=0;pe--){ var pn=carPeople[pe];
+      if(!pn.board){ pn.y+=sc*1.6;
+        if(Math.abs((W/2+pn.x)-(W/2+car.x))<30 && Math.abs(pn.y-(H*0.78))<34){ pn.board=true; pn.bt=16; carPass++; boardSfx(carPass); } }
+      else { pn.bt-=dt; pn.y-=2*dt; if(pn.bt<=0){ carPeople.splice(pe,1); continue; } }
+      if(pn.y>H+30) carPeople.splice(pe,1); }
+  }
+  function carRender(){
+    var roadW=Math.min(W*0.62,380), roadX=(W-roadW)/2;
+    // sky + grass
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,"#8fd3f4"); g.addColorStop(0.5,"#bfe8c0"); g.addColorStop(1,"#7cc84a");
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="#5aa03a"; ctx.fillRect(0,0,roadX,H); ctx.fillStyle="#5aa03a"; ctx.fillRect(roadX+roadW,0,W-roadX-roadW,H);
+    // road
+    ctx.fillStyle="#3a3f47"; ctx.fillRect(roadX,0,roadW,H);
+    ctx.fillStyle="#ffd93d"; ctx.fillRect(roadX+6,0,4,H); ctx.fillRect(roadX+roadW-10,0,4,H);
+    ctx.fillStyle="#eef2f6"; for(var l=0;l<carLines.length;l++) ctx.fillRect(W/2-3,carLines[l],6,H*0.06);
+    // roadside props
+    for(var p=0;p<carProps.length;p++){ var pr=carProps[p], px=pr.side<0? roadX-40 : roadX+roadW+40;
+      if(pr.kind==="tree"){ ctx.fillStyle="#6a4522"; ctx.fillRect(px-4,pr.y,8,18); ctx.fillStyle="#2f8f4a"; ctx.beginPath(); ctx.arc(px,pr.y-6,18,0,7); ctx.fill(); }
+      else { ctx.fillStyle=pr.col; ctx.fillRect(px-26,pr.y-30,52,44); ctx.fillStyle="#7a3a2a"; ctx.beginPath(); ctx.moveTo(px-30,pr.y-30); ctx.lineTo(px,pr.y-52); ctx.lineTo(px+30,pr.y-30); ctx.fill(); ctx.fillStyle="#ffe98a"; ctx.fillRect(px-16,pr.y-18,14,14); ctx.fillRect(px+4,pr.y-18,14,14); ctx.fillStyle="#5a3a1a"; ctx.fillRect(px-6,pr.y-6,12,20); } }
+    // coins
+    for(var c=0;c<carCoins.length;c++){ var co=carCoins[c]; ctx.fillStyle="#ffcf33"; ctx.beginPath(); ctx.ellipse(W/2+co.x,co.y,8,10,0,0,7); ctx.fill(); ctx.strokeStyle="#c99a1f"; ctx.lineWidth=2; ctx.stroke(); }
+    // people waiting to be picked up
+    for(var pe=0;pe<carPeople.length;pe++){ var pn=carPeople[pe]; var px2=W/2+pn.x, py2=pn.y, al=pn.board?Math.max(0,pn.bt/16):1;
+      ctx.save(); ctx.globalAlpha=al; ctx.fillStyle="#00000033"; ctx.beginPath(); ctx.ellipse(px2,py2+12,11,4,0,0,7); ctx.fill();
+      var col=["#37b06a","#e0679a","#ffb03a","#8a63d2","#20b0a0"][Math.floor(hsh(pn.seed*2.3)*5)%5];
+      ctx.strokeStyle="#2a3550"; ctx.lineWidth=4; ctx.lineCap="round"; ctx.beginPath(); ctx.moveTo(px2-3,py2+4); ctx.lineTo(px2-3,py2+12); ctx.moveTo(px2+3,py2+4); ctx.lineTo(px2+3,py2+12); ctx.stroke();
+      ctx.fillStyle=col; ctx.beginPath(); ctx.arc(px2,py2,8,0,7); ctx.fill();
+      var waveA=pn.board?-1.2:Math.sin(last/150+pn.seed)*0.8; ctx.strokeStyle=col; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(px2+6,py2-2); ctx.lineTo(px2+11,py2-2+waveA*6); ctx.stroke();
+      ctx.fillStyle=pick(SKIN,pn.seed*3.1); ctx.beginPath(); ctx.arc(px2,py2-9,6,0,7); ctx.fill();
+      ctx.fillStyle=pick(HAIR,pn.seed*1.7); ctx.beginPath(); ctx.arc(px2,py2-11,6,Math.PI,0); ctx.fill();
+      ctx.restore(); }
+    // HOME house appears near the end / when home
+    var homeY = H*0.30 - (carGoal-carDist)*0.14;
+    if(carDist>carGoal-500 || mode==="home"){ if(mode==="home") homeY=H*0.34;
+      ctx.fillStyle="#8a9098"; ctx.fillRect(W/2-24, homeY+30, 48, 40);            // driveway to road
+      ctx.fillStyle="#c26a4a"; ctx.fillRect(W/2-46, homeY-20, 92, 54);
+      ctx.fillStyle="#7a3a2a"; ctx.beginPath(); ctx.moveTo(W/2-54,homeY-20); ctx.lineTo(W/2,homeY-54); ctx.lineTo(W/2+54,homeY-20); ctx.closePath(); ctx.fill();
+      ctx.fillStyle="#5a3a1a"; ctx.fillRect(W/2-10,homeY+8,20,26); ctx.fillStyle="#ffe98a"; ctx.fillRect(W/2-36,homeY-8,18,16); ctx.fillRect(W/2+18,homeY-8,18,16);
+      ctx.fillStyle="#0a2a3a"; ctx.font="bold 12px sans-serif"; ctx.textAlign="center"; ctx.fillText("🏠 HOME",W/2,homeY-40); }
+    // Mo's car
+    var cyCar = mode==="home"? homeY+52 : H*0.78;
+    if(vehicle==="bus") drawTopBus(W/2+(mode==="home"?0:car.x), cyCar); else drawTopCar(W/2+ (mode==="home"?0:car.x), cyCar);
+    // HUD: distance-home bar
+    if(mode==="car"){ var pct=Math.min(1,carDist/carGoal);
+      ctx.fillStyle="#0a1220aa"; rr(W*0.1,10,W*0.8,22,10); ctx.fill();
+      ctx.fillStyle="#37b06a"; rr(W*0.1,10,W*0.8*pct,22,10); ctx.fill();
+      ctx.fillStyle="#fff"; ctx.font="bold 13px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("🚌 Ride the bus home!   🪙 "+carCoinN+"   🧑 "+carPass, W/2, 21); }
+  }
+  function drawTopCar(x,y){ var w=Math.min(W,H)*0.09, h=w*1.7;
+    ctx.fillStyle="#00000033"; rr(x-w/2+3,y-h/2+5,w,h,10); ctx.fill();
+    ctx.fillStyle=carColor; rr(x-w/2,y-h/2,w,h,10); ctx.fill();
+    ctx.fillStyle="#ffffff22"; rr(x-w/2,y-h/2,w,h*0.4,10); ctx.fill();
+    ctx.fillStyle="#bfe8ff"; rr(x-w*0.32,y-h*0.30,w*0.64,h*0.2,4); ctx.fill();
+    ctx.fillStyle="#a9d6ee"; rr(x-w*0.32,y+h*0.12,w*0.64,h*0.18,4); ctx.fill();
+    ctx.fillStyle="#e8b98f"; ctx.beginPath(); ctx.arc(x,y-h*0.02,w*0.15,0,7); ctx.fill();
+    ctx.fillStyle="#3a2312"; ctx.beginPath(); ctx.arc(x,y-h*0.06,w*0.15,Math.PI,0); ctx.fill();
+    ctx.fillStyle="#111"; ctx.fillRect(x-w/2-3,y-h*0.28,4,h*0.2); ctx.fillRect(x+w/2-1,y-h*0.28,4,h*0.2); ctx.fillRect(x-w/2-3,y+h*0.1,4,h*0.2); ctx.fillRect(x+w/2-1,y+h*0.1,4,h*0.2);
+    ctx.fillStyle="#fff6b0"; ctx.beginPath(); ctx.arc(x-w*0.3,y-h/2+3,3,0,7); ctx.arc(x+w*0.3,y-h/2+3,3,0,7); ctx.fill(); }
+  function drawTopBus(x,y){ var w=Math.min(W,H)*0.11, h=w*2.4;
+    ctx.fillStyle="#00000033"; rr(x-w/2+3,y-h/2+5,w,h,10); ctx.fill();
+    ctx.fillStyle="#ffcf33"; rr(x-w/2,y-h/2,w,h,12); ctx.fill();
+    ctx.fillStyle="#e0b020"; rr(x-w/2,y-h/2,w,h*0.12,12); ctx.fill();
+    ctx.fillStyle="#bfe8ff"; rr(x-w*0.34,y-h*0.40,w*0.68,h*0.16,4); ctx.fill();                 // windshield
+    for(var i=0;i<4;i++){ ctx.fillStyle="#9fdcff"; rr(x-w*0.4,y-h*0.16+i*h*0.14,w*0.34,h*0.1,3); ctx.fill(); rr(x+w*0.06,y-h*0.16+i*h*0.14,w*0.34,h*0.1,3); ctx.fill(); }
+    ctx.fillStyle="#c99a1f"; ctx.fillRect(x-w/2,y-h*0.05,w,4);
+    ctx.fillStyle="#e8b98f"; ctx.beginPath(); ctx.arc(x,y-h*0.30,w*0.13,0,7); ctx.fill();          // Mo driving
+    ctx.fillStyle="#3a2312"; ctx.beginPath(); ctx.arc(x,y-h*0.33,w*0.13,Math.PI,0); ctx.fill();
+    ctx.fillStyle="#111"; ctx.fillRect(x-w/2-3,y-h*0.30,4,h*0.16); ctx.fillRect(x+w/2-1,y-h*0.30,4,h*0.16); ctx.fillRect(x-w/2-3,y+h*0.16,4,h*0.16); ctx.fillRect(x+w/2-1,y+h*0.16,4,h*0.16);
+    ctx.fillStyle="#fff6b0"; ctx.beginPath(); ctx.arc(x-w*0.3,y-h/2+3,3,0,7); ctx.arc(x+w*0.3,y-h/2+3,3,0,7); ctx.fill(); }
+  function drawSideBus(x,gy){ var w=W*0.24,h=w*0.38, y=gy-h-h*0.3;
+    ctx.fillStyle="#00000022"; ctx.beginPath(); ctx.ellipse(x,gy+2,w*0.55,h*0.16,0,0,7); ctx.fill();
+    ctx.fillStyle="#ffcf33"; rr(x-w/2,y,w,h,10); ctx.fill();
+    ctx.fillStyle="#e0b020"; rr(x-w/2,y,w,h*0.16,10); ctx.fill();
+    ctx.fillStyle="#bfe8ff"; for(var wx=x-w*0.42; wx<x+w*0.2; wx+=w*0.16){ rr(wx,y+h*0.22,w*0.12,h*0.36,3); ctx.fill(); }
+    ctx.fillStyle="#0a0e18"; rr(x+w*0.30,y+h*0.2,w*0.14,h*0.7,3); ctx.fill();                       // open door
+    ctx.fillStyle="#111"; ctx.beginPath(); ctx.arc(x-w*0.28,gy,h*0.3,0,7); ctx.arc(x+w*0.28,gy,h*0.3,0,7); ctx.fill();
+    ctx.fillStyle="#888"; ctx.beginPath(); ctx.arc(x-w*0.28,gy,h*0.13,0,7); ctx.arc(x+w*0.28,gy,h*0.13,0,7); ctx.fill();
+    ctx.fillStyle="#3a2400"; ctx.font="bold 10px sans-serif"; ctx.textAlign="center"; ctx.fillText("MO BUS",x-w*0.1,y+h*0.12); }
+
+  // car input
+  var keyState={left:false,right:false,up:false};
+  window.addEventListener("keydown",function(e){ if(e.code==="ArrowLeft"||e.code==="KeyA")keyState.left=true; if(e.code==="ArrowRight"||e.code==="KeyD")keyState.right=true; if(e.code==="ArrowUp"||e.code==="KeyW"||e.code==="Space")keyState.up=true; });
+  window.addEventListener("keyup",function(e){ if(e.code==="ArrowLeft"||e.code==="KeyA")keyState.left=false; if(e.code==="ArrowRight"||e.code==="KeyD")keyState.right=false; if(e.code==="ArrowUp"||e.code==="KeyW"||e.code==="Space")keyState.up=false; });
+  function relX(e){ var r=cv.getBoundingClientRect(); var t=e.touches&&e.touches[0]?e.touches[0]:e; return (t.clientX-r.left)*(W/r.width); }
+  function relY(e){ var r=cv.getBoundingClientRect(); var t=e.touches&&e.touches[0]?e.touches[0]:e; return (t.clientY-r.top)*(H/r.height); }
+  stage.addEventListener("mousemove",function(e){ if(mode==="car"&&pointerDown) carPX=relX(e); });
+  stage.addEventListener("mousedown",function(e){ if(mode==="car") carPX=relX(e); });
+  window.addEventListener("mouseup",function(){ if(mode==="car") carPX=null; });
+  stage.addEventListener("touchmove",function(e){ if(mode==="car") carPX=relX(e); },{passive:true});
+  stage.addEventListener("touchstart",function(e){ if(mode==="car") carPX=relX(e); },{passive:true});
+  window.addEventListener("touchend",function(){ if(mode==="car") carPX=null; });
+  document.getElementById("rideAgainBtn").onclick=function(){ ac(); document.getElementById("homeOv").classList.add("hide"); document.getElementById("gasBtn").style.display="none"; hideVeh(); document.getElementById("hornBtn").textContent="📢 Horn"; var c=document.getElementById("moCard"),rl=document.getElementById("readerLight"); c.classList.remove("slid"); rl.classList.remove("ok"); rl.textContent="TAP"; document.getElementById("cardHint").textContent="👆 Tap the card, then the reader"; document.getElementById("cardOv").classList.remove("hide"); say("Tap your Mo Card to ride again."); };
+  (function(){ var gb=document.getElementById("gasBtn");
+    var on=function(e){ e.preventDefault(); ac(); gasHeld=true; }, off=function(e){ e&&e.preventDefault&&e.preventDefault(); gasHeld=false; };
+    gb.addEventListener("mousedown",on); gb.addEventListener("mouseup",off); gb.addEventListener("mouseleave",off);
+    gb.addEventListener("touchstart",on,{passive:false}); gb.addEventListener("touchend",off); gb.addEventListener("touchcancel",off); })();
+  document.getElementById("micBtn").onclick=function(){ if(mode!=="play"&&mode!=="car")return; say("Attention passengers. Next stop is "+stName+"."); };
+
+  reset(); mode="start";
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

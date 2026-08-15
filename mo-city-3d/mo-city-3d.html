@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>MO CITY 3D</title>
+<style>
+  html,body { margin:0; height:100%; background:#0e1622; overflow:hidden; font-family:'Trebuchet MS',system-ui,sans-serif; }
+  #stage { position:absolute; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+  #hud { position:absolute; top:10px; left:12px; right:12px; z-index:3; display:flex; gap:10px; color:#fff; font-weight:bold; text-shadow:0 2px 3px #0009; pointer-events:none; }
+  #hud .pill { background:linear-gradient(#1b3552cc,#0e2136cc); padding:6px 12px; border-radius:20px; border:1px solid #ffffff22; font-size:17px; }
+  #lvl { margin-left:auto; }
+  #panel { position:absolute; left:0; right:0; bottom:0; z-index:4; background:linear-gradient(#16263a,#0c1826); border-top:3px solid #2f4d6e;
+    padding:8px 8px calc(8px + env(safe-area-inset-bottom)); }
+  #builds { display:flex; gap:7px; overflow-x:auto; }
+  .b { flex:0 0 auto; width:74px; border:none; border-radius:12px; padding:6px 4px; cursor:pointer; color:#fff; text-align:center;
+    background:linear-gradient(#294660,#16293c); box-shadow:0 3px 0 #0b1826; }
+  .b.on { outline:3px solid #ffe45c; }
+  .b:active { transform:translateY(3px); box-shadow:0 1px 0 #0b1826; }
+  .b .ic { font-size:26px; } .b .nm { font-size:10px; font-weight:800; }
+  .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; z-index:6; background:#08101acc; }
+  .overlay.hide { display:none; }
+  .card { background:#16263aee; border:3px solid #6cd0ff; border-radius:22px; padding:22px 26px; max-width:90%; color:#fff; box-shadow:0 20px 60px #000a; }
+  .card h1 { margin:0 0 6px; font-size:28px; color:#8fe3ff; }
+  .card p { margin:8px 0; line-height:1.35; }
+  .big { margin-top:14px; padding:14px 28px; font-size:20px; font-weight:bold; background:linear-gradient(#ffe07a,#f0b429); color:#5a3d00; border:none; border-radius:14px; box-shadow:0 4px 0 #b8922a; cursor:pointer; }
+  .big:active { transform:translateY(4px); box-shadow:0 1px 0 #b8922a; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hud">
+    <div class="pill" id="coins">🪙 0</div>
+    <div class="pill" id="pop">👥 0</div>
+    <div class="pill" id="lvl">🏙️ Village</div>
+  </div>
+  <div id="panel"><div id="builds"></div></div>
+  <div class="overlay" id="startOv">
+    <div class="card">
+      <h1>🏙️ MO CITY 3D</h1>
+      <p>Build your own 3D city! Tap a building, then tap the ground to place it.</p>
+      <p>🏠 Houses & 🏢 towers add <b>people</b> • 🏪 shops earn <b>coins</b> • 🌳 parks make it nice.<br>Use 🚜 Bulldoze to remove. Drag to build a row!</p>
+      <button class="big" id="startBtn">▶ START BUILDING</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), ctx=cv.getContext("2d"), stage=document.getElementById("stage");
+  var DPR=Math.min(2, window.devicePixelRatio||1);
+  var W=0,H=0, N=12, TW=64, TH=32, ox=0, oy=0, panelH=110;
+  function layout(){ panelH=document.getElementById("panel").offsetHeight||110; var avail=H-panelH; TW=Math.max(30,Math.min(66, Math.floor(W/(N+1)))); TH=TW/2;
+    ox=W/2; oy=Math.max(TH*2, (avail - N*TH)/2 + TH*2); }
+  function resize(){ W=stage.clientWidth; H=stage.clientHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0); layout(); }
+  window.addEventListener("resize",resize); resize();
+
+  var AC=null; function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||"sine"; o.frequency.value=f; g.gain.value=v||0.05; o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.08)); o.stop(a.currentTime+(d||0.08)+0.02); }
+  function placeSfx(){ beep(500,0.05,"square",0.05); setTimeout(function(){beep(720,0.05,"square",0.04);},45); }
+  function bulldozeSfx(){ beep(200,0.12,"sawtooth",0.06); }
+
+  var BUILD=[
+    {id:"grass", nm:"Grass",  ic:"🟩", ground:true},
+    {id:"road",  nm:"Road",   ic:"🛣️", ground:true},
+    {id:"water", nm:"Water",  ic:"🌊", ground:true},
+    {id:"park",  nm:"Park",   ic:"🌳", ground:true, prop:"tree"},
+    {id:"house", nm:"House",  ic:"🏠", floors:1, wall:"#f0e0c0", roof:"#c0392b", pop:4},
+    {id:"shop",  nm:"Shop",   ic:"🏪", floors:1, wall:"#ffcf7a", shop:true, coin:4},
+    {id:"apt",   nm:"Flats",  ic:"🏢", floors:3, wall:"#cbb890", pop:14, coin:2},
+    {id:"tower", nm:"Tower",  ic:"🏢", floors:5, wall:"#9fc0e0", glass:true, pop:30, coin:3},
+    {id:"sky",   nm:"Skyscr.",ic:"🏙️", floors:8, wall:"#8a94a0", glass:true, pop:60, coin:6},
+    {id:"arena", nm:"Arena",  ic:"🏟️", floors:2, wall:"#c8ccd4", dome:true, pop:10, coin:8},
+    {id:"buldz", nm:"Bulldoze",ic:"🚜", tool:true}
+  ];
+  var BMAP={}; BUILD.forEach(function(b){ BMAP[b.id]=b; });
+
+  var mode="start", sel="house", grid={}, coins=0, painting=false, lastCell=null, floatY=0;
+  function key(r,c){ return r+"_"+c; }
+  function hash(r,c){ return Math.abs(Math.sin((r*12.9+c*78.2))*43758.5)%1; }
+  function load(){ try{ var s=JSON.parse(localStorage.getItem("moCity3d")); if(s){ grid=s.grid||{}; coins=s.coins||0; } }catch(e){} }
+  var saveT=0; function save(){ try{ localStorage.setItem("moCity3d",JSON.stringify({grid:grid,coins:coins})); }catch(e){} }
+  load();
+
+  var buildsEl=document.getElementById("builds");
+  BUILD.forEach(function(b){ var d=document.createElement("button"); d.className="b"+(b.id===sel?" on":""); d.innerHTML='<div class="ic">'+b.ic+'</div><div class="nm">'+b.nm+'</div>';
+    d.onclick=function(){ ac(); sel=b.id; document.querySelectorAll(".b").forEach(function(x){x.classList.remove("on");}); d.classList.add("on"); };
+    buildsEl.appendChild(b._el=d); });
+  document.getElementById("startBtn").onclick=function(){ ac(); mode="build"; document.getElementById("startOv").classList.add("hide"); };
+
+  // iso helpers
+  function tileCenter(r,c){ return { x:ox+(c-r)*TW/2, y:oy+(c+r)*TH/2 }; }
+  function screenToCell(sx,sy){ var u=(sx-ox)/(TW/2), v=(sy-oy)/(TH/2); var c=Math.round((u+v)/2), r=Math.round((v-u)/2); if(r<0||c<0||r>=N||c>=N) return null; return {r:r,c:c}; }
+  function relXY(e){ var rr=cv.getBoundingClientRect(); var t=e.touches&&e.touches[0]?e.touches[0]:e; return {x:(t.clientX-rr.left)*(W/rr.width), y:(t.clientY-rr.top)*(H/rr.height)}; }
+
+  function place(cellRC){ if(!cellRC) return; var k=key(cellRC.r,cellRC.c); var b=BMAP[sel];
+    if(b.tool){ if(grid[k]){ delete grid[k]; bulldozeSfx(); } return; }
+    if(grid[k]!==sel){ grid[k]=sel; placeSfx(); floatY=1; } }
+  function down(e){ if(mode!=="build")return; ac(); painting=true; var p=relXY(e); var cc=screenToCell(p.x,p.y); lastCell=cc&&key(cc.r,cc.c); place(cc); save(); }
+  function move(e){ if(!painting||mode!=="build")return; var p=relXY(e); var cc=screenToCell(p.x,p.y); if(!cc)return; var k=key(cc.r,cc.c); if(k!==lastCell){ lastCell=k; place(cc); } }
+  function up(){ if(painting){ painting=false; save(); } }
+  cv.onmousedown=down; cv.onmousemove=move; window.addEventListener("mouseup",up);
+  cv.addEventListener("touchstart",function(e){ e.preventDefault(); down(e); },{passive:false});
+  cv.addEventListener("touchmove",function(e){ e.preventDefault(); move(e); },{passive:false});
+  window.addEventListener("touchend",up);
+
+  function stats(){ var pop=0, inc=0, parks=0, count=0; for(var k in grid){ var b=BMAP[grid[k]]; if(!b)continue; count++; if(b.pop)pop+=b.pop; if(b.coin)inc+=b.coin; if(b.id==="park")parks++; } return {pop:pop,inc:inc,parks:parks,count:count}; }
+
+  var last=0;
+  function frame(ts){ var dt=Math.min(3,((ts-last)/16.67)||1); last=ts;
+    if(mode==="build"){ var s=stats(); coins += s.inc*(dt/60)*0.5; if(floatY>0)floatY-=0.06*dt;
+      saveT+=dt; if(saveT>200){ saveT=0; save(); }
+      var pop=s.pop; document.getElementById("coins").textContent="🪙 "+Math.floor(coins);
+      document.getElementById("pop").textContent="👥 "+pop;
+      document.getElementById("lvl").textContent = "🏙️ "+(pop>500?"Metropolis":pop>200?"Big City":pop>60?"Town":pop>0?"Village":"Empty Lot");
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  function render(){
+    // sky
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,"#7ec8f0"); g.addColorStop(0.55,"#bfe6f5"); g.addColorStop(0.551,"#9fd6a0"); g.addColorStop(1,"#7bc47f"); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // a soft sun
+    ctx.save(); ctx.globalCompositeOperation="lighter"; var sg=ctx.createRadialGradient(W*0.8,H*0.14,4,W*0.8,H*0.14,120); sg.addColorStop(0,"rgba(255,245,200,0.7)"); sg.addColorStop(1,"rgba(255,245,200,0)"); ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(W*0.8,H*0.14,120,0,7); ctx.fill(); ctx.restore();
+
+    // draw ground diamonds first
+    for(var r=0;r<N;r++){ for(var c=0;c<N;c++){ drawGround(r,c); } }
+    // then buildings back-to-front (sorted by r+c)
+    var cells=[]; for(var k in grid){ var pr=k.split("_"); cells.push({r:+pr[0],c:+pr[1],id:grid[k]}); }
+    cells.sort(function(a,b){ return (a.r+a.c)-(b.r+b.c); });
+    for(var i=0;i<cells.length;i++){ drawBuilding(cells[i].r,cells[i].c,BMAP[cells[i].id]); }
+  }
+
+  function diamond(cx,cy,dy){ ctx.beginPath(); ctx.moveTo(cx,cy-TH/2+dy); ctx.lineTo(cx+TW/2,cy+dy); ctx.lineTo(cx,cy+TH/2+dy); ctx.lineTo(cx-TW/2,cy+dy); ctx.closePath(); }
+  function drawGround(r,c){ var p=tileCenter(r,c), id=grid[key(r,c)], b=id?BMAP[id]:null;
+    var base = (b&&b.id==="water")?"#3a86e0": (b&&b.id==="road")?"#5a6472": "#6ab86e";
+    if(b&&(b.id==="park")) base="#5aa85e";
+    diamond(p.x,p.y,0); ctx.fillStyle=base; ctx.fill();
+    ctx.strokeStyle="rgba(0,0,0,0.10)"; ctx.lineWidth=1; ctx.stroke();
+    if(b&&b.id==="road"){ ctx.strokeStyle="#f0d24a"; ctx.lineWidth=2; ctx.setLineDash([5,5]); ctx.beginPath(); ctx.moveTo(p.x-TW*0.3,p.y+TH*0.15); ctx.lineTo(p.x+TW*0.3,p.y-TH*0.15); ctx.stroke(); ctx.setLineDash([]); }
+    if(b&&b.id==="water"){ ctx.fillStyle="rgba(255,255,255,0.25)"; var wob=Math.sin(last/300+r+c)*2; ctx.fillRect(p.x-6,p.y+wob,12,2); }
+    if(b&&b.id==="park"){ var tx=p.x, ty=p.y-2; ctx.font=Math.floor(TW*0.5)+"px Arial"; ctx.textAlign="center"; ctx.textBaseline="alphabetic"; ctx.fillText("🌳", tx, ty+6); }
+  }
+
+  function shade(hex,f){ var n=parseInt(hex.slice(1),16), R=(n>>16)&255,G=(n>>8)&255,B=n&255;
+    R=Math.round(R*f); G=Math.round(G*f); B=Math.round(B*f); return "rgb("+Math.min(255,R)+","+Math.min(255,G)+","+Math.min(255,B)+")"; }
+  function drawBuilding(r,c,b){ if(!b||b.ground) return; var p=tileCenter(r,c), cx=p.x, cy=p.y;
+    var floorH=Math.max(10,TH*0.62); var h=b.floors*floorH + (b.id==="sky"?floorH*(1+Math.floor(hash(r,c)*3)):0);
+    var wall=b.wall||"#ccc", top=shade(wall,1.12), left=shade(wall,0.7), right=shade(wall,0.85);
+    // left face
+    ctx.beginPath(); ctx.moveTo(cx-TW/2,cy); ctx.lineTo(cx,cy+TH/2); ctx.lineTo(cx,cy+TH/2-h); ctx.lineTo(cx-TW/2,cy-h); ctx.closePath(); ctx.fillStyle=left; ctx.fill();
+    // right face
+    ctx.beginPath(); ctx.moveTo(cx,cy+TH/2); ctx.lineTo(cx+TW/2,cy); ctx.lineTo(cx+TW/2,cy-h); ctx.lineTo(cx,cy+TH/2-h); ctx.closePath(); ctx.fillStyle=right; ctx.fill();
+    // windows on both faces
+    var floors=Math.round(h/floorH);
+    for(var f=0;f<floors;f++){ var wy=cy - f*floorH - floorH*0.55;
+      // left face windows
+      ctx.fillStyle = b.glass? (hash(r*3+f,c)>0.5?"#ffe9a0":"#3a5a78") : "#6a89b0";
+      ctx.fillRect(cx-TW*0.34, wy-6, TW*0.12, 7); ctx.fillRect(cx-TW*0.16, wy-6+TH*0.13, TW*0.12, 7);
+      // right face windows
+      ctx.fillStyle = b.glass? (hash(r,c*3+f)>0.5?"#ffe9a0":"#3a5a78") : "#6a89b0";
+      ctx.fillRect(cx+TW*0.06, wy-6+TH*0.13, TW*0.12, 7); ctx.fillRect(cx+TW*0.24, wy-6, TW*0.12, 7);
+    }
+    // top face
+    diamond(cx,cy,-h); ctx.fillStyle=top; ctx.fill(); ctx.strokeStyle="rgba(0,0,0,0.15)"; ctx.lineWidth=1; ctx.stroke();
+    // roofs / toppers
+    if(b.roof){ // pitched red roof (a raised smaller diamond + ridge)
+      ctx.fillStyle=b.roof; diamond(cx,cy-h-TH*0.28,0); ctx.fill();
+      ctx.strokeStyle=shade(b.roof,0.7); ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(cx-TW/2,cy-h); ctx.lineTo(cx,cy-h-TH*0.28-TH/2); ctx.lineTo(cx+TW/2,cy-h); ctx.stroke();
+    }
+    if(b.shop){ // awning + sign
+      ctx.fillStyle="#e0453a"; ctx.fillRect(cx-TW*0.34,cy-h-2,TW*0.34,6); ctx.fillStyle="#fff"; for(var s=0;s<3;s++) ctx.fillRect(cx-TW*0.34+s*TW*0.12,cy-h-2,TW*0.06,6);
+      ctx.fillStyle="#2a2a3a"; ctx.font="bold "+Math.floor(TW*0.16)+"px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("SHOP", cx, cy-h-floorH*0.5); }
+    if(b.dome){ ctx.fillStyle=shade(wall,1.05); ctx.beginPath(); ctx.ellipse(cx,cy-h,TW*0.32,TH*0.5,0,Math.PI,0); ctx.fill(); ctx.strokeStyle="rgba(0,0,0,0.2)"; ctx.stroke(); }
+    if(b.id==="sky"){ ctx.fillStyle="#c33"; ctx.fillRect(cx-1,cy-h-14,2,14); ctx.fillStyle=(Math.floor(last/300)%2)?"#ff5a5a":"#7a2020"; ctx.beginPath(); ctx.arc(cx,cy-h-14,2.5,0,7); ctx.fill(); }
+  }
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

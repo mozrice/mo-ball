@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Mo Garden</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; overflow:hidden; background:#8fd35a;
+    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif; color:#173a10;
+    user-select:none; -webkit-user-select:none; touch-action:none; }
+  #stage { position:fixed; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:absolute; top:10px; left:12px; right:12px; z-index:3; pointer-events:none;
+    display:flex; align-items:center; gap:12px; font-weight:bold; text-shadow:0 2px 2px #0002; }
+  #score { font-size:24px; color:#2a5a1a; }
+  #goal { font-size:14px; color:#3a6a24; }
+  #moves { margin-left:auto; font-size:20px; color:#2a5a1a; }
+  #shuffleBtn { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:4;
+    pointer-events:auto; border:none; border-radius:14px; padding:11px 20px; font:inherit; font-weight:bold;
+    background:#37933a; color:#fff; box-shadow:0 4px 0 #256326; cursor:pointer; }
+  #shuffleBtn:active { transform:translateX(-50%) translateY(3px); box-shadow:0 1px 0 #256326; }
+  .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    text-align:center; z-index:6; background:#0a2a0f44; }
+  .overlay.hide { display:none; }
+  .card { background:#1c4a20ee; border:3px solid #ffd93d; border-radius:22px; padding:24px 28px; max-width:90%; color:#fff; }
+  .card h1 { margin:0 0 6px; font-size:30px; color:#ffd93d; text-shadow:0 3px 0 #7a6a1a; }
+  .card p { margin:8px 0; font-size:16px; color:#eaffea; }
+  .big { margin-top:14px; padding:14px 28px; font-size:20px; font-weight:bold; background:#ffd93d; color:#4a3d00;
+    border:none; border-radius:16px; cursor:pointer; box-shadow:0 5px 0 #b8922a; }
+  .big:active { transform:translateY(4px); box-shadow:0 1px 0 #b8922a; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hud">
+    <div id="score">0</div><div id="goal">Goal 300</div><div id="moves">🌱 20</div>
+  </div>
+  <button id="shuffleBtn">🔀 Shuffle</button>
+
+  <div class="overlay" id="startOv">
+    <div class="card">
+      <h1>🌻 MO GARDEN</h1>
+      <p>Swap two neighbor plants to line up<br><b>3 or more the same</b> — they burst!</p>
+      <p>Reach the goal before you run out of 🌱 moves.<br>Big lines and combos score more!</p>
+      <button class="big" id="playBtn">▶ PLAY</button>
+    </div>
+  </div>
+  <div class="overlay hide" id="msgOv">
+    <div class="card">
+      <h1 id="msgTitle">LEVEL CLEAR!</h1>
+      <p id="msgP">Score: 0</p>
+      <button class="big" id="msgBtn">NEXT ▶</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), ctx=cv.getContext("2d"), stage=document.getElementById("stage");
+  var DPR=Math.max(1,Math.min(3,window.devicePixelRatio||1));
+  var W=0,H=0, COLS=7, ROWS=8, T=0, bx=0, by=0;
+  var FLOWERS=["🌻","🌸","🌷","🌹","🌼","🍀"], NF=FLOWERS.length;
+
+  function resize(){ W=stage.clientWidth; H=stage.clientHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    var top=52, bot=70; var availW=W-20, availH=H-top-bot;
+    T=Math.min(availW/COLS, availH/ROWS); T=Math.floor(T);
+    bx=Math.floor((W-T*COLS)/2); by=top+Math.floor((availH-T*ROWS)/2);
+  }
+  window.addEventListener("resize",function(){ resize(); });
+  resize();
+
+  var AC=null; function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain();
+    o.type=t||"triangle"; o.frequency.value=f; g.gain.value=v||0.08; o.connect(g); g.connect(a.destination);
+    var n=a.currentTime; o.start(n); g.gain.exponentialRampToValueAtTime(0.0001,n+(d||0.12)); o.stop(n+(d||0.12)+0.02); }
+  function popSfx(combo){ beep(520+combo*90,0.07,"triangle",0.09); setTimeout(function(){beep(780+combo*90,0.09,"sine",0.08);},60); }
+  function badSfx(){ beep(200,0.12,"sawtooth",0.09); }
+  function winSfx(){ beep(660,0.1,"square",0.1); setTimeout(function(){beep(880,0.1,"square",0.1);},110); setTimeout(function(){beep(1180,0.14,"square",0.1);},220); }
+
+  var board, sel, phase, combo, score, goal, moves, level, parts, best;
+  best=parseInt(localStorage.getItem("moGardenBest")||"0",10)||0;
+  function idx(r,c){ return r*COLS+c; }
+  function newTypeSafe(r,c){ var t,tries=0; do{ t=Math.floor(Math.random()*NF); tries++; }
+    while(tries<24 && ((c>=2 && board[idx(r,c-1)].t===t && board[idx(r,c-2)].t===t) || (r>=2 && board[idx(r-1,c)].t===t && board[idx(r-2,c)].t===t))); return t; }
+  function fill(){ board=[]; for(var r=0;r<ROWS;r++) for(var c=0;c<COLS;c++) board.push({t:0,ox:0,oy:0,clr:0,clearing:false});
+    for(var r2=0;r2<ROWS;r2++) for(var c2=0;c2<COLS;c2++) board[idx(r2,c2)].t=newTypeSafe(r2,c2); }
+
+  function reset(){ fill(); sel=null; phase="idle"; combo=0; score=0; parts=[]; level=1; goal=300; moves=20; updateHud(); }
+  function nextLevel(){ level++; goal=300+(level-1)*200; moves=20; score=0; fill(); sel=null; phase="idle"; combo=0; updateHud(); }
+  function updateHud(){ document.getElementById("score").textContent=score;
+    document.getElementById("goal").textContent="Goal "+goal+"  ·  Lv "+level;
+    document.getElementById("moves").textContent="🌱 "+moves; }
+
+  // ---- matches ----
+  function findMatches(){ var s={};
+    for(var r=0;r<ROWS;r++){ var c=0; while(c<COLS){ var t=board[idx(r,c)].t,c2=c; while(c2<COLS && board[idx(r,c2)].t===t) c2++; if(c2-c>=3){ for(var k=c;k<c2;k++) s[k+","+r]=true; } c=c2; } }
+    for(var cc=0;cc<COLS;cc++){ var rr=0; while(rr<ROWS){ var t2=board[idx(rr,cc)].t,r2=rr; while(r2<ROWS && board[idx(r2,cc)].t===t2) r2++; if(r2-rr>=3){ for(var k2=rr;k2<r2;k2++) s[cc+","+k2]=true; } rr=r2; } }
+    return s; }
+  function keyCount(s){ var n=0; for(var k in s) n++; return n; }
+
+  function cellCenter(r,c){ return {x:bx+c*T+T/2, y:by+r*T+T/2}; }
+
+  function trySwap(a,b){
+    var ta=board[idx(a.r,a.c)].t; board[idx(a.r,a.c)].t=board[idx(b.r,b.c)].t; board[idx(b.r,b.c)].t=ta;
+    var pa=cellCenter(a.r,a.c), pb=cellCenter(b.r,b.c);
+    board[idx(a.r,a.c)].ox=pb.x-pa.x; board[idx(a.r,a.c)].oy=pb.y-pa.y;
+    board[idx(b.r,b.c)].ox=pa.x-pb.x; board[idx(b.r,b.c)].oy=pa.y-pb.y;
+    lastSwap=[a,b]; phase="swap"; }
+  var lastSwap=null;
+
+  function beginClear(s){ combo++; var n=keyCount(s);
+    score += n*10*combo; if(n>=4) score += 20;
+    for(var k in s){ var p=k.split(","), c=+p[0], r=+p[1], cell=board[idx(r,c)]; cell.clearing=true; cell.clr=0;
+      var ce=cellCenter(r,c); for(var q=0;q<5;q++) parts.push({x:ce.x,y:ce.y,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.6)*5,life:1,col:FCOL[cell.t]}); }
+    popSfx(combo); updateHud(); phase="clear"; }
+  var FCOL=["#ffcf33","#ff8ac0","#ff7a7a","#e0453a","#ffd93d","#4dbf6a"];
+
+  function collapse(){
+    for(var c=0;c<COLS;c++){ var kept=[];
+      for(var r=ROWS-1;r>=0;r--){ var cell=board[idx(r,c)]; if(!cell.clearing) kept.push({t:cell.t, r:r}); }
+      var nr=ROWS-1;
+      for(var i=0;i<kept.length;i++){ var d=board[idx(nr,c)]; d.t=kept[i].t; d.clearing=false; d.clr=0; d.ox=0; d.oy=(kept[i].r-nr)*T; nr--; }
+      for(var rr=nr; rr>=0; rr--){ var d2=board[idx(rr,c)]; d2.t=Math.floor(Math.random()*NF); d2.clearing=false; d2.clr=0; d2.ox=0; d2.oy=-(rr+2)*T; }
+    }
+    phase="fall"; }
+
+  function settle(){ // called when board idle again
+    if(score>=goal){ phase="done"; winSfx(); showMsg("LEVEL CLEAR!","clear"); return; }
+    if(moves<=0){ if(score>best){ best=score; localStorage.setItem("moGardenBest",""+best); } showMsg("OUT OF MOVES","over"); phase="done"; return; }
+    if(!anyMove()) reshuffle();
+    phase="idle"; }
+  function anyMove(){ for(var r=0;r<ROWS;r++) for(var c=0;c<COLS;c++){
+      if(c<COLS-1){ swapT(r,c,r,c+1); var m=keyCount(findMatches()); swapT(r,c,r,c+1); if(m) return true; }
+      if(r<ROWS-1){ swapT(r,c,r+1,c); var m2=keyCount(findMatches()); swapT(r,c,r+1,c); if(m2) return true; } } return false; }
+  function swapT(r,c,r2,c2){ var t=board[idx(r,c)].t; board[idx(r,c)].t=board[idx(r2,c2)].t; board[idx(r2,c2)].t=t; }
+  function reshuffle(){ var types=[]; for(var i=0;i<board.length;i++) types.push(board[i].t);
+    for(var j=types.length-1;j>0;j--){ var k=(j*7+3)%(j+1); var tmp=types[j]; types[j]=types[k]; types[k]=tmp; }
+    for(var m=0;m<board.length;m++){ board[m].t=types[m]; board[m].oy=-T; } }
+
+  // ---- input ----
+  function pos(e){ var r=cv.getBoundingClientRect(); var t=e.touches&&e.touches[0]?e.touches[0]:e; return {x:t.clientX-r.left,y:t.clientY-r.top}; }
+  function cellAt(p){ var c=Math.floor((p.x-bx)/T), r=Math.floor((p.y-by)/T); if(c<0||c>=COLS||r<0||r>=ROWS) return null; return {r:r,c:c}; }
+  function down(e){ if(mode!=="play") return; e.preventDefault(); ac(); if(phase!=="idle") return; var cell=cellAt(pos(e)); if(!cell) return;
+    if(!sel){ sel=cell; return; }
+    if(sel.r===cell.r && sel.c===cell.c){ sel=null; return; }
+    if(Math.abs(sel.r-cell.r)+Math.abs(sel.c-cell.c)===1){ var a=sel; sel=null; trySwap(a,cell); }
+    else sel=cell; }
+  cv.addEventListener("mousedown",down); cv.addEventListener("touchstart",down,{passive:false});
+
+  var mode="start";
+  document.getElementById("playBtn").onclick=function(){ ac(); reset(); mode="play"; document.getElementById("startOv").classList.add("hide"); };
+  document.getElementById("shuffleBtn").onclick=function(){ if(mode!=="play"||phase!=="idle") return; ac(); reshuffle(); moves--; sel=null; updateHud(); beep(400,0.08,"square",0.08); if(moves<=0) settle(); };
+  var msgKind="clear";
+  function showMsg(t,k){ msgKind=k; document.getElementById("msgTitle").textContent=t;
+    document.getElementById("msgP").textContent = k==="clear"? ("Score: "+score+"  ·  Next goal!") : ("Score: "+score+"  ·  Best: "+best);
+    document.getElementById("msgBtn").textContent = k==="clear"?"NEXT ▶":"↻ TRY AGAIN";
+    document.getElementById("msgOv").classList.remove("hide"); }
+  document.getElementById("msgBtn").onclick=function(){ document.getElementById("msgOv").classList.add("hide");
+    if(msgKind==="clear") nextLevel(); else reset(); mode="play"; };
+
+  // ---- loop ----
+  var last=0;
+  function frame(ts){ var dt=Math.min(2.5,((ts-last)/16.67)||1); last=ts; update(dt); render(); requestAnimationFrame(frame); }
+
+  function offsetsSettled(){ for(var i=0;i<board.length;i++){ if(Math.abs(board[i].ox)>0.6||Math.abs(board[i].oy)>0.6) return false; } return true; }
+  function clearsDone(){ for(var i=0;i<board.length;i++){ if(board[i].clearing && board[i].clr<1) return false; } return true; }
+
+  function update(dt){
+    if(!board) return;
+    // ease offsets
+    for(var i=0;i<board.length;i++){ var cel=board[i]; cel.ox+=(0-cel.ox)*0.28*dt; cel.oy+=(0-cel.oy)*0.28*dt;
+      if(cel.clearing) cel.clr=Math.min(1,cel.clr+0.12*dt); }
+    // particles
+    for(var p=parts.length-1;p>=0;p--){ var pp=parts[p]; pp.x+=pp.vx*dt; pp.y+=pp.vy*dt; pp.vy+=0.2*dt; pp.life-=0.04*dt; if(pp.life<=0) parts.splice(p,1); }
+
+    if(phase==="swap" && offsetsSettled()){ var m=findMatches();
+      if(keyCount(m)>0){ moves--; combo=0; beginClear(m); }
+      else { // swap back
+        var a=lastSwap[0], b=lastSwap[1]; trySwap(a,b); phase="swapback"; badSfx(); } }
+    else if(phase==="swapback" && offsetsSettled()){ phase="idle"; }
+    else if(phase==="clear" && clearsDone()){ collapse(); }
+    else if(phase==="fall" && offsetsSettled()){ var m2=findMatches();
+      if(keyCount(m2)>0){ beginClear(m2); } else { combo=0; settle(); } }
+  }
+
+  function render(){
+    // garden background
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,"#bff07a"); g.addColorStop(1,"#7cc84a");
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    if(!board){ return; }
+    // board frame (soil)
+    ctx.fillStyle="#6a4a2a"; roundRect(bx-8,by-8,T*COLS+16,T*ROWS+16,14); ctx.fill();
+    ctx.fillStyle="#7a5a34"; roundRect(bx-2,by-2,T*COLS+4,T*ROWS+4,10); ctx.fill();
+    // cells
+    for(var r=0;r<ROWS;r++) for(var c=0;c<COLS;c++){ var cell=board[idx(r,c)];
+      var cx=bx+c*T+T/2+cell.ox, cy=by+r*T+T/2+cell.oy;
+      // tile bg
+      ctx.fillStyle=(r+c)%2? "#e9f6d6":"#dff0c6"; roundRect(bx+c*T+3, by+r*T+3, T-6, T-6, 8); ctx.fill();
+      var sc=cell.clearing? Math.max(0,1-cell.clr) : 1;
+      if(sc>0){ ctx.save(); ctx.translate(cx,cy); ctx.scale(sc,sc);
+        ctx.font=Math.round(T*0.62)+"px 'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif";
+        ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(FLOWERS[cell.t],0,2); ctx.restore(); }
+    }
+    // selection highlight
+    if(sel){ ctx.strokeStyle="#ffd93d"; ctx.lineWidth=4; roundRect(bx+sel.c*T+3,by+sel.r*T+3,T-6,T-6,8); ctx.stroke(); }
+    // particles
+    for(var i=0;i<parts.length;i++){ var pp=parts[i]; ctx.save(); ctx.globalAlpha=Math.max(0,pp.life); ctx.fillStyle=pp.col; ctx.beginPath(); ctx.arc(pp.x,pp.y,3,0,7); ctx.fill(); ctx.restore(); }
+    // goal bar
+    var pct=Math.min(1,score/goal); ctx.fillStyle="#2a5a1a55"; roundRect(bx, by-6+T*ROWS+14, T*COLS, 8, 4); ctx.fill();
+    ctx.fillStyle="#ffd93d"; roundRect(bx, by-6+T*ROWS+14, T*COLS*pct, 8, 4); ctx.fill();
+  }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

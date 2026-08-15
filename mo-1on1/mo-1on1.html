@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Mo 1on1 Fun Games</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; overflow:hidden; background:#101a2c;
+    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif; color:#fff;
+    user-select:none; -webkit-user-select:none; touch-action:none; }
+  #stage { position:fixed; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    text-align:center; z-index:6; background:#0a1424dd; padding:16px; }
+  .overlay.hide { display:none; }
+  .card { background:#14233eF2; border:3px solid #ffd93d; border-radius:22px; padding:22px 26px; max-width:94%; }
+  .card h1 { margin:0 0 4px; font-size:28px; color:#ffd93d; text-shadow:0 3px 0 #7a5a1a; }
+  .card p { margin:6px 0; font-size:15px; color:#dff4ff; }
+  .games { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+  .gbtn { padding:16px 10px; border:none; border-radius:16px; font:inherit; font-weight:bold; font-size:16px;
+    color:#08243a; background:#7fdfff; box-shadow:0 4px 0 #3f9fbf; cursor:pointer; }
+  .gbtn:active { transform:translateY(3px); box-shadow:0 1px 0 #3f9fbf; }
+  .big { margin:8px 6px 0; padding:13px 22px; font-size:18px; font-weight:bold; background:#ffd93d; color:#5a3d00;
+    border:none; border-radius:14px; cursor:pointer; box-shadow:0 5px 0 #b8922a; }
+  .big:active { transform:translateY(4px); box-shadow:0 1px 0 #b8922a; }
+  .big.alt { background:#7fdfff; color:#08243a; box-shadow:0 5px 0 #3f9fbf; }
+  #backBtn { position:absolute; top:10px; left:10px; z-index:4; border:none; border-radius:12px; padding:9px 14px;
+    font:inherit; font-weight:bold; background:#24406a; color:#fff; box-shadow:0 3px 0 #142542; cursor:pointer; display:none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <button id="backBtn">☰ Menu</button>
+
+  <div class="overlay" id="menuOv">
+    <div class="card">
+      <h1>🏆 MO 1ON1 FUN GAMES</h1>
+      <p><b style="color:#7fd0ff">Blue = Player 1 (left)</b> · <b style="color:#ff8a8a">Red = Player 2 (right)</b></p>
+      <p style="font-size:13px">Tap your side of the screen · or keys <b>A</b> (P1) &amp; <b>L</b> (P2).<br>Pong: P1 = W/S, P2 = ↑/↓, or drag on your side.</p>
+      <div class="games">
+        <button class="gbtn" data-game="reaction">⚡ Reaction Duel</button>
+        <button class="gbtn" data-game="tug">🪢 Tug of War</button>
+        <button class="gbtn" data-game="tap">👆 Tap Race</button>
+        <button class="gbtn" data-game="pong">🏓 Pong</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay hide" id="resultOv">
+    <div class="card">
+      <h1 id="resTitle">P1 WINS!</h1>
+      <p id="resP"></p>
+      <button class="big" id="againBtn">↻ Play Again</button>
+      <button class="big alt" id="menuBtn">☰ Menu</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), ctx=cv.getContext("2d"), stage=document.getElementById("stage");
+  var DPR=Math.max(1,Math.min(3,window.devicePixelRatio||1));
+  var W=0,H=0;
+  function resize(){ W=stage.clientWidth; H=stage.clientHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener("resize",resize); resize();
+
+  var AC=null; function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain();
+    o.type=t||"triangle"; o.frequency.value=f; g.gain.value=v||0.09; o.connect(g); g.connect(a.destination);
+    var n=a.currentTime; o.start(n); g.gain.exponentialRampToValueAtTime(0.0001,n+(d||0.12)); o.stop(n+(d||0.12)+0.02); }
+  function tick(){ beep(700,0.05,"square",0.08); }
+  function win(){ beep(660,0.1,"square",0.1); setTimeout(function(){beep(990,0.1,"square",0.1);},110); setTimeout(function(){beep(1320,0.14,"square",0.1);},220); }
+  function buzz(){ beep(180,0.18,"sawtooth",0.1); }
+
+  var P1="#2f7fc0", P2="#e0453a", P1L="#7fd0ff", P2L="#ff8a8a";
+  var mode="menu"; // menu, play
+  var game=null;
+
+  // input state
+  var p1dir=0,p2dir=0,p1touch=null,p2touch=null;
+  function pressEdge(pl){ if(game && game.press) game.press(pl); }
+  window.addEventListener("keydown",function(e){
+    if(e.repeat) return;
+    if(e.code==="KeyA"){ pressEdge(1); e.preventDefault(); }
+    if(e.code==="KeyL"){ pressEdge(2); e.preventDefault(); }
+    if(e.code==="KeyW"){ p1dir=-1; } if(e.code==="KeyS"){ p1dir=1; }
+    if(e.code==="ArrowUp"){ p2dir=-1; e.preventDefault(); } if(e.code==="ArrowDown"){ p2dir=1; e.preventDefault(); }
+  });
+  window.addEventListener("keyup",function(e){
+    if(e.code==="KeyW"||e.code==="KeyS") p1dir=0; if(e.code==="ArrowUp"||e.code==="ArrowDown") p2dir=0; });
+  function touches(e){ var r=cv.getBoundingClientRect(), out=[]; var ts=e.touches||[e];
+    for(var i=0;i<ts.length;i++){ out.push({x:ts[i].clientX-r.left, y:ts[i].clientY-r.top}); } return out; }
+  function onTouchStart(e){ ac(); if(mode!=="play") return; e.preventDefault(); var ts=touches(e);
+    for(var i=0;i<ts.length;i++){ var t=ts[i], pl=t.x<W/2?1:2; if(game&&game.usesPress) pressEdge(pl); if(pl===1)p1touch=t.y; else p2touch=t.y; } }
+  function onTouchMove(e){ if(mode!=="play")return; e.preventDefault(); var ts=touches(e); p1touch=null; p2touch=null;
+    for(var i=0;i<ts.length;i++){ var t=ts[i]; if(t.x<W/2)p1touch=t.y; else p2touch=t.y; } }
+  function onTouchEnd(e){ if(!e.touches||e.touches.length===0){ p1touch=null; p2touch=null; } }
+  cv.addEventListener("touchstart",onTouchStart,{passive:false}); cv.addEventListener("touchmove",onTouchMove,{passive:false}); cv.addEventListener("touchend",onTouchEnd);
+  cv.addEventListener("mousedown",function(e){ ac(); if(mode!=="play")return; var r=cv.getBoundingClientRect(); var x=e.clientX-r.left,y=e.clientY-r.top; var pl=x<W/2?1:2; if(game&&game.usesPress) pressEdge(pl); if(pl===1)p1touch=y; else p2touch=y; });
+  cv.addEventListener("mousemove",function(e){ if(mode!=="play")return; var r=cv.getBoundingClientRect(); var x=e.clientX-r.left,y=e.clientY-r.top; if(e.buttons){ if(x<W/2)p1touch=y; else p2touch=y; } });
+  window.addEventListener("mouseup",function(){ p1touch=null; p2touch=null; });
+
+  // menu / result
+  Array.prototype.forEach.call(document.querySelectorAll("[data-game]"),function(b){
+    b.onclick=function(){ ac(); startGame(b.getAttribute("data-game")); }; });
+  document.getElementById("backBtn").onclick=toMenu;
+  document.getElementById("menuBtn").onclick=toMenu;
+  document.getElementById("againBtn").onclick=function(){ document.getElementById("resultOv").classList.add("hide"); startGame(game.id); };
+  function toMenu(){ mode="menu"; game=null; document.getElementById("resultOv").classList.add("hide"); document.getElementById("menuOv").classList.remove("hide"); document.getElementById("backBtn").style.display="none"; }
+  function startGame(id){ document.getElementById("menuOv").classList.add("hide"); document.getElementById("resultOv").classList.add("hide");
+    document.getElementById("backBtn").style.display="block"; game=makeGame(id); game.enter(); mode="play"; }
+  function finish(title,sub){ mode="result"; document.getElementById("resTitle").textContent=title;
+    document.getElementById("resTitle").style.color = title.indexOf("1")>=0? P1L : (title.indexOf("2")>=0? P2L : "#ffd93d");
+    document.getElementById("resP").textContent=sub||""; document.getElementById("resultOv").classList.remove("hide"); win(); }
+
+  function sideBg(){ ctx.fillStyle="#12233e"; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="#1b3a5a"; ctx.fillRect(0,0,W/2,H); ctx.fillStyle="#4a1e1e"; ctx.fillRect(W/2,0,W/2,H);
+    ctx.strokeStyle="#ffffff44"; ctx.lineWidth=3; ctx.setLineDash([10,10]); ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke(); ctx.setLineDash([]); }
+  function labels(){ ctx.textAlign="center"; ctx.fillStyle=P1L; ctx.font="bold 18px sans-serif"; ctx.fillText("PLAYER 1",W*0.25,H-16);
+    ctx.fillStyle=P2L; ctx.fillText("PLAYER 2",W*0.75,H-16); }
+  function bigText(t,y,col){ ctx.textAlign="center"; ctx.fillStyle=col||"#fff"; ctx.font="bold "+Math.round(Math.min(W,H)*0.09)+"px 'Trebuchet MS',sans-serif"; ctx.textBaseline="middle"; ctx.fillText(t,W/2,y); }
+
+  // ---------------- GAMES ----------------
+  function makeGame(id){
+    if(id==="reaction") return reactionGame();
+    if(id==="tug") return tugGame();
+    if(id==="tap") return tapGame();
+    return pongGame();
+  }
+
+  // Reaction Duel
+  function reactionGame(){ var g={id:"reaction",usesPress:true,phase:"wait",t:0,go:0};
+    g.enter=function(){ g.phase="wait"; g.t=0; g.go=1.2+Math.random()*3; };
+    g.update=function(dt){ if(g.phase==="wait"){ g.t+=dt/60; if(g.t>=g.go){ g.phase="go"; tick(); } } };
+    g.press=function(pl){ if(g.phase==="wait"){ buzz(); finish("PLAYER "+(pl===1?2:1)+" WINS!","Too early, P"+pl+"! False start."); }
+      else if(g.phase==="go"){ finish("PLAYER "+pl+" WINS!","Fastest slap! ⚡"); } };
+    g.draw=function(){ if(g.phase==="wait"){ ctx.fillStyle="#7a2020"; ctx.fillRect(0,0,W,H); bigText("WAIT...",H*0.42,"#ffd0d0"); ctx.font="18px sans-serif"; ctx.fillStyle="#ffd0d0"; ctx.textAlign="center"; ctx.fillText("Slap your side when it turns GREEN",W/2,H*0.55); }
+      else { ctx.fillStyle="#1f8a3a"; ctx.fillRect(0,0,W,H); bigText("SLAP! ⚡",H*0.45,"#eaffea"); } labels(); };
+    return g; }
+
+  // Tug of War
+  function tugGame(){ var g={id:"tug",usesPress:true,knot:0};
+    g.enter=function(){ g.knot=0; };
+    g.update=function(dt){ };
+    g.press=function(pl){ g.knot += pl===1? -0.05 : 0.05; tick();
+      if(g.knot<=-1){ finish("PLAYER 1 WINS!","P1 pulled it over! 🪢"); } else if(g.knot>=1){ finish("PLAYER 2 WINS!","P2 pulled it over! 🪢"); } };
+    g.draw=function(){ sideBg();
+      var cy=H*0.5; ctx.strokeStyle="#c9a24a"; ctx.lineWidth=8; ctx.beginPath(); ctx.moveTo(W*0.1,cy); ctx.lineTo(W*0.9,cy); ctx.stroke();
+      var kx=W/2 + g.knot*(W*0.36);
+      ctx.fillStyle="#ffd93d"; ctx.beginPath(); ctx.arc(kx,cy,18,0,7); ctx.fill(); ctx.strokeStyle="#a5701a"; ctx.lineWidth=3; ctx.stroke();
+      // flags at goals
+      ctx.fillStyle=P1L; ctx.fillRect(W*0.14-3,cy-46,4,40); ctx.beginPath(); ctx.moveTo(W*0.14+1,cy-46); ctx.lineTo(W*0.14+26,cy-38); ctx.lineTo(W*0.14+1,cy-30); ctx.fill();
+      ctx.fillStyle=P2L; ctx.fillRect(W*0.86-1,cy-46,4,40); ctx.beginPath(); ctx.moveTo(W*0.86-1,cy-46); ctx.lineTo(W*0.86-26,cy-38); ctx.lineTo(W*0.86-1,cy-30); ctx.fill();
+      bigText("TUG OF WAR",H*0.25,"#ffd93d"); ctx.fillStyle="#dff4ff"; ctx.font="16px sans-serif"; ctx.textAlign="center"; ctx.fillText("Mash your side to pull the knot to you!",W/2,H*0.72); labels(); };
+    return g; }
+
+  // Tap Race
+  function tapGame(){ var g={id:"tap",usesPress:true,a:0,b:0,goal:25};
+    g.enter=function(){ g.a=0; g.b=0; };
+    g.update=function(dt){};
+    g.press=function(pl){ if(pl===1)g.a++; else g.b++; tick();
+      if(g.a>=g.goal){ finish("PLAYER 1 WINS!","P1 tapped "+g.goal+" first! 👆"); } else if(g.b>=g.goal){ finish("PLAYER 2 WINS!","P2 tapped "+g.goal+" first! 👆"); } };
+    g.draw=function(){ sideBg(); bigText("TAP RACE",H*0.18,"#ffd93d");
+      ctx.fillStyle="#dff4ff"; ctx.font="15px sans-serif"; ctx.textAlign="center"; ctx.fillText("First to "+g.goal+" taps wins!",W/2,H*0.26);
+      bar(W*0.25, g.a/g.goal, P1); bar(W*0.75, g.b/g.goal, P2);
+      ctx.fillStyle="#fff"; ctx.font="bold 30px sans-serif"; ctx.fillText(g.a,W*0.25,H*0.86); ctx.fillText(g.b,W*0.75,H*0.86); labels(); };
+    function bar(cx,f,col){ var w=W*0.28, x=cx-w/2, y=H*0.34, h=H*0.4; ctx.fillStyle="#0d1a2e"; roundRect(x,y,w,h,10); ctx.fill();
+      var fh=h*Math.min(1,f); ctx.fillStyle=col; roundRect(x,y+h-fh,w,fh,10); ctx.fill(); ctx.strokeStyle="#ffffff44"; ctx.lineWidth=2; roundRect(x,y,w,h,10); ctx.stroke(); }
+    return g; }
+
+  // Pong
+  function pongGame(){ var g={id:"pong",usesPress:false,p1:0,p2:0,ph:0,by:0,bx:0,vx:0,vy:0,s1:0,s2:0,ph_h:0};
+    g.enter=function(){ g.ph_h=H*0.18; g.p1=H/2; g.p2=H/2; g.s1=0; g.s2=0; serve(1); };
+    function serve(dir){ g.bx=W/2; g.by=H/2; var sp=Math.min(W,H)*0.011; g.vx=dir*sp; g.vy=(Math.random()-0.5)*sp; }
+    g.update=function(dt){ var sp=8*dt;
+      if(p1dir) g.p1+=p1dir*sp; if(p1touch!==null) g.p1+=(p1touch-g.p1)*0.3*dt;
+      if(p2dir) g.p2+=p2dir*sp; if(p2touch!==null) g.p2+=(p2touch-g.p2)*0.3*dt;
+      g.p1=Math.max(g.ph_h/2,Math.min(H-g.ph_h/2,g.p1)); g.p2=Math.max(g.ph_h/2,Math.min(H-g.ph_h/2,g.p2));
+      g.bx+=g.vx*dt; g.by+=g.vy*dt;
+      if(g.by<10){ g.by=10; g.vy*=-1; } if(g.by>H-10){ g.by=H-10; g.vy*=-1; }
+      var pw=16;
+      if(g.vx<0 && g.bx<pw+18 && Math.abs(g.by-g.p1)<g.ph_h/2+8){ g.bx=pw+18; g.vx*=-1.06; g.vy+=(g.by-g.p1)*0.05; tick(); }
+      if(g.vx>0 && g.bx>W-pw-18 && Math.abs(g.by-g.p2)<g.ph_h/2+8){ g.bx=W-pw-18; g.vx*=-1.06; g.vy+=(g.by-g.p2)*0.05; tick(); }
+      if(g.bx<-10){ g.s2++; buzz(); if(g.s2>=5) finish("PLAYER 2 WINS!","Pong "+g.s1+"–"+g.s2+" 🏓"); else serve(1); }
+      if(g.bx>W+10){ g.s1++; buzz(); if(g.s1>=5) finish("PLAYER 1 WINS!","Pong "+g.s1+"–"+g.s2+" 🏓"); else serve(-1); }
+    };
+    g.draw=function(){ ctx.fillStyle="#0e2036"; ctx.fillRect(0,0,W,H);
+      ctx.strokeStyle="#ffffff33"; ctx.lineWidth=3; ctx.setLineDash([12,12]); ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke(); ctx.setLineDash([]);
+      var pw=16; ctx.fillStyle=P1; roundRect(8,g.p1-g.ph_h/2,pw,g.ph_h,6); ctx.fill(); ctx.fillStyle=P2; roundRect(W-8-pw,g.p2-g.ph_h/2,pw,g.ph_h,6); ctx.fill();
+      ctx.fillStyle="#ffd93d"; ctx.beginPath(); ctx.arc(g.bx,g.by,9,0,7); ctx.fill();
+      ctx.fillStyle="#fff"; ctx.font="bold 34px sans-serif"; ctx.textAlign="center"; ctx.fillText(g.s1,W*0.35,44); ctx.fillText(g.s2,W*0.65,44);
+      ctx.font="13px sans-serif"; ctx.fillStyle="#bfe8ff"; ctx.fillText("P1: W/S or drag left",W*0.25,H-12); ctx.fillText("P2: ↑/↓ or drag right",W*0.75,H-12); };
+    return g; }
+
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+  var last=0;
+  function frame(ts){ var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts;
+    if(mode==="play" && game){ if(game.update) game.update(dt); game.draw(); }
+    else if(game && game.draw){ game.draw(); }
+    else { ctx.fillStyle="#101a2c"; ctx.fillRect(0,0,W,H); }
+    requestAnimationFrame(frame); }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
