@@ -1,10 +1,12 @@
-// Service worker: lets Hoop Shot open with no internet connection.
-// Bump CACHE when you change the game so phones pick up the new version.
-const CACHE = "hoop-shot-v56";
+// Service worker: lets Mo Arcade open with no internet connection.
+// Bump CACHE when you change the site so phones pick up the new version.
+const CACHE = "mo-arcade-v57";
 const FILES = [
   "./",
   "./index.html",
+  "./hoop-shot.html",
   "./hoop-shot-3d.html",
+  "./games.html",
   "./three.min.js",
   "./manifest.webmanifest",
   "./icon.svg",
@@ -30,7 +32,7 @@ self.addEventListener("activate", function (e) {
 });
 
 // Network first, cache second. This way your edits show up straight away when
-// you are online, but the game still opens when you are not.
+// you are online, but games still open when you are not.
 self.addEventListener("fetch", function (e) {
   if (e.request.method !== "GET") return;
   e.respondWith(
