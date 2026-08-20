@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Snowball</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:#bfe3ff;font-family:'Trebuchet MS',system-ui,sans-serif;color:#123;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:20px;font-weight:bold;color:#0a4a8a;pointer-events:none;}
+  a.back{position:fixed;top:8px;left:10px;color:#0a4a8a;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;}
+  #over{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:#0007;color:#fff;}
+  #over h1{font-size:34px;color:#ffd23f;margin:0 0 6px;} button{background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:20px;padding:14px 28px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">⬅ Games</a>
+<div id="hud">⏱️<span id="t">30</span>s &nbsp; ❄️ Hits <span id="sc">0</span></div>
+<canvas id="c"></canvas>
+<div id="over"><h1>⛄ TIME!</h1><p>You hit <span id="fin">0</span> targets!</p><button id="rs">▶ Play Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener('resize',fit); fit();
+  var targets,snowballs,score,time,running,last,spawnT;
+  function reset(){ targets=[]; snowballs=[]; score=0; time=30; running=true; last=0; spawnT=0; document.getElementById('over').style.display='none'; document.getElementById('sc').textContent=0; document.getElementById('t').textContent=30; }
+  function spawn(){ var e=['⛄','🎯','🐧','🦌'][Math.floor(Math.random()*4)]; var fromL=Math.random()<0.5; targets.push({x:fromL?-30:W+30,y:H*0.2+Math.random()*H*0.4,vx:(fromL?1:-1)*(1.2+Math.random()*1.5),e:e,hit:0}); }
+  function throwAt(e){ var t0=e.changedTouches?e.changedTouches[0]:e; var r=cv.getBoundingClientRect(); var tx=t0.clientX-r.left,ty=t0.clientY-r.top; var sx=W/2,sy=H-40; var a=Math.atan2(ty-sy,tx-sx); snowballs.push({x:sx,y:sy,vx:Math.cos(a)*11,vy:Math.sin(a)*11,life:60}); }
+  cv.addEventListener('touchstart',function(e){throwAt(e);e.preventDefault();},{passive:false});
+  cv.addEventListener('mousedown',function(e){throwAt(e);});
+  function loop(ts){ if(!running)return; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts;
+    time-=dt/60; if(time<=0){ time=0; over(); } document.getElementById('t').textContent=Math.ceil(time);
+    spawnT-=dt; if(spawnT<=0){ spawn(); spawnT=40; }
+    for(var i=targets.length-1;i>=0;i--){ var g=targets[i]; g.x+=g.vx*dt; if(g.hit>0){ g.hit--; if(g.hit===0)targets.splice(i,1); continue; } if(g.x<-40||g.x>W+40)targets.splice(i,1); }
+    for(var s=snowballs.length-1;s>=0;s--){ var b=snowballs[s]; b.x+=b.vx*dt; b.y+=b.vy*dt; b.life-=dt; var gone=false;
+      for(var j=0;j<targets.length;j++){ var g2=targets[j]; if(g2.hit>0)continue; if(Math.hypot(g2.x-b.x,g2.y-b.y)<26){ g2.hit=10; score++; document.getElementById('sc').textContent=score; gone=true; break; } }
+      if(gone||b.life<=0||b.y<0||b.x<0||b.x>W)snowballs.splice(s,1); }
+    draw(); requestAnimationFrame(loop); }
+  function draw(){ ctx.fillStyle='#bfe3ff'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#fff'; ctx.fillRect(0,H*0.75,W,H*0.25);
+    for(var i=0;i<targets.length;i++){ var g=targets[i]; ctx.font=(g.hit>0?'40px':'34px')+' sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(g.hit>0?'💥':g.e,g.x,g.y); }
+    for(var s=0;s<snowballs.length;s++){ var b=snowballs[s]; ctx.fillStyle='#fff'; ctx.strokeStyle='#8ab4d8'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(b.x,b.y,8,0,6.29); ctx.fill(); ctx.stroke(); }
+    ctx.font='44px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🧑‍🦱',W/2,H-36); ctx.font='16px Trebuchet MS'; ctx.fillStyle='#0a4a8a'; ctx.fillText('👆 tap to throw!',W/2,H-8); }
+  function over(){ running=false; document.getElementById('fin').textContent=score; document.getElementById('over').style.display='flex'; }
+  document.getElementById('rs').onclick=function(){ reset(); requestAnimationFrame(loop); };
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration - shows a gold badge + confetti on win/finish */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function hookText(el){ if(!el)return; var was=false; new MutationObserver(function(){ var t=(el.textContent||'').trim(); if(t&&!was){ was=true; celebrate(); } else if(!t){ was=false; } }).observe(el,{childList:true,characterData:true,subtree:true}); }
+  function init(){ hookVisible(document.getElementById('over')); hookText(document.getElementById('win')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+
+</body></html>

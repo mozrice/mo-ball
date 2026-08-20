@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Maze Runner</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:#0e1424;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;margin:0 auto;background:#16203a;}
+  #hud{text-align:center;padding:30px 10px 4px;font-size:19px;font-weight:bold;color:#ffd23f;}
+  a.back{position:fixed;top:8px;left:10px;color:#bcd0ea;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;}
+  #pad{position:fixed;bottom:16px;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:8px;}
+  .row{display:flex;gap:8px;}
+  .b{width:66px;height:66px;border-radius:14px;background:#26325a;border:2px solid #4a5a8a;color:#fff;font-size:28px;font-weight:bold;box-shadow:0 4px 0 #0006;}
+  .b:active{transform:translateY(3px);}
+  #win{text-align:center;height:24px;font-size:20px;font-weight:bold;color:#7bff9e;}
+</style></head>
+<body>
+<a class="back" href="../games.html">⬅ Games</a>
+<div id="hud">🧩 Level <span id="lv">1</span> &nbsp; ⏱️<span id="t">0</span>s</div>
+<canvas id="c"></canvas>
+<div id="win"></div>
+<div id="pad">
+  <div class="row"><button class="b" data-d="up">⬆️</button></div>
+  <div class="row"><button class="b" data-d="left">⬅️</button><button class="b" data-d="down">⬇️</button><button class="b" data-d="right">➡️</button></div>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),DPR=Math.min(2,window.devicePixelRatio||1);
+  var N,cell,maze,px,py,level,t0,timer,px0;
+  function gen(n){ // recursive backtracker; walls as bitmask per cell? simpler: grid of walls
+    var g=[]; for(var y=0;y<n;y++){ g.push([]); for(var x=0;x<n;x++)g[y].push({v:false,w:{N:true,E:true,S:true,W:true}}); }
+    var st=[[0,0]]; g[0][0].v=true; var dirs=[['N',0,-1],['E',1,0],['S',0,1],['W',-1,0]],opp={N:'S',E:'W',S:'N',W:'E'};
+    while(st.length){ var c=st[st.length-1],cx=c[0],cy=c[1]; var opts=[]; for(var d=0;d<4;d++){ var nx=cx+dirs[d][1],ny=cy+dirs[d][2]; if(nx>=0&&ny>=0&&nx<n&&ny<n&&!g[ny][nx].v)opts.push(d); }
+      if(!opts.length){ st.pop(); continue; } var d2=opts[Math.floor(Math.random()*opts.length)]; var nx2=cx+dirs[d2][1],ny2=cy+dirs[d2][2]; g[cy][cx].w[dirs[d2][0]]=false; g[ny2][nx2].w[opp[dirs[d2][0]]]=false; g[ny2][nx2].v=true; st.push([nx2,ny2]); }
+    return g; }
+  function fit(){ var w=Math.min(window.innerWidth-20,window.innerHeight-230); w=Math.max(220,w); cell=Math.floor(w/N); cv.width=cell*N*DPR; cv.height=cell*N*DPR; cv.style.width=(cell*N)+'px'; cv.style.height=(cell*N)+'px'; ctx.setTransform(DPR,0,0,DPR,0,0); draw(); }
+  function start(l){ level=l; N=5+l; document.getElementById('lv').textContent=l; maze=gen(N); px=0; py=0; document.getElementById('win').textContent=''; t0=Date.now(); fit(); }
+  function move(d){ var c=maze[py][px]; if(d==='up'&&!c.w.N)py--; else if(d==='down'&&!c.w.S)py++; else if(d==='left'&&!c.w.W)px--; else if(d==='right'&&!c.w.E)px++; else { beep(200,0.06); return; } beep(500,0.04);
+    if(px===N-1&&py===N-1){ document.getElementById('win').textContent='🏁 Level '+level+' done! 🎉'; beep(880,0.2); setTimeout(function(){ start(level+1); },900); } draw(); }
+  var btns=document.querySelectorAll('.b'); for(var i=0;i<btns.length;i++){ (function(b){ b.addEventListener('click',function(){ move(b.dataset.d); }); })(btns[i]); }
+  window.addEventListener('keydown',function(e){ var m={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right'}; if(m[e.key]){ move(m[e.key]); e.preventDefault(); } });
+  window.addEventListener('resize',function(){ if(N)fit(); });
+  function draw(){ if(!maze)return; ctx.clearRect(0,0,cv.width,cv.height); ctx.fillStyle='#16203a'; ctx.fillRect(0,0,cell*N,cell*N);
+    ctx.font=Math.floor(cell*0.6)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🏁',(N-0.5)*cell,(N-0.5)*cell);
+    ctx.strokeStyle='#8fb0ff'; ctx.lineWidth=3; ctx.lineCap='round';
+    for(var y=0;y<N;y++)for(var x=0;x<N;x++){ var c=maze[y][x],X=x*cell,Y=y*cell; ctx.beginPath(); if(c.w.N){ctx.moveTo(X,Y);ctx.lineTo(X+cell,Y);} if(c.w.S){ctx.moveTo(X,Y+cell);ctx.lineTo(X+cell,Y+cell);} if(c.w.E){ctx.moveTo(X+cell,Y);ctx.lineTo(X+cell,Y+cell);} if(c.w.W){ctx.moveTo(X,Y);ctx.lineTo(X,Y+cell);} ctx.stroke(); }
+    ctx.font=Math.floor(cell*0.6)+'px sans-serif'; ctx.fillText('🧑',(px+0.5)*cell,(py+0.5)*cell); }
+  var ac; function beep(f,d){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  timer=setInterval(function(){ if(t0)document.getElementById('t').textContent=Math.floor((Date.now()-t0)/1000); },500);
+  start(1);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration - shows a gold badge + confetti on win/finish */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function hookText(el){ if(!el)return; var was=false; new MutationObserver(function(){ var t=(el.textContent||'').trim(); if(t&&!was){ was=true; celebrate(); } else if(!t){ was=false; } }).observe(el,{childList:true,characterData:true,subtree:true}); }
+  function init(){ hookVisible(document.getElementById('over')); hookText(document.getElementById('win')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+
+</body></html>

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Soccer Shootout</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:#3a8a3a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  a.back{position:fixed;top:8px;left:10px;color:#eaffea;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:19px;font-weight:bold;color:#fff;pointer-events:none;}
+  #msg{position:fixed;top:44px;left:0;right:0;text-align:center;font-size:28px;font-weight:bold;color:#ffd23f;pointer-events:none;text-shadow:0 2px 0 #0007;}
+  #tip{position:fixed;bottom:14px;left:0;right:0;text-align:center;color:#eaffea;font-size:15px;pointer-events:none;}
+  #over{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:#0008;z-index:7;}
+  #over h1{font-size:30px;color:#ffd23f;margin:0 0 6px;} #over button{background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:20px;padding:14px 28px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">⬅ Games</a>
+<div id="hud">⚽ <span id="pn">1</span>/5 &nbsp; 🥅<span id="goals">0</span> Goals &nbsp; 🏆<span id="hi">0</span></div>
+<div id="msg"></div>
+<canvas id="c"></canvas>
+<div id="tip">👆 Drag back from the ball and let go to KICK — aim for a corner!</div>
+<div id="over"><h1>⚽ SHOOTOUT OVER!</h1><p id="fmsg"></p><button id="rs">▶ Play Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); layout(); }
+  window.addEventListener('resize',fit);
+  var HK='moSoccerHi'; function getHi(){ try{return +localStorage.getItem(HK)||0;}catch(e){return 0;} } function setHi(v){ try{localStorage.setItem(HK,v);}catch(e){} }
+  var goalL,goalR,goalTop,goalY,ball,ballStart,keeper,state,pn,goals,msg,msgT,aim,dragging,anim;
+  function layout(){ goalL=W*0.18; goalR=W*0.82; goalTop=H*0.16; goalY=H*0.30; ballStart={x:W/2,y:H*0.82}; if(ball&&!anim){ball.x=ballStart.x;ball.y=ballStart.y;} keeper={x:W/2,y:goalY-14,dx:0,diving:false}; }
+  function reset(){ pn=1; goals=0; state='ready'; msg=''; msgT=0; document.getElementById('pn').textContent=1; document.getElementById('goals').textContent=0; document.getElementById('over').style.display='none'; newShot(); }
+  document.getElementById('hi').textContent=getHi();
+  function newShot(){ ball={x:ballStart.x,y:ballStart.y,r:15}; anim=null; state='ready'; aim=null; keeper.x=W/2; keeper.dx=0; keeper.diving=false; }
+  function down(e){ if(state!=='ready')return; dragging=true; aim=pt(e); }
+  function move(e){ if(dragging&&state==='ready')aim=pt(e); }
+  function up(e){ if(!dragging||state!=='ready')return; dragging=false; var a=pt(e); var dx=ball.x-a.x, dy=ball.y-a.y; if(dy<30){ aim=null; return; } // must pull back (down) to shoot up
+    var power=Math.min(1,Math.hypot(dx,dy)/240); if(power<0.15){aim=null;return;}
+    var tx=ball.x+dx*1.6, ty=goalY; // aim target at goal line
+    tx=Math.max(goalL-20,Math.min(goalR+20,tx));
+    anim={fromx:ball.x,fromy:ball.y,tx:tx,ty:ty,t:0,speed:0.03+power*0.03,power:power};
+    // keeper picks a dive
+    var third=Math.random(); keeper.target=third<0.34?goalL+(goalR-goalL)*0.2:(third<0.67?W/2:goalL+(goalR-goalL)*0.8); keeper.diving=true;
+    state='kick'; aim=null; beep(400,0.08); }
+  function pt(e){ var t=e.changedTouches?e.changedTouches[0]:e; var r=cv.getBoundingClientRect(); return {x:t.clientX-r.left,y:t.clientY-r.top}; }
+  cv.addEventListener('touchstart',function(e){down(e);e.preventDefault();},{passive:false});
+  cv.addEventListener('touchmove',function(e){move(e);e.preventDefault();},{passive:false});
+  cv.addEventListener('touchend',function(e){up(e);e.preventDefault();},{passive:false});
+  cv.addEventListener('mousedown',function(e){down(e);});
+  cv.addEventListener('mousemove',function(e){move(e);});
+  cv.addEventListener('mouseup',function(e){up(e);});
+  function loop(){
+    if(state==='kick'&&anim){ anim.t+=anim.speed; var e=Math.min(1,anim.t); ball.x=anim.fromx+(anim.tx-anim.fromx)*e; ball.y=anim.fromy+(anim.ty-anim.fromy)*e; ball.r=15-6*e; // shrink for depth
+      if(keeper.diving){ keeper.x+=(keeper.target-keeper.x)*0.12; }
+      if(e>=1){ // reached goal line - decide
+        var inGoal=ball.x>goalL&&ball.x<goalR; var saved=Math.abs(ball.x-keeper.x)<W*0.10;
+        if(inGoal&&!saved){ goals++; document.getElementById('goals').textContent=goals; showMsg('🥅 GOAL! ⚽'); beep(760,0.1); setTimeout(function(){beep(1000,0.12);},90); }
+        else if(saved){ showMsg('🧤 SAVED!'); beep(200,0.12); }
+        else { showMsg('❌ MISSED!'); beep(180,0.12); }
+        state='done'; setTimeout(nextShot,1100); }
+    }
+    if(msgT>0){ msgT--; if(msgT<=0)document.getElementById('msg').textContent=''; }
+    draw(); requestAnimationFrame(loop); }
+  function nextShot(){ pn++; if(pn>5){ over(); return; } document.getElementById('pn').textContent=pn; newShot(); }
+  function draw(){ ctx.fillStyle='#3a8a3a'; ctx.fillRect(0,0,W,H);
+    for(var s=0;s<H;s+=40){ ctx.fillStyle=(Math.floor(s/40)%2?'#3a8a3a':'#358035'); ctx.fillRect(0,s,W,40); }
+    // goal
+    ctx.fillStyle='#eee'; ctx.fillRect(goalL-8,goalTop,8,goalY-goalTop); ctx.fillRect(goalR,goalTop,8,goalY-goalTop); ctx.fillRect(goalL-8,goalTop,goalR-goalL+16,8);
+    ctx.strokeStyle='#ffffff55'; ctx.lineWidth=1; for(var gx=goalL;gx<goalR;gx+=18){ ctx.beginPath(); ctx.moveTo(gx,goalTop); ctx.lineTo(gx,goalY); ctx.stroke(); }
+    for(var gy=goalTop;gy<goalY;gy+=16){ ctx.beginPath(); ctx.moveTo(goalL,gy); ctx.lineTo(goalR,gy); ctx.stroke(); }
+    // penalty arc
+    ctx.strokeStyle='#ffffff88'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(W/2,H*0.55,W*0.22,0,Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.arc(W/2,H*0.82,5,0,6.29); ctx.fillStyle='#fff'; ctx.fill();
+    // keeper
+    ctx.font='34px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(keeper.diving?'🧤':'🧍‍♂️',keeper.x,keeper.y);
+    // aim line
+    if(aim&&state==='ready'){ ctx.strokeStyle='#ffd23f'; ctx.lineWidth=4; ctx.setLineDash([8,8]); ctx.beginPath(); ctx.moveTo(ball.x,ball.y); ctx.lineTo(ball.x+(ball.x-aim.x),ball.y+(ball.y-aim.y)); ctx.stroke(); ctx.setLineDash([]); }
+    // ball
+    ctx.font=(ball.r*2)+'px sans-serif'; ctx.fillText('⚽',ball.x,ball.y);
+    // MO kicker
+    if(state==='ready'||state==='kick'){ ctx.font='30px sans-serif'; ctx.fillText('🧑‍🦱',ball.x-24,ball.y+4); } }
+  function showMsg(t){ document.getElementById('msg').textContent=t; msgT=70; }
+  function over(){ state='over'; if(goals>getHi()){ setHi(goals); } document.getElementById('hi').textContent=getHi(); document.getElementById('fmsg').textContent='You scored '+goals+' of 5 goals! Best '+getHi(); document.getElementById('over').style.display='flex'; }
+  var ac; function beep(f,d){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  document.getElementById('rs').onclick=function(){ reset(); };
+  fit(); reset(); requestAnimationFrame(loop);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:30%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function init(){ var over=document.getElementById('over'); if(!over)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(over).display!=='none'; if(vis&&!was){ was=true; var f=document.getElementById('fmsg'); if(f&&/scored ([2-9]|1[0-9]) of/.test(f.textContent))celebrate(); } else if(!vis){ was=false; } }).observe(over,{attributes:true,attributeFilter:['style','class']}); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+</body></html>

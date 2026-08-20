@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Monster Truck</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:#87ceeb;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:20px;font-weight:bold;color:#12203a;pointer-events:none;}
+  a.back{position:fixed;top:8px;left:10px;color:#12203a;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;}
+  #jump{position:fixed;bottom:24px;right:6%;width:110px;height:110px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ffd23f,#f0722a);border:none;color:#5a2a00;font-weight:bold;font-size:20px;box-shadow:0 6px 0 #b4541a;}
+  #jump:active{transform:translateY(4px);}
+  #over{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:#0008;}
+  #over h1{font-size:32px;color:#ffd23f;margin:0 0 6px;} #over button{background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:20px;padding:14px 28px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">⬅ Games</a>
+<div id="hud">🚚 Crushed <span id="sc">0</span> &nbsp; ⭐<span id="dist">0</span>m</div>
+<canvas id="c"></canvas>
+<button id="jump">🚀 JUMP</button>
+<div id="over"><h1>💥 CRASH!</h1><p>Crushed <span id="fin">0</span> cars • <span id="fd">0</span>m</p><button id="rs">▶ Play Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener('resize',fit); fit();
+  var truck,obs,score,dist,running,last,spawnT,groundY,speed;
+  function reset(){ groundY=function(){ return H*0.78; }; truck={x:W*0.25,y:0,vy:0,onGround:true,r:34}; truck.y=groundY()-truck.r; obs=[]; score=0; dist=0; running=true; last=0; spawnT=40; speed=5; document.getElementById('over').style.display='none'; document.getElementById('sc').textContent=0; document.getElementById('dist').textContent=0; }
+  function jump(){ if(truck.onGround){ truck.vy=-13; truck.onGround=false; beep(500,0.1); } }
+  document.getElementById('jump').addEventListener('touchstart',function(e){jump();e.preventDefault();},{passive:false});
+  document.getElementById('jump').addEventListener('mousedown',function(){jump();});
+  window.addEventListener('keydown',function(e){ if(e.key===' '||e.key==='ArrowUp'){ jump(); e.preventDefault(); } });
+  cv.addEventListener('touchstart',function(e){jump();e.preventDefault();},{passive:false});
+  cv.addEventListener('mousedown',function(){jump();});
+  function spawn(){ var car=Math.random()<0.6; obs.push({x:W+30,type:car?'car':'cone',crushed:0}); }
+  function loop(ts){ if(!running)return; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts;
+    speed=5+dist*0.002; dist+=speed*dt*0.1; document.getElementById('dist').textContent=Math.floor(dist);
+    truck.vy+=0.7*dt; truck.y+=truck.vy*dt; var gy=groundY()-truck.r; if(truck.y>=gy){ truck.y=gy; truck.vy=0; truck.onGround=true; }
+    spawnT-=dt; if(spawnT<=0){ spawn(); spawnT=Math.max(30,70-dist*0.05); }
+    for(var i=obs.length-1;i>=0;i--){ var o=obs[i]; o.x-=speed*dt; if(o.crushed>0){ o.crushed--; if(o.crushed===0)obs.splice(i,1); continue; }
+      var oy=groundY(); if(Math.abs(o.x-truck.x)<32){ if(truck.y+truck.r>oy-18){ // touching ground level object
+          if(o.type==='car'){ o.crushed=12; score++; document.getElementById('sc').textContent=score; beep(200,0.12); truck.vy=-6; }
+          else { over(); return; } } }
+      if(o.x<-40)obs.splice(i,1); }
+    draw(); requestAnimationFrame(loop); }
+  function draw(){ ctx.fillStyle='#87ceeb'; ctx.fillRect(0,0,W,H);
+    ctx.font='30px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    for(var c=0;c<W;c+=120){ ctx.fillText('☁️',((c-dist*2)%(W+120)+W+120)%(W+120),H*0.2); }
+    var gy=H*0.78; ctx.fillStyle='#5a4a2a'; ctx.fillRect(0,gy,W,H-gy); ctx.fillStyle='#3a3a3a'; ctx.fillRect(0,gy,W,10);
+    ctx.strokeStyle='#ffd23f'; ctx.lineWidth=3; ctx.setLineDash([20,18]); ctx.beginPath(); ctx.moveTo(-(dist*4%38),gy+22); ctx.lineTo(W,gy+22); ctx.stroke(); ctx.setLineDash([]);
+    for(var i=0;i<obs.length;i++){ var o=obs[i]; ctx.font='30px sans-serif'; ctx.fillText(o.crushed>0?'💥':(o.type==='car'?'🚗':'🚧'),o.x,gy-14); }
+    ctx.font='46px sans-serif'; ctx.save(); ctx.translate(truck.x,truck.y); if(!truck.onGround)ctx.rotate(truck.vy*0.02); ctx.fillText('🛻',0,0); ctx.restore(); }
+  function over(){ running=false; document.getElementById('fin').textContent=score; document.getElementById('fd').textContent=Math.floor(dist); document.getElementById('over').style.display='flex'; beep(150,0.3); }
+  var ac; function beep(f,d){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  document.getElementById('rs').onclick=function(){ reset(); requestAnimationFrame(loop); };
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration - shows a gold badge + confetti on win/finish */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function hookText(el){ if(!el)return; var was=false; new MutationObserver(function(){ var t=(el.textContent||'').trim(); if(t&&!was){ was=true; celebrate(); } else if(!t){ was=false; } }).observe(el,{childList:true,characterData:true,subtree:true}); }
+  function init(){ hookVisible(document.getElementById('over')); hookText(document.getElementById('win')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+
+</body></html>

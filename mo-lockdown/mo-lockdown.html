@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO LOCKDOWN D</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#20143a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0007;}
+  .pill{background:#0008;border-radius:20px;padding:6px 14px;font-size:17px;}
+  #kl{position:fixed;bottom:24px;left:3%;width:30%;height:92px;} #kr{position:fixed;bottom:24px;right:3%;width:30%;height:92px;}
+  .key{border-radius:20px;border:3px solid #ffffff77;display:flex;align-items:center;justify-content:center;font-size:38px;color:#fff;background:#0004;}
+  #block{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);width:30%;height:92px;border-radius:20px;background:linear-gradient(#e0453a,#a52a24);border:none;color:#fff;font-weight:bold;font-size:19px;}
+  .key:active,#block:active{background:#0007;}
+  #hint{position:fixed;bottom:126px;left:0;right:0;text-align:center;font-size:14px;color:#e7d6ff;background:#0005;padding:5px;pointer-events:none;}
+  #msg{position:fixed;top:38%;left:0;right:0;text-align:center;font-size:40px;font-weight:bold;color:#ffd23f;text-shadow:0 3px 0 #0008;pointer-events:none;opacity:0;transition:opacity .1s;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#20143add;text-align:center;}
+  #over h1{font-size:36px;margin:0 0 6px;color:#7bff9e;} #over p{font-size:20px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#e0453a,#a52a24);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #7a1c18;font-family:inherit;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">🛡️ Stops <span id="stops">0</span></div>
+  <div class="pill">⏱️ <span id="time">45</span>s</div>
+  <div class="pill">🏀 They <span id="buckets">0</span></div>
+</div>
+<div class="key" id="kl">◀</div>
+<button id="block">🛡️ BLOCK</button>
+<div class="key" id="kr">▶</div>
+<div id="hint">Slide ◀▶ to stay in front. When they SHOOT, hit BLOCK while lined up!</div>
+<div id="msg"></div>
+<div id="over"><h1 id="ot">🛡️ GAME!</h1><p id="os"></p><button class="btn" id="again">Play D Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'square';o.frequency.value=f;g.gain.value=v||0.05;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.08));o.stop(a.currentTime+(d||0.08)+0.02);}catch(e){} }
+  var off, def, L, R, state, shotT, shotWindow, stops, buckets, timeLeft, running, msgT, ballY, nowv=0;
+  function reset(){ off={x:W/2,tx:W/2}; def={x:W/2}; L=R=false; state='play'; shotT=120; shotWindow=0; stops=0; buckets=0; timeLeft=45; running=true; msgT=0; ballY=0;
+    document.getElementById('over').style.display='none'; document.getElementById('stops').textContent='0'; document.getElementById('buckets').textContent='0'; document.getElementById('time').textContent='45';
+    if(!reset._t){ reset._t=setInterval(function(){ if(running){ timeLeft--; document.getElementById('time').textContent=Math.max(0,timeLeft); if(timeLeft<=0) over(); } },1000); } }
+  function hold(el,set){ el.addEventListener('touchstart',function(e){set(true);e.preventDefault();},{passive:false}); el.addEventListener('touchend',function(e){set(false);e.preventDefault();},{passive:false}); el.addEventListener('mousedown',function(){set(true);}); el.addEventListener('mouseup',function(){set(false);}); el.addEventListener('mouseleave',function(){set(false);}); }
+  hold(document.getElementById('kl'),function(v){L=v;}); hold(document.getElementById('kr'),function(v){R=v;});
+  function blockPress(){ if(!running)return; if(state==='shot'){ if(Math.abs(off.x-def.x)<W*0.14){ stops++; document.getElementById('stops').textContent=stops; showMsg('🚫 BLOCKED!','#7bff9e'); beep(700,0.12,'square',0.06); } else { showMsg('❌ Too far!','#ff6a6a'); beep(200,0.1,'sawtooth',0.05); } state='play'; shotT=90+Math.random()*60; nextTarget(); } }
+  document.getElementById('block').addEventListener('touchstart',function(e){blockPress();e.preventDefault();},{passive:false}); document.getElementById('block').addEventListener('mousedown',blockPress);
+  addEventListener('keydown',function(e){ if(e.key==='ArrowLeft')L=true; if(e.key==='ArrowRight')R=true; if(e.key===' ')blockPress(); });
+  addEventListener('keyup',function(e){ if(e.key==='ArrowLeft')L=false; if(e.key==='ArrowRight')R=false; });
+  document.getElementById('again').onclick=reset;
+  function nextTarget(){ off.tx=W*(0.2+Math.random()*0.6); }
+  function showMsg(m,col){ var e=document.getElementById('msg'); e.textContent=m; e.style.color=col||'#ffd23f'; e.style.opacity=1; msgT=1; }
+  function over(){ running=false; document.getElementById('ot').textContent=stops>buckets?'🔒 LOCKDOWN!':'🛡️ GAME!'; document.getElementById('os').innerHTML='Stops: <b>'+stops+'</b> — Their buckets: <b>'+buckets+'</b>'; document.getElementById('over').style.display='flex'; }
+  function update(dt){
+    if(L)def.x-=7*dt; if(R)def.x+=7*dt; def.x=Math.max(30,Math.min(W-30,def.x));
+    if(state==='play'){ off.x+=(off.tx-off.x)*0.06*dt; if(Math.abs(off.x-off.tx)<8) nextTarget();
+      shotT-=dt; if(shotT<=0){ state='shot'; shotWindow=48; ballY=0; showMsg('🏀 SHOT! BLOCK!','#ffd23f'); beep(500,0.1,'square',0.05); } }
+    else if(state==='shot'){ shotWindow-=dt; ballY+=2*dt; if(shotWindow<=0){ // not blocked in time -> they score
+        buckets++; document.getElementById('buckets').textContent=buckets; showMsg('🏀 They scored!','#ff6a6a'); beep(300,0.15,'sine',0.05); state='play'; shotT=90+Math.random()*60; nextTarget(); } }
+    if(msgT>0){ msgT-=0.018*dt; if(msgT<=0)document.getElementById('msg').style.opacity=0; }
+  }
+  function render(){
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#3a2470'); g.addColorStop(1,'#1a1030'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // hoop at top center
+    ctx.fillStyle='#eef3f7'; ctx.fillRect(W/2-30,50,60,10); ctx.strokeStyle='#ff7b00'; ctx.lineWidth=5; ctx.beginPath(); ctx.ellipse(W/2,64,24,7,0,0,6.29); ctx.stroke();
+    // court
+    ctx.fillStyle='#d0904e'; ctx.fillRect(0,H*0.68,W,H*0.32);
+    // alignment guide
+    ctx.strokeStyle=(Math.abs(off.x-def.x)<W*0.14)?'rgba(123,255,158,0.5)':'rgba(255,255,255,0.15)'; ctx.lineWidth=3; ctx.setLineDash([6,6]); ctx.beginPath(); ctx.moveTo(off.x,H*0.34); ctx.lineTo(def.x,H*0.66); ctx.stroke(); ctx.setLineDash([]);
+    // offense (with ball, shooting)
+    drawPlayer(off.x,H*0.34,'#e0453a','24',state==='shot');
+    // defender (you)
+    drawPlayer(def.x,H*0.66,'#1a6fd0','MO',false,true);
+    // ball during shot
+    if(state==='shot'){ ctx.fillStyle='#e0701f'; ctx.beginPath(); ctx.arc(off.x,H*0.34-40-ballY*3,10,0,6.29); ctx.fill(); }
+  }
+  function drawPlayer(x,y,col,label,arms,def2){ ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle=col; roundRect(-14,-18,28,34,9); ctx.fill();
+    ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(0,-28,11,0,6.29); ctx.fill(); ctx.fillStyle='#3a2a1a'; ctx.beginPath(); ctx.arc(0,-31,11,Math.PI,6.29); ctx.fill();
+    if(arms||def2){ ctx.strokeStyle=col; ctx.lineWidth=6; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-12,-8); ctx.lineTo(-20,-28); ctx.moveTo(12,-8); ctx.lineTo(20,-28); ctx.stroke(); }
+    ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(label,0,-2); ctx.restore(); }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(running) update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

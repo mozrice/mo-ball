@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO CLIMB</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#7fc7ff;font-family:'Trebuchet MS',system-ui,sans-serif;color:#0a2a44;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none;font-weight:bold;}
+  .pill{background:#ffffffcc;border-radius:20px;padding:6px 14px;font-size:17px;color:#0a2a44;box-shadow:0 2px 0 #0001;}
+  .key{position:fixed;bottom:22px;width:44%;height:110px;border-radius:22px;border:3px solid #ffffff99;display:flex;align-items:center;justify-content:center;font-size:40px;color:#fff;font-weight:bold;}
+  #kl{left:3%;background:linear-gradient(#8a63d2,#5a3aa0);} #kr{right:3%;background:linear-gradient(#43c6ff,#1a8fd6);}
+  .key:active{transform:translateY(3px);}
+  #hint{position:fixed;bottom:140px;left:0;right:0;text-align:center;font-size:14px;color:#0a2a44;background:#ffffff99;padding:5px;pointer-events:none;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#7fc7ffd8;text-align:center;}
+  #over h1{font-size:38px;margin:0 0 6px;color:#a52a24;} #over p{font-size:20px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#8a63d2,#5a3aa0);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #3a2470;font-family:inherit;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">⛰️ <span id="height">0</span>m</div>
+  <div class="pill">🪙 <span id="coins">0</span></div>
+  <div class="pill">🏆 <span id="best">0</span></div>
+</div>
+<div class="key" id="kl">◀ LEFT</div>
+<div class="key" id="kr">RIGHT ▶</div>
+<div id="hint">Tap the side where the next handhold is! Be quick ⏳</div>
+<div id="over"><h1 id="ot">🪨 FELL!</h1><p id="os"></p><button class="btn" id="again">Climb Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  var best=+(localStorage.getItem('moclimb_best')||0); document.getElementById('best').textContent=best;
+  var SP=90; // vertical spacing of holds
+  var holds, idx, camY, camTarget, timer, timerMax, coins, running, falling, fallV, nowv=0, shake;
+  function reset(){ holds=[]; for(var i=0;i<40;i++) genHold(i); idx=0; camY=0; camTarget=0; timer=1; timerMax=1; coins=0; running=true; falling=false; fallV=0; shake=0;
+    setCam(); document.getElementById('over').style.display='none'; document.getElementById('height').textContent='0'; document.getElementById('coins').textContent='0'; }
+  function genHold(i){ var side= i===0?'L':(Math.random()<0.5?'L':'R'); holds[i]={side:side, wy:-i*SP, coin:i>0&&Math.random()<0.3}; }
+  function setCam(){ camTarget = holds[idx].wy + H*0.62 - H*0.5; /* keep current hold ~62% down */ }
+  function holdX(side){ return side==='L'?W*0.32:W*0.68; }
+  function move(side){ if(!running||falling)return; var nx=holds[idx+1];
+    if(nx && nx.side===side){ idx++; if(holds[idx].coin){ coins++; document.getElementById('coins').textContent=coins; beep(800,0.07,'square',0.05); holds[idx].coin=false; }
+      document.getElementById('height').textContent=idx; timerMax=Math.max(0.4,1-idx*0.006); timer=timerMax; setCam(); beep(500+Math.min(idx*8,400),0.07,'square',0.06);
+      if(idx>holds.length-8){ for(var k=0;k<10;k++) genHold(holds.length); }
+    } else { fall(); } }
+  document.getElementById('kl').addEventListener('touchstart',function(e){move('L');e.preventDefault();},{passive:false}); document.getElementById('kl').addEventListener('mousedown',function(){move('L');});
+  document.getElementById('kr').addEventListener('touchstart',function(e){move('R');e.preventDefault();},{passive:false}); document.getElementById('kr').addEventListener('mousedown',function(){move('R');});
+  addEventListener('keydown',function(e){ if(e.key==='ArrowLeft')move('L'); if(e.key==='ArrowRight')move('R'); });
+  document.getElementById('again').onclick=reset;
+  function fall(){ falling=true; fallV=0; shake=1; beep(200,0.3,'sawtooth',0.08); }
+  function over(){ running=false; if(idx>best){best=idx;localStorage.setItem('moclimb_best',best);document.getElementById('best').textContent=best;}
+    document.getElementById('os').innerHTML='You climbed <b>'+idx+'m</b> and grabbed <b>'+coins+'</b> coins!<br>Best: <b>'+best+'m</b>'; document.getElementById('over').style.display='flex'; }
+  function update(dt){
+    camY+=(camTarget-camY)*0.2*dt;
+    if(falling){ fallV+=0.8*dt; camY-=fallV*dt; if(shake>0)shake-=0.05*dt; if(holds[idx].wy - camY > H+100){ over(); } return; }
+    timer-=(0.016/timerMax)*dt*0.9; if(timer<=0){ fall(); }
+    if(shake>0)shake-=0.05*dt;
+  }
+  function render(){
+    var shk=shake>0?Math.sin(nowv*0.08)*8*shake:0;
+    var sky=ctx.createLinearGradient(0,0,0,H); sky.addColorStop(0,'#bfe4ff'); sky.addColorStop(1,'#7fc7ff'); ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+    // sun/clouds scroll slightly with height
+    ctx.fillStyle='#fff4c0'; ctx.beginPath(); ctx.arc(W*0.82,80- camY*0.05,30,0,6.29); ctx.fill();
+    ctx.save(); ctx.translate(shk,0);
+    // cliff column
+    ctx.fillStyle='#8a6a4a'; ctx.fillRect(W*0.22,0,W*0.56,H);
+    ctx.fillStyle='#7a5a3a'; for(var yy=(-(camY)%60);yy<H;yy+=60){ ctx.fillRect(W*0.22,yy,W*0.56,4); }
+    ctx.fillStyle='#6a4a2a'; for(var i=0;i<30;i++){ var sy=((i*173 - camY*0.4)%(H+80)+H+80)%(H+80)-40; ctx.beginPath(); ctx.arc(W*0.3+((i*97)%(W*0.4)),sy,5,0,6.29); ctx.fill(); }
+    // holds
+    for(var h=0;h<holds.length;h++){ var hd=holds[h]; var sy=hd.wy - camY; if(sy<-40||sy>H+40)continue; var x=holdX(hd.side);
+      var isNext=(h===idx+1);
+      ctx.fillStyle=isNext?'#ffd23f':'#a5764a'; ctx.beginPath(); ctx.ellipse(x,sy,20,11,0,0,6.29); ctx.fill();
+      ctx.fillStyle=isNext?'#f0a929':'#8a5a2b'; ctx.beginPath(); ctx.ellipse(x,sy,12,6,0,0,6.29); ctx.fill();
+      if(isNext){ ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(x,sy,26,0,6.29); ctx.stroke(); }
+      if(hd.coin){ ctx.fillStyle='#ffd23f'; ctx.beginPath(); ctx.arc(x,sy-22,9,0,6.29); ctx.fill(); ctx.fillStyle='#caa314'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('$',x,sy-22); } }
+    // climber
+    var cur=holds[idx]; var cx=holdX(cur.side), cy=cur.wy-camY;
+    drawMo(cx,cy, holds[idx+1]?holdX(holds[idx+1].side):cx, holds[idx+1]?holds[idx+1].wy-camY:cy);
+    ctx.restore();
+    // timer bar
+    if(running&&!falling){ ctx.fillStyle='#0004'; ctx.fillRect(W*0.2,H*0.14,W*0.6,10); ctx.fillStyle=timer>0.4?'#37d06a':'#e0453a'; ctx.fillRect(W*0.2,H*0.14,W*0.6*Math.max(0,timer),10); }
+  }
+  function drawMo(x,y,nx,ny){ ctx.save(); ctx.translate(x,y-10);
+    // reaching arm toward next hold
+    if(!falling){ ctx.strokeStyle='#1a6fd0'; ctx.lineWidth=5; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(0,-6); ctx.lineTo((nx-x)*0.4,(ny-y)*0.4-4); ctx.stroke(); }
+    ctx.fillStyle='#1a6fd0'; roundRect(-11,-14,22,26,7); ctx.fill();
+    ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(0,-20,9,0,6.29); ctx.fill(); ctx.fillStyle='#e0453a'; ctx.fillRect(-9,-24,18,5);
+    ctx.fillStyle='#fff'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('MO',0,-1);
+    ctx.fillStyle='#12406b'; ctx.fillRect(-8,12,6,8); ctx.fillRect(2,12,6,8);
+    ctx.restore(); }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(running) update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

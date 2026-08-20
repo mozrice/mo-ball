@@ -56,9 +56,10 @@
   #ballBtn { top:82px; left:104px; background:linear-gradient(#e88a2a,#b5591f); }
   #buildBtn { top:118px; left:12px; background:linear-gradient(#3aa657,#1f7a3a); }
   #copterBtn { top:118px; left:104px; background:linear-gradient(#4a90c8,#2560a0); }
+  #petBtn { top:154px; left:12px; background:linear-gradient(#a06fd0,#6a3aa0); }
   #placeBtn { position:absolute; left:50%; transform:translateX(-50%); bottom:96px; z-index:7; display:none; padding:13px 26px; border-radius:16px; border:none; font-size:18px; font-weight:bold; background:linear-gradient(#8ef0a8,#2fbf6a); color:#04351a; box-shadow:0 5px 0 #1f8a4a; cursor:pointer; }
   #placeBtn:active { transform:translateX(-50%) translateY(4px); box-shadow:0 1px 0 #1f8a4a; }
-  body.inside #flyBtn, body.inside #ballBtn, body.inside #buildBtn, body.inside #placeBtn, body.inside #copterBtn { display:none !important; }
+  body.inside #flyBtn, body.inside #ballBtn, body.inside #buildBtn, body.inside #placeBtn, body.inside #copterBtn, body.inside #petBtn { display:none !important; }
   #meBtn { position:absolute; top:46px; right:12px; z-index:7; padding:7px 14px; border-radius:20px; border:1px solid #ffffff33; background:linear-gradient(#f0a429,#c47a12); color:#3a2600; font-weight:bold; font-size:14px; cursor:pointer; box-shadow:0 3px 0 #8a5a10; }
   #meBtn:active { transform:translateY(3px); box-shadow:0 0 0 #8a5a10; }
   #driveBtn { position:absolute; top:82px; right:12px; z-index:7; padding:7px 14px; border-radius:20px; border:1px solid #ffffff33; background:linear-gradient(#e0453a,#a52a24); color:#fff; font-weight:bold; font-size:14px; cursor:pointer; box-shadow:0 3px 0 #7a1c18; }
@@ -89,6 +90,7 @@
   <button id="ballBtn" class="actL">🏀 SHOOT</button>
   <button id="buildBtn" class="actL">🧱 BUILD</button>
   <button id="copterBtn" class="actL">🚁 COPTER</button>
+  <button id="petBtn" class="actL">🐾 PET</button>
   <button id="placeBtn">🧱 PLACE BLOCK</button>
   <button id="meBtn">🤳 ME</button>
   <button id="driveBtn">🚗 DRIVE</button>
@@ -185,10 +187,11 @@
 
   var mode="start", coins, px, py, ang, fwd,bak,tl,tr, dragX, coinsList, zbuf=[], bob=0, walkPh=0, cars=[], peds=[], nearB=null, nearGrace=0, nearPotty=null, enterTarget=null, inside=null, showMe=false, driving=false, boostHeld=false, night=false, flying=false, building=false, streetBall=null, streetScore=0, talkT=0, talkMsg="", nearTalk=null, copter=false, rotor=0;
   var mission=null, missionT=0;
+  var pet=null, petX=7.5, petY=1.0, petPh=0, petName="Sparky", petHeart=0;
   var PHRASES=["Hi Mo! 👋","Nice city!","Go MO! 🏀","Cool car! 🚗","Have a great day!","Wanna play ball?","Love this town!","You're awesome!","Watch out for cars!","To the hotel! 🏨"];
   var CARS=[{c:"#e0453a",n:"RED RACER"},{c:"#2f6fd0",n:"BLUE BOLT"},{c:"#f2b705",n:"GOLD FLASH"},{c:"#37b06a",n:"GREEN MACHINE"},{c:"#8a63d2",n:"PURPLE POWER"},{c:"#2b2f36",n:"NIGHT RIDER"},{c:"#eef0f4",n:"WHITE LIGHTNING"},{c:"#e88a2a",n:"ORANGE ZOOM"}], myCarIdx=0;
   function labelFor(tp){ return tp==="hotel"?"🏨 MO HOTEL":tp==="apartments"?"🏢 MO APARTMENTS":tp==="house"?"🏠 MO HOUSE":tp==="garage"?"🅿️ MO GARAGE":tp==="carshop"?"🚗 MO CAR SHOP":"🏬 MO SHOP"; }
-  function reset(){ coins=0; px=7.5; py=1.0; ang=1.5708; fwd=bak=tl=tr=false; dragX=null; bob=0; walkPh=0;
+  function reset(){ coins=0; px=7.5; py=1.0; ang=1.5708; fwd=bak=tl=tr=false; dragX=null; bob=0; walkPh=0; petX=px; petY=py; petHeart=0;
     coinsList=[]; for(var i=0;i<80;i++){ var x=Math.floor(Math.random()*MW), y=Math.floor(Math.random()*MH); if(grid[y][x]===0) coinsList.push({x:x+0.5,y:y+0.5,got:false}); }
     // traffic: cars drive along street corridors
     cars=[]; var lanes=[];
@@ -225,6 +228,17 @@
   document.getElementById("nightBtn").onclick=function(e){ e.stopPropagation(); ac(); night=!night; document.getElementById("nightBtn").textContent=night?"☀️ DAY":"🌙 NIGHT"; beep(night?300:500,0.12,"sine",0.1); };
   document.getElementById("flyBtn").onclick=function(e){ e.stopPropagation(); ac(); flying=!flying; document.getElementById("flyBtn").textContent=flying?"🚶 LAND":"🦸 FLY"; if(flying){ copter=false; document.getElementById("copterBtn").textContent="🚁 COPTER"; driving=false; document.getElementById("driveBtn").textContent="🚗 DRIVE"; beep(500,0.1,"sine",0.1); setTimeout(function(){beep(760,0.14,"sine",0.1);},90);} else beep(300,0.12,"sine",0.08); };
   document.getElementById("copterBtn").onclick=function(e){ e.stopPropagation(); ac(); copter=!copter; document.getElementById("copterBtn").textContent=copter?"🚶 GET OUT":"🚁 COPTER"; if(copter){ flying=false; document.getElementById("flyBtn").textContent="🦸 FLY"; driving=false; document.getElementById("driveBtn").textContent="🚗 DRIVE"; beep(120,0.3,"sawtooth",0.1);} else beep(100,0.2,"sawtooth",0.08); };
+  document.getElementById("petBtn").onclick=function(e){ e.stopPropagation(); ac();
+    var order=[null,"dog","cat","dragon"]; var idx=order.indexOf(pet); pet=order[(idx+1)%order.length];
+    var b=document.getElementById("petBtn");
+    if(pet){ b.textContent=(pet==="dog"?"🐶":pet==="cat"?"🐱":"🐉")+" "+pet.toUpperCase();
+      petX=px-Math.cos(ang); petY=py-Math.sin(ang); petHeart=1;
+      var nm=null; try{ nm=prompt("What is your "+pet+"'s name? 🐾", petName); }catch(_){}
+      if(nm && nm.trim()) petName=nm.trim();
+      talkMsg=(pet==="dragon"?"🐉 ":pet==="dog"?"🐶 ":"🐱 ")+petName+" joined you! Press FLY to soar on the dragon 🐉"; talkT=2.2;
+      beep(600,0.1,"square",0.08); setTimeout(function(){beep(880,0.1,"square",0.07);},70);
+    } else { b.textContent="🐾 PET"; talkMsg="Bye pet! 👋"; talkT=1.2; beep(300,0.1,"sine",0.07); }
+  };
   function newMission(){ var opts=[{t:"coins",n:8},{t:"coins",n:15},{t:"baskets",n:3},{t:"baskets",n:5}]; var m=opts[Math.floor(hsh((last||1)*0.013+ (mission?mission.seed+1:1))*opts.length)];
     mission={type:m.t, target:m.n, base:(m.t==="coins"?coins:streetScore), seed:(mission?mission.seed+1:1)}; missionT=2.2; beep(700,0.08,"sine",0.1); }
   function checkMission(){ if(!mission)return; var prog=(mission.type==="coins"?coins:streetScore)-mission.base;
@@ -1190,6 +1204,14 @@
     // talk to nearby people
     nearTalk=null; for(var pt=0;pt<peds.length;pt++){ var pdd=(peds[pt].x-px)*(peds[pt].x-px)+(peds[pt].y-py)*(peds[pt].y-py); if(pdd<2.6){ nearTalk=peds[pt]; break; } }
     for(var i=0;i<coinsList.length;i++){ if(!coinsList[i].got && Math.hypot(coinsList[i].x-px,coinsList[i].y-py)<0.4){ coinsList[i].got=true; coins++; coinSfx(); updateHUD(); } }
+    // pet follows you and helps grab coins
+    if(pet){ petPh+=0.15*dt;
+      var pfx=Math.cos(ang), pfy=Math.sin(ang), psx=-pfy, psy=pfx;
+      var tgx=px+pfx*1.3+psx*0.5*Math.sin(petPh), tgy=py+pfy*1.3+psy*0.5*Math.sin(petPh);
+      petX+=(tgx-petX)*0.12*dt; petY+=(tgy-petY)*0.12*dt;
+      for(var pc=0;pc<coinsList.length;pc++){ if(!coinsList[pc].got && Math.hypot(coinsList[pc].x-petX,coinsList[pc].y-petY)<0.7){ coinsList[pc].got=true; coins++; coinSfx(); updateHUD(); petHeart=1; } }
+    }
+    if(petHeart>0) petHeart=Math.max(0,petHeart-0.02*dt);
     // traffic lights: green alternates between up-down (v) and side-to-side (h) streets
     lightGreenV = (Math.floor((last||0)/5000)%2)===0;
     // move traffic — cars stop when their street has a red light
@@ -1295,6 +1317,7 @@
     for(var po3=0;po3<potties.length;po3++){ var pt3=potties[po3]; var p3d=(pt3.x-px)*(pt3.x-px)+(pt3.y-py)*(pt3.y-py); if(p3d>500)continue; spr.push({x:pt3.x,y:pt3.y,t:"potty",d:p3d}); }
     for(var lk=0;lk<landmarks.length;lk++){ var lo=landmarks[lk]; var lod=(lo.x-px)*(lo.x-px)+(lo.y-py)*(lo.y-py); if(lod>1400)continue; spr.push({x:lo.x,y:lo.y,t:lo.t,d:lod}); }
     for(var tl=0;tl<tlights.length;tl++){ var to=tlights[tl]; var tod=(to.x-px)*(to.x-px)+(to.y-py)*(to.y-py); if(tod>360)continue; spr.push({x:to.x,y:to.y,t:"light",d:tod}); }
+    if(pet){ spr.push({x:petX,y:petY,t:"pet",kind:pet,d:(petX-px)*(petX-px)+(petY-py)*(petY-py)}); }
     spr.sort(function(a,b){ return b.d-a.d; });
     var invDet=1/(planeX*dirY - dirX*planeY);
     for(var si=0;si<spr.length;si++){ var o=spr[si]; var rx=o.x-px, ry=o.y-py;
@@ -1306,6 +1329,24 @@
       var floorY=HC+(H/tY)/2; var sz=Math.abs(Math.floor(H/tY))*0.35;
       if(o.t==="coin"){ var cy=HC + (H*0.18)/tY;
         var g2=ctx.createRadialGradient(scr,cy,1,scr,cy,sz*0.6); g2.addColorStop(0,"#fff2a0"); g2.addColorStop(0.6,"#ffd93d"); g2.addColorStop(1,"#caa314"); ctx.fillStyle=g2; ctx.beginPath(); ctx.ellipse(scr,cy - Math.abs(Math.sin(last/300))*4, sz*0.42, sz*0.5,0,0,7); ctx.fill();
+      } else if(o.t==="pet"){ var ah=(H/tY)*0.4, aw=sz*1.0, by=floorY;
+        var col=o.kind==="dog"?"#b5793c":o.kind==="cat"?"#9aa0a8":"#37b06a";
+        var wag=Math.sin(last/110)*aw*0.12;
+        ctx.fillStyle="rgba(0,0,0,0.22)"; ctx.beginPath(); ctx.ellipse(scr,by,aw*0.5,ah*0.1,0,0,7); ctx.fill();
+        if(o.kind==="dragon"){ ctx.fillStyle="#2f8a54";
+          ctx.beginPath(); ctx.moveTo(scr,by-ah*0.7); ctx.lineTo(scr-aw*0.95,by-ah*1.15+wag); ctx.lineTo(scr-aw*0.15,by-ah*0.45); ctx.closePath(); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(scr,by-ah*0.7); ctx.lineTo(scr+aw*0.95,by-ah*1.15-wag); ctx.lineTo(scr+aw*0.15,by-ah*0.45); ctx.closePath(); ctx.fill(); }
+        ctx.fillStyle=shade(col,0.78); ctx.fillRect(scr-aw*0.3,by-ah*0.32,aw*0.12,ah*0.32); ctx.fillRect(scr+aw*0.18,by-ah*0.32,aw*0.12,ah*0.32);
+        ctx.fillStyle=col; ctx.beginPath(); ctx.ellipse(scr,by-ah*0.52,aw*0.42,ah*0.3,0,0,7); ctx.fill();
+        ctx.fillRect(scr+aw*0.34,by-ah*0.62+wag,aw*0.2,ah*0.09);
+        ctx.beginPath(); ctx.ellipse(scr-aw*0.34,by-ah*0.74,aw*0.24,ah*0.22,0,0,7); ctx.fill();
+        if(o.kind==="cat"){ ctx.beginPath(); ctx.moveTo(scr-aw*0.46,by-ah*0.92); ctx.lineTo(scr-aw*0.38,by-ah*1.06); ctx.lineTo(scr-aw*0.3,by-ah*0.92); ctx.closePath(); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(scr-aw*0.3,by-ah*0.92); ctx.lineTo(scr-aw*0.22,by-ah*1.06); ctx.lineTo(scr-aw*0.14,by-ah*0.92); ctx.closePath(); ctx.fill(); }
+        else if(o.kind==="dog"){ ctx.fillStyle=shade(col,0.68); ctx.beginPath(); ctx.ellipse(scr-aw*0.48,by-ah*0.72,aw*0.08,ah*0.14,0,0,7); ctx.fill(); }
+        else { ctx.fillStyle="#ffd93d"; ctx.beginPath(); ctx.moveTo(scr-aw*0.42,by-ah*0.92); ctx.lineTo(scr-aw*0.37,by-ah*1.05); ctx.lineTo(scr-aw*0.31,by-ah*0.92); ctx.closePath(); ctx.fill(); }
+        ctx.fillStyle="#111"; ctx.beginPath(); ctx.arc(scr-aw*0.4,by-ah*0.76,Math.max(1.2,aw*0.04),0,7); ctx.fill();
+        ctx.fillStyle="#fff"; ctx.font="bold "+Math.max(8,ah*0.2)+"px 'Trebuchet MS'"; ctx.textAlign="center"; ctx.fillText(petName,scr,by-ah*1.2);
+        if(petHeart>0){ ctx.font=Math.max(11,ah*0.26)+"px sans-serif"; ctx.fillText("❤️",scr+aw*0.42,by-ah*1.25); }
       } else if(o.t==="tree"){ var th=(H/tY)*0.62, tw=sz*0.7;
         ctx.fillStyle="#6a4a2a"; ctx.fillRect(scr-tw*0.12, floorY-th*0.42, tw*0.24, th*0.42);
         ctx.fillStyle="#2f8a44"; ctx.beginPath(); ctx.ellipse(scr, floorY-th*0.55, tw*0.55, th*0.4,0,0,7); ctx.fill();

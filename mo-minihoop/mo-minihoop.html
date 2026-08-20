@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Mini Hoop 3D</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:#1a1030;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  #cvwrap{position:fixed;inset:0;}
+  canvas{display:block;width:100%;height:100%;}
+  a.back{position:fixed;top:8px;left:10px;color:#c8b0ff;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:20px;font-weight:bold;color:#ffd23f;pointer-events:none;z-index:4;text-shadow:0 2px 0 #0007;}
+  #tip{position:fixed;bottom:16px;left:0;right:0;text-align:center;color:#e0c8ff;font-size:15px;pointer-events:none;z-index:4;}
+  #msg{position:fixed;top:46px;left:0;right:0;text-align:center;font-size:26px;font-weight:bold;color:#7bff9e;pointer-events:none;z-index:4;text-shadow:0 2px 0 #0007;}
+</style></head>
+<body>
+<a class="back" href="../mo-home/mo-home.html">⬅ Home</a>
+<div id="hud">🏀 <span id="sc">0</span> &nbsp; 🔥<span id="streak">0</span> &nbsp; 🏆<span id="hi">0</span></div>
+<div id="msg"></div>
+<div id="cvwrap"><canvas id="c"></canvas></div>
+<div id="tip">👆 Swipe UP to shoot! Aim left/right with your swipe.</div>
+<script src="../three.min.js"></script>
+<script>
+(function(){
+  if(!window.THREE){ document.body.innerHTML='<div style="padding:40px;text-align:center;font-size:20px">Could not load 3D engine 😢<br><a href="../mo-home/mo-home.html" style="color:#7bff9e">⬅ Back Home</a></div>'; return; }
+  var HK='moMiniHoopHi'; function getHi(){ try{return +localStorage.getItem(HK)||0;}catch(e){return 0;} } function setHi(v){ try{localStorage.setItem(HK,v);}catch(e){} }
+  var scene,camera,renderer,ball,rim,board,W,H;
+  var score=0,streak=0,shooting=false,vel=null,scored=false,ballStart;
+  document.getElementById('hi').textContent=getHi();
+  var cv=document.getElementById('c');
+  try{ renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:false}); }catch(e){ document.body.innerHTML='<div style="padding:40px;text-align:center">3D not supported here 😢 <a href="../mo-home/mo-home.html" style="color:#7bff9e">⬅ Back</a></div>'; return; }
+  scene=new THREE.Scene(); scene.background=new THREE.Color(0x2a1e50);
+  camera=new THREE.PerspectiveCamera(55,1,0.1,100); camera.position.set(0,1.5,6); camera.lookAt(0,2,-3);
+  var amb=new THREE.AmbientLight(0xffffff,0.8); scene.add(amb);
+  var dir=new THREE.DirectionalLight(0xffffff,0.6); dir.position.set(3,6,4); scene.add(dir);
+  // floor
+  var floor=new THREE.Mesh(new THREE.PlaneGeometry(20,20), new THREE.MeshStandardMaterial({color:0x8a5a2a})); floor.rotation.x=-Math.PI/2; floor.position.y=0; scene.add(floor);
+  // back wall
+  var wall=new THREE.Mesh(new THREE.PlaneGeometry(20,12), new THREE.MeshStandardMaterial({color:0x3a2f6a})); wall.position.set(0,6,-5); scene.add(wall);
+  // MO face texture on backboard
+  var fc=document.createElement('canvas'); fc.width=256; fc.height=200; var fx=fc.getContext('2d');
+  fx.fillStyle='#ffffff'; fx.fillRect(0,0,256,200); fx.strokeStyle='#e0662a'; fx.lineWidth=10; fx.strokeRect(6,6,244,188);
+  fx.fillStyle='#f0a030'; fx.beginPath(); fx.arc(128,92,58,0,6.29); fx.fill();
+  fx.fillStyle='#2a2018'; fx.beginPath(); fx.arc(108,82,9,0,6.29); fx.fill(); fx.beginPath(); fx.arc(148,82,9,0,6.29); fx.fill();
+  fx.strokeStyle='#2a2018'; fx.lineWidth=6; fx.beginPath(); fx.arc(128,98,26,0.15*Math.PI,0.85*Math.PI); fx.stroke();
+  fx.fillStyle='#e0453a'; fx.font='bold 34px Trebuchet MS'; fx.textAlign='center'; fx.fillText('MO',128,182);
+  // red square target under
+  fx.strokeStyle='#e0453a'; fx.lineWidth=6; fx.strokeRect(96,120,64,48);
+  var boardTex=new THREE.CanvasTexture(fc);
+  board=new THREE.Mesh(new THREE.PlaneGeometry(3,2.3), new THREE.MeshBasicMaterial({map:boardTex})); board.position.set(0,3.6,-4.6); scene.add(board);
+  // rim (torus)
+  var rimR=0.55;
+  rim=new THREE.Mesh(new THREE.TorusGeometry(rimR,0.06,10,28), new THREE.MeshStandardMaterial({color:0xff5a1a})); rim.rotation.x=Math.PI/2; rim.position.set(0,2.55,-4.1); scene.add(rim);
+  var rimPos=rim.position;
+  // net (cone wireframe)
+  var net=new THREE.Mesh(new THREE.CylinderGeometry(rimR*0.9,rimR*0.4,0.6,12,1,true), new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true,transparent:true,opacity:0.6})); net.position.set(0,2.25,-4.1); scene.add(net);
+  // pole
+  var pole=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,4.6,8), new THREE.MeshStandardMaterial({color:0x888888})); pole.position.set(0,2.3,-4.85); scene.add(pole);
+  // ball
+  var ballR=0.32;
+  ball=new THREE.Mesh(new THREE.SphereGeometry(ballR,20,16), new THREE.MeshStandardMaterial({color:0xe0662a,roughness:0.7})); scene.add(ball);
+  ballStart=new THREE.Vector3(0,1.0,4.2);
+  function resetBall(){ ball.position.copy(ballStart); vel=null; shooting=false; scored=false; }
+  resetBall();
+  function fit(){ W=window.innerWidth; H=window.innerHeight; renderer.setSize(W,H,false); renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1)); camera.aspect=W/H; camera.updateProjectionMatrix(); }
+  window.addEventListener('resize',fit); fit();
+  // input: swipe
+  var sx=0,sy=0,st=0,dragging=false;
+  function down(e){ if(shooting)return; var t=e.changedTouches?e.changedTouches[0]:e; sx=t.clientX; sy=t.clientY; st=Date.now?0:0; dragging=true; }
+  function up(e){ if(!dragging||shooting)return; dragging=false; var t=e.changedTouches?e.changedTouches[0]:e; var dx=t.clientX-sx, dy=t.clientY-sy; if(dy>-20){ return; } // must swipe up
+    var power=Math.min(1.6,Math.max(0.6,(-dy)/220));
+    vel=new THREE.Vector3((dx/W)*4.5, 6.2*power, -8.2*power); shooting=true; scored=false; beep(420,0.08); }
+  cv.addEventListener('touchstart',function(e){down(e);e.preventDefault();},{passive:false});
+  cv.addEventListener('touchend',function(e){up(e);e.preventDefault();},{passive:false});
+  cv.addEventListener('mousedown',function(e){down(e);});
+  cv.addEventListener('mouseup',function(e){up(e);});
+  var last=0, msgT=0;
+  function loop(ts){ var dt=Math.min(0.05,((ts-last)/1000)||0.016); last=ts;
+    if(shooting&&vel){ vel.y-=9.8*dt; ball.position.x+=vel.x*dt; ball.position.y+=vel.y*dt; ball.position.z+=vel.z*dt; ball.rotation.x+=0.2; ball.rotation.y+=0.1;
+      // score check: ball passes down through rim plane
+      if(!scored && vel.y<0 && ball.position.y<rimPos.y+0.15 && ball.position.y>rimPos.y-0.3){ var dxr=ball.position.x-rimPos.x, dzr=ball.position.z-rimPos.z; if(Math.sqrt(dxr*dxr+dzr*dzr)<rimR-0.05){ scored=true; score++; streak++; document.getElementById('sc').textContent=score; document.getElementById('streak').textContent=streak; showMsg(streak>1?('🔥 SWISH x'+streak+'!'):'🏀 SWISH!'); beep(760,0.1); setTimeout(function(){beep(1000,0.1);},90); if(score>getHi()){setHi(score);document.getElementById('hi').textContent=score;} } }
+      // bounce off floor / reset
+      if(ball.position.y<=ballR+0.01){ ball.position.y=ballR+0.01; if(!scored){ streak=0; document.getElementById('streak').textContent=0; } vel.multiplyScalar(0.0); shooting=false; setTimeout(resetBall,500); }
+      if(ball.position.z<-6||Math.abs(ball.position.x)>8){ if(!scored){ streak=0; document.getElementById('streak').textContent=0; } setTimeout(resetBall,400); shooting=false; }
+    }
+    if(msgT>0){ msgT-=dt; if(msgT<=0)document.getElementById('msg').textContent=''; }
+    rim.rotation.z+=0.002;
+    renderer.render(scene,camera); requestAnimationFrame(loop); }
+  function showMsg(t){ document.getElementById('msg').textContent=t; msgT=1.4; }
+  var ac; function beep(f,d){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body></html>

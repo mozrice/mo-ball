@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO ISLAND SURVIVAL</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0a6ea0;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #wrap{position:fixed;inset:0;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;flex-wrap:wrap;gap:7px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0008;}
+  .pill{background:#0008;border-radius:18px;padding:5px 11px;font-size:16px;}
+  #hbar{position:fixed;left:12px;bottom:14px;width:150px;height:16px;background:#0007;border-radius:10px;overflow:hidden;border:2px solid #fff5;}
+  #hfill{height:100%;width:100%;background:linear-gradient(90deg,#7bff9e,#2fbf6a);}
+  #hint{position:fixed;bottom:36px;left:12px;font-size:12px;color:#eaf6ff;background:#0006;padding:5px 9px;border-radius:9px;pointer-events:none;}
+  #eatBtn{position:fixed;right:118px;bottom:14px;background:linear-gradient(#ff9f43,#f0722a);border:none;color:#fff;font-weight:bold;font-size:17px;padding:12px 15px;border-radius:14px;box-shadow:0 4px 0 #b4541a;font-family:inherit;}
+  #buildBtn{position:fixed;right:12px;bottom:14px;background:linear-gradient(#ffcf5a,#f0a929);border:none;color:#5a3b00;font-weight:bold;font-size:18px;padding:12px 16px;border-radius:14px;box-shadow:0 4px 0 #a86f10;font-family:inherit;}
+  #eatBtn:active,#buildBtn:active{transform:translateY(2px);}
+  #buildPanel{position:fixed;left:0;right:0;bottom:0;background:#062a40f2;border-top:3px solid #ffd23f;padding:10px 12px 16px;display:none;max-height:66%;overflow:auto;}
+  #buildPanel h3{margin:2px 0 8px;text-align:center;color:#ffd23f;font-size:17px;}
+  .prow{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;}
+  .pbtn{background:#0e4a6b;border:2px solid #2a86bd;color:#fff;font-weight:bold;font-size:14px;padding:9px 11px;border-radius:12px;font-family:inherit;min-width:104px;}
+  .pbtn:disabled{opacity:.45;}
+  #closeBuild{display:block;margin:10px auto 0;background:#e0453a;border:none;color:#fff;font-weight:bold;font-size:16px;padding:8px 22px;border-radius:12px;font-family:inherit;}
+  #msg{position:fixed;top:52px;left:0;right:0;text-align:center;font-weight:bold;font-size:18px;color:#ffe08a;text-shadow:0 2px 0 #0009;pointer-events:none;opacity:0;transition:opacity .15s;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div class="hud">
+    <div class="pill">🪵 <span id="wood">0</span></div>
+    <div class="pill">🥥 <span id="food">0</span></div>
+    <div class="pill">🪨 <span id="stone">0</span></div>
+    <div class="pill">🏗️ <span id="built">0</span></div>
+  </div>
+  <div id="hbar"><div id="hfill"></div></div>
+  <div id="hint">Tap a 🌴🌳🪨 to gather • tap ground to walk</div>
+  <div id="msg"></div>
+  <button id="eatBtn">🥥 Eat</button>
+  <button id="buildBtn">🔨 Build</button>
+  <div id="buildPanel">
+    <h3>🏝️ Build on your island — costs resources</h3>
+    <div class="prow" id="prow"></div>
+    <button id="closeBuild">Close</button>
+  </div>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=window.innerWidth; H=window.innerHeight;
+    cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener('resize',resize); resize();
+
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());
+    var o=a.createOscillator(),g=a.createGain(); o.type=t||'sine'; o.frequency.value=f;
+    g.gain.value=v||0.06; o.connect(g); g.connect(a.destination); o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.12)); o.stop(a.currentTime+(d||0.12)+0.02);}catch(e){} }
+
+  var WORLD=1800, ICX=WORLD/2, ICY=WORLD/2, IR=WORLD*0.42;
+  function rnd(a,b){return a+Math.random()*(b-a);}
+  function onSand(x,y){ return Math.hypot(x-ICX,y-ICY) < IR; }
+
+  var BUILDS=[
+    {k:'campfire',n:'Campfire',e:'🔥',w:3,s:0,f:0},
+    {k:'tent',    n:'Tent',    e:'⛺',w:5,s:0,f:0},
+    {k:'fence',   n:'Fence',   e:'🪵',w:2,s:0,f:0},
+    {k:'torch',   n:'Torch',   e:'🕯️',w:2,s:0,f:0},
+    {k:'statue',  n:'Statue',  e:'🗿',w:0,s:4,f:0},
+    {k:'well',    n:'Well',    e:'🕳️',w:2,s:3,f:0},
+    {k:'flag',    n:'MO Flag', e:'🚩',w:1,s:0,f:0},
+    {k:'hut',     n:'Big Hut', e:'🛖',w:8,s:2,f:0},
+    {k:'garden',  n:'Garden',  e:'🌻',w:1,s:0,f:2},
+    {k:'dock',    n:'Dock',    e:'🛶',w:4,s:0,f:0}
+  ];
+
+  var mo, cam, trees, bushes, rocks, builds, wood, food, stone, hunger, msgT;
+  function reset(){
+    mo={x:ICX,y:ICY,tx:ICX,ty:ICY,step:0};
+    cam={x:0,y:0};
+    trees=[]; for(var i=0;i<16;i++){ var p=sandPt(); trees.push({x:p.x,y:p.y,amt:3,regrow:0,sway:rnd(0,6)}); }
+    bushes=[]; for(var j=0;j<12;j++){ var p2=sandPt(); bushes.push({x:p2.x,y:p2.y,amt:2,regrow:0}); }
+    rocks=[]; for(var k=0;k<9;k++){ var p3=sandPt(); rocks.push({x:p3.x,y:p3.y,amt:3,regrow:0}); }
+    builds=[]; wood=0; food=0; stone=0; hunger=100; msgT=0;
+    updateHUD(); renderBuildPanel();
+  }
+  function sandPt(){ var a=rnd(0,6.28), d=rnd(60,IR*0.92); return {x:ICX+Math.cos(a)*d, y:ICY+Math.sin(a)*d}; }
+  function updateHUD(){ document.getElementById('wood').textContent=wood; document.getElementById('food').textContent=food;
+    document.getElementById('stone').textContent=stone; document.getElementById('built').textContent=builds.length;
+    document.getElementById('hfill').style.width=Math.max(0,hunger)+'%'; }
+  function showMsg(m){ var e=document.getElementById('msg'); e.textContent=m; e.style.opacity=1; msgT=1; }
+
+  function tap(e){ var r=cv.getBoundingClientRect();
+    var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left + cam.x;
+    var py=(e.touches?e.touches[0].clientY:e.clientY)-r.top + cam.y;
+    // try to harvest nearest resource within range
+    if(harvestAt(px,py)) return;
+    mo.tx=Math.max(20,Math.min(WORLD-20,px)); mo.ty=Math.max(20,Math.min(WORLD-20,py));
+  }
+  function harvestAt(px,py){
+    var lists=[{a:trees,type:'wood'},{a:bushes,type:'food'},{a:rocks,type:'stone'}];
+    for(var L=0;L<lists.length;L++){ var arr=lists[L].a;
+      for(var i=0;i<arr.length;i++){ var o=arr[i];
+        if(o.amt>0 && Math.hypot(o.x-px,o.y-py)<48 && Math.hypot(o.x-mo.x,o.y-mo.y)<170){
+          o.amt--; o.regrow=(o.amt<=0)?600:0;
+          if(lists[L].type==='wood'){ wood++; showMsg('+1 🪵 Wood'); beep(300,0.08,'square',0.06); }
+          else if(lists[L].type==='food'){ food++; showMsg('+1 🥥 Coconut'); beep(600,0.08,'sine',0.06); }
+          else { stone++; showMsg('+1 🪨 Stone'); beep(200,0.09,'square',0.06); }
+          updateHUD(); renderBuildPanel(); return true;
+        }
+      }
+    }
+    return false;
+  }
+  cv.addEventListener('mousedown',tap);
+  cv.addEventListener('touchstart',function(e){tap(e);e.preventDefault();},{passive:false});
+
+  document.getElementById('eatBtn').addEventListener('click',function(){ if(food>0){ food--; hunger=Math.min(100,hunger+25); updateHUD(); showMsg('Yum! 🥥 +25'); beep(700,0.1,'sine',0.07); setTimeout(function(){beep(950,0.1,'sine',0.05);},70);} else { showMsg('No coconuts! Tap a 🌳'); beep(160,0.15,'sawtooth',0.06);} });
+
+  var bPanel=document.getElementById('buildPanel'), prow=document.getElementById('prow');
+  document.getElementById('buildBtn').addEventListener('click',function(){ bPanel.style.display=(bPanel.style.display==='block'?'none':'block'); renderBuildPanel(); });
+  document.getElementById('closeBuild').addEventListener('click',function(){ bPanel.style.display='none'; });
+  function canAfford(bd){ return wood>=bd.w && stone>=bd.s && food>=bd.f; }
+  function costStr(bd){ var s=[]; if(bd.w)s.push(bd.w+'🪵'); if(bd.s)s.push(bd.s+'🪨'); if(bd.f)s.push(bd.f+'🥥'); return s.join(' '); }
+  function renderBuildPanel(){ prow.innerHTML='';
+    BUILDS.forEach(function(bd){ var b=document.createElement('button'); b.className='pbtn';
+      b.textContent=bd.e+' '+bd.n+' ('+costStr(bd)+')'; b.disabled=!canAfford(bd);
+      b.addEventListener('click',function(){ if(!canAfford(bd)) return; wood-=bd.w; stone-=bd.s; food-=bd.f;
+        builds.push({k:bd.k,e:bd.e,x:mo.x+rnd(-14,14),y:mo.y+rnd(20,40)}); updateHUD(); renderBuildPanel();
+        showMsg('Built a '+bd.n+'! 🏗️'); beep(700,0.1,'square',0.06); setTimeout(function(){beep(1050,0.1,'square',0.05);},70); });
+      prow.appendChild(b); });
+  }
+
+  function update(dt){
+    var dx=mo.tx-mo.x, dy=mo.ty-mo.y, d=Math.hypot(dx,dy);
+    if(d>2){ var sp=Math.min(d,2.6*dt); mo.x+=dx/d*sp; mo.y+=dy/d*sp; mo.step+=0.3*dt; if(Math.abs(dx)>0.5) mo.face=dx<0?-1:1; }
+    hunger=Math.max(0,hunger-0.012*dt);
+    updateHUD();
+    // regrow resources
+    var all=[trees,bushes,rocks];
+    for(var g=0;g<all.length;g++){ for(var i=0;i<all[g].length;i++){ var o=all[g][i]; if(o.regrow>0){ o.regrow-=dt; if(o.regrow<=0){ o.amt=(g===0?3:g===1?2:3); } } } }
+    for(var s2=0;s2<trees.length;s2++) trees[s2].sway+=0.03*dt;
+    cam.x=mo.x-W/2; cam.y=mo.y-H/2;
+    cam.x=Math.max(-40,Math.min(WORLD-W+40,cam.x)); cam.y=Math.max(-40,Math.min(WORLD-H+40,cam.y));
+    if(W>WORLD+80) cam.x=(WORLD-W)/2; if(H>WORLD+80) cam.y=(WORLD-H)/2;
+    if(msgT>0){ msgT-=0.015*dt; if(msgT<=0) document.getElementById('msg').style.opacity=0; }
+  }
+
+  function emoji(e,x,y,sz){ ctx.font=sz+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(e,x,y); }
+
+  function render(){
+    // ocean
+    var sea=ctx.createLinearGradient(0,0,0,H); sea.addColorStop(0,'#1aa0d8'); sea.addColorStop(1,'#0a6ea0');
+    ctx.fillStyle=sea; ctx.fillRect(0,0,W,H);
+    // wave shimmer
+    ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=2;
+    for(var wy=0;wy<H;wy+=40){ ctx.beginPath(); for(var x=0;x<=W;x+=24){ var yy=wy+Math.sin((x*0.03)+(nowv*0.002)+wy)*4; if(x===0)ctx.moveTo(x,yy); else ctx.lineTo(x,yy);} ctx.stroke(); }
+    // island: beach ring + sand
+    var scx=ICX-cam.x, scy=ICY-cam.y;
+    ctx.fillStyle='#f0d9a0'; ctx.beginPath(); ctx.arc(scx,scy,IR+14,0,6.29); ctx.fill();      // wet beach
+    ctx.fillStyle='#f4e4b8'; ctx.beginPath(); ctx.arc(scx,scy,IR,0,6.29); ctx.fill();          // sand
+    ctx.fillStyle='#efd9a0'; for(var d2=0;d2<40;d2++){ var a=d2*0.618*6.28, rr=IR*0.15+((d2*53)%Math.floor(IR*0.7)); var sx=scx+Math.cos(a)*rr, sy=scy+Math.sin(a)*rr; ctx.beginPath(); ctx.arc(sx,sy,3,0,6.29); ctx.fill(); }
+    // grass patch center
+    ctx.fillStyle='rgba(120,190,90,0.5)'; ctx.beginPath(); ctx.arc(scx,scy,IR*0.55,0,6.29); ctx.fill();
+
+    // gather all drawables with world y for depth sort
+    var items=[];
+    for(var i=0;i<rocks.length;i++){ if(rocks[i].amt>0) items.push({t:'rock',o:rocks[i]}); }
+    for(var j=0;j<bushes.length;j++){ if(bushes[j].amt>0) items.push({t:'bush',o:bushes[j]}); }
+    for(var k=0;k<trees.length;k++){ items.push({t:'tree',o:trees[k]}); }
+    for(var b=0;b<builds.length;b++){ items.push({t:'build',o:builds[b]}); }
+    items.push({t:'mo',o:mo});
+    items.sort(function(A,B){ return (A.o.y)-(B.o.y); });
+    for(var n=0;n<items.length;n++){ drawItem(items[n]); }
+
+    // hunger warning
+    if(hunger<25){ ctx.fillStyle='rgba(255,60,60,'+(0.25*(1-hunger/25))+')'; ctx.fillRect(0,0,W,H); }
+  }
+
+  function drawItem(it){ var o=it.o, sx=o.x-cam.x, sy=o.y-cam.y;
+    if(sx<-60||sx>W+60||sy<-80||sy>H+60) return;
+    if(it.t==='tree'){ var sway=Math.sin(o.sway)*4;
+      ctx.fillStyle='rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(sx,sy+4,20,7,0,0,6.29); ctx.fill();
+      if(o.amt>0){ ctx.strokeStyle='#8a5a2b'; ctx.lineWidth=8; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(sx,sy); ctx.quadraticCurveTo(sx+sway*0.5,sy-34,sx+sway,sy-56); ctx.stroke();
+        emoji('🌴',sx+sway,sy-64,52);
+        // coconuts marker if wood remaining
+      } else { ctx.fillStyle='#8a5a2b'; ctx.beginPath(); ctx.ellipse(sx,sy-6,10,7,0,0,6.29); ctx.fill(); ctx.strokeStyle='#6b4423'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(sx,sy-6,6,0,6.29); ctx.stroke(); }
+    } else if(it.t==='bush'){ ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(sx,sy+3,16,6,0,0,6.29); ctx.fill(); emoji('🌳',sx,sy-14,42);
+      for(var c=0;c<o.amt;c++){ emoji('🥥',sx-8+c*14,sy-4,16); }
+    } else if(it.t==='rock'){ ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(sx,sy+3,16,6,0,0,6.29); ctx.fill(); emoji('🪨',sx,sy-8,38); }
+    else if(it.t==='build'){ ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(sx,sy+3,16,6,0,0,6.29); ctx.fill(); emoji(o.e,sx,sy-12,40); }
+    else if(it.t==='mo'){ drawMo(sx,sy); }
+  }
+
+  function drawMo(sx,sy){ var r=13, wob=Math.sin(mo.step)*2;
+    ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(sx,sy+r*0.9,r*0.9,r*0.35,0,0,6.29); ctx.fill();
+    ctx.fillStyle='#1a6fd0'; roundRect(sx-r*0.7,sy-r*0.2+wob*0.3,r*1.4,r*1.1,r*0.4); ctx.fill();
+    ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(sx-r*0.75,sy+r*0.2+wob,r*0.22,0,6.29); ctx.fill(); ctx.beginPath(); ctx.arc(sx+r*0.75,sy+r*0.2-wob,r*0.22,0,6.29); ctx.fill();
+    ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(sx,sy-r*0.5,r*0.5,0,6.29); ctx.fill();
+    ctx.fillStyle='#3a2a1a'; ctx.beginPath(); ctx.arc(sx,sy-r*0.62,r*0.52,Math.PI,6.29); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font='bold '+Math.max(8,r*0.5)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('MO',sx,sy+r*0.35+wob*0.3);
+  }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+  var last=0, nowv=0;
+  function loop(ts){ nowv=ts; if(!last) last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts;
+    update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO 2K26 — All In One</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#080b14;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;user-select:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px;overflow:auto;z-index:6;background:#080b14f7;}
+  .screen.on{display:flex;}
+  h1{font-size:38px;margin:8px 0 0;color:#ffd23f;text-shadow:0 3px 0 #0008,0 0 20px #ff9500;letter-spacing:1px;text-align:center;}
+  .sub{font-size:13px;color:#8fc0ff;letter-spacing:3px;font-weight:bold;margin:2px 0 10px;}
+  .btn{margin-top:10px;background:linear-gradient(#ff9f43,#f0722a);border:none;color:#fff;font-weight:bold;font-size:20px;padding:13px 24px;border-radius:14px;box-shadow:0 5px 0 #b4541a;font-family:inherit;width:250px;}
+  .btn.blue{background:linear-gradient(#43a6ff,#2a6ff0);box-shadow:0 5px 0 #1a4bb4;}
+  .btn.green{background:linear-gradient(#3ad17a,#1a9a5a);box-shadow:0 5px 0 #12793f;}
+  .btn.purp{background:linear-gradient(#b06aff,#7a2af0);box-shadow:0 5px 0 #5a1ab4;}
+  .btn.sm{font-size:15px;padding:9px 16px;width:auto;}
+  .back{position:fixed;top:10px;left:10px;z-index:9;background:#1a2butt;background:#141c30;border:2px solid #5ab6ff;color:#cfe0ff;font-weight:bold;font-size:14px;padding:7px 12px;border-radius:10px;font-family:inherit;display:none;}
+  /* player card */
+  #pcard{width:250px;border-radius:16px;padding:14px;background:linear-gradient(160deg,#2a3d6a,#141c33);border:3px solid #ffd23f;box-shadow:0 6px 18px #000a;position:relative;margin:6px 0;}
+  #pcard.leg{background:linear-gradient(160deg,#7a5a1a,#3a2a08);border-color:#ffe680;}
+  #ovr{position:absolute;top:10px;left:14px;text-align:center;} #ovr .n{font-size:38px;font-weight:bold;color:#ffd23f;line-height:1;} #ovr .l{font-size:11px;color:#9fd0ff;font-weight:bold;}
+  #pface{font-size:56px;margin-top:6px;} #pname{font-size:22px;font-weight:bold;} #prank{font-size:14px;color:#ffd23f;font-weight:bold;margin-top:2px;} #badges{margin-top:6px;font-size:20px;min-height:24px;}
+  .stats{display:flex;gap:14px;justify-content:center;margin:6px 0;font-size:13px;color:#cfe0ff;} .stats b{color:#fff;font-size:16px;display:block;}
+  .attr{width:280px;display:flex;align-items:center;gap:8px;margin:5px 0;background:#131a2e;border-radius:12px;padding:8px 10px;}
+  .attr .an{width:80px;font-size:13px;font-weight:bold;text-align:left;} .bar{flex:1;height:14px;background:#0008;border-radius:8px;overflow:hidden;border:1px solid #ffffff22;} .bar>i{display:block;height:100%;background:linear-gradient(90deg,#43c6ff,#7bff9e);} .attr .av{width:26px;font-weight:bold;color:#ffd23f;}
+  .plus{width:34px;height:34px;border-radius:8px;border:none;background:#2ad17a;color:#053;font-size:20px;font-weight:bold;font-family:inherit;} .plus:disabled{background:#444;color:#888;}
+  table{border-collapse:collapse;margin:8px 0;font-size:14px;} td,th{padding:5px 12px;border-bottom:1px solid #ffffff1a;text-align:center;} th{color:#ffd23f;} tr.me td{color:#7bff9e;font-weight:bold;}
+  /* game hud */
+  #ghud{position:fixed;top:10px;left:0;right:0;display:none;justify-content:center;gap:8px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0007;z-index:5;}
+  #ghud .pill{background:#0008;border-radius:20px;padding:6px 12px;font-size:15px;}
+  #gmsg{position:fixed;top:38%;left:0;right:0;text-align:center;font-size:32px;font-weight:bold;color:#ffd23f;text-shadow:0 3px 0 #0008,0 0 18px #ffae00;pointer-events:none;opacity:0;transition:opacity .1s;z-index:5;}
+  #ghint{position:fixed;bottom:14px;left:0;right:0;text-align:center;font-size:14px;color:#cfe0ff;pointer-events:none;z-index:5;padding:0 12px;}
+  #coach{position:fixed;top:52px;left:8px;right:8px;background:#0e1730e8;border:2px solid #ffd23f;border-radius:14px;padding:10px 12px;font-size:15px;color:#fff;display:none;z-index:5;text-align:center;}
+  #coach b{color:#ffd23f;}
+  .mini{font-size:12px;color:#8fc0ff;max-width:330px;text-align:center;line-height:1.4;margin-top:4px;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<button class="back" id="backBtn">◀ MENU</button>
+<div id="ghud"><div class="pill" id="hL">🔵 MO <span id="gyou">0</span></div><div class="pill" id="hM">Poss <span id="gposs">1</span>/6</div><div class="pill" id="hR">🔴 <span id="gopp">0</span></div></div>
+<div id="coach"></div>
+<button id="viewBtn" style="display:none;position:fixed;top:44px;right:8px;z-index:6;background:#141c30;border:2px solid #ffd23f;color:#ffd23f;font-weight:bold;font-size:12px;padding:6px 10px;border-radius:10px;font-family:inherit;">📷 Broadcast</button>
+<button id="moMusicBtn" style="position:fixed;top:78px;right:8px;z-index:20;background:#1a0e2a;border:2px solid #ff6ad5;color:#ffc8ef;font-weight:bold;font-size:12px;padding:6px 10px;border-radius:10px;font-family:inherit;">🎵 MO THEME</button>
+<script>
+(function(){
+  var AC=null,on=false,step=0,timer=null;
+  var A2=110,F2=87.31,G2=98,E2=82.41;
+  var A4=440,C5=523.25,D5=587.33,E5=659.25,F4=349.23,G4=392,B4=493.88,E4=329.63;
+  var BASS=[A2,0,A2,A2, F2,0,F2,F2, G2,0,G2,G2, E2,0,E2,E2];
+  var LEAD=[A4,C5,E5,0, F4,A4,C5,0, G4,B4,D5,0, E4,G4,B4,E5];
+  function ensure(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==='suspended')AC.resume(); }
+  function tone(freq,dur,type,vol){ if(!AC||!freq)return; var o=AC.createOscillator(),g=AC.createGain(),t0=AC.currentTime; o.type=type; o.frequency.value=freq; g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(vol,t0+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t0+dur); o.connect(g); g.connect(AC.destination); o.start(t0); o.stop(t0+dur+0.03); }
+  function drum(kick){ if(!AC)return; var o=AC.createOscillator(),g=AC.createGain(),t0=AC.currentTime; o.type='sine'; if(kick){ o.frequency.setValueAtTime(150,t0); o.frequency.exponentialRampToValueAtTime(50,t0+0.12); g.gain.setValueAtTime(0.16,t0); } else { o.frequency.value=210; g.gain.setValueAtTime(0.06,t0); } g.gain.exponentialRampToValueAtTime(0.0001,t0+0.15); o.connect(g); g.connect(AC.destination); o.start(t0); o.stop(t0+0.17); }
+  var LYRICS=['M-O, MO 2 K!','Ball is life, we play all day!','Cross him up and drive away!','Dunk it down, hear the crowd say — MO!','Buzzer beater, we dont play!','Champions, we lead the way!','MO MO, MVP today!','Ring the bell, we came to slay!','MO the all star, lighting it up!','All star weekend, raise the cup!','Cross, step back, all star mode!','MVP on the all star road!','Three, two, one, the all star glow!','Slam it down, steal the show!','All star hustle, never slow!','MO the all star, here we go!'];
+  var li=0, banner=null, gen=0;
+  function ensureBanner(){ if(!banner){ banner=document.createElement('div'); banner.style.cssText='position:fixed;left:0;right:0;top:118px;text-align:center;z-index:19;pointer-events:none;font-family:inherit;font-weight:bold;font-size:22px;color:#fff;text-shadow:0 2px 6px #000,0 0 14px #ff6ad5;transition:opacity .3s;opacity:0;padding:0 12px;'; document.body.appendChild(banner); } }
+  function singNext(g){ if(!on||g!==gen)return; ensureBanner(); var line=LYRICS[li%LYRICS.length]; li++; banner.textContent='🎤 '+line; banner.style.opacity='1';
+    try{ if(window.speechSynthesis){ var u=new SpeechSynthesisUtterance(line); u.pitch=1.35; u.rate=0.98; u.volume=0.95; u.onend=function(){ if(banner&&on&&g===gen)banner.style.opacity='0.4'; if(on&&g===gen)setTimeout(function(){ singNext(g); },350); }; u.onerror=function(){ if(on&&g===gen)setTimeout(function(){ singNext(g); },350); }; window.speechSynthesis.speak(u); } else { setTimeout(function(){ singNext(g); },1700); } }catch(e){ setTimeout(function(){ singNext(g); },1700); } }
+  function stepFn(){ var s=step%16; tone(BASS[s],0.17,'square',0.05); tone(LEAD[s],0.16,'triangle',0.05); if(s%4===0)drum(true); if(s===4||s===12)drum(false); step++; }
+  function toggle(){ on=!on; var b=document.getElementById('moMusicBtn'); if(on){ ensure(); step=0; li=0; gen++; if(timer)clearInterval(timer); timer=setInterval(stepFn,125); try{ if(window.speechSynthesis)window.speechSynthesis.cancel(); }catch(e){} singNext(gen); if(b){ b.textContent='🎶 THEME ON'; b.style.borderColor='#7bff9e'; } } else { gen++; if(timer)clearInterval(timer); if(banner)banner.style.opacity='0'; try{ if(window.speechSynthesis)window.speechSynthesis.cancel(); }catch(e){} if(b){ b.textContent='🎵 MO THEME'; b.style.borderColor='#ff6ad5'; } } }
+  var mb=document.getElementById('moMusicBtn'); if(mb)mb.onclick=toggle;
+})();
+</script>
+<div id="gmsg"></div>
+<div id="ghint">HOLD to fill, RELEASE on GREEN 🟩!</div>
+
+<!-- MENU -->
+<div class="screen on" id="menu">
+  <h1>🏀 MO 2K26</h1>
+  <div class="sub">ALL IN ONE</div>
+  <button class="btn green" id="mLearn">🎓 LEARN TO PLAY</button>
+  <button class="btn" id="mQuick">🏀 QUICK GAME</button>
+  <button class="btn" id="m5v5" style="background:linear-gradient(#2ad17a,#1a9a5a);box-shadow:0 5px 0 #12793f;">🏀 5v5 FULL GAME</button>
+  <button class="btn" id="mHome" style="background:linear-gradient(#8a6a3a,#5a3a1a);box-shadow:0 5px 0 #3a2410;">🏠 GO HOME (drive to games)</button>
+  <button class="btn purp" id="mCareer">👑 MyCAREER</button>
+  <button class="btn blue" id="mNba">🏆 MyNBA SEASON</button>
+  <button class="btn" id="mDraft" style="background:linear-gradient(#ffd23f,#f0a72a);box-shadow:0 5px 0 #b47a1a;color:#5a3a00;">🎟️ DRAFT DAY</button>
+  <button class="btn" id="mMore" style="background:linear-gradient(#ff5ea8,#e02a7a);box-shadow:0 5px 0 #b41a5a;">🌟 MORE MODES</button>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;">
+  <button class="btn sm" id="mCap" style="background:#1e2740;border:2px solid #7bff9e;color:#cfe0ff;box-shadow:none;">👤 CREATE PLAYER</button>
+  <button class="btn sm" id="mJersey" style="background:#1e2740;border:2px solid #5ab6ff;color:#cfe0ff;box-shadow:none;">👕 JERSEY</button>
+  <button class="btn sm" id="mHof" style="background:#1e2740;border:2px solid #ffd23f;color:#ffe9a8;box-shadow:none;">🏆 HALL OF FAME</button>
+  </div>
+  <div class="mini">Every mode uses the 2K shot meter: HOLD the ball, let go on the GREEN 🟩 for a perfect swish!</div>
+</div>
+
+<!-- CREATE A PLAYER -->
+<div class="screen" id="cap">
+  <h1 style="font-size:26px;">👤 Create Player</h1>
+  <canvas id="cappreview" width="120" height="150" style="margin:6px;"></canvas>
+  <div class="mini">Skin</div><div id="capSkin" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:300px;"></div>
+  <div class="mini" style="margin-top:6px;">Hair</div><div id="capHair" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:300px;"></div>
+  <button class="btn sm" id="capBand" style="margin-top:8px;">🎽 Headband: OFF</button>
+  <button class="btn" id="capSave">SAVE PLAYER</button>
+</div>
+
+<!-- HALL OF FAME -->
+<div class="screen" id="hof">
+  <h1 style="font-size:26px;">🏆 Hall of Fame</h1>
+  <div id="hofBox" style="font-size:15px;line-height:1.8;text-align:center;max-width:330px;"></div>
+  <button class="btn" id="hofDone">◀ BACK</button>
+</div>
+
+<!-- MORE MODES -->
+<div class="screen" id="more">
+  <h1 style="font-size:26px;">🌟 More Modes</h1>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:420px;margin-top:8px;">
+    <button class="btn sm mm" data-m="mvprace" style="background:linear-gradient(#ffd23f,#f0a72a);color:#5a3a00;">🏆 MVP Race</button>
+    <button class="btn sm mm" data-m="dunk" style="background:linear-gradient(#ff5ea8,#e02a7a);">🔨 Dunk Contest</button>
+    <button class="btn sm mm" data-m="allstar" style="background:linear-gradient(#43c6ff,#2a6ff0);">⭐ All-Star Weekend</button>
+    <button class="btn sm mm" data-m="potg" style="background:#333;">🏅 Player of Game</button>
+    <button class="btn sm mm" data-m="badges" style="background:linear-gradient(#7bff9e,#2ad17a);color:#053;">🎯 Badge Challenge</button>
+    <button class="btn sm mm" data-m="clutch" style="background:linear-gradient(#ff9f43,#f0722a);">⏰ Clutch Time</button>
+    <button class="btn sm mm" data-m="tour" style="background:linear-gradient(#b06aff,#7a2af0);">🌍 Street Tour</button>
+    <button class="btn sm mm" data-m="combine" style="background:linear-gradient(#43c6ff,#2a6ff0);">🏀 Draft Combine</button>
+    <button class="btn sm mm" data-m="legend" style="background:linear-gradient(#ffd23f,#b47a1a);color:#3a2400;">🐐 Legend Mode</button>
+    <button class="btn sm mm" data-m="halftime" style="background:linear-gradient(#ff6ad5,#b02a8a);">🎵 Halftime Show</button>
+    <button class="btn sm mm" data-m="streak" style="background:linear-gradient(#ff5a5a,#c02020);">🔥 Streak Master</button>
+    <button class="btn sm mm" data-m="threept" style="background:linear-gradient(#ff9f43,#f0722a);">🎯 3PT Shootout</button>
+  </div>
+</div>
+
+<!-- JERSEY -->
+<div class="screen" id="jersey">
+  <h1 style="font-size:26px;">👕 Jersey Creator</h1>
+  <canvas id="jpreview" width="120" height="140" style="margin:8px;"></canvas>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:300px;" id="jcolors"></div>
+  <div style="margin-top:10px;">Number: <input id="jnum" type="number" min="0" max="99" value="23" style="width:64px;padding:6px;border-radius:8px;border:2px solid #5ab6ff;background:#0c1020;color:#fff;font-size:18px;text-align:center;font-family:inherit;"></div>
+  <button class="btn" id="jSave">SAVE JERSEY</button>
+</div>
+
+<!-- DRAFT -->
+<div class="screen" id="draft">
+  <h1 style="font-size:28px;">🎟️ Draft Day</h1>
+  <div id="draftRound" class="sub">PICK YOUR PLAYER</div>
+  <div id="myRoster" style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin:4px 0;min-height:30px;"></div>
+  <div id="pool" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:420px;margin:8px 0;"></div>
+  <div id="draftInfo" class="mini"></div>
+  <button class="btn" id="draftDone" style="display:none;">✅ DONE</button>
+</div>
+
+<!-- CAREER HUB -->
+<div class="screen" id="career">
+  <h1 style="font-size:30px;">👑 MyCareer</h1>
+  <div id="pcard"><div id="ovr"><div class="n" id="ovrN">58</div><div class="l">OVR</div></div><div id="pface">🏀</div><div id="pname">MO</div><div id="prank">ROOKIE</div><div id="badges"></div></div>
+  <div class="stats"><div>GP<b id="sGP">0</b></div><div>PTS<b id="sPTS">0</b></div><div>Wins<b id="sW">0</b></div><div>Best<b id="sBest">0</b></div></div>
+  <button class="btn" id="cPlay">▶ PLAY GAME</button>
+  <button class="btn blue sm" id="cUp">⭐ UPGRADE <span id="spBadge"></span></button>
+</div>
+<!-- UPGRADE -->
+<div class="screen" id="upgrade">
+  <h1 style="font-size:28px;">⭐ Upgrade</h1>
+  <div id="sp" style="color:#ffd23f;font-weight:bold;margin:6px;">Skill Points: 0</div>
+  <div class="attr"><div class="an">🎯 Shooting</div><div class="bar"><i id="b_sh"></i></div><div class="av" id="v_sh">60</div><button class="plus" data-a="sh">+</button></div>
+  <div class="attr"><div class="an">🏹 Range</div><div class="bar"><i id="b_rg"></i></div><div class="av" id="v_rg">55</div><button class="plus" data-a="rg">+</button></div>
+  <div class="attr"><div class="an">🤾 Handle</div><div class="bar"><i id="b_hd"></i></div><div class="av" id="v_hd">55</div><button class="plus" data-a="hd">+</button></div>
+  <div class="attr"><div class="an">🔨 Dunk</div><div class="bar"><i id="b_dk"></i></div><div class="av" id="v_dk">60</div><button class="plus" data-a="dk">+</button></div>
+  <button class="btn" id="upDone">DONE</button>
+</div>
+
+<!-- MyNBA HUB -->
+<div class="screen" id="nba">
+  <h1 style="font-size:28px;">🏆 MyNBA</h1>
+  <div id="nbaPhase" class="sub">REGULAR SEASON</div>
+  <div id="nbaTable"></div>
+  <div id="nbaInfo" class="mini"></div>
+  <button class="btn" id="nbaPlay">▶ NEXT GAME</button>
+  <button class="btn sm" style="background:#333;box-shadow:0 5px 0 #111;" id="nbaReset">↺ New Season</button>
+</div>
+
+<!-- POST -->
+<div class="screen" id="post">
+  <h1 id="postT" style="font-size:30px;">🏀 GAME OVER</h1>
+  <div id="postBox" style="font-size:18px;text-align:center;line-height:1.7;max-width:340px;"></div>
+  <button class="btn" id="postDone">CONTINUE</button>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1,GY=0,T=40,G=0.4,GC=0.84;
+  var view=+(localStorage.getItem('mo2k_view')||0);
+  var VIEWS=[{n:'Broadcast',sc:1,oyf:0},{n:'Zoom In',sc:1.3,oyf:-0.05},{n:'Wide',sc:0.85,oyf:0.02},{n:'Courtside',sc:1.14,oyf:-0.02,tilt:1}];
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); GY=H*0.8; }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.05;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  function cheer(){ beep(523,0.1,'square',0.05); setTimeout(function(){beep(659,0.1,'square',0.05);},80); setTimeout(function(){beep(784,0.16,'square',0.05);},160); }
+  // ===== save data =====
+  var car; function loadCar(){ try{car=JSON.parse(localStorage.getItem('mo2k_career')||'null');}catch(e){} if(!car||!car.attr)car={attr:{sh:60,rg:55,hd:55,dk:60},sp:0,gp:0,pts:0,wins:0,best:0,badges:[]}; }
+  function saveCar(){ try{localStorage.setItem('mo2k_career',JSON.stringify(car));}catch(e){} } loadCar();
+  function ovr(){ var a=car.attr; return Math.round((a.sh+a.rg+a.hd+a.dk)/4); }
+  function rank(o){ if(o>=96)return['🐐 LEGEND',1]; if(o>=92)return['👑 MVP',1]; if(o>=86)return['💫 SUPERSTAR',0]; if(o>=80)return['🌟 ALL-STAR',0]; if(o>=75)return['⭐ STARTER',0]; if(o>=70)return['🏀 ROTATION',0]; return['🏀 ROOKIE',0]; }
+  var BADGES=[{id:'sharp',emo:'🎯',n:'Sharpshooter',f:function(){return car.attr.sh>=80;}},{id:'deadeye',emo:'🏹',n:'Deadeye',f:function(){return car.attr.rg>=80;}},{id:'handles',emo:'🤾',n:'Ankle Snatcher',f:function(){return car.attr.hd>=80;}},{id:'poster',emo:'🔨',n:'Poster',f:function(){return car.attr.dk>=85;}},{id:'allstar',emo:'🌟',n:'All-Star',f:function(){return ovr()>=80;}},{id:'mvp',emo:'👑',n:'MVP',f:function(){return ovr()>=92;}},{id:'bucket',emo:'🪣',n:'Bucket Getter',f:function(){return car.pts>=100;}},{id:'champ',emo:'🏆',n:'Champion',f:function(){return car.wins>=5;}}];
+  function checkBadges(){ var e=[]; for(var i=0;i<BADGES.length;i++){ if(BADGES[i].f()&&car.badges.indexOf(BADGES[i].id)<0){ car.badges.push(BADGES[i].id); e.push(BADGES[i]); } } return e; }
+  var TEAMS=['MO','HAWKS','WOLVES','KINGS','SUNS','HEAT'];
+  var season; function loadSeason(){ try{season=JSON.parse(localStorage.getItem('mo2k_season')||'null');}catch(e){} if(!season||!season.rec){ newSeason(); } }
+  function newSeason(){ season={rec:{},sched:[],idx:0,phase:'reg',bracket:null,champ:null}; for(var i=0;i<TEAMS.length;i++)season.rec[TEAMS[i]]={w:0,l:0}; for(var j=1;j<TEAMS.length;j++)season.sched.push(TEAMS[j]); saveSeason(); }
+  function saveSeason(){ try{localStorage.setItem('mo2k_season',JSON.stringify(season));}catch(e){} }
+  // ===== screens =====
+  var SCR=['menu','career','upgrade','nba','post','draft','more','jersey','cap','hof'];
+  function show(id){ SCR.forEach(function(s){ var el=document.getElementById(s); if(el)el.classList.toggle('on',s===id); }); document.getElementById('ghud').style.display='none'; document.getElementById('coach').style.display='none'; document.getElementById('ghint').style.display='none'; document.getElementById('viewBtn').style.display='none'; document.getElementById('backBtn').style.display=(id==='menu')?'none':'block'; canvasMode=false; }
+  function showGame(){ SCR.forEach(function(s){ var el=document.getElementById(s); if(el)el.classList.remove('on'); }); document.getElementById('ghud').style.display='flex'; document.getElementById('ghint').style.display='block'; document.getElementById('viewBtn').style.display='block'; document.getElementById('backBtn').style.display='block'; canvasMode=true; }
+  var viewBtn=document.getElementById('viewBtn'); viewBtn.textContent='📷 '+VIEWS[view].n;
+  viewBtn.onclick=function(){ view=(view+1)%VIEWS.length; try{localStorage.setItem('mo2k_view',view);}catch(e){} viewBtn.textContent='📷 '+VIEWS[view].n; beep(500,0.05,'square',0.04); };
+  var canvasMode=false;
+  document.getElementById('backBtn').onclick=function(){ running=false; goBackTo(); };
+  var lastHub='menu';
+  var MOREMODES=['mvprace','dunk','allstar','potg','badges','clutch','tour','combine','legend','halftime','streak','threept'];
+  function goBackTo(){ document.getElementById('coach').style.display='none'; if(mode==='career'){ show('career'); renderCareer(); } else if(mode==='nba'){ show('nba'); renderNba(); } else if(MOREMODES.indexOf(mode)>=0){ show('more'); } else show('menu'); }
+  // menu buttons
+  document.getElementById('mLearn').onclick=function(){ resumeAudio(); startLearn(); };
+  document.getElementById('mQuick').onclick=function(){ resumeAudio(); mode='quick'; startGame({POSS:6,opp:0.5,gwFn:function(t,c){return fixedGw(t,c);},three:true,onEnd:quickEnd}); };
+  document.getElementById('mCareer').onclick=function(){ resumeAudio(); mode='career'; show('career'); renderCareer(); };
+  document.getElementById('mNba').onclick=function(){ resumeAudio(); mode='nba'; loadSeason(); show('nba'); renderNba(); };
+  document.getElementById('mDraft').onclick=function(){ resumeAudio(); mode='draft'; startDraft(); };
+  function resumeAudio(){ if(beep.ac&&beep.ac.state==='suspended')beep.ac.resume(); }
+  var mode='menu';
+  // ===== CAREER =====
+  function renderCareer(){ var o=ovr(); document.getElementById('ovrN').textContent=o; var rk=rank(o); document.getElementById('prank').textContent=rk[0]; document.getElementById('pcard').className=rk[1]?'leg':'';
+    document.getElementById('sGP').textContent=car.gp; document.getElementById('sPTS').textContent=car.pts; document.getElementById('sW').textContent=car.wins; document.getElementById('sBest').textContent=car.best;
+    document.getElementById('spBadge').textContent=car.sp>0?('('+car.sp+')'):'';
+    var bd=''; for(var i=0;i<car.badges.length;i++){ var b=BADGES.filter(function(x){return x.id===car.badges[i];})[0]; if(b)bd+=b.emo; } document.getElementById('badges').textContent=bd||'— no badges yet —'; }
+  document.getElementById('cUp').onclick=function(){ show('upgrade'); renderUpgrade(); };
+  document.getElementById('cPlay').onclick=function(){ resumeAudio(); startGame({POSS:6,opp:0.5,gwFn:careerGw,three:true,onEnd:careerEnd}); };
+  function renderUpgrade(){ document.getElementById('sp').textContent='Skill Points: '+car.sp; var a=car.attr; ['sh','rg','hd','dk'].forEach(function(k){ document.getElementById('v_'+k).textContent=a[k]; document.getElementById('b_'+k).style.width=a[k]+'%'; }); var btns=document.querySelectorAll('.plus'); for(var i=0;i<btns.length;i++){ var k=btns[i].getAttribute('data-a'); btns[i].disabled=(car.sp<=0||a[k]>=99); } }
+  var plusBtns=document.querySelectorAll('.plus'); for(var pi=0;pi<plusBtns.length;pi++){ plusBtns[pi].onclick=function(){ var k=this.getAttribute('data-a'); if(car.sp>0&&car.attr[k]<99){ car.attr[k]++; car.sp--; beep(600,0.05,'square',0.04); checkBadges(); renderUpgrade(); } }; }
+  document.getElementById('upDone').onclick=function(){ saveCar(); show('career'); renderCareer(); };
+  function careerGw(type,contest){ var a=car.attr; var base=0.05+a.sh/100*0.09; if(type==='three')base-=(1-a.rg/100)*0.06; if(type==='layup')base=0.09+a.dk/100*0.09; return Math.max(0.035,base-contest*0.06); }
+  function careerEnd(r){ car.gp++; car.pts+=r.you; if(r.you>car.best)car.best=r.you; if(r.win)car.wins++; var earned=2+Math.floor(r.you/4)+(r.win?3:0); car.sp+=earned; var nb=checkBadges(); saveCar();
+    var bx='Final: <b>'+r.youTotal+' – '+r.opp+'</b><br>Your points: <b>'+r.you+'</b><br>+<b>'+earned+'</b> Skill Points ⭐';
+    bx+='<br>'+potg(r.made,r.you); if(nb.length)bx+='<br><br>NEW BADGE'+(nb.length>1?'S':'')+':<br>'+nb.map(function(b){return b.emo+' '+b.n;}).join('<br>'); var o=ovr(); bx+='<br><br>OVR: <b>'+o+'</b> — '+rank(o)[0];
+    postScreen(r.win?'🏆 WIN!':'😤 LOSS',bx, function(){ show('career'); renderCareer(); }); }
+  // ===== QUICK =====
+  function fixedGw(type,contest){ var base=type==='layup'?0.13:(type==='three'?0.08:0.11); return Math.max(0.04,base-contest*0.06); }
+  function quickEnd(r){ postScreen(r.win?'🏆 YOU WIN!':'😤 YOU LOSE', 'Final: <b>'+r.youTotal+' – '+r.opp+'</b><br>Your points: <b>'+r.you+'</b><br>'+potg(r.made,r.you), function(){ show('menu'); }); }
+  // ===== MyNBA =====
+  function standingsSorted(){ var arr=TEAMS.slice(); arr.sort(function(a,b){ return season.rec[b].w-season.rec[a].w || season.rec[a].l-season.rec[b].l; }); return arr; }
+  function renderNba(){ var ph=season.phase; document.getElementById('nbaPhase').textContent= ph==='reg'?'REGULAR SEASON':ph==='playoffs'?'PLAYOFFS':'SEASON COMPLETE';
+    var arr=standingsSorted(); var html='<table><tr><th>#</th><th>Team</th><th>W</th><th>L</th></tr>'; for(var i=0;i<arr.length;i++){ html+='<tr class="'+(arr[i]==='MO'?'me':'')+'"><td>'+(i+1)+'</td><td>'+arr[i]+'</td><td>'+season.rec[arr[i]].w+'</td><td>'+season.rec[arr[i]].l+'</td></tr>'; } html+='</table>'; document.getElementById('nbaTable').innerHTML=html;
+    var info='', btn=document.getElementById('nbaPlay');
+    if(ph==='reg'){ if(season.idx<season.sched.length){ info='Next up: MO vs <b>'+season.sched[season.idx]+'</b> (Game '+(season.idx+1)+' of '+season.sched.length+')'; btn.style.display='block'; btn.textContent='▶ PLAY GAME'; }
+      else { info='Regular season done! Tap to start the PLAYOFFS 🏆'; btn.style.display='block'; btn.textContent='▶ START PLAYOFFS'; } }
+    else if(ph==='playoffs'){ if(season.champ){ info=''; } else if(season.bracket){ var b=season.bracket; if(b.round==='semi'){ info=(b.moIn?'Semifinal: MO vs <b>'+b.moOpp+'</b>':'You missed the playoffs 😢 — watch the finals'); } else if(b.round==='final'){ info=(b.moIn?'🏆 FINALS: MO vs <b>'+b.finalOpp+'</b>!':'Finals: '+b.finalA+' vs '+b.finalB); } btn.style.display='block'; btn.textContent=b.moIn?'▶ PLAY '+(b.round==='final'?'FINALS':'SEMIFINAL'):'▶ SIM RESULT'; } }
+    else { info = season.champ==='MO'?'🏆🏆 MO ARE CHAMPIONS! 🏆🏆':'Champions: <b>'+season.champ+'</b>. Try again!'; btn.style.display='none'; }
+    document.getElementById('nbaInfo').innerHTML=info; }
+  document.getElementById('nbaReset').onclick=function(){ newSeason(); renderNba(); };
+  document.getElementById('nbaPlay').onclick=function(){ resumeAudio(); nbaNext(); };
+  function simGame(sa,sb){ // returns winner name using team strengths
+    var stA=teamStr(sa), stB=teamStr(sb); var a=0,b=0; for(var i=0;i<6;i++){ a+=Math.random()<stA?(Math.random()<0.3?3:2):0; b+=Math.random()<stB?(Math.random()<0.3?3:2):0; } if(a===b)a+=2; return a>b?sa:sb; }
+  function teamStr(name){ if(name==='MO')return 0.5; var h=0; for(var i=0;i<name.length;i++)h+=name.charCodeAt(i); return 0.42+ (h%9)/9*0.16; }
+  function simOthers(exclude){ // sim one game among other teams to add variety
+    var others=TEAMS.filter(function(t){return t!=='MO'&&exclude.indexOf(t)<0;}); if(others.length>=2){ var x=others[0],y=others[1]; var w=simGame(x,y); season.rec[w].w++; season.rec[w===x?y:x].l++; } }
+  function nbaNext(){ if(season.phase==='reg'){ if(season.idx<season.sched.length){ var opp=season.sched[season.idx]; mode='nba'; nbaOpp=opp; startGame({POSS:6,opp:teamStr(opp),gwFn:fixedGw,three:true,onEnd:nbaGameEnd}); }
+      else { startPlayoffs(); } }
+    else if(season.phase==='playoffs'){ var b=season.bracket; if(b.moIn){ var opp2=(b.round==='semi')?b.moOpp:b.finalOpp; nbaOpp=opp2; mode='nba'; startGame({POSS:6,opp:teamStr(opp2),gwFn:fixedGw,three:true,onEnd:nbaPlayoffEnd}); }
+      else { // sim
+        if(b.round==='semi'){ advancePlayoffAfterSemi(simGame(b.finalA||b.simA,b.finalB||b.simB)); } else { season.champ=simGame(b.finalA,b.finalB); season.phase='done'; saveSeason(); renderNba(); } } }
+  }
+  var nbaOpp=null;
+  function nbaGameEnd(r){ if(r.win){ season.rec['MO'].w++; season.rec[nbaOpp].l++; } else { season.rec['MO'].l++; season.rec[nbaOpp].w++; } simOthers([nbaOpp]); season.idx++; saveSeason();
+    postScreen(r.win?'🏆 WIN vs '+nbaOpp:'😤 LOSS vs '+nbaOpp, 'Final: <b>'+r.youTotal+' – '+r.opp+'</b><br>Your points: <b>'+r.you+'</b><br>'+potg(r.made,r.you), function(){ show('nba'); renderNba(); }); }
+  function startPlayoffs(){ var arr=standingsSorted(); var top4=arr.slice(0,4); var moIn=top4.indexOf('MO')>=0; season.phase='playoffs';
+    // seeds 1v4, 2v3
+    var semiA=[top4[0],top4[3]], semiB=[top4[1],top4[2]];
+    season.bracket={round:'semi',top4:top4,semiA:semiA,semiB:semiB,moIn:moIn};
+    if(moIn){ var moSemi = semiA.indexOf('MO')>=0?semiA:semiB; season.bracket.moOpp = moSemi[0]==='MO'?moSemi[1]:moSemi[0]; season.bracket.otherSemi = (moSemi===semiA)?semiB:semiA; }
+    else { season.bracket.simA=semiA; season.bracket.simB=semiB; }
+    saveSeason(); renderNba(); }
+  function nbaPlayoffEnd(r){ var b=season.bracket;
+    if(b.round==='semi'){ if(r.win){ // MO advances; sim other semi
+        var os=b.otherSemi; var ow=simGame(os[0],os[1]); b.round='final'; b.moIn=true; b.finalOpp=ow; b.finalA='MO'; b.finalB=ow; saveSeason();
+        postScreen('🏆 SEMIFINAL WIN!','MO advance to the FINALS vs <b>'+ow+'</b>! ('+r.youTotal+'–'+r.opp+')', function(){ show('nba'); renderNba(); }); }
+      else { season.phase='done'; var os2=b.otherSemi; var ow2=simGame(os2[0],os2[1]); var moSemiOpp=b.moOpp; season.champ=simGame(moSemiOpp,ow2); saveSeason();
+        postScreen('😤 ELIMINATED','MO lost the semifinal ('+r.youTotal+'–'+r.opp+').<br>Champions: <b>'+season.champ+'</b>', function(){ show('nba'); renderNba(); }); } }
+    else { // final
+      if(r.win){ season.champ='MO'; season.phase='done'; saveSeason(); try{var rg=+(localStorage.getItem('mo2k_rings')||0)+1; localStorage.setItem('mo2k_rings',rg);}catch(e){} postScreen('🏆🏆 CHAMPIONS! 🏆🏆','MO win it all '+r.youTotal+'–'+r.opp+'! 🎉<br>💍 Championship ring earned!', function(){ show('nba'); renderNba(); }); }
+      else { season.champ=b.finalOpp; season.phase='done'; saveSeason(); postScreen('😤 RUNNER-UP','So close! Lost the finals '+r.youTotal+'–'+r.opp+'.<br>Champions: <b>'+b.finalOpp+'</b>', function(){ show('nba'); renderNba(); }); } }
+  }
+  function advancePlayoffAfterSemi(otherWinner){ /* MO not in playoffs path */ season.champ=otherWinner; season.phase='done'; saveSeason(); renderNba(); }
+  // ===== DRAFT =====
+  var draftState=null;
+  var PROSPECTS=[{n:'ACE',e:'⚡'},{n:'ZANE',e:'🌟'},{n:'REX',e:'🦖'},{n:'MAX',e:'💪'},{n:'LEO',e:'🦁'},{n:'KAI',e:'🌊'},{n:'JJ',e:'🎯'},{n:'BUZZ',e:'🐝'},{n:'TANK',e:'🛡️'},{n:'ZIP',e:'💨'},{n:'NOVA',e:'✨'},{n:'BOLT',e:'⚡'},{n:'ROCKY',e:'🪨'},{n:'FLASH',e:'📸'}];
+  function startDraft(){ var pool=PROSPECTS.slice(); for(var i=pool.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=pool[i]; pool[i]=pool[j]; pool[j]=t; }
+    pool=pool.slice(0,12).map(function(p){ return {n:p.n,e:p.e,ovr:70+Math.floor(Math.random()*26)}; });
+    draftState={pool:pool,roster:[{n:'MO',e:'⭐',ovr:88}],round:1,picks:4}; renderDraft(); document.getElementById('draftDone').style.display='none'; show('draft'); }
+  function renderDraft(){ var d=draftState;
+    document.getElementById('draftRound').textContent = d.roster.length>d.picks ? 'YOUR SQUAD IS SET!' : ('ROUND '+d.round+' — PICK A PLAYER');
+    var rd=''; for(var i=0;i<d.roster.length;i++){ var p=d.roster[i]; rd+='<div style="background:#1a2a4a;border:2px solid '+(i===0?'#ffd23f':'#5ab6ff')+';border-radius:8px;padding:3px 7px;font-size:13px;"><b>'+p.e+' '+p.n+'</b> <span style="color:#ffd23f">'+p.ovr+'</span></div>'; }
+    document.getElementById('myRoster').innerHTML=rd;
+    var pl=''; for(var k=0;k<d.pool.length;k++){ var q=d.pool[k]; pl+='<button class="pcard2" data-i="'+k+'" style="width:82px;border-radius:10px;padding:8px 4px;background:linear-gradient(160deg,#2a3d6a,#141c33);border:2px solid #ffd23f;color:#fff;font-family:inherit;cursor:pointer;"><div style="font-size:11px;text-align:right;color:#ffd23f;font-weight:bold;">'+q.ovr+'</div><div style="font-size:26px;">'+q.e+'</div><div style="font-size:12px;font-weight:bold;">'+q.n+'</div></button>'; }
+    document.getElementById('pool').innerHTML=pl;
+    var btns=document.querySelectorAll('.pcard2'); for(var b=0;b<btns.length;b++){ btns[b].onclick=function(){ draftPick(+this.getAttribute('data-i')); }; }
+    if(d.roster.length>d.picks){ document.getElementById('pool').innerHTML=''; document.getElementById('draftInfo').innerHTML='Your squad is drafted! 🏀'; document.getElementById('draftDone').style.display='block'; }
+    else document.getElementById('draftInfo').innerHTML='Tap a player to add them to your team ('+(d.roster.length-1)+'/'+d.picks+' picked)'; }
+  function draftPick(i){ var d=draftState; if(d.roster.length>d.picks)return; var p=d.pool.splice(i,1)[0]; d.roster.push(p); beep(660,0.08,'square',0.05);
+    // rivals grab a couple
+    for(var r=0;r<2&&d.pool.length>0;r++){ d.pool.splice(Math.floor(Math.random()*d.pool.length),1); }
+    d.round++;
+    if(d.roster.length>d.picks){ try{localStorage.setItem('mo2k_draftteam',JSON.stringify(d.roster));}catch(e){} cheer(); }
+    renderDraft(); }
+  document.getElementById('draftDone').onclick=function(){ show('menu'); };
+  // ===== JERSEY =====
+  var jersey; try{ jersey=JSON.parse(localStorage.getItem('mo2k_jersey')||'null'); }catch(e){} if(!jersey)jersey={color:'#1a6fd0',num:23};
+  var JCOLORS=['#1a6fd0','#e0453a','#2ad17a','#b06aff','#ff9f43','#ffd23f','#ff5ea8','#00c2c7','#111','#eef3f7'];
+  document.getElementById('mJersey').onclick=function(){ show('jersey'); buildJersey(); };
+  function buildJersey(){ var wrap=document.getElementById('jcolors'); wrap.innerHTML=''; JCOLORS.forEach(function(c){ var b=document.createElement('button'); b.style.cssText='width:38px;height:38px;border-radius:8px;border:3px solid '+(c===jersey.color?'#ffd23f':'#fff3')+';background:'+c+';'; b.onclick=function(){ jersey.color=c; buildJersey(); drawJpreview(); }; wrap.appendChild(b); });
+    document.getElementById('jnum').value=jersey.num; drawJpreview(); }
+  document.getElementById('jnum').oninput=function(){ jersey.num=Math.max(0,Math.min(99,parseInt(this.value)||0)); drawJpreview(); };
+  function drawJpreview(){ var jc=document.getElementById('jpreview'), x=jc.getContext('2d'); x.clearRect(0,0,120,140); x.save(); x.translate(60,80); x.scale(2.4,2.4);
+    x.fillStyle=jersey.color; rr2(x,-13,-14,26,30,8); x.fill(); x.fillStyle='#f6c48a'; x.beginPath(); x.arc(0,-24,10,0,6.29); x.fill(); x.fillStyle='#2a2018'; x.beginPath(); x.arc(0,-27,10,Math.PI,6.29); x.fill();
+    x.fillStyle=(jersey.color==='#eef3f7'||jersey.color==='#ffd23f')?'#111':'#fff'; x.font='bold 11px Trebuchet MS'; x.textAlign='center'; x.fillText(jersey.num,0,-1); x.restore(); }
+  function rr2(x,a,b,w,h,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+w,b,a+w,b+h,r); x.arcTo(a+w,b+h,a,b+h,r); x.arcTo(a,b+h,a,b,r); x.arcTo(a,b,a+w,b,r); x.closePath(); }
+  document.getElementById('jSave').onclick=function(){ try{localStorage.setItem('mo2k_jersey',JSON.stringify(jersey));}catch(e){} show('menu'); };
+  // ===== CREATE-A-PLAYER =====
+  var look; try{look=JSON.parse(localStorage.getItem('mo2k_look')||'null');}catch(e){} if(!look)look={skin:'#f6c48a',hair:'#2a2018',band:false};
+  var SKINS=['#f6c48a','#e0a86a','#c68642','#8d5524','#5a3a1a','#ffd9b3'];
+  var HAIRS=['#2a2018','#111111','#5a3a1a','#c08a3a','#e0d0b0','#ff5ea8','#43c6ff','#7bff9e'];
+  document.getElementById('mCap').onclick=function(){ show('cap'); buildCap(); };
+  function swatchRow(id,arr,cur,setFn){ var w=document.getElementById(id); w.innerHTML=''; arr.forEach(function(c){ var bt=document.createElement('button'); bt.style.cssText='width:34px;height:34px;border-radius:8px;border:3px solid '+(c===cur()?'#ffd23f':'#ffffff33')+';background:'+c+';'; bt.onclick=function(){ setFn(c); buildCap(); }; w.appendChild(bt); }); }
+  function buildCap(){ swatchRow('capSkin',SKINS,function(){return look.skin;},function(c){look.skin=c;}); swatchRow('capHair',HAIRS,function(){return look.hair;},function(c){look.hair=c;}); document.getElementById('capBand').textContent='🎽 Headband: '+(look.band?'ON':'OFF'); drawCap(); }
+  document.getElementById('capBand').onclick=function(){ look.band=!look.band; buildCap(); };
+  function drawCap(){ var jc=document.getElementById('cappreview'), x=jc.getContext('2d'); x.clearRect(0,0,120,150); x.save(); x.translate(60,95); x.scale(2.6,2.6);
+    x.fillStyle=jersey.color; rr2(x,-13,-14,26,30,8); x.fill(); x.fillStyle=look.skin; x.beginPath(); x.arc(0,-24,10,0,6.29); x.fill(); x.fillStyle=look.hair; x.beginPath(); x.arc(0,-27,10,Math.PI,6.29); x.fill();
+    if(look.band){ x.fillStyle=jersey.color; x.fillRect(-10,-27,20,3); }
+    x.fillStyle=(jersey.color==='#eef3f7'||jersey.color==='#ffd23f')?'#111':'#fff'; x.font='bold 10px Trebuchet MS'; x.textAlign='center'; x.fillText(jersey.num,0,-1); x.restore(); }
+  document.getElementById('capSave').onclick=function(){ try{localStorage.setItem('mo2k_look',JSON.stringify(look));}catch(e){} show('menu'); };
+  // ===== HALL OF FAME =====
+  document.getElementById('mHof').onclick=function(){ show('hof'); renderHof(); };
+  document.getElementById('hofDone').onclick=function(){ show('menu'); };
+  function renderHof(){ var rings=+(localStorage.getItem('mo2k_rings')||0), streak=+(localStorage.getItem('mo2k_streak')||0), clutch=+(localStorage.getItem('mo2k_clutch')||0), dunkb=+(localStorage.getItem('mo2k_dunkbest')||0);
+    var bd=''; for(var i=0;i<car.badges.length;i++){ var b=BADGES.filter(function(x){return x.id===car.badges[i];})[0]; if(b)bd+=b.emo; } if(!bd)bd='— none yet —'; var o=ovr();
+    document.getElementById('hofBox').innerHTML='<div style="font-size:28px;">'+(rings>0?new Array(Math.min(rings,5)+1).join('💍'):'🏀')+'</div><b>OVR '+o+'</b> — '+rank(o)[0]+'<br>💍 Championships: <b>'+rings+'</b><br>🏅 Career Wins: <b>'+car.wins+'</b><br>🏀 Career Points: <b>'+car.pts+'</b><br>⭐ Best Game: <b>'+car.best+'</b><br>🔥 Best Streak: <b>'+streak+'</b><br>⏰ Clutch Record: <b>'+clutch+'</b><br>🔨 Dunk High: <b>'+dunkb+'</b><br>🎖️ Badges: '+bd; }
+
+  // ===== POTG helper =====
+  function potg(made,pts){ if(pts>=14)return'🏅 A+ MVP performance!'; if(pts>=10)return'🏅 A — Player of the Game!'; if(pts>=6)return'B — solid game!'; return'C — keep grinding!'; }
+
+  // ===== MORE MODES routing =====
+  var moreBtns=document.querySelectorAll('.mm'); for(var mb=0;mb<moreBtns.length;mb++){ moreBtns[mb].onclick=function(){ resumeAudio(); routeMode(this.getAttribute('data-m')); }; }
+  document.getElementById('mMore').onclick=function(){ show('more'); };
+  document.getElementById('m5v5').onclick=function(){ location.href='../mo-2k/mo-2k.html'; };
+  document.getElementById('mHome').onclick=function(){ location.href='../mo-home/mo-home.html'; };
+  function routeMode(m){ mode=m;
+    if(m==='mvprace'){ series={type:'mvprace',game:0,games:5,pts:0,goal:60}; nextSeriesGame(); }
+    else if(m==='legend'){ series={type:'legend',lvl:0,banners:0}; nextSeriesGame(); }
+    else if(m==='tour'){ series={type:'tour',stop:0}; nextSeriesGame(); }
+    else if(m==='threept'){ startGame({POSS:6,opp:0.5,three:true,gwFn:function(t,c){return 0.09;},forceType:'three',onEnd:function(r){ postScreen('🎯 3PT SHOOTOUT','You scored <b>'+r.you+'</b> from deep!<br>'+potg(r.made,r.you),function(){show('more');}); }}); }
+    else if(m==='streak'){ startStreak(); }
+    else if(m==='clutch'){ startClutch(); }
+    else if(m==='dunk'){ startDunk(); }
+    else if(m==='allstar'){ startAllStar(); }
+    else if(m==='halftime'){ startHalftime(); }
+    else if(m==='combine'){ startCombine(); }
+    else if(m==='badges'){ startBadges(); }
+    else if(m==='potg'){ startGame({POSS:6,opp:0.5,three:true,gwFn:fixedGw,onEnd:function(r){ postScreen(r.win?'🏅 '+potg(r.made,r.you):'🏅 Player of the Game', 'Final: <b>'+r.youTotal+' – '+r.opp+'</b><br>Your points: <b>'+r.you+'</b><br>'+potg(r.made,r.you),function(){show('more');}); }}); }
+  }
+  // ===== SERIES engine (MVP Race / Legend / Street Tour) =====
+  var series=null;
+  var TOUR=[{n:'NYC Blacktop',c:'#3a3a44'},{n:'Venice Beach',c:'#2a7a9a'},{n:'Chicago Park',c:'#4a5a3a'},{n:'Tokyo Court',c:'#6a2a5a'},{n:'MO Arena',c:'#c68e44'}];
+  function nextSeriesGame(){ var s=series;
+    if(s.type==='mvprace'){ if(s.game>=s.games){ var mvp=s.pts>=s.goal; postScreen(mvp?'🏆 MVP AWARD!':'Season done', mvp?('You scored <b>'+s.pts+'</b> pts and won MVP! 🏆'):('You scored <b>'+s.pts+'</b> of '+s.goal+' needed. So close!'),function(){show('more');}); return; }
+      courtTheme=null; startGame({POSS:6,opp:0.52,three:true,gwFn:fixedGw,onEnd:function(r){ s.pts+=r.you; s.game++; postScreen('🏆 Game '+s.game+'/'+s.games,'You scored <b>'+r.you+'</b> (MVP total: '+s.pts+'/'+s.goal+')',function(){ nextSeriesGame(); }); }}); }
+    else if(s.type==='legend'){ var opp=0.46+s.lvl*0.05; courtTheme=null; startGame({POSS:6,opp:opp,three:true,gwFn:fixedGw,onEnd:function(r){ if(r.win){ s.banners++; s.lvl++; if(s.lvl>=6){ postScreen('🐐 G.O.A.T.!','You beat every level and hung <b>'+s.banners+'</b> banners! Legend! 🏆',function(){show('more');}); } else postScreen('🏆 Level '+s.lvl+' WON!','Banner raised! 🎌 ('+s.banners+')<br>Next foe is tougher…',function(){ nextSeriesGame(); }); } else { postScreen('😤 Streak Over','You hung <b>'+s.banners+'</b> banners before falling at level '+(s.lvl+1)+'.',function(){show('more');}); } }}); }
+    else if(s.type==='tour'){ if(s.stop>=TOUR.length){ postScreen('🌍 TOUR CHAMPION!','You beat every court on the Street Tour! 🏆',function(){show('more');}); return; }
+      var t=TOUR[s.stop]; courtTheme=t; startGame({POSS:6,opp:0.48+s.stop*0.03,three:true,gwFn:fixedGw,onEnd:function(r){ if(r.win){ s.stop++; postScreen('🌍 '+t.n+' — WON!','On to the next court! ('+s.stop+'/'+TOUR.length+')',function(){ nextSeriesGame(); }); } else { postScreen('😤 Lost at '+t.n,'Beaten on the road. Try the tour again!',function(){show('more');}); } }}); }
+  }
+  var courtTheme=null;
+  // ===== STREAK =====
+  function startStreak(){ mode='streak'; var best=+(localStorage.getItem('mo2k_streak')||0); streakN=0; cfg={streak:true,gwFn:function(t,c){return 0.09;},three:false}; game={you:0,mate:0,opp:0,poss:0,POSS:9999,made:0}; running=true; holding=false; meter=0;
+    document.getElementById('hL').innerHTML='🔥 Streak <span id="gyou">0</span>'; document.getElementById('hM').style.display='none'; document.getElementById('hR').innerHTML='Best '+best;
+    showGame(); newPossStreak(); }
+  var streakN=0;
+  function newPossStreak(){ ball={x:W/2+(Math.random()-0.5)*W*0.5,y:GY-16,vx:0,vy:0,spin:0,frame:0,flying:false,green:false,type:Math.random()<0.3?'three':'mid',contest:Math.random()*0.4}; holding=false; meter=0; document.getElementById('ghint').textContent='🔥 Keep the streak alive! HOLD & release on GREEN'; }
+  // ===== CLUTCH =====
+  function startClutch(){ mode='clutch'; clutchRound=1; cfg={clutch:true,gwFn:function(t,c){ return Math.max(0.05,0.11-clutchRound*0.006-c*0.05); }}; game={you:0}; running=true; holding=false; meter=0;
+    document.getElementById('hL').innerHTML='⏰ Round <span id="gyou">1</span>'; document.getElementById('hM').style.display='none'; document.getElementById('hR').innerHTML='Best '+(+(localStorage.getItem('mo2k_clutch')||0)); showGame(); newClutch(); }
+  var clutchRound=1, clutchClock=0;
+  function newClutch(){ ball={x:W/2+(Math.random()-0.5)*W*0.4,y:GY-16,vx:0,vy:0,spin:0,frame:0,flying:false,green:false,type:'three',contest:0.2+clutchRound*0.05}; holding=false; meter=0; clutchClock=Math.max(1.6,4-clutchRound*0.25); document.getElementById('ghint').textContent='⏰ DOWN BY 2! Hit the 3 before the buzzer!'; }
+  // ===== DUNK CONTEST =====
+  var dunk=null;
+  function startDunk(){ mode='dunk'; dunk={n:0,DUNKS:5,total:0,phase:'charge',meter:0,holding:false,py:H*0.74,pv:0,slamOK:false,spin:0,score:0,jumpPow:0,rimY:H*0.26,groundY:H*0.74,_as:false}; running=true;
+    document.getElementById('hL').innerHTML='🔨 Dunk <span id="gyou">1</span>/5'; document.getElementById('hM').style.display='none'; document.getElementById('hR').innerHTML='🏆 <span id="gopp">0</span>'; showGame(); document.getElementById('ghint').textContent='HOLD to build hops, release on GREEN 🟩 — then TAP to SLAM!'; }
+  // ===== ALL-STAR (chain dunk -> 3pt -> skills) =====
+  function startAllStar(){ allstar={stage:0,scores:[]}; asNext(); }
+  var allstar=null;
+  function asNext(){ if(allstar.stage===0){ mode='allstar'; startDunk(); dunk._as=true; }
+    else if(allstar.stage===1){ startGame({POSS:5,opp:0,three:true,gwFn:function(){return 0.09;},forceType:'three',onEnd:function(r){ allstar.scores.push(r.you); allstar.stage++; postScreen('⭐ 3PT: '+r.you+' pts','On to the Skills Challenge!',function(){ asNext(); }); }}); }
+    else if(allstar.stage===2){ startGame({POSS:5,opp:0,three:false,gwFn:function(t,c){return t==='layup'?0.15:0.11;},forceType:'layup',onEnd:function(r){ allstar.scores.push(r.you); var tot=allstar.scores.reduce(function(a,b){return a+b;},0); postScreen('⭐ ALL-STAR DONE!','Dunk + 3PT + Skills<br>Total: <b>'+tot+'</b> 🌟',function(){show('more');}); }}); }
+  }
+  // ===== DRAFT COMBINE =====
+  function startCombine(){ combine={drill:0,scores:[]}; mode='combine'; combineNext(); }
+  var combine=null;
+  function combineNext(){ if(combine.drill>=3){ var tot=combine.scores.reduce(function(a,b){return a+b;},0); var stock=Math.min(10,Math.max(1,Math.round(tot/2))); postScreen('🏀 DRAFTED!','Combine score: <b>'+tot+'</b><br>You were drafted <b>#'+ (11-stock) +'</b> overall! 🎉',function(){show('more');}); return; }
+    var types=['mid','three','layup'], names=['Mid-Range Drill','3-Point Drill','Finishing Drill']; var ty=types[combine.drill];
+    startGame({POSS:4,opp:0,three:ty==='three',gwFn:function(){return ty==='three'?0.09:(ty==='layup'?0.14:0.11);},forceType:ty,onEnd:function(r){ combine.scores.push(r.you); combine.drill++; postScreen('🏀 '+names[combine.drill-1],'Scored <b>'+r.you+'</b>!',function(){ combineNext(); }); }}); }
+  // ===== BADGE CHALLENGE =====
+  function startBadges(){ mode='badges'; badgeCh={i:0}; badgeNext(); }
+  var badgeCh=null;
+  var BADGE_CH=[{name:'Sharpshooter 🎯',type:'mid',target:3,badge:'sharp'},{name:'Deadeye 🏹',type:'three',target:2,badge:'deadeye'},{name:'Poster 🔨',type:'layup',target:2,badge:'poster'}];
+  function badgeNext(){ if(badgeCh.i>=BADGE_CH.length){ postScreen('🎯 CHALLENGES DONE!','Great work! Check MyCareer for your badges.',function(){show('more');}); return; }
+    var ch=BADGE_CH[badgeCh.i]; startGame({POSS:6,opp:0,three:ch.type==='three',gwFn:function(){return ch.type==='three'?0.085:(ch.type==='layup'?0.14:0.10);},forceType:ch.type,onEnd:function(r){ var got=r.made>=ch.target; if(got&&car.badges.indexOf(ch.badge)<0){ car.badges.push(ch.badge); saveCar(); } badgeCh.i++; postScreen(got?'🏅 BADGE EARNED!':'Almost!', ch.name+'<br>Made '+r.made+' / '+ch.target+(got?'<br>Badge unlocked! ✅':'<br>Try again anytime'),function(){ badgeNext(); }); }}); }
+  // ===== HALFTIME (rhythm) =====
+  var half=null;
+  function startHalftime(){ mode='halftime'; half={notes:[],t:0,score:0,spawn:0,left:600}; running=true;
+    document.getElementById('hL').innerHTML='🎵 <span id="gyou">0</span>'; document.getElementById('hM').style.display='none'; document.getElementById('hR').innerHTML='TAP THE BEAT'; showGame(); document.getElementById('ghint').textContent='🎵 TAP when a note hits the ring!'; }
+  // streak/clutch resolve
+  function afterStreak(made){ if(made){ streakN++; hype=1; var gy=document.getElementById('gyou'); if(gy)gy.textContent=streakN; gmsg('🔥 '+streakN+' in a row!','#7bff9e'); beep(500+streakN*18,0.08,'square',0.05); setTimeout(function(){ if(running)newPossStreak(); },600); }
+    else { running=false; var best=+(localStorage.getItem('mo2k_streak')||0); if(streakN>best){best=streakN;try{localStorage.setItem('mo2k_streak',best);}catch(e){}} gmsg('❌ Streak over!','#ffb0b0'); beep(160,0.2,'sawtooth',0.05); setTimeout(function(){ postScreen('🔥 Streak: '+streakN,'You made <b>'+streakN+'</b> shots in a row!<br>Best: <b>'+best+'</b>',function(){show('more');}); },750); } }
+  function afterClutch(made){ if(made){ clutchRound++; hype=1; var gy=document.getElementById('gyou'); if(gy)gy.textContent=clutchRound; gmsg('🎯 CLUTCH!','#7bff9e'); beep(640,0.1,'square',0.05); setTimeout(function(){ if(running)newClutch(); },700); }
+    else { running=false; var reached=clutchRound-1; var best=+(localStorage.getItem('mo2k_clutch')||0); if(reached>best){best=reached;try{localStorage.setItem('mo2k_clutch',best);}catch(e){}} gmsg('❌ No good!','#ffb0b0'); beep(160,0.2,'sawtooth',0.05); setTimeout(function(){ postScreen('⏰ Clutch: '+reached,'You hit <b>'+reached+'</b> clutch shots!<br>Best: <b>'+best+'</b>',function(){show('more');}); },750); } }
+  // dunk
+  function dunkPress(){ if(!dunk)return; if(dunk.phase==='charge'){ if(!dunk.holding){ dunk.holding=true; dunk.meter=0; } } else if(dunk.phase==='jump'&&dunk.slamOK){ dunk.slamOK=false; dunk.phase='slam'; dunk.spin=0; var air=dunk.jumpPow||0; var timing=1-Math.abs(dunk.py-dunk.rimY)/80; timing=Math.max(0,Math.min(1,timing)); dunk.score=Math.min(50,Math.round(20+air*20+timing*10)); beep(dunk.score>=42?720:420,0.12,'square',0.06); } }
+  function dunkRelease(){ if(!dunk||dunk.phase!=='charge'||!dunk.holding)return; dunk.holding=false; var off=dunk.meter-0.84; dunk.jumpPow=Math.max(0,1-Math.abs(off)/0.3); if(Math.abs(off)<0.09){dunk.jumpPow=1; gmsg('🟩 HOPS!','#7bff9e');} beep(Math.abs(off)<0.09?520:300,0.1,'sine',0.05); dunk.phase='jump'; dunk.pv=-(9+dunk.jumpPow*7); dunk.py=dunk.groundY; }
+  function updateDunk(dt){ if(dunk.holding&&dunk.phase==='charge'){ dunk.meter+=0.02*dt; if(dunk.meter>=1){dunk.meter=1; dunkRelease();} }
+    if(dunk.phase==='jump'){ dunk.py+=dunk.pv*dt; dunk.pv+=0.5*dt; dunk.slamOK=(dunk.py<dunk.rimY+70&&dunk.pv<0); if(dunk.pv>0&&dunk.py>dunk.rimY+70&&(dunk.score||0)===0){ dunk.score=Math.round(12+(dunk.jumpPow||0)*8); } if(dunk.py>=dunk.groundY){ dunk.py=dunk.groundY; dunk.pv=0; finishDunk(); } }
+    else if(dunk.phase==='slam'){ dunk.spin+=0.5*dt; dunk.py+=dunk.pv*dt; dunk.pv+=0.5*dt; if(dunk.py>=dunk.groundY){dunk.py=dunk.groundY; dunk.pv=0; finishDunk();} } }
+  function finishDunk(){ var s=dunk.score||20; dunk.total+=s; dunk.n++; hype=1; var go=document.getElementById('gopp'); if(go)go.textContent=dunk.total; gmsg('👏 '+s+'/50!', s>=42?'#7bff9e':'#ffd23f');
+    if(dunk.n>=dunk.DUNKS){ running=false; setTimeout(function(){ if(dunk._as){ allstar.scores.push(dunk.total); allstar.stage++; postScreen('🔨 Dunk: '+dunk.total,'Nice hops! Next up: 3PT Contest',function(){asNext();}); } else { var best=+(localStorage.getItem('mo2k_dunkbest')||0); if(dunk.total>best){best=dunk.total;try{localStorage.setItem('mo2k_dunkbest',best);}catch(e){}} postScreen(dunk.total>=210?'🏆 DUNK CHAMPION!':'🔨 Dunk Contest','Total: <b>'+dunk.total+'</b>/250<br>Best: <b>'+best+'</b>',function(){show('more');}); } },800); return; }
+    var gy=document.getElementById('gyou'); if(gy)gy.textContent=dunk.n+1; dunk.phase='charge'; dunk.meter=0; dunk.holding=false; dunk.py=dunk.groundY; dunk.pv=0; dunk.score=0; }
+  function drawDunk(){ var hoopY=H*0.26;
+    if(dunk.phase==='jump'&&dunk.slamOK){ ctx.fillStyle='#ffd23f'; ctx.font='bold 22px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('TAP TO SLAM! 🔨',W/2,hoopY-70); }
+    ctx.save(); ctx.translate(W/2,dunk.py); if(dunk.phase==='slam')ctx.rotate(Math.sin(dunk.spin)*0.3);
+    ctx.fillStyle=jersey.color; rr(-15,-20,30,38,9); ctx.fill(); ctx.fillStyle=look.skin; ctx.beginPath(); ctx.arc(0,-32,12,0,6.29); ctx.fill(); ctx.fillStyle=look.hair; ctx.beginPath(); ctx.arc(0,-35,12,Math.PI,6.29); ctx.fill(); if(look.band){ctx.fillStyle=jersey.color; ctx.fillRect(-11,-35,22,3);}
+    if(dunk.phase==='jump'||dunk.phase==='slam'){ ctx.strokeStyle=jersey.color; ctx.lineWidth=7; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(8,-10); ctx.lineTo(20,-40); ctx.stroke(); ctx.fillStyle='#e0701f'; ctx.beginPath(); ctx.arc(22,-46,10,0,6.29); ctx.fill(); }
+    else { ctx.fillStyle='#e0701f'; ctx.beginPath(); ctx.arc(18,4,10,0,6.29); ctx.fill(); }
+    ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.fillText(jersey.num,0,-3); ctx.restore();
+    if(dunk.phase==='charge'){ var mx=W/2+40,my=dunk.groundY-150,mh=140,mw=17; ctx.fillStyle='#000a'; rr(mx,my,mw,mh,9); ctx.fill(); var gc=0.84,gw=0.09; ctx.fillStyle='#37d06a'; ctx.fillRect(mx+2,my+mh*(1-(gc+gw)),mw-4,mh*2*gw); ctx.fillStyle=dunk.holding?'#ffd23f':'#888'; ctx.fillRect(mx+2,my+mh*(1-dunk.meter),mw-4,mh*dunk.meter); ctx.strokeStyle='#fff'; ctx.lineWidth=2; rr(mx,my,mw,mh,9); ctx.stroke(); } }
+  // halftime
+  function halfTap(){ if(!half)return; var ringY=H*0.66,hit=false; for(var i=0;i<half.notes.length;i++){ if(Math.abs(half.notes[i].y-ringY)<46){ half.notes.splice(i,1); half.score++; hype=0.6; var gy=document.getElementById('gyou'); if(gy)gy.textContent=half.score; gmsg('🎵 +1','#7bff9e'); beep(500+Math.random()*300,0.08,'square',0.05); hit=true; break; } } if(!hit)beep(180,0.06,'sawtooth',0.03); }
+  function updateHalf(dt){ half.left-=dt; half.spawn-=dt; if(half.spawn<=0){ half.notes.push({y:-20}); half.spawn=38+Math.random()*16; }
+    for(var i=half.notes.length-1;i>=0;i--){ half.notes[i].y+=4.2*dt; if(half.notes[i].y>H*0.66+60){ half.notes.splice(i,1); } }
+    if(half.left<=0){ if(half._break){ mode=halfReturn; halfReturn=null; running=true; document.getElementById('hM').style.display='block'; document.getElementById('hL').innerHTML='🔵 MO <span id="gyou">0</span>'; document.getElementById('hR').innerHTML='🔴 <span id="gopp">0</span>'; document.getElementById('ghint').textContent='2nd half — keep scoring!'; updHud(); gmsg('▶ 2ND HALF!','#ffd23f'); newPoss(); }
+      else { running=false; setTimeout(function(){ postScreen('🎵 Halftime Show!','You nailed <b>'+half.score+'</b> beats! 🎶',function(){show('more');}); },300); } } }
+  function drawHalf(){ var ringY=H*0.66; ctx.strokeStyle='#ffd23f'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(W/2,ringY,26,0,6.29); ctx.stroke();
+    for(var i=0;i<half.notes.length;i++){ ctx.font='30px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🎵',W/2,half.notes[i].y); }
+    ctx.fillStyle='#fff'; ctx.font='bold 14px Trebuchet MS'; ctx.fillText('Time: '+Math.ceil(half.left/60)+'s',W/2,ringY+70); }
+
+  // ===== POST screen =====
+  function postScreen(title,html,cont){ document.getElementById('postT').textContent=title; document.getElementById('postBox').innerHTML=html; postCont=cont; show('post'); if(title.indexOf('WIN')>=0||title.indexOf('CHAMP')>=0)cheer(); else beep(200,0.2,'sawtooth',0.05); }
+  var postCont=null; document.getElementById('postDone').onclick=function(){ if(postCont)postCont(); postCont=null; };
+  // ===== shared SHOOTER game =====
+  var game=null, holding=false, meter=0, ball=null, msgT=0, running=false, cfg=null;
+  function startGame(c){ cfg=c; game={poss:0,POSS:c.POSS,you:0,mate:0,opp:0,made:0}; running=true; holding=false; meter=0; msgT=0;
+    document.getElementById('hL').style.display='block'; document.getElementById('hM').style.display='block'; document.getElementById('hR').style.display='block';
+    document.getElementById('hL').innerHTML='🔵 MO <span id="gyou">0</span>'; document.getElementById('hM').innerHTML='Poss <span id="gposs">1</span>/'+c.POSS; document.getElementById('hR').innerHTML='🔴 <span id="gopp">0</span>';
+    document.getElementById('coach').style.display='none'; showGame(); updHud(); newPoss(); }
+  function updHud(){ document.getElementById('gyou').textContent=game.you+game.mate; document.getElementById('gopp').textContent=game.opp; document.getElementById('gposs').textContent=Math.min(game.poss+1,game.POSS); }
+  function newPoss(){ var r=Math.random(); var type=cfg.forceType||(r<0.25?'layup':(r<0.6?'mid':(cfg.three?'three':'mid'))); var dx=(type==='three'?(Math.random()-0.5)*W*0.5:(Math.random()-0.5)*W*0.4); var contest=Math.max(0,Math.min(1,Math.random()*(cfg.opp===0?0.5:1)));
+    ball={x:W/2+dx,y:GY-16,vx:0,vy:0,spin:0,frame:0,flying:false,green:false,type:type,contest:contest}; holding=false; meter=0;
+    document.getElementById('ghint').textContent= type==='layup'?'Drive! HOLD & release on GREEN 🟩 (layup +2)':type==='three'?'Deep 3! HOLD & release on GREEN 🟩 (+3)':'Mid-range! HOLD & release on GREEN 🟩 (+2)'; }
+  function gwNow(){ return cfg.gwFn(ball.type,ball.contest); }
+  function startHold(){ if(mode==='dunk'){ dunkPress(); return; } if(mode==='halftime'){ halfTap(); return; } if(!running||!ball||ball.flying||holding)return; holding=true; meter=0; }
+  function release(){ if(mode==='dunk'){ dunkRelease(); return; } if(!holding)return; holding=false; var off=meter-GC; var made=Math.abs(off)<gwNow(); if(ball.type==='layup'&&!made)made=Math.random()<(0.5-ball.contest*0.3);
+    var perfectVy=(H*0.26-ball.y-0.5*G*T*T)/T; var pf=1+off*1.4; ball.vy=perfectVy*pf; ball.vx=(W/2-ball.x)/T; ball.flying=true; ball.frame=0; ball.green=made; ball._pts=(ball.type==='three')?3:2; ball._dunk=(ball.type==='layup'&&made&&ball.contest<0.3&&Math.random()<0.6); beep(made?520:300,0.1,'sine',0.05); }
+  function gmsg(m,col){ if(!m)return; var e=document.getElementById('gmsg'); e.textContent=m; e.style.color=col||'#ffd23f'; e.style.opacity=1; msgT=1.1; }
+  function afterShot(made){ if(cfg.drill){ afterDrillShot(made); return; }
+    if(cfg.streak){ afterStreak(made); return; } if(cfg.clutch){ afterClutch(made); return; }
+    if(made){ game.you+=ball._pts; game.made++; hype=1; if(ball._pts===3||ball._dunk)chantT=1.6; gmsg(ball._dunk?'🔨 POSTER! +2':(ball.green?(ball._pts===3?'🟩 THREE! +3':'🟩 BUCKET! +'+ball._pts):'🏀 +'+ball._pts),'#7bff9e'); beep(660,0.1,'square',0.05); } else gmsg('❌ Miss','#ffb0b0');
+    if(cfg.opp){ if(Math.random()<0.32)game.mate+=2; if(Math.random()<Math.max(0.28,cfg.opp))game.opp+=(Math.random()<0.25?3:2); } updHud(); game.poss++;
+    if(game.poss>=game.POSS){ setTimeout(endGame,700); return; }
+    if(cfg.opp && !game._ht && game.poss===Math.floor(game.POSS/2)){ game._ht=true; setTimeout(startHalfBreak,700); return; }
+    setTimeout(function(){ if(running)newPoss(); },650); }
+  var halfReturn=null;
+  function startHalfBreak(){ halfReturn=mode; mode='halftime'; running=true; half={notes:[],spawn:0,score:0,left:300,_break:true};
+    document.getElementById('hL').innerHTML='🎵 Halftime <span id="gyou">0</span>'; document.getElementById('hM').style.display='none'; document.getElementById('hR').innerHTML='TAP!'; document.getElementById('ghint').textContent='🎵 HALFTIME SHOW! Tap the beats!'; gmsg('🎵 HALFTIME SHOW!','#ff6ad5'); }
+  function endGame(){ running=false; var youTot=game.you+game.mate, win=youTot>game.opp; var r={you:game.you,youTotal:youTot,opp:game.opp,win:win,made:game.made}; if(cfg.onEnd)cfg.onEnd(r); }
+  // ===== LEARN =====
+  var learn=null;
+  var DRILLS=[ {type:'mid',gw:0.16,target:2,text:'Welcome! 🏀 This bar is your <b>SHOT METER</b>. HOLD the ball, then let go when it hits the <b>GREEN</b> 🟩. Make <b>2</b> shots!'},
+    {type:'mid',gw:0.10,target:2,text:'Nice! A perfect <b>GREEN</b> release = swish. The green can be smaller on tough shots. Make <b>2</b> more!'},
+    {type:'three',gw:0.09,target:1,text:'Step back for a <b>THREE</b> 🏹 — worth <b>3 points</b>! Sink <b>1</b>.'},
+    {type:'layup',gw:0.15,target:1,text:'Drive close for an easy <b>LAYUP or DUNK</b> 🔨! Score <b>1</b>.'} ];
+  function startLearn(){ mode='learn'; learn={i:0,made:0}; running=true; cfg={drill:true}; game={you:0,mate:0,opp:0,poss:0,POSS:99,made:0};
+    document.getElementById('hL').style.display='none'; document.getElementById('hR').style.display='none'; document.getElementById('hM').style.display='none';
+    showGame(); loadDrill(); }
+  function loadDrill(){ var d=DRILLS[learn.i]; learn.made=0; document.getElementById('coach').style.display='block'; document.getElementById('coach').innerHTML='🧑‍🏫 '+d.text+'<br><span style="color:#7bff9e">Made: 0 / '+d.target+'</span>';
+    ball={x:W/2+(d.type==='three'?0:(Math.random()-0.5)*60),y:GY-16,vx:0,vy:0,spin:0,frame:0,flying:false,green:false,type:d.type,contest:0}; holding=false; meter=0;
+    document.getElementById('ghint').textContent='HOLD & release on the GREEN 🟩'; }
+  function afterDrillShot(made){ var d=DRILLS[learn.i]; if(made){ learn.made++; hype=1; gmsg(d.type==='three'?'🟩 THREE!':(d.type==='layup'?'🔨 NICE!':'🟩 SWISH!'),'#7bff9e'); beep(660,0.1,'square',0.05); }
+    else { gmsg('❌ Try again!','#ffb0b0'); beep(200,0.12,'sawtooth',0.04); }
+    document.getElementById('coach').innerHTML='🧑‍🏫 '+d.text+'<br><span style="color:#7bff9e">Made: '+learn.made+' / '+d.target+'</span>';
+    if(learn.made>=d.target){ learn.i++; if(learn.i>=DRILLS.length){ setTimeout(function(){ running=false; postScreen('🎓 ALL-STAR GRADUATE!','You learned the 2K shot meter! 🏀<br>Now go ball out in Quick Game, MyCareer, and MyNBA!', function(){ show('menu'); }); },700); return; } setTimeout(function(){ if(running)loadDrill(); },800); }
+    else setTimeout(function(){ if(running){ var dd=DRILLS[learn.i]; ball={x:W/2+(dd.type==='three'?0:(Math.random()-0.5)*60),y:GY-16,vx:0,vy:0,spin:0,frame:0,flying:false,green:false,type:dd.type,contest:0}; holding=false; meter=0; } },650); }
+  // input
+  cv.addEventListener('mousedown',function(){ if(canvasMode)startHold(); }); addEventListener('mouseup',function(){ if(canvasMode)release(); });
+  cv.addEventListener('touchstart',function(e){ if(canvasMode){startHold();e.preventDefault();} },{passive:false}); addEventListener('touchend',function(){ if(canvasMode)release(); });
+  addEventListener('keydown',function(e){ if(e.key===' '&&canvasMode)startHold(); }); addEventListener('keyup',function(e){ if(e.key===' '&&canvasMode)release(); });
+  // update + render
+  function update(dt){ if(hype>0)hype-=0.012*dt;
+    if(mode==='dunk'){ if(running)updateDunk(dt); if(msgT>0){msgT-=0.02*dt; if(msgT<=0)document.getElementById('gmsg').style.opacity=0;} return; }
+    if(mode==='halftime'){ if(running)updateHalf(dt); if(msgT>0){msgT-=0.02*dt; if(msgT<=0)document.getElementById('gmsg').style.opacity=0;} return; }
+    if(mode==='clutch'&&running&&ball&&!ball.flying&&!holding){ clutchClock-=0.0166*dt; var hr=document.getElementById('hR'); if(hr)hr.textContent='⏰ '+Math.max(0,clutchClock).toFixed(1); if(clutchClock<=0){ ball.flying=false; afterClutch(false); return; } }
+    if(!running||!ball)return;
+    if(holding){ meter+=0.02*dt; if(meter>=1){ meter=1; release(); } }
+    if(ball.flying){ ball.frame+=dt; ball.x+=ball.vx*dt; ball.y+=ball.vy*dt; ball.vy+=G*dt; ball.spin+=0.3*dt;
+      if(ball.frame>=T){ var hy=H*0.26; var made=ball.green||Math.abs(ball.y-hy)<16; ball.flying=false; afterShot(made); return; }
+      if(ball.y>GY+30){ ball.flying=false; afterShot(false); } }
+    if(msgT>0){ msgT-=0.02*dt; if(msgT<=0)document.getElementById('gmsg').style.opacity=0; }
+  }
+  var led=0, fans=null, hype=0, chantT=0;
+  var SHIRTS=['#ff8a1e','#43c6ff','#ffd23f','#ff6ad5','#7bff9e','#ffffff','#ff5a5a','#9b6aff'];
+  var SIGNS=['GO MO!','🏀','MVP!','DEFENSE','LETS GO','MO 2K','#1'];
+  function buildFans(){ fans=[]; var cols=Math.ceil(W/13), rows=4; var sc=0;
+    for(var r=0;r<rows;r++){ for(var i=0;i<cols;i++){ var f={x:i*13+ (r%2?6:0)+4, row:r, c:SHIRTS[(i*3+r)%SHIRTS.length], ph:(i*0.7+r), sign:null};
+      if(r===0 && i%6===2 && sc<6){ f.sign=SIGNS[sc%SIGNS.length]; sc++; } fans.push(f); } } }
+  function render(){ led+=0.05; ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle='#0a1224'; ctx.fillRect(0,0,W,H);
+    if(chantT>0)chantT-=0.02;
+    var v=VIEWS[view]||VIEWS[0], cx=W/2, cy=H*0.4, oy=H*(v.oyf||0);
+    ctx.save(); ctx.translate(cx,cy+oy); ctx.scale(v.sc, v.sc*(v.tilt?0.9:1)); ctx.translate(-cx,-cy); drawWorld(); ctx.restore();
+    if(chantT>0){ ctx.fillStyle='rgba(255,210,63,'+Math.min(1,chantT)+')'; ctx.font='bold 20px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('📣 MO! MO! MO!',W/2,H*0.11); } }
+  function drawWorld(){
+    // NBA arena background
+    ctx.fillStyle='#0a1224'; ctx.fillRect(0,0,W,H);
+    // stands
+    var standH=H*0.135; ctx.fillStyle='#0e1732'; ctx.fillRect(0,0,W,standH);
+    if(!fans)buildFans();
+    for(var fi=0;fi<fans.length;fi++){ var f=fans[fi];
+      var baseY=8+f.row*8; var bob=Math.sin(led*2+f.ph)*1.4; var jump=hype>0?Math.abs(Math.sin(led*3+f.ph))*hype*7:0; var fy=baseY-bob-jump;
+      // body
+      ctx.fillStyle=f.c; ctx.fillRect(f.x-2,fy,5,6);
+      // head
+      ctx.fillStyle='#f6c48a'; ctx.fillRect(f.x-1,fy-3,3,3);
+      // raised arms when hyped
+      if(hype>0.3){ ctx.strokeStyle=f.c; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(f.x-2,fy+1); ctx.lineTo(f.x-4,fy-3); ctx.moveTo(f.x+3,fy+1); ctx.lineTo(f.x+5,fy-3); ctx.stroke(); }
+      // signs
+      if(f.sign){ ctx.fillStyle='#fff'; ctx.fillRect(f.x-9,fy-12,22,8); ctx.fillStyle='#111'; ctx.font='bold 6px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText(f.sign,f.x+2,fy-6); } }
+    for(var x=0;x<W;x+=24){ var on=Math.sin(led+x*0.05)>0; ctx.fillStyle=on?'#ffd23f':'#5a4a1a'; ctx.fillRect(x,standH-5,18,4); }
+    ctx.fillStyle='#000a'; ctx.fillRect(W/2-90,2,180,20); ctx.fillStyle='#ffd23f'; ctx.font='bold 14px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('★ '+(courtTheme?courtTheme.n.toUpperCase():'MO 2K26 ARENA')+' ★',W/2,16);
+    // glossy hardwood
+    if(courtTheme){ ctx.fillStyle=courtTheme.c; ctx.fillRect(0,H*0.13,W,GY-H*0.13); ctx.fillStyle='#ffffff10'; for(var sp=0;sp<30;sp++){ ctx.fillRect((sp*79%W),H*0.13+(sp*53%(GY-H*0.13)),2,2); } }
+    else { var wood=ctx.createLinearGradient(0,H*0.13,0,GY); wood.addColorStop(0,'#e0ad63'); wood.addColorStop(0.5,'#d49a4e'); wood.addColorStop(1,'#c68e44'); ctx.fillStyle=wood; ctx.fillRect(0,H*0.13,W,GY-H*0.13); }
+    ctx.fillStyle='#0c1424'; ctx.fillRect(0,GY,W,H-GY);
+    var hoop={x:W/2,y:H*0.26,r:22};
+    // key painted
+    ctx.fillStyle='#2a6ff0cc'; ctx.fillRect(hoop.x-W*0.13,hoop.y+4,W*0.26,H*0.22); ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.strokeRect(hoop.x-W*0.13,hoop.y+4,W*0.26,H*0.22);
+    ctx.beginPath(); ctx.arc(hoop.x,hoop.y+4+H*0.22,W*0.13,0,Math.PI,false); ctx.stroke();
+    ctx.beginPath(); ctx.arc(hoop.x,GY,Math.min(W*0.42,GY-hoop.y-10),Math.PI,6.29,false); ctx.stroke();
+    // center logo circle near baseline
+    ctx.strokeStyle='#ffffff44'; ctx.beginPath(); ctx.arc(W/2,GY-2,W*0.12,Math.PI,6.29,false); ctx.stroke(); ctx.fillStyle='#ffffff22'; ctx.font='bold 24px Trebuchet MS'; ctx.fillText('MO',W/2,GY-24);
+    // hoop
+    ctx.fillStyle='#555b63'; ctx.fillRect(hoop.x-4,hoop.y-44,8,-28);
+    ctx.fillStyle='#eef3f7'; ctx.fillRect(hoop.x-28,hoop.y-44,56,10); ctx.strokeStyle='#c0392b'; ctx.lineWidth=3; ctx.strokeRect(hoop.x-28,hoop.y-44,56,10);
+    ctx.strokeStyle='#ff7b00'; ctx.lineWidth=5; ctx.beginPath(); ctx.ellipse(hoop.x,hoop.y,hoop.r,7,0,0,6.29); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=1.4; for(var n=0;n<7;n++){ var an=n/7*6.28; ctx.beginPath(); ctx.moveTo(hoop.x+Math.cos(an)*hoop.r,hoop.y+Math.sin(an)*7); ctx.lineTo(hoop.x+Math.cos(an)*hoop.r*0.5,hoop.y+18); ctx.stroke(); }
+    if(mode==='dunk'){ drawDunk(); return; }
+    if(mode==='halftime'){ drawHalf(); return; }
+    if(ball){ if(ball.contest>0.4&&!ball.flying){ ctx.save(); ctx.translate(ball.x+(ball.x<W/2?36:-36),ball.y-6); ctx.fillStyle='#e0453a'; rr(-12,-14,24,28,7); ctx.fill(); ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(0,-22,9,0,6.29); ctx.fill(); ctx.strokeStyle='#e0453a'; ctx.lineWidth=5; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-9,-6); ctx.lineTo(-16,-26); ctx.moveTo(9,-6); ctx.lineTo(16,-26); ctx.stroke(); ctx.restore(); }
+      var jt=(jersey.color==='#eef3f7'||jersey.color==='#ffd23f')?'#111':'#fff';
+      ctx.save(); ctx.translate(ball.x,ball.y+8); ctx.fillStyle=jersey.color; rr(-13,-14,26,28,8); ctx.fill(); ctx.fillStyle=look.skin; ctx.beginPath(); ctx.arc(0,-22,10,0,6.29); ctx.fill(); ctx.fillStyle=look.hair; ctx.beginPath(); ctx.arc(0,-25,10,Math.PI,6.29); ctx.fill(); if(look.band){ctx.fillStyle=jersey.color; ctx.fillRect(-10,-25,20,3);} ctx.fillStyle=jt; ctx.font='bold 9px sans-serif'; ctx.fillText(jersey.num,0,-1); ctx.restore();
+      drawBall(ball.x,ball.y); if(!ball.flying)drawMeter(); }
+  }
+  function drawMeter(){ if(ball.flying)return; var gw=gwLearnOrCfg(); var mx=ball.x+30; if(mx>W-40)mx=ball.x-48; var my=ball.y-150,mh=140,mw=17;
+    ctx.fillStyle='#000a'; rr(mx,my,mw,mh,9); ctx.fill(); var gy1=my+mh*(1-(GC+gw)),gy2=my+mh*(1-(GC-gw)); ctx.fillStyle='#37d06a'; ctx.fillRect(mx+2,gy1,mw-4,gy2-gy1);
+    ctx.fillStyle=holding?'#ffd23f':'#888'; ctx.fillRect(mx+2,my+mh*(1-meter),mw-4,mh*meter); ctx.strokeStyle='#fff'; ctx.lineWidth=2; rr(mx,my,mw,mh,9); ctx.stroke();
+    if(!holding){ ctx.fillStyle='#fff'; ctx.font='bold 11px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('HOLD',mx+mw/2,my+mh+16); } }
+  function gwLearnOrCfg(){ if(cfg&&cfg.drill){ return DRILLS[learn.i].gw; } return cfg?cfg.gwFn(ball.type,ball.contest):0.1; }
+  function drawBall(x,y){ var r=12; ctx.save(); ctx.translate(x,y); ctx.rotate(ball.spin); var grd=ctx.createRadialGradient(-r*0.3,-r*0.3,r*0.2,0,0,r); grd.addColorStop(0,'#ffb15c'); grd.addColorStop(1,'#e0701f'); ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(0,0,r,0,6.29); ctx.fill(); ctx.strokeStyle='#7a3d10'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.arc(0,0,r,0,6.29); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-r,0); ctx.lineTo(r,0); ctx.moveTo(0,-r); ctx.lineTo(0,r); ctx.stroke(); ctx.restore(); }
+  function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(running)update(dt); if(canvasMode)render(); requestAnimationFrame(loop); }
+  renderCareer(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

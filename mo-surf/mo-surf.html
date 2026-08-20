@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO SURF</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#2ab0d8;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0007;}
+  .pill{background:#0008;border-radius:20px;padding:6px 14px;font-size:17px;}
+  #hint{position:fixed;bottom:16px;left:0;right:0;text-align:center;font-size:15px;color:#eaffff;pointer-events:none;text-shadow:0 1px 2px #000;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#2ab0d8d8;text-align:center;}
+  #over h1{font-size:38px;margin:0 0 6px;color:#ffd23f;} #over p{font-size:20px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#43c6ff,#1a8fd6);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #0e5a8a;font-family:inherit;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">📏 <span id="dist">0</span></div>
+  <div class="pill">🤸 <span id="tricks">0</span></div>
+  <div class="pill">🐚 <span id="shells">0</span></div>
+</div>
+<div id="hint">TAP to jump off the wave • tap again in the air to SPIN • dodge 🦈</div>
+<div id="over"><h1 id="ot">🌊 WIPEOUT!</h1><p id="os"></p><button class="btn" id="again">Surf Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1,MOX=0,BASE=0;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); MOX=W*0.3; BASE=H*0.62; }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  var scroll, speed, mo, air, vy, spins, tricks, shells, dist, running, sharks, shellsL, nextShark, nextShell, rot, nowv=0;
+  function waveY(worldX){ return BASE + Math.sin(worldX*0.006)*70 + Math.sin(worldX*0.013+1)*26; }
+  function reset(){ scroll=0; speed=4.5; mo={y:0}; air=false; vy=0; spins=0; tricks=0; shells=0; dist=0; running=true; rot=0;
+    sharks=[]; shellsL=[]; nextShark=W*0.9; nextShell=W*0.6;
+    document.getElementById('over').style.display='none'; document.getElementById('dist').textContent='0'; document.getElementById('tricks').textContent='0'; document.getElementById('shells').textContent='0'; }
+  function rnd(a,b){return a+Math.random()*(b-a);}
+  function tap(){ if(!running)return; if(!air){ air=true; vy=-11; beep(500,0.08,'square',0.06); } else { spins++; rot+=Math.PI; beep(600+spins*60,0.08,'square',0.06); } }
+  cv.addEventListener('mousedown',tap); cv.addEventListener('touchstart',function(e){tap();e.preventDefault();},{passive:false});
+  addEventListener('keydown',function(e){ if(e.key===' '||e.key==='ArrowUp')tap(); });
+  document.getElementById('again').onclick=reset;
+  function over(){ running=false; document.getElementById('os').innerHTML='You surfed <b>'+Math.floor(dist)+'</b>, landed <b>'+tricks+'</b> tricks & got <b>'+shells+'</b> shells!'; document.getElementById('over').style.display='flex'; beep(160,0.3,'sawtooth',0.1); }
+  function update(dt){
+    speed+=0.0018*dt; scroll+=speed*dt; dist+=speed*dt*0.1; document.getElementById('dist').textContent=Math.floor(dist);
+    var moWX=scroll+MOX; var surf=waveY(moWX);
+    if(air){ vy+=0.5*dt; mo.y+=vy*dt; rot*=1; if(mo.y>=0 && vy>0){ // landed
+        air=false; mo.y=0; if(spins>0){ tricks+=spins; document.getElementById('tricks').textContent=tricks; beep(900,0.12,'square',0.07);} spins=0; rot=0; } }
+    else { mo.y=0; }
+    // spawn sharks & shells
+    if(scroll+W > nextShark){ sharks.push({x:nextShark+W*0.2}); nextShark += rnd(W*0.5,W*0.9); }
+    if(scroll+W > nextShell){ shellsL.push({x:nextShell+W*0.2, up:rnd(60,140)}); nextShell += rnd(W*0.4,W*0.7); }
+    // collisions
+    for(var i=sharks.length-1;i>=0;i--){ var s=sharks[i]; if(s.x-scroll<-60){ sharks.splice(i,1); continue; }
+      if(!air && Math.abs(s.x-moWX)<28){ over(); } }
+    for(var j=shellsL.length-1;j>=0;j--){ var sh=shellsL[j]; if(sh.x-scroll<-60){ shellsL.splice(j,1); continue; }
+      var shy=waveY(sh.x)-sh.up; var moScreenY=waveY(moWX)-38+mo.y;
+      if(Math.abs(sh.x-moWX)<30 && Math.abs(shy-moScreenY)<40){ shells++; document.getElementById('shells').textContent=shells; beep(800,0.07,'square',0.05); shellsL.splice(j,1); } }
+  }
+  function render(){
+    var sky=ctx.createLinearGradient(0,0,0,H); sky.addColorStop(0,'#8fd3ff'); sky.addColorStop(1,'#cdeeff'); ctx.fillStyle=sky; ctx.fillRect(0,0,W,H*0.6);
+    ctx.fillStyle='#fff4c0'; ctx.beginPath(); ctx.arc(W*0.8,80,30,0,6.29); ctx.fill();
+    // wave fill
+    ctx.fillStyle='#2ab0d8'; ctx.beginPath(); ctx.moveTo(0,H);
+    for(var x=0;x<=W;x+=8){ ctx.lineTo(x,waveY(scroll+x)); } ctx.lineTo(W,H); ctx.closePath(); ctx.fill();
+    // foam crest
+    ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=4; ctx.beginPath(); for(var x2=0;x2<=W;x2+=8){ ctx.lineTo(x2,waveY(scroll+x2)); } ctx.stroke();
+    ctx.fillStyle='#1a90b8'; ctx.beginPath(); ctx.moveTo(0,H); for(var x3=0;x3<=W;x3+=8){ ctx.lineTo(x3,waveY(scroll+x3)+30); } ctx.lineTo(W,H); ctx.closePath(); ctx.fill();
+    // sharks (fins)
+    for(var i=0;i<sharks.length;i++){ var s=sharks[i]; var sx=s.x-scroll, sy=waveY(s.x); ctx.fillStyle='#3a4652'; ctx.beginPath(); ctx.moveTo(sx-14,sy); ctx.quadraticCurveTo(sx,sy-30,sx+14,sy); ctx.closePath(); ctx.fill(); ctx.fillStyle='#fff'; ctx.beginPath(); ctx.moveTo(sx-2,sy-6); ctx.lineTo(sx+4,sy-14); ctx.lineTo(sx+4,sy-6); ctx.closePath(); ctx.fill(); }
+    // shells
+    for(var j=0;j<shellsL.length;j++){ var sh=shellsL[j]; var x=sh.x-scroll, y=waveY(sh.x)-sh.up; ctx.font='26px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🐚',x,y+Math.sin(nowv*0.005+j)*3); }
+    // surfer
+    var moWX=scroll+MOX; var surf=waveY(moWX); var slope=(waveY(moWX+10)-waveY(moWX-10))/20;
+    drawSurfer(MOX, surf-38+mo.y, air?rot:Math.atan(slope));
+  }
+  function drawSurfer(x,y,ang){ ctx.save(); ctx.translate(x,y); ctx.rotate(ang);
+    // board
+    ctx.fillStyle='#ffd23f'; roundRect(-30,30,60,10,5); ctx.fill(); ctx.fillStyle='#e0453a'; ctx.fillRect(-2,30,4,10);
+    // body
+    ctx.fillStyle='#1a6fd0'; roundRect(-11,2,22,28,7); ctx.fill();
+    ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(0,-6,9,0,6.29); ctx.fill(); ctx.fillStyle='#3a2a1a'; ctx.beginPath(); ctx.arc(0,-9,9,Math.PI,6.29); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('MO',0,14);
+    // arms out for balance
+    ctx.strokeStyle='#1a6fd0'; ctx.lineWidth=5; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-8,10); ctx.lineTo(-20,2); ctx.moveTo(8,10); ctx.lineTo(20,2); ctx.stroke();
+    ctx.restore(); }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(running) update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO PET DRAGON</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#2a2050;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  canvas{display:block;width:100%;height:72%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0007;z-index:5;}
+  .pill{background:#0008;border-radius:20px;padding:6px 14px;font-size:16px;}
+  #panel{position:fixed;bottom:0;left:0;right:0;height:28%;background:#1a1440;border-top:3px solid #8a63d2;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;padding:10px;}
+  .cb{background:linear-gradient(#8a63d2,#5a3aa0);border:none;color:#fff;font-weight:bold;font-size:18px;padding:14px 16px;border-radius:16px;box-shadow:0 4px 0 #3a2470;font-family:inherit;min-width:96px;}
+  .cb:active{transform:translateY(2px);box-shadow:0 2px 0 #3a2470;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">⭐ Lv <span id="lvl">1</span></div>
+  <div class="pill" id="nm">🐉 Egg</div>
+</div>
+<div id="panel">
+  <button class="cb" id="feed">🍖 Feed</button>
+  <button class="cb" id="play">🎾 Play</button>
+  <button class="cb" id="sleep">😴 Sleep</button>
+  <button class="cb" id="trick">🔥 Trick</button>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=Math.round(innerHeight*0.72); cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  var hatched, name, hunger, happy, energy, xp, level, emote, emoteT, fireT, bounce, sleeping, crack, hearts, nowv=0;
+  function reset(){ hatched=false; name='Egg'; hunger=70; happy=70; energy=80; xp=0; level=1; emote=''; emoteT=0; fireT=0; bounce=0; sleeping=false; crack=0; hearts=[];
+    document.getElementById('lvl').textContent='1'; document.getElementById('nm').textContent='🥚 Egg'; }
+  function hatch(){ hatched=true; beep(500,0.1,'square',0.07); setTimeout(function(){beep(760,0.14,'square',0.07);},90);
+    var n=null; try{ n=prompt("Name your baby dragon! 🐉","Sparky"); }catch(e){} name=(n&&n.trim())||'Sparky'; document.getElementById('nm').textContent='🐉 '+name; emo('🐣'); }
+  function emo(e){ emote=e; emoteT=1; }
+  cv.addEventListener('mousedown',function(){ if(!hatched){ crack+=0.34; emo('🐣'); beep(300+crack*200,0.06,'square',0.05); if(crack>=1) hatch(); } else { hearts.push({x:W/2+(Math.random()-0.5)*80,y:H*0.5,t:1}); happy=Math.min(100,happy+3); addxp(1); } });
+  cv.addEventListener('touchstart',function(e){ e.preventDefault(); var ev=new Event('mousedown'); cv.dispatchEvent(ev); },{passive:false});
+  function need(){ if(!hatched){ emo('🥚'); return false;} return true; }
+  document.getElementById('feed').onclick=function(){ if(!need())return; hunger=Math.min(100,hunger+28); emo('🍖'); addxp(4); beep(600,0.09,'sine',0.06); };
+  document.getElementById('play').onclick=function(){ if(!need())return; if(energy<12){ emo('😴'); return;} happy=Math.min(100,happy+24); energy=Math.max(0,energy-14); emo('🎾'); addxp(5); bounce=1; beep(700,0.09,'square',0.06); };
+  document.getElementById('sleep').onclick=function(){ if(!need())return; sleeping=!sleeping; emo(sleeping?'😴':'😃'); beep(sleeping?300:500,0.1,'sine',0.05); };
+  document.getElementById('trick').onclick=function(){ if(!need())return; if(energy<18){ emo('😴'); return;} energy=Math.max(0,energy-16); happy=Math.min(100,happy+14); fireT=1; emo('🔥'); addxp(6); beep(200,0.15,'sawtooth',0.06); };
+  function addxp(n){ xp+=n; var nl=Math.floor(xp/45)+1; if(nl>level){ level=nl; emo('⭐'); beep(880,0.12,'square',0.07); setTimeout(function(){beep(1180,0.14,'square',0.06);},90); for(var i=0;i<16;i++) hearts.push({x:W/2+(Math.random()-0.5)*120,y:H*0.5,t:1,star:true}); } document.getElementById('lvl').textContent=Math.min(level,6); }
+  function update(dt){
+    if(!hatched) return;
+    var d=sleeping?0.004:0.014;
+    hunger=Math.max(0,hunger-d*dt); happy=Math.max(0,happy-d*0.8*dt); if(sleeping) energy=Math.min(100,energy+0.08*dt); else energy=Math.max(0,energy-0.008*dt);
+    bounce*= 0.9; if(fireT>0)fireT-=0.02*dt; if(emoteT>0)emoteT-=0.01*dt;
+    for(var i=hearts.length-1;i>=0;i--){ hearts[i].y-=1.2*dt; hearts[i].t-=0.02*dt; if(hearts[i].t<=0)hearts.splice(i,1); }
+  }
+  function bar(x,y,w,val,col,label){ ctx.fillStyle='#0006'; roundRect(x,y,w,14,7); ctx.fill(); ctx.fillStyle=col; roundRect(x+2,y+2,(w-4)*val/100,10,5); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font='bold 11px Trebuchet MS'; ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(label,x+4,y+7); }
+  function render(){
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#3a2a6a'); g.addColorStop(1,'#1a1440'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // floor / nest
+    ctx.fillStyle='#4a3a20'; ctx.beginPath(); ctx.ellipse(W/2,H*0.82,140,34,0,0,6.29); ctx.fill();
+    ctx.fillStyle='#6b5a30'; for(var s=0;s<14;s++){ var a=s/14*6.28; ctx.beginPath(); ctx.ellipse(W/2+Math.cos(a)*130,H*0.82+Math.sin(a)*30,14,7,a,0,6.29); ctx.fill(); }
+    var cy=H*0.52-Math.abs(Math.sin(nowv*0.004))*6 - bounce*20;
+    if(!hatched){ drawEgg(W/2,cy); }
+    else { drawDragon(W/2,cy, Math.min(level,5)); }
+    // emote bubble
+    if(emoteT>0 && emote){ ctx.font='30px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.globalAlpha=Math.min(1,emoteT*2); ctx.fillText(emote,W/2+80,cy-70); ctx.globalAlpha=1; }
+    for(var i=0;i<hearts.length;i++){ ctx.globalAlpha=Math.max(0,hearts[i].t); ctx.font='20px sans-serif'; ctx.textAlign='center'; ctx.fillText(hearts[i].star?'⭐':'❤️',hearts[i].x,hearts[i].y); ctx.globalAlpha=1; }
+    // stat bars
+    if(hatched){ var bw=Math.min(200,W*0.28); bar(16,H-56,bw,hunger,'#ff8a3a','🍖'); bar(16,H-36,bw,happy,'#ff6ad5','😊'); bar(16,H-16,bw,energy,'#43c6ff','⚡'); }
+    else { ctx.fillStyle='#ffd23f'; ctx.font='bold 18px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('TAP the egg to hatch it! 🥚',W/2,H-30); }
+  }
+  function drawEgg(x,y){ ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle='#f0e6d0'; ctx.beginPath(); ctx.ellipse(0,0,54,68,0,0,6.29); ctx.fill();
+    ctx.fillStyle='#c9b98a'; for(var s=0;s<6;s++){ ctx.beginPath(); ctx.arc(Math.cos(s)*22,Math.sin(s*2)*26,6,0,6.29); ctx.fill(); }
+    if(crack>0){ ctx.strokeStyle='#7a5a2a'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(-30,-10); ctx.lineTo(-8,4*crack); ctx.lineTo(6,-8*crack); ctx.lineTo(28,6); ctx.stroke(); }
+    ctx.restore(); }
+  function drawDragon(x,y,lv){ var s=0.7+lv*0.22; ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
+    // wings (appear at lv2+)
+    if(lv>=2){ ctx.fillStyle='#2f8a54'; var wf=Math.sin(nowv*0.01)*10;
+      ctx.beginPath(); ctx.moveTo(-30,-10); ctx.quadraticCurveTo(-90,-40-wf,-70,10); ctx.quadraticCurveTo(-50,0,-30,4); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(30,-10); ctx.quadraticCurveTo(90,-40-wf,70,10); ctx.quadraticCurveTo(50,0,30,4); ctx.closePath(); ctx.fill(); }
+    // tail
+    ctx.strokeStyle='#37b06a'; ctx.lineWidth=14; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(0,30); ctx.quadraticCurveTo(40,50,54,30); ctx.stroke();
+    // body
+    ctx.fillStyle='#37b06a'; ctx.beginPath(); ctx.ellipse(0,10,42,46,0,0,6.29); ctx.fill();
+    ctx.fillStyle='#8ef0a8'; ctx.beginPath(); ctx.ellipse(0,20,26,30,0,0,6.29); ctx.fill();
+    // head
+    ctx.fillStyle='#37b06a'; ctx.beginPath(); ctx.ellipse(0,-34,32,28,0,0,6.29); ctx.fill();
+    // horns (lv3+)
+    if(lv>=3){ ctx.fillStyle='#ffd23f'; ctx.beginPath(); ctx.moveTo(-18,-54); ctx.lineTo(-24,-74); ctx.lineTo(-10,-56); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(18,-54); ctx.lineTo(24,-74); ctx.lineTo(10,-56); ctx.closePath(); ctx.fill(); }
+    // eyes
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-12,-38,7,0,6.29); ctx.arc(12,-38,7,0,6.29); ctx.fill();
+    ctx.fillStyle='#111'; var ex=sleeping?0:0; ctx.beginPath(); ctx.arc(-12,-37,3.5,0,6.29); ctx.arc(12,-37,3.5,0,6.29); ctx.fill();
+    if(sleeping){ ctx.strokeStyle='#111'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-18,-38); ctx.lineTo(-6,-38); ctx.moveTo(6,-38); ctx.lineTo(18,-38); ctx.stroke(); }
+    // snout + fire
+    ctx.fillStyle='#2f8a54'; ctx.beginPath(); ctx.ellipse(0,-24,16,10,0,0,6.29); ctx.fill();
+    if(fireT>0){ var fl=20+Math.abs(Math.sin(nowv*0.05))*30; var gg=ctx.createRadialGradient(0,-30,3,0,-30-fl,fl); gg.addColorStop(0,'#fff3a0'); gg.addColorStop(0.5,'#ff7b00'); gg.addColorStop(1,'#e0453a00'); ctx.fillStyle=gg; ctx.beginPath(); ctx.moveTo(-12,-26); ctx.quadraticCurveTo(0,-40-fl,12,-26); ctx.closePath(); ctx.fill(); }
+    ctx.restore(); }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO ICE CREAM SHOP</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#ffe6f0;font-family:'Trebuchet MS',system-ui,sans-serif;color:#5a2340;touch-action:none;}
+  canvas{display:block;width:100%;height:60%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none;font-weight:bold;z-index:5;}
+  .pill{background:#ffffffdd;border-radius:20px;padding:6px 14px;font-size:17px;color:#5a2340;box-shadow:0 2px 0 #0001;}
+  #panel{position:fixed;bottom:0;left:0;right:0;height:40%;background:#fff2f8;border-top:3px solid #ff9ec0;padding:10px;display:flex;flex-direction:column;gap:8px;}
+  .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  .fb{width:58px;height:58px;border-radius:50%;border:3px solid #fff;box-shadow:0 3px 0 #0002;font-size:12px;font-weight:bold;color:#3a2030;}
+  .tb{padding:8px 12px;border-radius:14px;border:2px solid #d98ab0;background:#fff;font-size:22px;}
+  .fb:active,.tb:active{transform:translateY(2px);}
+  #serve{flex:1;background:linear-gradient(#7be07b,#2fbf4a);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px;border-radius:16px;box-shadow:0 4px 0 #1f8a34;}
+  #clear{background:linear-gradient(#ff8a7a,#e0453a);border:none;color:#fff;font-weight:bold;font-size:18px;padding:14px 18px;border-radius:16px;box-shadow:0 4px 0 #a52a24;}
+  #serve:active,#clear:active{transform:translateY(2px);}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#ffe6f0e0;text-align:center;z-index:9;}
+  #over h1{font-size:38px;margin:0 0 6px;color:#e0453a;} #over p{font-size:20px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#ff9ec0,#e0637f);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #a53a54;font-family:inherit;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">🪙 <span id="coins">0</span></div>
+  <div class="pill">⏱️ <span id="time">60</span>s</div>
+  <div class="pill">🔥 <span id="combo">0</span></div>
+</div>
+<div id="panel">
+  <div class="row" id="flavRow"></div>
+  <div class="row" id="topRow"></div>
+  <div class="row"><button id="clear">🗑️</button><button id="serve">🍦 SERVE</button></div>
+</div>
+<div id="over"><h1 id="ot">🍦 CLOSED!</h1><p id="os"></p><button class="btn" id="again">Open Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=Math.round(innerHeight*0.6); cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  var FLAV=[{n:'Vanilla',c:'#f3e3bf'},{n:'Choco',c:'#7a4a25'},{n:'Straw',c:'#ff9ec0'},{n:'Mint',c:'#9fe6b0'},{n:'Blue',c:'#8aa8ff'}];
+  var TOPS=['🍒','🍫','🌈'];
+  var order, build, coins, combo, timeLeft, running, custHappy, custFace, nowv=0;
+  function reset(){ coins=0; combo=0; timeLeft=60; running=true; custHappy=0; newOrder(); build={scoops:[],top:-1};
+    document.getElementById('over').style.display='none'; document.getElementById('coins').textContent='0'; document.getElementById('combo').textContent='0'; document.getElementById('time').textContent='60';
+    if(!reset._t){ reset._t=setInterval(function(){ if(running){ timeLeft--; document.getElementById('time').textContent=Math.max(0,timeLeft); if(timeLeft<=0) over(); } },1000); } }
+  function rint(n){return Math.floor(Math.random()*n);}
+  function newOrder(){ var n=1+rint(3); var sc=[]; for(var i=0;i<n;i++) sc.push(rint(FLAV.length)); order={scoops:sc, top: Math.random()<0.7?rint(TOPS.length):-1}; custFace=['😀','😋','🤗','😊','🥳'][rint(5)]; }
+  // buttons
+  var fr=document.getElementById('flavRow'); FLAV.forEach(function(f,i){ var b=document.createElement('button'); b.className='fb'; b.style.background=f.c; b.textContent=f.n;
+    b.onclick=function(){ if(!running)return; if(build.scoops.length<4){ build.scoops.push(i); beep(500+i*60,0.07,'sine',0.06);} }; fr.appendChild(b); });
+  var tr=document.getElementById('topRow'); TOPS.forEach(function(tp,i){ var b=document.createElement('button'); b.className='tb'; b.textContent=tp;
+    b.onclick=function(){ if(!running)return; build.top=(build.top===i?-1:i); beep(700,0.07,'square',0.05); }; tr.appendChild(b); });
+  document.getElementById('clear').onclick=function(){ build={scoops:[],top:-1}; beep(200,0.08,'sawtooth',0.05); };
+  document.getElementById('serve').onclick=function(){ if(!running)return; serve(); };
+  document.getElementById('again').onclick=reset;
+  function match(){ if(build.scoops.length!==order.scoops.length) return false; for(var i=0;i<order.scoops.length;i++) if(build.scoops[i]!==order.scoops[i]) return false; return build.top===order.top; }
+  function serve(){ if(match()){ combo++; var pts=5+combo; coins+=pts; custHappy=1; beep(700,0.1,'square',0.07); setTimeout(function(){beep(1000,0.12,'square',0.06);},80);
+      document.getElementById('coins').textContent=coins; document.getElementById('combo').textContent=combo; }
+    else { combo=0; custHappy=-1; beep(160,0.25,'sawtooth',0.08); document.getElementById('combo').textContent='0'; }
+    build={scoops:[],top:-1}; newOrder(); }
+  function over(){ running=false; document.getElementById('os').innerHTML='You earned <b>'+coins+'</b> coins!'; document.getElementById('over').style.display='flex'; }
+  function drawCone(cx,by,ord,scale){
+    scale=scale||1; var r=22*scale;
+    // cone
+    ctx.fillStyle='#e0a860'; ctx.beginPath(); ctx.moveTo(cx-r*0.8,by); ctx.lineTo(cx+r*0.8,by); ctx.lineTo(cx,by+r*2.2); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#c98a4a'; ctx.lineWidth=1; for(var w=-1;w<=1;w+=0.5){ ctx.beginPath(); ctx.moveTo(cx+w*r*0.5,by); ctx.lineTo(cx,by+r*2.2); ctx.stroke(); }
+    // scoops stacked upward
+    for(var i=0;i<ord.scoops.length;i++){ var sy=by-i*r*1.0; ctx.fillStyle=FLAV[ord.scoops[i]].c; ctx.beginPath(); ctx.arc(cx,sy,r,0,6.29); ctx.fill(); ctx.strokeStyle='rgba(0,0,0,0.12)'; ctx.lineWidth=2; ctx.stroke(); }
+    // topping
+    if(ord.top>=0){ var ty=by-(ord.scoops.length-1)*r*1.0 - r*0.9; ctx.font=(r*1.1)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(TOPS[ord.top],cx,ty); }
+    else if(ord.scoops.length===0){ ctx.fillStyle='#b98'; ctx.font='12px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('empty',cx,by-10); }
+  }
+  function render(){
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#fff0f6'); g.addColorStop(1,'#ffd9e8'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // counter
+    ctx.fillStyle='#d98ab0'; ctx.fillRect(0,H*0.62,W,6);
+    // customer
+    var cxC=W*0.24, cyC=H*0.34;
+    ctx.fillStyle='#12406b'; ctx.beginPath(); ctx.arc(cxC,cyC+30,26,Math.PI,6.29); ctx.fill();
+    ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(cxC,cyC,22,0,6.29); ctx.fill();
+    ctx.fillStyle='#3a2a1a'; ctx.beginPath(); ctx.arc(cxC,cyC-6,22,Math.PI,6.29); ctx.fill();
+    ctx.font='24px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(custHappy>0?'😍':custHappy<0?'😠':custFace,cxC,cyC+2);
+    if(custHappy>0){ custHappy-=0.02; } if(custHappy<0){ custHappy+=0.02; }
+    // order bubble
+    ctx.fillStyle='#fff'; roundRect(cxC+34,cyC-70,W*0.42,110,14); ctx.fill(); ctx.strokeStyle='#d98ab0'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle='#5a2340'; ctx.font='bold 14px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('I want:',cxC+34+W*0.21,cyC-52);
+    drawCone(cxC+34+W*0.21, cyC+20, order, 0.8);
+    // your cone
+    ctx.fillStyle='#5a2340'; ctx.font='bold 16px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('👇 Your cone',W*0.72,H*0.14);
+    drawCone(W*0.72, H*0.5, build, 1.1);
+  }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

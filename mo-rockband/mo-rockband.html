@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO ROCK BAND</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#12082a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0007;}
+  .pill{background:#0008;border-radius:20px;padding:6px 14px;font-size:17px;}
+  #keys{position:fixed;bottom:0;left:0;right:0;height:110px;display:flex;}
+  .lk{flex:1;border:none;border-top:4px solid #fff3;font-size:0;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#12082add;text-align:center;}
+  #over h1{font-size:38px;margin:0 0 6px;color:#ff6ad5;} #over p{font-size:20px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#ff6ad5,#c0369a);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #7a1c58;font-family:inherit;}
+  #hint{position:fixed;bottom:118px;left:0;right:0;text-align:center;font-size:14px;color:#e7d6ff;pointer-events:none;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">🎵 <span id="score">0</span></div>
+  <div class="pill">🔥 <span id="combo">0</span></div>
+  <div class="pill">⏱️ <span id="time">60</span>s</div>
+</div>
+<div id="hint">Tap the lane when its note hits the line! 🎸</div>
+<div id="keys">
+  <button class="lk" data-l="0" style="background:linear-gradient(#e0453a,#a52a24)"></button>
+  <button class="lk" data-l="1" style="background:linear-gradient(#37b06a,#1f7a44)"></button>
+  <button class="lk" data-l="2" style="background:linear-gradient(#43c6ff,#1a8fd6)"></button>
+  <button class="lk" data-l="3" style="background:linear-gradient(#ffd23f,#e0a800)"></button>
+</div>
+<div id="over"><h1 id="ot">🎸 SONG DONE!</h1><p id="os"></p><button class="btn" id="again">Play Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1,HITY=0;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); HITY=H-140; }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'triangle';o.frequency.value=f;g.gain.value=v||0.08;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.2));o.stop(a.currentTime+(d||0.2)+0.02);}catch(e){} }
+  var COL=['#e0453a','#37b06a','#43c6ff','#ffd23f'], FRQ=[262,330,392,494];
+  var notes, spawnT, speed, score, combo, best, timeLeft, running, flashL, judge, judgeT, nowv=0, rock=0;
+  function reset(){ notes=[]; spawnT=0; speed=5; score=0; combo=0; timeLeft=60; running=true; flashL=[0,0,0,0]; judge=''; judgeT=0;
+    document.getElementById('over').style.display='none'; document.getElementById('score').textContent='0'; document.getElementById('combo').textContent='0'; document.getElementById('time').textContent='60';
+    if(!reset._t){ reset._t=setInterval(function(){ if(running){ timeLeft--; document.getElementById('time').textContent=Math.max(0,timeLeft); if(timeLeft<=0) over(); } },1000); } }
+  function laneX(l){ return W*(0.5) + (l-1.5)*Math.min(90,W*0.16); }
+  function spawn(){ var n=Math.random()<0.2?2:1; var used={}; for(var i=0;i<n;i++){ var l; do{ l=Math.floor(Math.random()*4); }while(used[l]); used[l]=1; notes.push({l:l,y:-30}); } }
+  function hit(l){ if(!running)return; flashL[l]=1; var bestN=null,bd=999;
+    for(var i=0;i<notes.length;i++){ if(notes[i].l===l && !notes[i].dead){ var d=Math.abs(notes[i].y-HITY); if(d<bd){bd=d;bestN=notes[i];} } }
+    if(bestN && bd<48){ bestN.dead=true; var pts=bd<18?100:50; score+=pts+combo; combo++; document.getElementById('score').textContent=score; document.getElementById('combo').textContent=combo;
+      judge=bd<18?'PERFECT!':'GOOD'; judgeT=1; rock=1; beep(FRQ[l],0.25,'triangle',0.09); }
+    else { combo=0; document.getElementById('combo').textContent='0'; judge='miss'; judgeT=1; beep(120,0.1,'sawtooth',0.05); }
+  }
+  var lks=document.querySelectorAll('.lk');
+  for(var i=0;i<lks.length;i++){ (function(b){ var l=+b.getAttribute('data-l'); b.addEventListener('touchstart',function(e){hit(l);e.preventDefault();},{passive:false}); b.addEventListener('mousedown',function(){hit(l);}); })(lks[i]); }
+  addEventListener('keydown',function(e){ var m={'a':0,'s':1,'d':2,'f':3,'ArrowLeft':0,'ArrowUp':1,'ArrowDown':2,'ArrowRight':3}; if(m[e.key]!==undefined)hit(m[e.key]); });
+  document.getElementById('again').onclick=reset;
+  function over(){ running=false; document.getElementById('os').innerHTML='You scored <b>'+score+'</b>! 🎶'; document.getElementById('over').style.display='flex'; }
+  function update(dt){
+    speed+=0.002*dt; spawnT-=dt; if(spawnT<=0){ spawn(); spawnT=Math.max(16,32-speed); }
+    for(var i=notes.length-1;i>=0;i--){ var n=notes[i]; n.y+=speed*dt;
+      if(n.y>HITY+60){ if(!n.dead){ combo=0; document.getElementById('combo').textContent='0'; } notes.splice(i,1); } }
+    for(var l=0;l<4;l++){ if(flashL[l]>0)flashL[l]-=0.06*dt; }
+    if(judgeT>0)judgeT-=0.015*dt; if(rock>0)rock-=0.04*dt;
+  }
+  function render(){
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#2a1050'); g.addColorStop(1,'#12082a'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // stage lights
+    ctx.save(); ctx.globalAlpha=0.12; for(var i=0;i<4;i++){ ctx.fillStyle=COL[i]; ctx.beginPath(); ctx.moveTo(laneX(i),H*0.1); ctx.lineTo(laneX(i)-50,H); ctx.lineTo(laneX(i)+50,H); ctx.closePath(); ctx.fill(); } ctx.restore();
+    // Mo rocking at top
+    drawRocker(W/2,H*0.16);
+    // highway lanes
+    var lw=Math.min(80,W*0.15);
+    for(var l=0;l<4;l++){ var x=laneX(l); ctx.fillStyle= (l%2)?'rgba(255,255,255,0.03)':'rgba(255,255,255,0.06)'; ctx.fillRect(x-lw/2,H*0.22,lw,H);
+      // flash
+      if(flashL[l]>0){ ctx.fillStyle='rgba(255,255,255,'+flashL[l]*0.25+')'; ctx.fillRect(x-lw/2,H*0.22,lw,H); } }
+    // hit line
+    ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(laneX(0)-lw/2,HITY); ctx.lineTo(laneX(3)+lw/2,HITY); ctx.stroke();
+    for(var l2=0;l2<4;l2++){ var x2=laneX(l2); ctx.strokeStyle=COL[l2]; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(x2,HITY,22,0,6.29); ctx.stroke(); }
+    // notes
+    for(var i=0;i<notes.length;i++){ var n=notes[i]; if(n.dead)continue; var x=laneX(n.l);
+      ctx.fillStyle=COL[n.l]; ctx.beginPath(); ctx.arc(x,n.y,20,0,6.29); ctx.fill(); ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(x-5,n.y-5,7,0,6.29); ctx.fill(); }
+    // judge text
+    if(judgeT>0 && judge){ ctx.globalAlpha=Math.min(1,judgeT*2); ctx.fillStyle=judge==='miss'?'#ff6a6a':judge==='PERFECT!'?'#ffd23f':'#7bff9e'; ctx.font='bold 30px Trebuchet MS'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(judge,W/2,HITY-70); ctx.globalAlpha=1; }
+  }
+  function drawRocker(x,y){ var b=rock>0?Math.sin(nowv*0.05)*6:0; ctx.save(); ctx.translate(x,y+b);
+    // guitar
+    ctx.strokeStyle='#e0453a'; ctx.lineWidth=6; ctx.beginPath(); ctx.moveTo(-8,6); ctx.lineTo(36,20); ctx.stroke(); ctx.fillStyle='#ffd23f'; ctx.beginPath(); ctx.ellipse(-14,4,12,9,0,0,6.29); ctx.fill();
+    ctx.fillStyle='#1a6fd0'; roundRect(-14,-16,28,30,8); ctx.fill();
+    ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(0,-24,11,0,6.29); ctx.fill(); ctx.fillStyle='#3a2a1a'; ctx.beginPath(); ctx.arc(0,-28,11,Math.PI,6.29); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('MO',0,-2);
+    ctx.restore(); }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(running) update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

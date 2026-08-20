@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO PIZZA DELIVERY</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#3a3f47;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0007;}
+  .pill{background:#0008;border-radius:20px;padding:6px 14px;font-size:17px;}
+  #hint{position:fixed;bottom:14px;left:0;right:0;text-align:center;font-size:14px;color:#eee;pointer-events:none;text-shadow:0 1px 2px #000;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#3a3f47dd;text-align:center;}
+  #over h1{font-size:38px;margin:0 0 6px;color:#ffd23f;} #over p{font-size:20px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#e88a2a,#c0501a);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #7a3010;font-family:inherit;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">🍕 <span id="score">0</span></div>
+  <div class="pill">⏱️ <span id="time">45</span>s</div>
+  <div class="pill">🏆 <span id="best">0</span></div>
+</div>
+<div id="hint">Drag to steer • hit 🏠 houses to deliver (+time) • dodge 🚗 cars!</div>
+<div id="over"><h1 id="ot">⏰ TIME UP!</h1><p id="os"></p><button class="btn" id="again">Deliver Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1,RX=0,RW=0;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); RW=Math.min(460,W*0.72); RX=(W-RW)/2; }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  var best=+(localStorage.getItem('mopizza_best')||0); document.getElementById('best').textContent=best;
+  var sc, items, spawnT, speed, timeLeft, score, running, scroll, flash, nowv=0;
+  function reset(){ sc={x:W/2,tx:W/2}; items=[]; spawnT=0; speed=4.5; timeLeft=45; score=0; running=true; scroll=0; flash=0;
+    document.getElementById('over').style.display='none'; document.getElementById('score').textContent='0'; document.getElementById('time').textContent='45';
+    if(!reset._t){ reset._t=setInterval(function(){ if(running){ timeLeft--; document.getElementById('time').textContent=Math.max(0,Math.ceil(timeLeft)); if(timeLeft<=0) over(); } },1000); } }
+  function rnd(a,b){return a+Math.random()*(b-a);}
+  function spawn(){ var r=Math.random(); var x=RX+rnd(30,RW-30);
+    if(r<0.5) items.push({t:'car',x:x,y:-50,c:['#e0453a','#2f6fd0','#37b06a','#8a63d2'][Math.floor(rnd(0,4))]});
+    else if(r<0.85) items.push({t:'house',x:(Math.random()<0.5?RX-1:RX+RW+1),side:(Math.random()<0.5?-1:1),y:-50});
+    else items.push({t:'coin',x:x,y:-50}); }
+  var down=false; function px(e){ var r=cv.getBoundingClientRect(); return (e.touches?e.touches[0].clientX:e.clientX)-r.left; }
+  cv.addEventListener('mousedown',function(e){down=true;sc.tx=px(e);}); cv.addEventListener('mousemove',function(e){if(down)sc.tx=px(e);}); addEventListener('mouseup',function(){down=false;});
+  cv.addEventListener('touchstart',function(e){down=true;sc.tx=px(e);e.preventDefault();},{passive:false}); cv.addEventListener('touchmove',function(e){sc.tx=px(e);e.preventDefault();},{passive:false}); addEventListener('touchend',function(){down=false;});
+  addEventListener('keydown',function(e){ if(e.key==='ArrowLeft')sc.tx-=50; if(e.key==='ArrowRight')sc.tx+=50; });
+  document.getElementById('again').onclick=reset;
+  function over(){ running=false; if(score>best){best=score;localStorage.setItem('mopizza_best',best);document.getElementById('best').textContent=best;}
+    document.getElementById('os').innerHTML='You delivered <b>'+score+'</b> pizzas!<br>Best: <b>'+best+'</b>'; document.getElementById('over').style.display='flex'; }
+  function update(dt){
+    speed+=0.002*dt; scroll+=speed*dt;
+    sc.x+=(sc.tx-sc.x)*0.25*dt; sc.x=Math.max(RX+18,Math.min(RX+RW-18,sc.x));
+    spawnT-=dt; if(spawnT<=0){ spawn(); spawnT=Math.max(16,40-speed); }
+    var sy=H-80;
+    for(var i=items.length-1;i>=0;i--){ var o=items[i]; o.y+=speed*dt;
+      if(o.y>H+60){ items.splice(i,1); continue; }
+      var hitx = o.t==='house' ? Math.abs((o.x+(o.side>0?-24:24))-sc.x) : Math.abs(o.x-sc.x);
+      if(Math.abs(o.y-sy)<28 && hitx<32){
+        if(o.t==='car'){ timeLeft=Math.max(0,timeLeft-4); flash=1; beep(150,0.2,'sawtooth',0.08); items.splice(i,1); }
+        else if(o.t==='house'){ score++; timeLeft+=4; document.getElementById('score').textContent=score; beep(700,0.09,'square',0.06); setTimeout(function(){beep(1000,0.1,'square',0.05);},70); items.splice(i,1); }
+        else { timeLeft+=1; beep(880,0.07,'square',0.05); items.splice(i,1); }
+      }
+    }
+    if(flash>0) flash-=0.05*dt;
+  }
+  function render(){
+    // grass sides
+    ctx.fillStyle='#4a9d3a'; ctx.fillRect(0,0,W,H);
+    // road
+    ctx.fillStyle='#4a4f57'; ctx.fillRect(RX,0,RW,H);
+    ctx.fillStyle='#3a3f47'; ctx.fillRect(RX-6,0,6,H); ctx.fillRect(RX+RW,0,6,H);
+    // center dashes
+    ctx.fillStyle='#ffd23f'; for(var y=(scroll%60)-60;y<H;y+=60){ ctx.fillRect(W/2-3,y,6,32); }
+    // sidewalk buildings hint
+    ctx.fillStyle='#7a8593'; for(var yb=(scroll%140)-140;yb<H;yb+=140){ ctx.fillRect(RX-70,yb,58,90); ctx.fillRect(RX+RW+12,yb,58,90); }
+    items.sort(function(a,b){return a.y-b.y;});
+    for(var i=0;i<items.length;i++) drawItem(items[i]);
+    drawScooter();
+    if(flash>0){ ctx.fillStyle='rgba(255,0,0,'+flash*0.3+')'; ctx.fillRect(0,0,W,H); }
+  }
+  function drawItem(o){ ctx.textAlign='center'; ctx.textBaseline='middle';
+    if(o.t==='car'){ ctx.save(); ctx.translate(o.x,o.y); ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(0,18,20,5,0,0,6.29); ctx.fill();
+      ctx.fillStyle=o.c; roundRect(-18,-24,36,48,9); ctx.fill(); ctx.fillStyle='#22303a'; roundRect(-13,-16,26,14,4); ctx.fill(); roundRect(-13,6,26,12,4); ctx.fill(); ctx.restore(); }
+    else if(o.t==='house'){ ctx.font='40px sans-serif'; ctx.fillText('🏠',o.x+(o.side>0?-24:24),o.y);
+      var gx=o.x+(o.side>0?-24:24); var a=0.4+0.4*Math.sin(nowv*0.008); ctx.fillStyle='rgba(255,210,63,'+a+')'; ctx.font='18px sans-serif'; ctx.fillText('🍕',gx,o.y-30); }
+    else if(o.t==='coin'){ ctx.fillStyle='#ffd23f'; ctx.beginPath(); ctx.arc(o.x,o.y,12,0,6.29); ctx.fill(); ctx.fillStyle='#caa314'; ctx.font='bold 14px sans-serif'; ctx.fillText('⏱',o.x,o.y+1); }
+  }
+  function drawScooter(){ var x=sc.x,y=H-80; ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(0,26,20,6,0,0,6.29); ctx.fill();
+    ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(0,20,9,0,6.29); ctx.arc(0,-20,9,0,6.29); ctx.fill();
+    ctx.fillStyle='#e0453a'; roundRect(-12,-14,24,34,8); ctx.fill();
+    ctx.fillStyle='#f2b705'; roundRect(-14,-26,28,14,5); ctx.fill(); ctx.fillStyle='#7a3010'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🍕',0,-19);
+    // Mo rider
+    ctx.fillStyle='#12406b'; roundRect(-9,-6,18,20,6); ctx.fill(); ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(0,-12,8,0,6.29); ctx.fill(); ctx.fillStyle='#e0453a'; ctx.fillRect(-8,-18,16,6);
+    ctx.restore(); }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(running) update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
