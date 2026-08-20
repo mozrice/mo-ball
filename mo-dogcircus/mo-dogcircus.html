@@ -4,53 +4,80 @@
 <title>MO Dog Circus</title>
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
-  html,body{margin:0;height:100%;background:#12203a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  html,body{margin:0;height:100%;background:#c04a6a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
   canvas{display:block;width:100%;height:100%;}
-  a.back{position:fixed;top:8px;left:10px;color:#bcd0ea;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;}
-  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:17px;font-weight:bold;color:#ffd23f;pointer-events:none;}
-  #tools{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:5px;flex-wrap:wrap;padding:8px;background:#0a1224dd;}
-  .tool{font-size:24px;background:#26325a;border:2px solid #3a4a7a;border-radius:12px;padding:5px 9px;font-family:inherit;color:#fff;}
-  .tool.sel{border-color:#ffd23f;background:#3a4a2a;}
-  .act{font-size:14px;font-weight:bold;background:#26325a;border:2px solid #4a5a8a;border-radius:12px;padding:8px 10px;color:#fff;font-family:inherit;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;opacity:.85;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;text-shadow:0 1px 3px #0008;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:18px;font-weight:bold;color:#fff;pointer-events:none;text-shadow:0 1px 3px #0009;}
+  #sub{position:fixed;top:34px;left:0;right:0;text-align:center;font-size:14px;font-weight:bold;color:#ffe;pointer-events:none;text-shadow:0 1px 3px #0009;}
+  #over{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:#0009;color:#fff;z-index:7;text-align:center;padding:20px;}
+  #over h1{font-size:32px;margin:0 0 8px;color:#ffd23f;text-shadow:0 2px 0 #b47a1a;}
+  #over p{font-size:18px;margin:4px;}
+  #over button{margin-top:16px;background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+  #over button:active{transform:translateY(3px);box-shadow:0 2px 0 #b4801a;}
+  #start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#c04a6a;color:#fff;z-index:8;text-align:center;padding:20px;}
+  #start .big{font-size:60px;margin-bottom:6px;}
+  #start h1{font-size:26px;margin:0 0 6px;text-shadow:0 2px 4px #0007;}
+  #start p{font-size:16px;margin:4px 0;opacity:.95;max-width:320px;}
+  #start button{margin-top:18px;background:linear-gradient(#8fe,#2ec4b6);border:none;color:#063;font-weight:bold;font-size:24px;padding:16px 36px;border-radius:18px;font-family:inherit;box-shadow:0 6px 0 #1a998e;}
+  #start button:active{transform:translateY(3px);box-shadow:0 3px 0 #1a998e;}
 </style></head>
 <body>
 <a class="back" href="../games.html">&#11013; Games</a>
-<div id="hud">&#127914; Dog circus show! &nbsp; &#128993;<span id="cnt">0</span></div>
+<div id="hud">&#11088; <span id="sc">0</span> &nbsp; &#9201;&#65039; <span id="t">45</span>s &nbsp; &#127942; <span id="hi">0</span></div>
+<div id="sub"></div>
 <canvas id="c"></canvas>
-<div id="tools"></div>
+<div id="start"><div class="big">🎪</div><h1>MO Dog Circus</h1><p>Catch circus pups and balls!</p><p>Get <b>25</b> to become MVP! Tap fast &#128293;</p><button id="go">&#9654; PLAY</button></div>
+<div id="over"><h1 id="otitle">Time!</h1><p id="omsg"></p><p id="obest"></p><button id="rs">&#9654; Play Again</button></div>
 <script>
 (function(){
   var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
   function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
   window.addEventListener('resize',fit); fit();
-  var PAL=["🐶", "🎪", "🤹", "🎈", "🔥", "🦴", "⭐", "🎩", "🎠", "🎉"]; var BG=["#ffd0e0", "#fff0f5", "#c83a7a"]; var items=[], tool=PAL[0], sz=28;
-  // which emojis should walk (animals/characters)
-  function walks(e){ return /[🐀-\uDFFF]/.test(e) && '🐶🐕🐈🐱🐇🐰🐦🦜🦆🐢🐍🐒🦁🐯🐘🦓🦌🐄🐖🐔🐑🦋🐝🐛🐧🦉🕊️🦢🐩🐾🧑‍🍳🦸🤹🧙👽🤖'.indexOf(e)>=0; }
-  var tb=document.getElementById('tools');
-  PAL.forEach(function(e,i){ var b=document.createElement('button'); b.className='tool'+(i===0?' sel':''); b.textContent=e; b.onclick=function(){ var all=tb.querySelectorAll('.tool'); for(var j=0;j<all.length;j++)all[j].classList.remove('sel'); b.classList.add('sel'); tool=e; }; tb.appendChild(b); });
-  var er=document.createElement('button'); er.className='tool'; er.innerHTML='&#129529;'; er.onclick=function(){ var all=tb.querySelectorAll('.tool'); for(var j=0;j<all.length;j++)all[j].classList.remove('sel'); er.classList.add('sel'); tool='ERASE'; }; tb.appendChild(er);
-  var cl=document.createElement('button'); cl.className='act'; cl.innerHTML='&#129529; Clear'; cl.onclick=function(){ items=[]; document.getElementById('cnt').textContent=0; }; tb.appendChild(cl);
-  function place(e){ var t0=e.changedTouches?e.changedTouches[0]:e; var r=cv.getBoundingClientRect(); var x=t0.clientX-r.left,y=t0.clientY-r.top; if(y>H-62)return;
-    if(tool==='ERASE'){ for(var i=items.length-1;i>=0;i--){ if(Math.hypot(items[i].x-x,items[i].y-y)<sz*0.7){ items.splice(i,1); break; } } }
-    else { var w=walks(tool); items.push({x:x,y:y,e:tool,vx:w?(Math.random()-0.5)*1.6:0,vy:w?(Math.random()-0.5)*1.6:0,walk:w,ph:Math.random()*6.28,turn:0,face:1}); }
-    document.getElementById('cnt').textContent=items.length; }
-  var dn=false;
-  cv.addEventListener('touchstart',function(e){dn=true;place(e);e.preventDefault();},{passive:false});
-  cv.addEventListener('touchmove',function(e){if(dn)place(e);e.preventDefault();},{passive:false});
-  cv.addEventListener('mousedown',function(e){dn=true;place(e);});
-  cv.addEventListener('mousemove',function(e){if(dn)place(e);});
-  window.addEventListener('mouseup',function(){dn=false;});
-  var tt=0;
-  function loop(){ tt+=0.1; var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,BG[0]); g.addColorStop(1,BG[1]); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-    if(BG[2]){ ctx.fillStyle=BG[2]; ctx.fillRect(0,H*0.7,W,H*0.3); }
+  var GOOD=["🐶", "🎪", "🤸", "🎫", "🎵"], BAD=["🤡", "💥"], GOLD="⭐", BG=["#c04a6a", "#e070a0", "#a03a5a"], GOAL=25;
+  var HK='moReal_dogcircus'; function getHi(){ try{return +localStorage.getItem(HK)||0;}catch(e){return 0;} } function setHi(v){ try{localStorage.setItem(HK,v);}catch(e){} }
+  var items=[], score=0, time=45, running=false, combo=0, comboT=0, pops=[], tt=0, spawnT=0, best;
+  best=getHi(); document.getElementById('hi').textContent=best;
+  function reset(){ items=[]; score=0; time=45; running=true; combo=0; comboT=0; pops=[]; tt=0; spawnT=0;
+    document.getElementById('sc').textContent=0; document.getElementById('t').textContent=45; document.getElementById('sub').textContent='';
+    document.getElementById('over').style.display='none'; document.getElementById('start').style.display='none'; }
+  function spawn(){ var r=Math.random(), kind, e;
+    if(r<0.12){ kind='gold'; e=GOLD; } else if(r<0.12+0.14 && BAD.length){ kind='bad'; e=BAD[Math.floor(Math.random()*BAD.length)]; }
+    else { kind='good'; e=GOOD[Math.floor(Math.random()*GOOD.length)]; }
+    var x=30+Math.random()*(W-60); items.push({x:x,y:-30,e:e,kind:kind,vy:1.1+Math.random()*1.3+score*0.012,vx:(Math.random()-0.5)*1.0,sz:40,ph:Math.random()*6.28,dead:0}); }
+  function pop(x,y,txt,col){ pops.push({x:x,y:y,txt:txt,col:col,life:34}); }
+  function tap(e){ if(!running)return; var t0=e.changedTouches?e.changedTouches[0]:e; var r=cv.getBoundingClientRect(); var x=t0.clientX-r.left,y=t0.clientY-r.top;
+    for(var i=items.length-1;i>=0;i--){ var it=items[i]; if(it.dead)continue; if(Math.hypot(it.x-x,it.y-y)<34){ hit(it); return; } } }
+  function hit(it){ it.dead=1;
+    if(it.kind==='bad'){ score=Math.max(0,score-1); combo=0; pop(it.x,it.y,'-1',' #ff6a6a'); beep(150,0.14,'sawtooth'); flash=8; }
+    else { var pts=it.kind==='gold'?3:1; combo++; comboT=40; if(combo>=3)pts+=1; score+=pts; pop(it.x,it.y,'+'+pts,it.kind==='gold'?'#ffd23f':'#8fffa8'); beep(it.kind==='gold'?980:640+combo*20,0.07,'square'); if(combo>=3)document.getElementById('sub').textContent='&#128293; COMBO x'+combo+'!'; }
+    document.getElementById('sc').textContent=score;
+    if(score>best){ best=score; setHi(best); document.getElementById('hi').textContent=best; }
+    if(score>=GOAL && running){ win(); } }
+  var flash=0;
+  cv.addEventListener('touchstart',function(e){ tap(e); e.preventDefault(); },{passive:false});
+  cv.addEventListener('mousedown',function(e){ tap(e); });
+  function tick(){ if(!running)return; time-=0.1; if(time<=0){ time=0; over(); } document.getElementById('t').textContent=Math.ceil(time); }
+  function win(){ running=false; document.getElementById('otitle').textContent='&#127881; YOU WIN! &#127881;'; document.getElementById('omsg').textContent='You scored '+score+'! MVP!'; document.getElementById('obest').textContent='Best: '+best; document.getElementById('over').style.display='flex'; if(window.MO_MVP)window.MO_MVP(); }
+  function over(){ running=false; document.getElementById('otitle').textContent="&#9201;&#65039; Time's Up!"; document.getElementById('omsg').textContent='You scored '+score+' out of '+GOAL; document.getElementById('obest').textContent='Best: '+best; document.getElementById('over').style.display='flex'; if(score>=GOAL && window.MO_MVP)window.MO_MVP(); }
+  function loop(){ tt+=0.1; if(flash>0)flash--; if(comboT>0){comboT--; if(comboT===0){combo=0;document.getElementById('sub').textContent='';}}
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,BG[0]); g.addColorStop(1,BG[1]); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    if(BG[2]){ ctx.fillStyle=BG[2]; ctx.fillRect(0,H*0.82,W,H*0.18); }
+    if(running){ spawnT-=1; if(spawnT<=0){ spawn(); spawnT=Math.max(14,42-score*0.6); } }
     ctx.textAlign='center'; ctx.textBaseline='middle';
-    for(var i=0;i<items.length;i++){ var it=items[i];
-      if(it.walk){ it.turn-=1; if(it.turn<=0){ it.vx=(Math.random()-0.5)*1.8; it.vy=(Math.random()-0.5)*1.8; it.turn=30+Math.random()*60; } it.x+=it.vx; it.y+=it.vy; if(it.x<16){it.x=16;it.vx=Math.abs(it.vx);} if(it.x>W-16){it.x=W-16;it.vx=-Math.abs(it.vx);} if(it.y<70){it.y=70;it.vy=Math.abs(it.vy);} if(it.y>H-74){it.y=H-74;it.vy=-Math.abs(it.vy);} if(it.vx<0)it.face=-1; else if(it.vx>0)it.face=1; }
-      var bob=it.walk?Math.abs(Math.sin(tt*3+it.ph))*3:0;
-      ctx.save(); ctx.translate(it.x,it.y-bob); if(it.walk)ctx.scale(it.face,1); ctx.font=sz+'px sans-serif'; ctx.fillText(it.e,0,0); ctx.restore(); }
-    ctx.fillStyle='#fff9'; ctx.font='13px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('Tap to build a dog circus!',W/2,H-70);
+    for(var i=items.length-1;i>=0;i--){ var it=items[i]; if(!it.dead && running){ it.y+=it.vy; it.x+=it.vx; if(it.x<20){it.x=20;it.vx=Math.abs(it.vx);} if(it.x>W-20){it.x=W-20;it.vx=-Math.abs(it.vx);} }
+      if(it.y>H+40){ items.splice(i,1); continue; }
+      if(it.dead){ it.y+=3; it.sz*=0.86; if(it.sz<8){ items.splice(i,1); continue; } }
+      var wob=Math.sin(tt*3+it.ph)*0.12;
+      ctx.save(); ctx.translate(it.x,it.y); ctx.rotate(wob);
+      if(it.kind==='gold'){ ctx.shadowColor='#ffd23f'; ctx.shadowBlur=16; }
+      ctx.font=it.sz+'px sans-serif'; ctx.fillText(it.e,0,0); ctx.restore(); }
+    for(var p=pops.length-1;p>=0;p--){ var pp=pops[p]; pp.y-=1.2; pp.life--; if(pp.life<=0){ pops.splice(p,1); continue; } ctx.globalAlpha=Math.min(1,pp.life/20); ctx.fillStyle=pp.col; ctx.font='bold 22px Trebuchet MS'; ctx.fillText(pp.txt,pp.x,pp.y); ctx.globalAlpha=1; }
+    if(flash>0){ ctx.fillStyle='rgba(255,60,60,'+(flash/20)+')'; ctx.fillRect(0,0,W,H); }
     requestAnimationFrame(loop); }
-  requestAnimationFrame(loop);
+  var ac; function beep(f,d,ty){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type=ty||'square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  document.getElementById('go').onclick=function(){ reset(); };
+  document.getElementById('rs').onclick=function(){ reset(); };
+  setInterval(tick,100); requestAnimationFrame(loop);
 })();
 </script>
 <script>

@@ -1,75 +1,107 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>MO Hardware Store</title>
+<title>MO Hardware Rush</title>
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
-  html,body{margin:0;height:100%;background:#3a3a44;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  html,body{margin:0;height:100%;background:#e0a040;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
   canvas{display:block;width:100%;height:100%;}
-  a.back{position:fixed;top:8px;left:10px;color:#ffd8b0;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;}
-  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:18px;font-weight:bold;color:#ff9f43;pointer-events:none;}
-  #bar{position:fixed;bottom:0;left:0;right:0;background:#1a1208ee;padding:6px 6px 8px;z-index:6;}
-  #cats{display:flex;justify-content:center;gap:5px;margin-bottom:5px;flex-wrap:wrap;}
-  .cat{font-size:16px;background:#5a3a1a;border:2px solid #8a5a2a;border-radius:12px;padding:5px 8px;color:#fff;font-family:inherit;}
-  .cat.sel{border-color:#ffd23f;background:#7a4a1a;}
-  #items{display:flex;justify-content:center;gap:5px;flex-wrap:wrap;}
-  .it{font-size:24px;background:#2a2018;border:2px solid #6a4a2a;border-radius:12px;padding:4px 8px;font-family:inherit;color:#fff;}
-  .it.sel{border-color:#ffd23f;background:#4a3418;}
-  .act{font-size:13px;font-weight:bold;background:#e0662a;border:none;border-radius:12px;padding:6px 9px;color:#fff;font-family:inherit;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;opacity:.85;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;text-shadow:0 1px 3px #0008;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:18px;font-weight:bold;color:#fff;pointer-events:none;text-shadow:0 1px 3px #0009;}
+  #sub{position:fixed;top:34px;left:0;right:0;text-align:center;font-size:14px;font-weight:bold;color:#ffe;pointer-events:none;text-shadow:0 1px 3px #0009;}
+  #over{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:#0009;color:#fff;z-index:7;text-align:center;padding:20px;}
+  #over h1{font-size:32px;margin:0 0 8px;color:#ffd23f;text-shadow:0 2px 0 #b47a1a;}
+  #over p{font-size:18px;margin:4px;}
+  #over button{margin-top:16px;background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+  #over button:active{transform:translateY(3px);box-shadow:0 2px 0 #b4801a;}
+  #start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#e0a040;color:#fff;z-index:8;text-align:center;padding:20px;}
+  #start .big{font-size:60px;margin-bottom:6px;}
+  #start h1{font-size:26px;margin:0 0 6px;text-shadow:0 2px 4px #0007;}
+  #start p{font-size:16px;margin:4px 0;opacity:.95;max-width:320px;}
+  #start button{margin-top:18px;background:linear-gradient(#8fe,#2ec4b6);border:none;color:#063;font-weight:bold;font-size:24px;padding:16px 36px;border-radius:18px;font-family:inherit;box-shadow:0 6px 0 #1a998e;}
+  #start button:active{transform:translateY(3px);box-shadow:0 3px 0 #1a998e;}
 </style></head>
 <body>
-<a class="back" href="../games.html">⬅ Games</a>
-<div id="hud">🔨 MO'S HARDWARE &nbsp; 📦<span id="cnt">0</span></div>
+<a class="back" href="../games.html">&#11013; Games</a>
+<div id="hud">&#11088; <span id="sc">0</span> &nbsp; &#9201;&#65039; <span id="t">45</span>s &nbsp; &#127942; <span id="hi">0</span></div>
+<div id="sub"></div>
 <canvas id="c"></canvas>
-<div id="bar"><div id="cats"></div><div id="items"></div></div>
+<div id="start"><div class="big">🔨</div><h1>MO Hardware Rush</h1><p>Grab tools! Dodge the junk.</p><p>Get <b>28</b> to become MVP! Tap fast &#128293;</p><button id="go">&#9654; PLAY</button></div>
+<div id="over"><h1 id="otitle">Time!</h1><p id="omsg"></p><p id="obest"></p><button id="rs">&#9654; Play Again</button></div>
 <script>
 (function(){
   var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
   function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
   window.addEventListener('resize',fit); fit();
-  var CATS=[
-    {n:'🔨 Tools',items:['🔨','🪛','🔧','🪚','🗜️','🔩','⚙️','🪝','🧰','⛏️']},
-    {n:'🧱 Building',items:['🧱','🪵','🚪','🪟','🪜','🛠️','🚽','🛁','🚿','🪠']},
-    {n:'🌱 Garden',items:['🌱','🌳','🪴','🌷','🌻','🍅','🧤','🌵','🪨','🐛']},
-    {n:'🎨 Paint',items:['🖌️','🪣','🧴','🧽','🎨','🧯','💡','🔦','🔌','🕯️']},
-    {n:'🛒 Store',items:['🛒','🏷️','📦','🧾','🛍️','🚚','🏪','🧑‍🔧','💵','📋']}
-  ];
-  var TILES=[ ['#c8c8c8','#a8a8a8'],['#c8a060','#a07840'],['#7ab0e0','#5a90c0'],['#e0a0a0','#c08080'],['#a0d0a0','#80b080'],['#d0d0d0','#404040'] ];
-  var items=[], cat=0, cur=CATS[0].items[0], ti=0, tileSize=44;
-  var cats=document.getElementById('cats'), ib=document.getElementById('items');
-  CATS.forEach(function(c,i){ var b=document.createElement('button'); b.className='cat'+(i===0?' sel':''); b.textContent=c.n; b.onclick=function(){ cat=i; for(var j=0;j<cats.children.length;j++)if(cats.children[j].classList.contains('cat'))cats.children[j].classList.remove('sel'); b.classList.add('sel'); buildItems(); }; cats.appendChild(b); });
-  function addAct(l,fn){ var b=document.createElement('button'); b.className='act'; b.innerHTML=l; b.onclick=fn; cats.appendChild(b); }
-  addAct('🔲 Tile Floor',function(){ ti=(ti+1)%TILES.length; });
-  addAct('🧽 Erase',function(){ cur='ERASE'; refreshSel(); });
-  addAct('🧹 Clear',function(){ items=[]; document.getElementById('cnt').textContent=0; });
-  function buildItems(){ ib.innerHTML=''; CATS[cat].items.forEach(function(e){ var b=document.createElement('button'); b.className='it'+(e===cur?' sel':''); b.textContent=e; b.dataset.e=e; b.onclick=function(){ cur=e; refreshSel(); }; ib.appendChild(b); }); }
-  function refreshSel(){ var all=ib.querySelectorAll('.it'); for(var i=0;i<all.length;i++)all[i].classList.toggle('sel',all[i].dataset.e===cur); }
-  buildItems();
-  function place(e){ var t=e.changedTouches?e.changedTouches[0]:e; var r=cv.getBoundingClientRect(); var x=t.clientX-r.left,y=t.clientY-r.top; if(y>H-96||y<52)return;
-    if(cur==='ERASE'){ for(var i=items.length-1;i>=0;i--){ if(Math.hypot(items[i].x-x,items[i].y-y)<22){ items.splice(i,1); break; } } }
-    else { items.push({x:x,y:y,e:cur}); }
-    document.getElementById('cnt').textContent=items.length; }
-  var dn=false;
-  cv.addEventListener('touchstart',function(e){dn=true;place(e);e.preventDefault();},{passive:false});
-  cv.addEventListener('touchmove',function(e){if(dn)place(e);e.preventDefault();},{passive:false});
-  cv.addEventListener('touchend',function(){dn=false;});
-  cv.addEventListener('mousedown',function(e){dn=true;place(e);});
-  cv.addEventListener('mousemove',function(e){if(dn)place(e);});
-  window.addEventListener('mouseup',function(){dn=false;});
-  function loop(){ // tiled floor
-    var c1=TILES[ti][0],c2=TILES[ti][1];
-    for(var yy=0;yy<H;yy+=tileSize){ for(var xx=0;xx<W;xx+=tileSize){ ctx.fillStyle=((Math.floor(xx/tileSize)+Math.floor(yy/tileSize))%2)?c1:c2; ctx.fillRect(xx,yy,tileSize,tileSize); } }
-    ctx.strokeStyle='#0002'; for(var yy2=0;yy2<H;yy2+=tileSize){ ctx.beginPath(); ctx.moveTo(0,yy2); ctx.lineTo(W,yy2); ctx.stroke(); } for(var xx2=0;xx2<W;xx2+=tileSize){ ctx.beginPath(); ctx.moveTo(xx2,0); ctx.lineTo(xx2,H); ctx.stroke(); }
-    // store sign banner
-    ctx.fillStyle='#e0662a'; ctx.fillRect(0,44,W,26); ctx.fillStyle='#fff'; ctx.font='bold 16px Trebuchet MS'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🔨 MO’S HARDWARE — YOU CAN BUILD IT! 🛠️',W/2,57);
-    ctx.textBaseline='middle'; ctx.textAlign='center';
-    for(var i=0;i<items.length;i++){ ctx.font='28px sans-serif'; ctx.fillText(items[i].e,items[i].x,items[i].y); }
+  var GOOD=["🔨", "🪛", "🪚", "🔩", "⚙️"], BAD=["💣", "🗑️"], GOLD="⭐", BG=["#e0a040", "#f0c070", "#c08030"], GOAL=28;
+  var HK='moReal_hardware'; function getHi(){ try{return +localStorage.getItem(HK)||0;}catch(e){return 0;} } function setHi(v){ try{localStorage.setItem(HK,v);}catch(e){} }
+  var items=[], score=0, time=45, running=false, combo=0, comboT=0, pops=[], tt=0, spawnT=0, best;
+  best=getHi(); document.getElementById('hi').textContent=best;
+  function reset(){ items=[]; score=0; time=45; running=true; combo=0; comboT=0; pops=[]; tt=0; spawnT=0;
+    document.getElementById('sc').textContent=0; document.getElementById('t').textContent=45; document.getElementById('sub').textContent='';
+    document.getElementById('over').style.display='none'; document.getElementById('start').style.display='none'; }
+  function spawn(){ var r=Math.random(), kind, e;
+    if(r<0.12){ kind='gold'; e=GOLD; } else if(r<0.12+0.14 && BAD.length){ kind='bad'; e=BAD[Math.floor(Math.random()*BAD.length)]; }
+    else { kind='good'; e=GOOD[Math.floor(Math.random()*GOOD.length)]; }
+    var x=30+Math.random()*(W-60); items.push({x:x,y:-30,e:e,kind:kind,vy:1.1+Math.random()*1.3+score*0.012,vx:(Math.random()-0.5)*1.0,sz:40,ph:Math.random()*6.28,dead:0}); }
+  function pop(x,y,txt,col){ pops.push({x:x,y:y,txt:txt,col:col,life:34}); }
+  function tap(e){ if(!running)return; var t0=e.changedTouches?e.changedTouches[0]:e; var r=cv.getBoundingClientRect(); var x=t0.clientX-r.left,y=t0.clientY-r.top;
+    for(var i=items.length-1;i>=0;i--){ var it=items[i]; if(it.dead)continue; if(Math.hypot(it.x-x,it.y-y)<34){ hit(it); return; } } }
+  function hit(it){ it.dead=1;
+    if(it.kind==='bad'){ score=Math.max(0,score-1); combo=0; pop(it.x,it.y,'-1',' #ff6a6a'); beep(150,0.14,'sawtooth'); flash=8; }
+    else { var pts=it.kind==='gold'?3:1; combo++; comboT=40; if(combo>=3)pts+=1; score+=pts; pop(it.x,it.y,'+'+pts,it.kind==='gold'?'#ffd23f':'#8fffa8'); beep(it.kind==='gold'?980:640+combo*20,0.07,'square'); if(combo>=3)document.getElementById('sub').textContent='&#128293; COMBO x'+combo+'!'; }
+    document.getElementById('sc').textContent=score;
+    if(score>best){ best=score; setHi(best); document.getElementById('hi').textContent=best; }
+    if(score>=GOAL && running){ win(); } }
+  var flash=0;
+  cv.addEventListener('touchstart',function(e){ tap(e); e.preventDefault(); },{passive:false});
+  cv.addEventListener('mousedown',function(e){ tap(e); });
+  function tick(){ if(!running)return; time-=0.1; if(time<=0){ time=0; over(); } document.getElementById('t').textContent=Math.ceil(time); }
+  function win(){ running=false; document.getElementById('otitle').textContent='&#127881; YOU WIN! &#127881;'; document.getElementById('omsg').textContent='You scored '+score+'! MVP!'; document.getElementById('obest').textContent='Best: '+best; document.getElementById('over').style.display='flex'; if(window.MO_MVP)window.MO_MVP(); }
+  function over(){ running=false; document.getElementById('otitle').textContent="&#9201;&#65039; Time's Up!"; document.getElementById('omsg').textContent='You scored '+score+' out of '+GOAL; document.getElementById('obest').textContent='Best: '+best; document.getElementById('over').style.display='flex'; if(score>=GOAL && window.MO_MVP)window.MO_MVP(); }
+  function loop(){ tt+=0.1; if(flash>0)flash--; if(comboT>0){comboT--; if(comboT===0){combo=0;document.getElementById('sub').textContent='';}}
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,BG[0]); g.addColorStop(1,BG[1]); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    if(BG[2]){ ctx.fillStyle=BG[2]; ctx.fillRect(0,H*0.82,W,H*0.18); }
+    if(running){ spawnT-=1; if(spawnT<=0){ spawn(); spawnT=Math.max(14,42-score*0.6); } }
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    for(var i=items.length-1;i>=0;i--){ var it=items[i]; if(!it.dead && running){ it.y+=it.vy; it.x+=it.vx; if(it.x<20){it.x=20;it.vx=Math.abs(it.vx);} if(it.x>W-20){it.x=W-20;it.vx=-Math.abs(it.vx);} }
+      if(it.y>H+40){ items.splice(i,1); continue; }
+      if(it.dead){ it.y+=3; it.sz*=0.86; if(it.sz<8){ items.splice(i,1); continue; } }
+      var wob=Math.sin(tt*3+it.ph)*0.12;
+      ctx.save(); ctx.translate(it.x,it.y); ctx.rotate(wob);
+      if(it.kind==='gold'){ ctx.shadowColor='#ffd23f'; ctx.shadowBlur=16; }
+      ctx.font=it.sz+'px sans-serif'; ctx.fillText(it.e,0,0); ctx.restore(); }
+    for(var p=pops.length-1;p>=0;p--){ var pp=pops[p]; pp.y-=1.2; pp.life--; if(pp.life<=0){ pops.splice(p,1); continue; } ctx.globalAlpha=Math.min(1,pp.life/20); ctx.fillStyle=pp.col; ctx.font='bold 22px Trebuchet MS'; ctx.fillText(pp.txt,pp.x,pp.y); ctx.globalAlpha=1; }
+    if(flash>0){ ctx.fillStyle='rgba(255,60,60,'+(flash/20)+')'; ctx.fillRect(0,0,W,H); }
     requestAnimationFrame(loop); }
-  requestAnimationFrame(loop);
+  var ac; function beep(f,d,ty){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type=ty||'square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  document.getElementById('go').onclick=function(){ reset(); };
+  document.getElementById('rs').onclick=function(){ reset(); };
+  setInterval(tick,100); requestAnimationFrame(loop);
 })();
 </script>
 <script>
-/* MO MVP SUPERSTAR celebration */
-(function(){var busy=false;function celebrate(){if(busy)return;busy=true;var b=document.createElement('div');b.textContent='⭐ MVP SUPERSTAR! ⭐';b.style.cssText='position:fixed;left:0;right:0;top:30%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';document.body.appendChild(b);var cvs=document.createElement('canvas');cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;';document.body.appendChild(cvs);var x=cvs.getContext('2d');cvs.width=innerWidth;cvs.height=innerHeight;var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});var fr=0;(function anim(){x.clearRect(0,0,cvs.width,cvs.height);for(var i=0;i<P.length;i++){var p=P[i];p.x+=p.vx;p.y+=p.vy;p.r+=0.12;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/2,p.s,p.s);x.restore();}fr++;if(fr<150)requestAnimationFrame(anim);else{if(cvs.parentNode)cvs.parentNode.removeChild(cvs);}})();try{var a=new(window.AudioContext||window.webkitAudioContext)();[660,880,990,1180].forEach(function(f,i){var o=a.createOscillator(),g=a.createGain();o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start(a.currentTime+i*0.11);o.stop(a.currentTime+i*0.11+0.12);});}catch(e){}setTimeout(function(){b.style.opacity='0';setTimeout(function(){if(b.parentNode)b.parentNode.removeChild(b);busy=false;},600);},1900);}window.MO_MVP=celebrate;})();
+/* MO MVP SUPERSTAR celebration - shows a gold badge + confetti on win/finish */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function hookText(el){ if(!el)return; var was=false; new MutationObserver(function(){ var t=(el.textContent||'').trim(); if(t&&!was){ was=true; celebrate(); } else if(!t){ was=false; } }).observe(el,{childList:true,characterData:true,subtree:true}); }
+  function init(){ hookVisible(document.getElementById('over')); hookText(document.getElementById('win')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
 </script>
+
 </body></html>
