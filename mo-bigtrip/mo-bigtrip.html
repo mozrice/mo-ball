@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Big Trip</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:#7fb8e0;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;position:absolute;inset:0;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;opacity:.95;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;text-shadow:0 1px 3px #0007;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:17px;font-weight:bold;color:#fff;pointer-events:none;text-shadow:0 1px 4px #000;z-index:4;}
+  #sub{position:fixed;top:33px;left:0;right:0;text-align:center;font-size:14px;font-weight:bold;color:#fff5c0;pointer-events:none;text-shadow:0 1px 3px #000;z-index:4;}
+  #start,#over{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8;text-align:center;padding:20px;}
+  #start{background:linear-gradient(#9fe0ff,#3a86c8);}
+  #start h1{font-size:24px;margin:0 0 6px;text-shadow:0 2px 4px #0006;} #start p{font-size:15px;margin:4px;max-width:330px;}
+  #start .big{font-size:52px;}
+  #over{background:#000a;display:none;}
+  #over h1{font-size:30px;color:#ffd23f;margin:0 0 6px;text-shadow:0 2px 0 #b47a1a;} #over p{font-size:17px;margin:3px;}
+  #start button,#over button{margin-top:16px;background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+  #start button:active,#over button:active{transform:translateY(3px);box-shadow:0 2px 0 #b4801a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">&#11013; Games</a>
+<div id="hud">🗺️ <span id="n">Book</span></div>
+<div id="sub"></div>
+<canvas id="c"></canvas>
+<div id="start"><div class="big">📋✈️🏀</div><h1>MO Big Trip</h1><p>Book the hotel, ride a plane there, then travel to the GAME at Van Nuys Rec Center on Vanowen! Tap to go step by step with the whole family and Arff.</p><button id="go">▶ START THE TRIP</button></div>
+<div id="over"><h1 id="ot">🏆 GAME TIME!</h1><p id="om"></p><button id="rs">▶ Trip Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener('resize',fit); fit();
+  var STEPS=[
+    {n:'1 · Book',  sub:'📋 Book your hotel trip!',        cont:'BOOK IT ▶'},
+    {n:'2 · Fly',   sub:'✈️ Fly to the hotel!',            cont:'LAND ▶'},
+    {n:'3 · Hotel', sub:'🏨 Checked in — great stay!',      cont:'GO TO THE GAME ▶'},
+    {n:'4 · Drive', sub:'🚗 Drive to Van Nuys Rec Center',  cont:'ARRIVE ▶'},
+    {n:'5 · GAME',  sub:'🏀 Van Nuys Rec Center · Vanowen', cont:'🏀 TAP TO SHOOT!'}
+  ];
+  var ph, pr, tt, sparks, ball, shot, made, cheer;
+  function setStep(){ document.getElementById('n').textContent=STEPS[ph].n; document.getElementById('sub').textContent=STEPS[ph].sub; }
+  function reset(){ ph=0; pr=0; tt=0; sparks=[]; ball=null; shot=false; made=false; cheer=0; setStep();
+    document.getElementById('over').style.display='none'; document.getElementById('start').style.display='none'; }
+  function pt(ev){ var t0=ev.changedTouches?ev.changedTouches[0]:ev; var r=cv.getBoundingClientRect(); return {x:t0.clientX-r.left,y:t0.clientY-r.top}; }
+  function tap(){ if(ph<4){ if(pr>=1){ ph++; pr=0; setStep(); if(ph===4){ ball={x:W*0.24,y:H*0.66,t:0}; } } else { pr=1; } return; }
+    // game step: shoot
+    if(!shot){ shot=true; made=true; ball.t=0; beep(320,0.08); } }
+  cv.addEventListener('touchstart',function(e){ tap(); e.preventDefault(); },{passive:false});
+  cv.addEventListener('mousedown',function(e){ tap(); });
+  function win(){ document.getElementById('ot').innerHTML='🏆 GAME TIME! 🏆'; document.getElementById('om').textContent='Booked it, flew there, and made it to the game at Van Nuys Rec Center — SWISH! 🏀🐶'; document.getElementById('over').style.display='flex'; if(window.MO_MVP)window.MO_MVP(); }
+  function rr(x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function box(x,y,w,h,c,r){ ctx.fillStyle=c; if(r){ rr(x,y,w,h,r); ctx.fill(); } else { ctx.fillRect(x,y,w,h); } }
+  function person(px,by,ph2,shirt,hair,name){ var hipY=by-ph2*0.42, shY=by-ph2*0.72, hr=ph2*0.17, hcy=by-ph2*0.90;
+    ctx.lineCap='round'; ctx.strokeStyle='#3a3550'; ctx.lineWidth=ph2*0.10;
+    ctx.beginPath(); ctx.moveTo(px-ph2*0.11,hipY); ctx.lineTo(px-ph2*0.11,by); ctx.moveTo(px+ph2*0.11,hipY); ctx.lineTo(px+ph2*0.11,by); ctx.stroke();
+    ctx.fillStyle='#2a2a2a'; ctx.beginPath(); ctx.ellipse(px-ph2*0.11,by,ph2*0.10,ph2*0.05,0,0,6.29); ctx.fill(); ctx.beginPath(); ctx.ellipse(px+ph2*0.11,by,ph2*0.10,ph2*0.05,0,0,6.29); ctx.fill();
+    ctx.fillStyle=shirt; rr(px-ph2*0.21,shY,ph2*0.42,hipY-shY+ph2*0.05,ph2*0.10); ctx.fill();
+    ctx.strokeStyle=shirt; ctx.lineWidth=ph2*0.11; ctx.beginPath(); ctx.moveTo(px-ph2*0.20,shY+ph2*0.05); ctx.lineTo(px-ph2*0.31,shY+ph2*0.30); ctx.moveTo(px+ph2*0.20,shY+ph2*0.05); ctx.lineTo(px+ph2*0.31,shY+ph2*0.30); ctx.stroke();
+    ctx.fillStyle='#f3c9a0'; ctx.beginPath(); ctx.arc(px-ph2*0.31,shY+ph2*0.32,ph2*0.055,0,6.29); ctx.fill(); ctx.beginPath(); ctx.arc(px+ph2*0.31,shY+ph2*0.32,ph2*0.055,0,6.29); ctx.fill();
+    ctx.fillStyle='#f3c9a0'; ctx.beginPath(); ctx.arc(px,hcy,hr,0,6.29); ctx.fill();
+    ctx.fillStyle=hair; ctx.beginPath(); ctx.arc(px,hcy-hr*0.14,hr*1.02,Math.PI*1.02,Math.PI*1.98); ctx.fill();
+    ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(px-hr*0.36,hcy+hr*0.05,hr*0.13,0,6.29); ctx.fill(); ctx.beginPath(); ctx.arc(px+hr*0.36,hcy+hr*0.05,hr*0.13,0,6.29); ctx.fill();
+    ctx.strokeStyle='#b5453a'; ctx.lineWidth=Math.max(1,ph2*0.025); ctx.beginPath(); ctx.arc(px,hcy+hr*0.18,hr*0.42,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+    if(name){ ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle='#2a2a1a'; ctx.font='bold '+Math.max(9,ph2*0.15)+'px Trebuchet MS'; ctx.fillText(name,px,by+ph2*0.16); } }
+  function dog(px,by,dh,name){ ctx.save(); var wag=Math.sin(tt*9)*0.5; ctx.lineCap='round'; ctx.strokeStyle='#f0efe9'; ctx.lineWidth=dh*0.13;
+    for(var i=0;i<4;i++){ var lx=px-dh*0.30+i*dh*0.20; ctx.beginPath(); ctx.moveTo(lx,by-dh*0.28); ctx.lineTo(lx,by); ctx.stroke(); }
+    ctx.fillStyle='#fff'; ctx.strokeStyle='#e6e6e0'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(px,by-dh*0.42,dh*0.42,dh*0.27,0,0,6.29); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=dh*0.12; ctx.beginPath(); ctx.moveTo(px-dh*0.42,by-dh*0.50); ctx.lineTo(px-dh*0.58,by-dh*0.64-wag*dh*0.2); ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(px+dh*0.44,by-dh*0.55,dh*0.23,0,6.29); ctx.fill();
+    ctx.fillStyle='#efeee8'; ctx.beginPath(); ctx.ellipse(px+dh*0.36,by-dh*0.66,dh*0.09,dh*0.16,0.4,0,6.29); ctx.fill();
+    ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(px+dh*0.46,by-dh*0.58,dh*0.045,0,6.29); ctx.fill();
+    ctx.fillStyle='#3a2a2a'; ctx.beginPath(); ctx.arc(px+dh*0.63,by-dh*0.53,dh*0.05,0,6.29); ctx.fill();
+    ctx.strokeStyle='#e0453a'; ctx.lineWidth=dh*0.07; ctx.beginPath(); ctx.moveTo(px+dh*0.30,by-dh*0.44); ctx.lineTo(px+dh*0.46,by-dh*0.40); ctx.stroke();
+    if(name){ ctx.textAlign='center'; ctx.fillStyle='#2a2a1a'; ctx.font='bold '+Math.max(9,dh*0.15)+'px Trebuchet MS'; ctx.fillText(name,px+dh*0.1,by+dh*0.16); } ctx.restore(); }
+  function fam(cx,by,u){ person(cx-u*0.75,by,u,'#3a6ea5','#2a2a2a','Daddy'); person(cx-u*0.05,by,u*0.94,'#d06a95','#5a2f14','Mommy'); person(cx+u*0.55,by,u*0.66,'#e0a030','#3a2412','Me'); dog(cx+u*1.15,by,u*0.72,'Arff'); }
+  function sky(){ var s=ctx.createLinearGradient(0,0,0,H); s.addColorStop(0,'#9fe0ff'); s.addColorStop(1,'#e8f6ff'); ctx.fillStyle=s; ctx.fillRect(0,0,W,H); ctx.fillStyle='#fff2a0'; ctx.beginPath(); ctx.arc(W*0.84,H*0.13,20,0,6.29); ctx.fill(); ctx.fillStyle='rgba(255,255,255,0.7)'; for(var i=0;i<4;i++){ var cx2=((i*W*0.33)-tt*12)%(W+120); if(cx2<-120)cx2+=W+120; ctx.beginPath(); ctx.ellipse(cx2,H*0.12+i*20,40,14,0,0,6.29); ctx.fill(); } }
+  function ground(col){ ctx.fillStyle=col||'#8fd07a'; ctx.fillRect(0,H*0.72,W,H*0.28); }
+  function contBtn(txt){ var bob=Math.sin(tt*2)*3, bw=W*0.56,bx=(W-bw)/2,by=H*0.90+bob; box(bx,by,bw,H*0.075,'#f0b429',16); box(bx,by,bw,H*0.05,'#ffe07a',16); ctx.fillStyle='#5a3a00'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='bold 19px Trebuchet MS'; ctx.fillText(txt,W/2,by+H*0.037); }
+  function draw(){ tt+=0.05; if(typeof ph==='undefined'){ requestAnimationFrame(draw); return; }
+    if(pr<1) pr+=0.012;
+    if(ph===0){ // BOOK
+      sky(); ground('#c8b48a'); box(0,0,W,H*0.72,'#eaf2fb'); ctx.fillStyle='#cfe0ee'; ctx.fillRect(0,H*0.66,W,H*0.06);
+      box(W*0.30,H*0.42,W*0.44,H*0.16,'#9a6a3a',6); box(W*0.30,H*0.40,W*0.44,H*0.03,'#c89a5a',3); ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='26px sans-serif'; ctx.fillStyle='#fff'; ctx.fillText('🏨 📋 ✈️',W*0.52,H*0.50);
+      ctx.fillStyle='#2a3a5a'; ctx.font='bold 16px Trebuchet MS'; ctx.fillText('BOOK YOUR TRIP',W*0.52,H*0.36);
+      fam(W*0.30,H*0.70,Math.min(H*0.13,74));
+    } else if(ph===1){ // PLANE
+      sky(); var px=(-0.2+pr*1.1)*W; box(0,0,0,0,'#000');
+      // plane body
+      ctx.save(); ctx.translate(px,H*0.40+Math.sin(tt*2)*6); ctx.fillStyle='#eef2f8'; rr(-70,-16,150,32,16); ctx.fill(); ctx.fillStyle='#3a86e0'; rr(-70,-4,150,10,5); ctx.fill();
+      ctx.fillStyle='#cfe0ee'; ctx.beginPath(); ctx.moveTo(60,-14); ctx.lineTo(84,-40); ctx.lineTo(70,-14); ctx.closePath(); ctx.fill(); // tail
+      ctx.fillStyle='#bfe4f4'; for(var w=0;w<4;w++){ ctx.beginPath(); ctx.arc(-40+w*22,-2,5,0,6.29); ctx.fill(); }
+      ctx.fillStyle='#8a939f'; ctx.beginPath(); ctx.moveTo(-10,10); ctx.lineTo(-40,40); ctx.lineTo(20,12); ctx.closePath(); ctx.fill(); // wing
+      ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='16px sans-serif'; ctx.fillText('👨',-38,-2); ctx.fillText('👩',-16,-2); ctx.fillText('👦',6,-2); ctx.fillText('🐶',28,-2);
+      ctx.restore();
+      ground('#7fc0e0'); ctx.fillStyle='#6fb0d0'; for(var wv=0;wv<W;wv+=40){ ctx.beginPath(); ctx.arc(wv+(tt*10%40),H*0.80,6,Math.PI,0); ctx.fill(); }
+    } else if(ph===2){ // HOTEL
+      sky(); ground('#8fd07a');
+      box(W*0.55,H*0.24,W*0.34,H*0.48,'#f0d6a0',8); for(var wy=0;wy<4;wy++)for(var wx=0;wx<3;wx++){ box(W*0.585+wx*W*0.10,H*0.28+wy*H*0.10,W*0.07,H*0.07,'#9fc8e0',3); }
+      box(W*0.66,H*0.60,W*0.10,H*0.12,'#8a5a3a',3); ctx.fillStyle='#5a3a1a'; ctx.font='bold 15px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('🏨 HOTEL',W*0.72,H*0.21);
+      fam(W*0.10+pr*W*0.18,H*0.70,Math.min(H*0.13,74));
+    } else if(ph===3){ // DRIVE to Van Nuys
+      sky(); ground('#8fd07a');
+      // Vanowen sign
+      box(W*0.60,H*0.30,W*0.30,H*0.14,'#2a6a3a',6); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='bold 13px Trebuchet MS'; ctx.fillText('VAN NUYS',W*0.75,H*0.35); ctx.fillText('REC CENTER',W*0.75,H*0.40); box(W*0.735,H*0.44,W*0.03,H*0.14,'#7a7a7a');
+      ctx.fillStyle='#5a5f6a'; ctx.fillRect(0,H*0.72,W,H*0.16); ctx.strokeStyle='#ffd23f'; ctx.lineWidth=5; ctx.setLineDash([26,20]); ctx.lineDashOffset=-(tt*60)%46; ctx.beginPath(); ctx.moveTo(0,H*0.80); ctx.lineTo(W,H*0.80); ctx.stroke(); ctx.setLineDash([]);
+      var carx=(-0.2+pr*0.9)*W; drawCar(carx,H*0.78,Math.min(W*0.15,70));
+    } else if(ph===4){ // GAME at Van Nuys Rec Center
+      var s2=ctx.createLinearGradient(0,0,0,H*0.5); s2.addColorStop(0,'#2a3a5a'); s2.addColorStop(1,'#46608a'); ctx.fillStyle=s2; ctx.fillRect(0,0,W,H*0.5);
+      // banner
+      box(W*0.10,H*0.06,W*0.80,H*0.07,'#c0392b',6); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='bold 15px Trebuchet MS'; ctx.fillText('🏀 VAN NUYS REC CENTER · VANOWEN',W/2,H*0.095);
+      ctx.fillStyle='#c9884a'; ctx.fillRect(0,H*0.5,W,H*0.5); ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(0,H*0.5); ctx.lineTo(W,H*0.5); ctx.stroke();
+      ctx.fillStyle='rgba(220,120,50,0.6)'; ctx.fillRect(W*0.58,H*0.5,W*0.30,H*0.28); ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.strokeRect(W*0.58,H*0.5,W*0.30,H*0.28);
+      // hoop
+      var hx=W*0.74, hy=H*0.34, hr=Math.min(W*0.09,40); box(hx-hr*1.1,hy-hr*1.5,hr*2.2,hr*1.4,'#eef2f8',4); ctx.strokeStyle='#c33'; ctx.lineWidth=3; ctx.strokeRect(hx-hr*0.5,hy-hr*1.0,hr,hr*0.7); ctx.strokeStyle='#e8792a'; ctx.lineWidth=5; ctx.beginPath(); ctx.ellipse(hx,hy,hr,hr*0.32,0,0,6.29); ctx.stroke();
+      ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=1.5; for(var nl=0;nl<7;nl++){ var a=nl/6; ctx.beginPath(); ctx.moveTo(hx-hr+a*hr*2,hy); ctx.lineTo(hx-hr*0.5+a*hr,hy+hr*0.9); ctx.stroke(); }
+      var bnc=cheer>0?Math.abs(Math.sin(tt*10))*10:0; if(cheer>0)cheer--;
+      fam(W*0.16,H*0.90-bnc,Math.min(H*0.12,66));
+      // shooter Me + ball
+      var sx=W*0.24, sy=H*0.66;
+      if(!shot){ ctx.font='30px sans-serif'; }
+      // ball flight
+      if(shot){ ball.t=Math.min(1,ball.t+0.04); var t=ball.t; var ex=hx, ey=hy+2; ball.x=sx+(ex-sx)*t; ball.y=sy+(ey-sy)*t - H*0.34*Math.sin(Math.PI*t);
+        if(t>=1 && !ball.done){ ball.done=true; cheer=24; for(var i=0;i<20;i++)sparks.push({x:hx,y:hy,vx:(Math.random()-0.5)*7,vy:(Math.random()-0.5)*7-1,life:28,c:['#ffe27a','#ff8a3a','#fff','#8fffcf'][i%4]}); beep(760,0.08); setTimeout(function(){beep(1040,0.09);},70); setTimeout(win,900); } }
+      else { ball={x:sx,y:sy-Math.min(H*0.12,66)*0.5,t:0,done:false}; }
+      // draw shooter (Me)
+      person(sx,sy,Math.min(H*0.13,74),'#e0a030','#3a2412','Me');
+      // draw ball
+      ctx.save(); ctx.translate(ball.x,ball.y); var br=Math.min(W*0.045,20); ctx.fillStyle='#e8792a'; ctx.beginPath(); ctx.arc(0,0,br,0,6.29); ctx.fill(); ctx.strokeStyle='#7a3a12'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,br,0,6.29); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-br,0); ctx.lineTo(br,0); ctx.moveTo(0,-br); ctx.lineTo(0,br); ctx.stroke(); ctx.restore();
+    }
+    // sparks
+    for(var sp=sparks.length-1;sp>=0;sp--){ var q=sparks[sp]; q.x+=q.vx; q.y+=q.vy; q.vy+=0.14; q.life--; if(q.life<=0){sparks.splice(sp,1);continue;} ctx.globalAlpha=q.life/28; ctx.fillStyle=q.c; ctx.fillRect(q.x,q.y,3,3); ctx.globalAlpha=1; }
+    // continue / shoot button
+    if(ph<4){ if(pr>=1) contBtn(STEPS[ph].cont); }
+    else { if(!shot) contBtn(STEPS[4].cont); }
+    requestAnimationFrame(draw); }
+  function drawCar(cx,cy,s){ ctx.save(); ctx.translate(cx,cy);
+    ctx.save(); ctx.globalAlpha=0.2; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(0,s*0.42,s*0.6,s*0.13,0,0,6.29); ctx.fill(); ctx.restore();
+    box(-s*0.55,-s*0.06,s*1.10,s*0.40,'#ff5a5a',s*0.12); box(-s*0.30,-s*0.34,s*0.58,s*0.30,'#e84a4a',s*0.10);
+    box(-s*0.26,-s*0.30,s*0.24,s*0.22,'#bfeaff',s*0.05); box(s*0.03,-s*0.30,s*0.22,s*0.22,'#bfeaff',s*0.05);
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font=(s*0.17)+'px sans-serif'; ctx.fillText('👦',-s*0.14,-s*0.19); ctx.fillText('🐶',s*0.13,-s*0.19);
+    box(-s*0.55,s*0.12,s*1.10,s*0.05,'#ffd23f'); ctx.fillStyle='#2a2a2a'; ctx.beginPath(); ctx.arc(-s*0.30,s*0.34,s*0.15,0,6.29); ctx.arc(s*0.32,s*0.34,s*0.15,0,6.29); ctx.fill(); ctx.fillStyle='#cfd6dd'; ctx.beginPath(); ctx.arc(-s*0.30,s*0.34,s*0.07,0,6.29); ctx.arc(s*0.32,s*0.34,s*0.07,0,6.29); ctx.fill();
+    ctx.restore(); }
+  var ac; function beep(f,d,ty){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),gn=ac.createGain(); o.frequency.value=f; o.type=ty||'square'; o.connect(gn); gn.connect(ac.destination); gn.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  document.getElementById('go').onclick=function(){ reset(); };
+  document.getElementById('rs').onclick=function(){ reset(); };
+  ph=0; pr=0; tt=0; sparks=[]; ball=null; shot=false; made=false; cheer=0;
+  requestAnimationFrame(draw);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var Pt=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)Pt.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<Pt.length;i++){ var p=Pt[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),gn=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(gn); gn.connect(a.destination); gn.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function init(){ hookVisible(document.getElementById('over')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+</body></html>

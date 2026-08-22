@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Trip Map</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:#8fd0f0;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;position:absolute;inset:0;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;opacity:.95;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;text-shadow:0 1px 3px #0007;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:18px;font-weight:bold;color:#fff;pointer-events:none;text-shadow:0 1px 4px #000;z-index:4;}
+  #sub{position:fixed;top:34px;left:0;right:0;text-align:center;font-size:14px;font-weight:bold;color:#fff5c0;pointer-events:none;text-shadow:0 1px 3px #000;z-index:4;}
+  #start,#over{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8;text-align:center;padding:20px;}
+  #start{background:linear-gradient(#9fe0ff,#3a86c8);}
+  #start h1{font-size:26px;margin:0 0 6px;text-shadow:0 2px 4px #0006;} #start p{font-size:15px;margin:4px;max-width:330px;}
+  #start .big{font-size:56px;}
+  #over{background:#000a;display:none;}
+  #over h1{font-size:30px;color:#ffd23f;margin:0 0 6px;text-shadow:0 2px 0 #b47a1a;} #over p{font-size:17px;margin:3px;}
+  #start button,#over button{margin-top:16px;background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+  #start button:active,#over button:active{transform:translateY(3px);box-shadow:0 2px 0 #b4801a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">&#11013; Games</a>
+<div id="hud">🗺️ Stop <span id="n">0</span>/<span id="tot">4</span></div>
+<div id="sub">Tap the glowing stop to drive there!</div>
+<canvas id="c"></canvas>
+<div id="start"><div class="big">🏠🏨🏀</div><h1>MO Trip Map</h1><p>Drive from HOME, stop at the hotels, and make it all the way to the GAME! Tap the glowing stop to drive the family there.</p><button id="go">▶ START DRIVING</button></div>
+<div id="over"><h1 id="ot">🎉 YOU MADE IT!</h1><p id="om"></p><button id="rs">▶ Drive Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener('resize',fit); fit();
+  // the map stops: 1 home, some hotels, then the game
+  var STOPS=[
+    {e:'🏠',n:'Home',      nx:0.16,ny:0.30, sub:'Pack up!'},
+    {e:'🏨',n:'Beach Hotel',nx:0.52,ny:0.24, sub:'Cool + comfy'},
+    {e:'🏨',n:'Sherman Oaks',nx:0.83,ny:0.40, sub:'Close to gym'},
+    {e:'🏨',n:'El Segundo',  nx:0.42,ny:0.57, sub:'Cheapest!'},
+    {e:'🏀',n:'THE GAME!',   nx:0.80,ny:0.72, sub:'Van Nuys gym'}
+  ];
+  var reached, moving, t, tt, sparks, dir, honk;
+  document.getElementById('tot').textContent=STOPS.length-1;
+  function P(i){ return {x:STOPS[i].nx*W, y:STOPS[i].ny*H}; }
+  function reset(){ reached=0; moving=false; t=0; tt=0; sparks=[]; dir=1; honk=0;
+    document.getElementById('n').textContent=0; document.getElementById('over').style.display='none'; document.getElementById('start').style.display='none'; document.getElementById('sub').textContent='👆 Tap the glowing '+STOPS[1].n+' to drive there!'; }
+  function carPos(){ if(!moving) return P(reached); var a=P(reached),b=P(reached+1); var e=t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2; return {x:a.x+(b.x-a.x)*e, y:a.y+(b.y-a.y)*e}; }
+  function pt(ev){ var t0=ev.changedTouches?ev.changedTouches[0]:ev; var r=cv.getBoundingClientRect(); return {x:t0.clientX-r.left,y:t0.clientY-r.top}; }
+  function tap(ev){ if(moving||reached>=STOPS.length-1)return; var p=pt(ev); var nb=P(reached+1);
+    // forgiving: tap the glowing stop OR anywhere drives to the next stop
+    if(Math.hypot(nb.x-p.x,nb.y-p.y)<W){ startMove(); } }
+  function startMove(){ moving=true; t=0; var a=P(reached),b=P(reached+1); dir=(b.x>=a.x)?1:-1; beep(360,0.1,'square'); honk=6; }
+  cv.addEventListener('touchstart',function(e){ tap(e); e.preventDefault(); },{passive:false});
+  cv.addEventListener('mousedown',function(e){ tap(e); });
+  function arrive(){ reached++; document.getElementById('n').textContent=reached; var pp=P(reached);
+    for(var i=0;i<18;i++)sparks.push({x:pp.x,y:pp.y,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6-1,life:26,c:['#ffe27a','#8fe0ff','#fff','#8fffcf'][i%4]});
+    beep(680+reached*40,0.07);
+    if(reached>=STOPS.length-1){ document.getElementById('sub').textContent='🏀 You made it to the game!'; setTimeout(win,700); }
+    else { document.getElementById('sub').textContent='✅ '+STOPS[reached].n+'! Tap the glowing '+STOPS[reached+1].n+'!'; } }
+  function win(){ document.getElementById('ot').innerHTML='🎉 YOU MADE IT! 🎉'; document.getElementById('om').textContent='Home → hotels → the court. Time to ball, MO! 🏀🐶'; document.getElementById('over').style.display='flex'; if(window.MO_MVP)window.MO_MVP(); }
+  function rr(x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function drawCar(cx,cy,s,d){ ctx.save(); ctx.translate(cx,cy); ctx.scale(d,1);
+    ctx.save(); ctx.globalAlpha=0.2; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(0,s*0.42,s*0.6,s*0.14,0,0,6.29); ctx.fill(); ctx.restore();
+    ctx.fillStyle='#ff5a5a'; rr(-s*0.55,-s*0.06,s*1.10,s*0.40,s*0.12); ctx.fill();
+    ctx.fillStyle='#e84a4a'; rr(-s*0.30,-s*0.34,s*0.58,s*0.30,s*0.10); ctx.fill();
+    ctx.fillStyle='#bfeaff'; rr(-s*0.26,-s*0.30,s*0.24,s*0.22,s*0.05); ctx.fill(); rr(s*0.03,-s*0.30,s*0.22,s*0.22,s*0.05); ctx.fill();
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font=(s*0.18)+'px sans-serif';
+    ctx.save(); ctx.scale(d,1); ctx.fillText('👦',-s*0.14*d,-s*0.19); ctx.fillText('🐶',s*0.13*d,-s*0.19); ctx.restore();
+    ctx.fillStyle='#ffd23f'; ctx.fillRect(-s*0.55,s*0.12,s*1.10,s*0.05);
+    ctx.fillStyle='#fff6c0'; ctx.beginPath(); ctx.arc(s*0.52,s*0.04,s*0.05,0,6.29); ctx.fill();
+    wheel(-s*0.30,s*0.34,s*0.15); wheel(s*0.32,s*0.34,s*0.15);
+    ctx.restore(); }
+  function wheel(x,y,r){ ctx.save(); ctx.translate(x,y); ctx.rotate(moving?tt*10:0); ctx.fillStyle='#2a2a2a'; ctx.beginPath(); ctx.arc(0,0,r,0,6.29); ctx.fill(); ctx.fillStyle='#cfd6dd'; ctx.beginPath(); ctx.arc(0,0,r*0.48,0,6.29); ctx.fill(); ctx.restore(); }
+  function draw(){ tt+=0.05;
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#a8e4ff'); g.addColorStop(1,'#d8f2e0'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // grass
+    ctx.fillStyle='#9ad86e'; ctx.fillRect(0,0,W,H); var sg=ctx.createLinearGradient(0,0,0,H); // overlay subtle
+    ctx.fillStyle='#a8e0ff'; ctx.fillRect(0,0,W,H*0.16);
+    ctx.fillStyle='#9ad86e'; ctx.fillRect(0,H*0.16,W,H);
+    // sun
+    ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle='#fff2a0'; ctx.beginPath(); ctx.arc(W-42,44,18,0,6.29); ctx.fill(); ctx.restore();
+    // road: dashed path through the stops
+    ctx.strokeStyle='#c9b58a'; ctx.lineWidth=Math.max(16,W*0.045); ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(P(0).x,P(0).y); for(var i=1;i<STOPS.length;i++)ctx.lineTo(P(i).x,P(i).y); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.lineWidth=3; ctx.setLineDash([12,12]); ctx.lineDashOffset=-(tt*10)%24;
+    ctx.beginPath(); ctx.moveTo(P(0).x,P(0).y); for(var i=1;i<STOPS.length;i++)ctx.lineTo(P(i).x,P(i).y); ctx.stroke(); ctx.setLineDash([]);
+    // stops
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    for(var i=0;i<STOPS.length;i++){ var pp=P(i); var isNext=(i===reached+1 && !moving); var done=(i<=reached);
+      var rad=Math.min(W*0.085,34);
+      if(isNext){ var pulse=1+0.12*Math.sin(tt*6); ctx.save(); ctx.globalAlpha=0.5+0.3*Math.sin(tt*6); ctx.strokeStyle='#ffd23f'; ctx.lineWidth=5; ctx.beginPath(); ctx.arc(pp.x,pp.y,rad*1.35*pulse,0,6.29); ctx.stroke(); ctx.restore(); }
+      ctx.save(); ctx.globalAlpha=0.25; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(pp.x,pp.y+rad*0.7,rad*0.9,rad*0.28,0,0,6.29); ctx.fill(); ctx.restore();
+      ctx.fillStyle=done?'#8fe0a0':'#ffffff'; ctx.strokeStyle=done?'#3fae63':(isNext?'#f0b429':'#cfd6dd'); ctx.lineWidth=4;
+      ctx.beginPath(); ctx.arc(pp.x,pp.y,rad,0,6.29); ctx.fill(); ctx.stroke();
+      ctx.font=(rad*1.05)+'px sans-serif'; ctx.fillText(STOPS[i].e,pp.x,pp.y);
+      if(done && i!==reached){ ctx.fillStyle='#2ec46a'; ctx.beginPath(); ctx.arc(pp.x+rad*0.75,pp.y-rad*0.75,rad*0.4,0,6.29); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold '+(rad*0.5)+'px Trebuchet MS'; ctx.fillText('✓',pp.x+rad*0.75,pp.y-rad*0.72); }
+      // label
+      ctx.fillStyle='#2a3a2a'; ctx.font='bold '+Math.max(11,rad*0.42)+'px Trebuchet MS'; ctx.fillText(STOPS[i].n,pp.x,pp.y+rad+13);
+    }
+    // move car
+    if(moving){ t+=0.028; if(t>=1){ t=1; moving=false; arrive(); } }
+    var cp=carPos(); if(honk>0)honk--;
+    drawCar(cp.x,cp.y-Math.min(W*0.085,34)*0.2,Math.min(W*0.16,74),dir);
+    // sparks
+    for(var sp=sparks.length-1;sp>=0;sp--){ var q=sparks[sp]; q.x+=q.vx; q.y+=q.vy; q.vy+=0.12; q.life--; if(q.life<=0){sparks.splice(sp,1);continue;} ctx.globalAlpha=q.life/26; ctx.fillStyle=q.c; ctx.fillRect(q.x,q.y,3,3); ctx.globalAlpha=1; }
+    requestAnimationFrame(draw); }
+  var ac; function beep(f,d,ty){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type=ty||'square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  document.getElementById('go').onclick=function(){ reset(); };
+  document.getElementById('rs').onclick=function(){ reset(); };
+  reached=0; moving=false; t=0; tt=0; sparks=[]; dir=1; honk=0;
+  requestAnimationFrame(draw);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var Pt=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)Pt.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<Pt.length;i++){ var p=Pt[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function init(){ hookVisible(document.getElementById('over')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+</body></html>

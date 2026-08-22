@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Arff Treat Factory</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:#5a3a2a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;position:absolute;inset:0;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;opacity:.95;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;text-shadow:0 1px 3px #000;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:18px;font-weight:bold;color:#fff;pointer-events:none;text-shadow:0 1px 4px #000;z-index:4;}
+  #sub{position:fixed;top:34px;left:0;right:0;text-align:center;font-size:14px;font-weight:bold;color:#ffe08a;pointer-events:none;text-shadow:0 1px 3px #000;z-index:4;}
+  #tray{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:10px 8px;background:rgba(0,0,0,0.5);border-top:3px solid rgba(255,255,255,0.3);z-index:6;}
+  .item{position:relative;font-size:30px;background:rgba(255,255,255,0.92);border:3px solid rgba(255,255,255,0.6);border-radius:16px;width:58px;height:58px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 0 rgba(0,0,0,0.28);}
+  .item .lbl{position:absolute;bottom:-15px;left:0;right:0;text-align:center;font-size:9px;color:#fff;font-weight:bold;text-shadow:0 1px 2px #000;}
+  .item.done{opacity:.38;}
+  .item.done::after{content:'✓';position:absolute;top:-6px;right:-6px;background:#2ec46a;color:#fff;font-size:14px;font-weight:bold;width:21px;height:21px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+  .item:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,0.28);}
+  #start,#over{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8;text-align:center;padding:20px;}
+  #start{background:linear-gradient(#5a3a2a,#a06a4a);}
+  #start h1{font-size:25px;margin:0 0 6px;text-shadow:0 2px 4px #0007;} #start p{font-size:15px;margin:4px;max-width:330px;}
+  #start .big{font-size:60px;}
+  #over{background:#000a;display:none;}
+  #over h1{font-size:30px;color:#ffd23f;margin:0 0 6px;text-shadow:0 2px 0 #b47a1a;} #over p{font-size:17px;margin:3px;}
+  #start button,#over button{margin-top:16px;background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+  #start button:active,#over button:active{transform:translateY(3px);box-shadow:0 2px 0 #b4801a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">&#11013; Games</a>
+<div id="hud">✨ <span id="n">0</span>/<span id="tot">0</span></div>
+<div id="sub">Tap a thing — it goes ON!</div>
+<canvas id="c"></canvas>
+<div id="tray"></div>
+<div id="start"><div class="big">🦴</div><h1>MO Arff Treat Factory</h1><p>👆 Tap a thing on the tray — it flies ON and sticks! Use them all!</p><button id="go">&#9654; START</button></div>
+<div id="over"><h1 id="ot">&#127881; DONE!</h1><p id="om"></p><button id="rs">&#9654; Play Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener('resize',fit); fit();
+  var ITEMS=[{"e": "🏭", "n": "🏭"}, {"e": "⚙️", "n": "⚙️"}, {"e": "⚙️", "n": "⚙️"}, {"e": "📦", "n": "📦"}, {"e": "🦴", "n": "🦴"}, {"e": "🍖", "n": "🍖"}, {"e": "🔩", "n": "🔩"}, {"e": "🐶", "n": "🐶"}], BG=["#5a3a2a", "#a06a4a"], GROUND="#3a2418", HERO='🦴', PAYOFF='🦴', OKMSG='The treat machine works! Arff loves them!', PANEL='#cfb4a4';
+  var used, running, flyers, sparks, tt, hearts, stuck, glow, pop, bounce;
+  var tray=document.getElementById('tray'); document.getElementById('tot').textContent=ITEMS.length;
+  function heroSize(){ return Math.min(W*0.30,H*0.20,110); }
+  function heroPos(){ return {x:W*0.5, y:H*0.42}; }
+  function offset(i){ var n=ITEMS.length; var ang=-Math.PI/2 + i*(2*Math.PI/n); var rad=heroSize()*1.15; return {ox:Math.cos(ang)*rad, oy:Math.sin(ang)*rad}; }
+  function buildTray(){ tray.innerHTML=''; ITEMS.forEach(function(it,i){ var b=document.createElement('button'); b.className='item'; b.innerHTML=it.e+'<span class="lbl">'+it.n+'</span>'; b.onclick=function(){ useItem(i,b); }; it.btn=b; tray.appendChild(b); }); }
+  function reset(){ used=0; running=true; flyers=[]; sparks=[]; tt=0; hearts=[]; stuck=[]; glow=0; pop=0; bounce=0;
+    ITEMS.forEach(function(it){ it.done=false; }); buildTray();
+    document.getElementById('n').textContent=0; document.getElementById('over').style.display='none'; document.getElementById('start').style.display='none'; document.getElementById('sub').textContent='👇 Tap a thing — it goes ON!'; }
+  function useItem(i,b){ if(!running)return; var it=ITEMS[i]; if(it.done)return; it.done=true; b.classList.add('done'); used++; document.getElementById('n').textContent=used;
+    var r=b.getBoundingClientRect(), cr=cv.getBoundingClientRect(); var sx=r.left+r.width/2-cr.left, sy=r.top+r.height/2-cr.top; var hp=heroPos(), of=offset(i);
+    flyers.push({e:it.e,x:sx,y:sy,tx:hp.x+of.ox,ty:hp.y+of.oy,i:i,t:0}); beep(540+used*24,0.06);
+    document.getElementById('sub').textContent=it.n+'! '+(ITEMS.length-used)+' to go';
+    if(used>=ITEMS.length){ setTimeout(function(){ if(used>=ITEMS.length&&running) win(); },700); } }
+  function land(fl){ var hp=heroPos(); stuck.push({e:fl.e,ox:fl.tx-hp.x,oy:fl.ty-hp.y,sz:0}); glow=14; pop=8; bounce=8;
+    for(var i=0;i<10;i++)sparks.push({x:fl.tx,y:fl.ty,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6-1,life:24,c:['#ffe27a','#8fe0ff','#fff','#8fffcf','#ffb0e0'][i%5]});
+    if((used%3)===0){ for(var h=0;h<4;h++)hearts.push({x:hp.x+(Math.random()-0.5)*70,y:hp.y,vy:-1-Math.random()*1.4,ph:Math.random()*6.28,life:56}); } }
+  function win(){ running=false; var hp=heroPos(); for(var i=0;i<48;i++)sparks.push({x:hp.x+(Math.random()-0.5)*150,y:hp.y+(Math.random()-0.5)*120,vx:(Math.random()-0.5)*7,vy:(Math.random()-0.5)*7,life:34,c:['#ffe27a','#8fe0ff','#fff','#8fffcf'][i%4]});
+    document.getElementById('ot').innerHTML='🎉 DONE! 🎉'; document.getElementById('om').textContent=OKMSG; document.getElementById('sub').textContent='🎉 '+OKMSG;
+    setTimeout(function(){ document.getElementById('over').style.display='flex'; if(window.MO_MVP)window.MO_MVP(); },1150); }
+  function rr(x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function sunny(){ ctx.save(); ctx.globalAlpha=0.85; ctx.fillStyle='#fff2a0'; ctx.beginPath(); ctx.arc(W-40,42,17,0,6.29); ctx.fill(); ctx.globalAlpha=0.35; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.ellipse(W*0.26+Math.sin(tt*0.3)*10,66,38,14,0,0,6.29); ctx.ellipse(W*0.64,50,30,11,0,0,6.29); ctx.fill(); ctx.restore(); }
+  function draw(){ tt+=0.05; var hp=heroPos(), s=heroSize();
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,BG[0]); g.addColorStop(1,BG[1]); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    if(GROUND){ ctx.fillStyle=GROUND; ctx.fillRect(0,H*0.72,W,H*0.28); }
+    sunny();
+    // soft room/stage panel behind the big hero
+    ctx.save(); ctx.globalAlpha=0.5; ctx.fillStyle=PANEL; rr(hp.x-s*1.7, hp.y-s*1.5, s*3.4, s*3.0, s*0.5); ctx.fill(); ctx.restore();
+    // pedestal
+    ctx.save(); ctx.globalAlpha=0.28; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(hp.x,hp.y+s*0.95,s*1.15,s*0.32,0,0,6.29); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.globalAlpha=0.85; ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.ellipse(hp.x,hp.y+s*0.92,s*1.05,s*0.26,0,0,6.29); ctx.fill(); ctx.restore();
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    // glow ring
+    if(glow>0){ glow--; ctx.save(); ctx.globalAlpha=glow/14*0.55; ctx.strokeStyle='#fff6c0'; ctx.lineWidth=6; ctx.beginPath(); ctx.arc(hp.x,hp.y,s*1.15,0,6.29); ctx.stroke(); ctx.restore(); }
+    // BIG hero (bobbing + pop bounce)
+    var bob=Math.sin(tt*2)*4; var pb=bounce>0?(bounce--,Math.sin((8-bounce)/8*Math.PI)*s*0.12):0;
+    ctx.font=(s*1.4+pb)+'px sans-serif'; ctx.fillText(HERO, hp.x, hp.y+bob);
+    // stuck items around hero
+    for(var st=0;st<stuck.length;st++){ var k=stuck[st]; if(k.sz<1)k.sz=Math.min(1,k.sz+0.14); ctx.save(); ctx.globalAlpha=0.22; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(hp.x+k.ox,hp.y+k.oy+bob+s*0.2*k.sz,s*0.24*k.sz,s*0.09*k.sz,0,0,6.29); ctx.fill(); ctx.restore(); ctx.font=(s*0.5*k.sz)+'px sans-serif'; ctx.fillText(k.e, hp.x+k.ox, hp.y+k.oy+bob); }
+    // hearts
+    for(var hI=hearts.length-1;hI>=0;hI--){ var ht=hearts[hI]; ht.y+=ht.vy; ht.x+=Math.sin(tt+ht.ph)*0.5; ht.life--; if(ht.life<=0){hearts.splice(hI,1);continue;} ctx.globalAlpha=Math.min(1,ht.life/30); ctx.font='20px sans-serif'; ctx.fillText('💛',ht.x,ht.y); ctx.globalAlpha=1; }
+    // flyers
+    for(var fi=flyers.length-1;fi>=0;fi--){ var fl=flyers[fi]; fl.t+=0.06; fl.x+=(fl.tx-fl.x)*0.2; fl.y+=(fl.ty-fl.y)*0.2; ctx.font='34px sans-serif'; ctx.fillText(fl.e,fl.x,fl.y); if(Math.hypot(fl.tx-fl.x,fl.ty-fl.y)<7){ land(fl); flyers.splice(fi,1); } }
+    // sparks
+    for(var sp=sparks.length-1;sp>=0;sp--){ var q=sparks[sp]; q.x+=q.vx; q.y+=q.vy; q.vy+=0.12; q.life--; if(q.life<=0){sparks.splice(sp,1);continue;} ctx.globalAlpha=q.life/26; ctx.fillStyle=q.c; ctx.fillRect(q.x,q.y,3,3); ctx.globalAlpha=1; }
+    // meter
+    var frac=ITEMS.length?used/ITEMS.length:0; var bw=W*0.55,bx=(W-bw)/2,by=76; ctx.save(); ctx.globalAlpha=0.92; ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(bx,by,bw,9); ctx.fillStyle='#ffd23f'; ctx.fillRect(bx,by,Math.max(0,bw*frac),9); ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1; ctx.strokeRect(bx,by,bw,9); ctx.restore();
+    if(PAYOFF && !running && stuck.length){ } // reserved
+    requestAnimationFrame(draw); }
+  var ac; function beep(f,d,ty){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type=ty||'square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  document.getElementById('go').onclick=function(){ reset(); };
+  document.getElementById('rs').onclick=function(){ reset(); };
+  used=0; running=false; flyers=[]; sparks=[]; tt=0; hearts=[]; stuck=[]; glow=0; pop=0; bounce=0; buildTray();
+  requestAnimationFrame(draw);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration - shows a gold badge + confetti on win/finish */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function hookText(el){ if(!el)return; var was=false; new MutationObserver(function(){ var t=(el.textContent||'').trim(); if(t&&!was){ was=true; celebrate(); } else if(!t){ was=false; } }).observe(el,{childList:true,characterData:true,subtree:true}); }
+  function init(){ hookVisible(document.getElementById('over')); hookText(document.getElementById('win')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+
+</body></html>

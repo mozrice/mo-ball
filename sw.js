@@ -1,6 +1,6 @@
 // Service worker: lets Mo Arcade open with no internet connection.
 // Bump CACHE when you change the site so phones pick up the new version.
-const CACHE = "mo-arcade-v138";
+const CACHE = "mo-arcade-v175";
 const FILES = [
   "./",
   "./index.html",
@@ -31,8 +31,7 @@ self.addEventListener("activate", function (e) {
   );
 });
 
-// Network first, cache second. This way your edits show up straight away when
-// you are online, but games still open when you are not.
+// Network first, cache second.
 self.addEventListener("fetch", function (e) {
   if (e.request.method !== "GET") return;
   e.respondWith(

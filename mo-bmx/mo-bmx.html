@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO BMX Jumps</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:#3a6a9a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;opacity:.9;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;text-shadow:0 1px 3px #000;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:18px;font-weight:bold;color:#fff;pointer-events:none;text-shadow:0 1px 4px #000;}
+  #sub{position:fixed;top:34px;left:0;right:0;text-align:center;font-size:14px;font-weight:bold;color:#ffe08a;pointer-events:none;text-shadow:0 1px 3px #000;}
+  #start,#over{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8;text-align:center;padding:20px;}
+  #start{background:linear-gradient(#3a6a9a,#7ab0e0);}
+  #start h1{font-size:25px;margin:0 0 6px;text-shadow:0 2px 4px #0007;} #start p{font-size:15px;margin:4px;max-width:330px;}
+  #start .big{font-size:58px;}
+  #over{background:#000a;display:none;}
+  #over h1{font-size:30px;color:#ffd23f;margin:0 0 6px;text-shadow:0 2px 0 #b47a1a;} #over p{font-size:17px;margin:3px;}
+  #start button,#over button{margin-top:16px;background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+  #start button:active,#over button:active{transform:translateY(3px);box-shadow:0 2px 0 #b4801a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">&#11013; Games</a>
+<div id="hud">⭐ <span id="sc">0</span>/<span id="goal">15</span> &nbsp; 🏆 <span id="hi">0</span></div>
+<div id="sub">DRAG up & down to move! Dodge the obstacles!</div>
+<canvas id="c"></canvas>
+<div id="start"><div class="big">🚲</div><h1>MO BMX Jumps</h1><p>DRAG up and down to move and dodge!</p><button id="go">&#9654; GO</button></div>
+<div id="over"><h1 id="ot">&#127881; WIN!</h1><p id="om"></p><button id="rs">&#9654; Play Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener('resize',fit); fit();
+  var HERO='🚲', OBST=["🚧", "🪵", "🛢️", "🪨"], BG=["#3a6a9a", "#7ab0e0"], GROUND="#2a3a4a", GOAL=15;
+  var HK='moRun_bmx'; function getHi(){ try{return +localStorage.getItem(HK)||0;}catch(e){return 0;} } function setHi(v){ try{localStorage.setItem(HK,v);}catch(e){} }
+  var hero, obs, score, running, spawnT, tt, scroll, best, bonk, drag;
+  best=getHi(); document.getElementById('hi').textContent=best; document.getElementById('goal').textContent=GOAL;
+  function reset(){ hero={x:W*0.26,y:H*0.5,ty:H*0.5}; obs=[]; score=0; running=true; spawnT=30; tt=0; scroll=0; bonk=0; drag=false;
+    document.getElementById('sc').textContent=0; document.getElementById('over').style.display='none'; document.getElementById('start').style.display='none'; document.getElementById('sub').textContent='👆 DRAG up & down to move!'; }
+  function pt(e){ var t0=e.changedTouches?e.changedTouches[0]:(e.touches?e.touches[0]:e); var r=cv.getBoundingClientRect(); return t0.clientY-r.top; }
+  function setY(e){ if(!running)return; hero.ty=Math.max(60,Math.min(H-40,pt(e))); }
+  cv.addEventListener('touchstart',function(e){ drag=true; setY(e); e.preventDefault(); },{passive:false});
+  cv.addEventListener('touchmove',function(e){ setY(e); e.preventDefault(); },{passive:false});
+  cv.addEventListener('touchend',function(e){ drag=false; e.preventDefault(); },{passive:false});
+  cv.addEventListener('mousedown',function(e){ drag=true; setY(e); });
+  cv.addEventListener('mousemove',function(e){ if(drag)setY(e); });
+  window.addEventListener('mouseup',function(){ drag=false; });
+  function spawn(){ obs.push({x:W+30, y:80+Math.random()*(H-160), e:OBST[Math.floor(Math.random()*OBST.length)], passed:false}); }
+  function win(){ running=false; document.getElementById('ot').innerHTML='🎉 YOU WIN! 🎉'; document.getElementById('om').textContent='Awesome! You scored '+score+'! Best: '+best; document.getElementById('over').style.display='flex'; if(window.MO_MVP)window.MO_MVP(); }
+  function shadow(x,y,w){ ctx.save(); ctx.globalAlpha=0.18; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(x,y+w*0.42,w*0.5,w*0.16,0,0,6.29); ctx.fill(); ctx.restore(); }
+  function sunny(){ ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle='#fff2a0'; ctx.beginPath(); ctx.arc(W-40,42,18,0,6.29); ctx.fill(); ctx.globalAlpha=0.4; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.ellipse(W*0.28+Math.sin(tt*0.3)*10,68,40,15,0,0,6.29); ctx.ellipse(W*0.66,52,32,12,0,0,6.29); ctx.fill(); ctx.restore(); }
+  var fx=[], flash=0;
+  function burst(x,y,c){ flash=12; for(var i=0;i<14;i++)fx.push({x:x,y:y,vx:(Math.random()-0.5)*7,vy:(Math.random()-0.5)*7-2,life:24,c:c||'#ffd23f'}); }
+  function progbar(){ var frac=0; try{ if(typeof builds!=='undefined'&&builds&&builds.length) frac=done/builds.length; else if(typeof GOAL!=='undefined') frac=Math.min(1,score/GOAL); }catch(e){} var bw=W*0.55,bx=(W-bw)/2,by=80; ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(bx,by,bw,9); ctx.fillStyle='#ffd23f'; ctx.fillRect(bx,by,Math.max(0,bw*frac),9); ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1; ctx.strokeRect(bx,by,bw,9); ctx.restore(); }
+  function fxdraw(){ for(var i=fx.length-1;i>=0;i--){ var f=fx[i]; f.x+=f.vx; f.y+=f.vy; f.vy+=0.2; f.life--; if(f.life<=0){fx.splice(i,1);continue;} ctx.globalAlpha=Math.max(0,f.life/24); ctx.fillStyle=f.c; ctx.fillRect(f.x,f.y,3,3); ctx.globalAlpha=1; } if(flash>0){ flash--; ctx.save(); ctx.globalAlpha=flash/24*0.35; ctx.fillStyle='#bfffcf'; ctx.fillRect(0,0,W,H); ctx.restore(); } progbar(); }
+  function draw(){ tt+=0.05; scroll+=4;
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,BG[0]); g.addColorStop(1,BG[1]); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle=GROUND; ctx.fillRect(0,H-24,W,24); ctx.fillRect(0,0,W,10); sunny();
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    if(running){
+      hero.y+=(hero.ty-hero.y)*0.2;
+      spawnT--; if(spawnT<=0){ spawn(); spawnT=Math.max(34,70-score*1.6); }
+      for(var i=obs.length-1;i>=0;i--){ var o=obs[i]; o.x-=(5+score*0.14);
+        if(!o.passed && o.x<hero.x-20){ o.passed=true; score++; document.getElementById('sc').textContent=score; beep(720+score*10,0.05); burst(hero.x,hero.y,'#8fffa8'); if(score>best){best=score;setHi(best);document.getElementById('hi').textContent=best;} if(score>=GOAL){ win(); } }
+        if(Math.abs(o.x-hero.x)<30 && Math.abs(o.y-hero.y)<32){ obs.splice(i,1); bonk=10; beep(150,0.14,'sawtooth'); if(score>0){score--;document.getElementById('sc').textContent=score;} continue; }
+        if(o.x<-40)obs.splice(i,1);
+      }
+    }
+    for(var j=0;j<obs.length;j++){ shadow(obs[j].x,obs[j].y,34); ctx.font='38px sans-serif'; ctx.fillText(obs[j].e,obs[j].x,obs[j].y); }
+    shadow(hero.x,hero.y,42); ctx.save(); ctx.translate(hero.x+(bonk>0?(Math.random()-0.5)*6:0),hero.y); var tilt=(hero.ty-hero.y)*0.006; ctx.rotate(tilt); ctx.font='42px sans-serif'; ctx.fillText(HERO,0,0); ctx.restore(); if(bonk>0)bonk--;
+    fxdraw(); requestAnimationFrame(draw); }
+  var ac; function beep(f,d,ty){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),gn=ac.createGain(); o.frequency.value=f; o.type=ty||'square'; o.connect(gn); gn.connect(ac.destination); gn.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  document.getElementById('go').onclick=function(){ reset(); };
+  document.getElementById('rs').onclick=function(){ reset(); };
+  hero={x:W*0.26,y:H*0.5,ty:H*0.5}; obs=[]; score=0; running=false; spawnT=30; tt=0; scroll=0; bonk=0; drag=false;
+  requestAnimationFrame(draw);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration - shows a gold badge + confetti on win/finish */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function hookText(el){ if(!el)return; var was=false; new MutationObserver(function(){ var t=(el.textContent||'').trim(); if(t&&!was){ was=true; celebrate(); } else if(!t){ was=false; } }).observe(el,{childList:true,characterData:true,subtree:true}); }
+  function init(){ hookVisible(document.getElementById('over')); hookText(document.getElementById('win')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+
+</body></html>
