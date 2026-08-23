@@ -1,6 +1,6 @@
 // Service worker: lets Mo Arcade open with no internet connection.
 // Bump CACHE when you change the site so phones pick up the new version.
-const CACHE = "mo-arcade-v180";
+const CACHE = "mo-arcade-v182";
 const FILES = [
   "./",
   "./index.html",
