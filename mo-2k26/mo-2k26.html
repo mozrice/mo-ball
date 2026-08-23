@@ -74,8 +74,7 @@
   <div class="sub">ALL IN ONE</div>
   <button class="btn green" id="mLearn">🎓 LEARN TO PLAY</button>
   <button class="btn" id="mQuick">🏀 QUICK GAME</button>
-  <button class="btn" id="m5v5" style="background:linear-gradient(#2ad17a,#1a9a5a);box-shadow:0 5px 0 #12793f;">🏀 5v5 FULL GAME</button>
-  <button class="btn" id="mFull" style="background:linear-gradient(#e8792a,#b45418);box-shadow:0 5px 0 #7a3a10;">🏟️ FULL COURT (pro NBA court)</button>
+  <button class="btn" id="m5v5" style="background:linear-gradient(#2ad17a,#1a9a5a);box-shadow:0 5px 0 #12793f;">🏀 5v5 FULL COURT</button>
   <button class="btn" id="mHome" style="background:linear-gradient(#8a6a3a,#5a3a1a);box-shadow:0 5px 0 #3a2410;">🏠 GO HOME (drive to games)</button>
   <button class="btn purp" id="mCareer">👑 MyCAREER</button>
   <button class="btn blue" id="mNba">🏆 MyNBA SEASON</button>
@@ -342,7 +341,6 @@
   var moreBtns=document.querySelectorAll('.mm'); for(var mb=0;mb<moreBtns.length;mb++){ moreBtns[mb].onclick=function(){ resumeAudio(); routeMode(this.getAttribute('data-m')); }; }
   document.getElementById('mMore').onclick=function(){ show('more'); };
   document.getElementById('m5v5').onclick=function(){ location.href='../mo-2k/mo-2k.html'; };
-  document.getElementById('mFull').onclick=function(){ location.href='../mo-fullcourt/mo-fullcourt.html'; };
   document.getElementById('mHome').onclick=function(){ location.href='../mo-home/mo-home.html'; };
   function routeMode(m){ mode=m;
     if(m==='mvprace'){ series={type:'mvprace',game:0,games:5,pts:0,goal:60}; nextSeriesGame(); }
