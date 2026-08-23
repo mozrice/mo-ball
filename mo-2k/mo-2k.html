@@ -35,32 +35,40 @@
     for(var r2=0;r2<2;r2++){ y=g.cb+H*0.014+r2*H*0.024; for(x=W*0.05;x<W*0.96;x+=W*0.044){ dot(x,y); } }
     for(var c=0;c<2;c++){ x=W*0.02+c*11; for(y=g.ctp+6;y<g.cb-6;y+=H*0.032){ dot(x,y); } x=W-W*0.02-c*11; for(y=g.ctp+6;y<g.cb-6;y+=H*0.032){ dot(x,y); } }
   }
-  var phase, charging, power, ball, mates, defs, score, cpu, tleft, running, tt, sparks, msg, best, rebFrames, cpuT, shooter;
+  var phase, charging, power, ball, mates, defs, score, cpu, gameClock, shotClock, running, tt, sparks, msg, best, rebFrames, cpuT, shooter, cpuBlocked;
   try{ best=+localStorage.getItem('mo2k5v5')||0; }catch(e){ best=0; }
   function rebRect(){ return {x:(W-W*0.6)/2, y:H*0.855, w:W*0.6, h:H*0.085}; }
+  function blockRect(){ return {x:W*0.08, y:H*0.855, w:W*0.40, h:H*0.085}; }
+  function stealRect(){ return {x:W*0.52, y:H*0.855, w:W*0.40, h:H*0.085}; }
+  function fmtClock(s){ var m=Math.floor(s/60), ss=s%60; return m+':'+(ss<10?'0':'')+ss; }
   function place(){ var g=G(); shooter={x:W/2,y:g.ctp+g.kh+H*0.05};
     mates=[{x:W*0.22,y:g.ctp+g.kh+H*0.02},{x:W*0.78,y:g.ctp+g.kh+H*0.02},{x:W*0.34,y:g.ctp+g.kh*0.55},{x:W*0.66,y:g.ctp+g.kh*0.55}];
     defs=[{x:W*0.42,y:g.ctp+g.kh+H*0.09},{x:W*0.58,y:g.ctp+g.kh+H*0.09},{x:W*0.5,y:g.ctp+g.kh*0.5},{x:W*0.28,y:g.ctp+g.kh*0.9},{x:W*0.72,y:g.ctp+g.kh*0.9}]; }
-  function reset(){ place(); phase='you'; charging=false; power=0; ball={onShooter:true,t:0}; score=0; cpu=0; tleft=60; running=true; tt=0; sparks=[]; msg='HOLD & release on GREEN!'; rebFrames=0; cpuT=0;
+  function reset(){ place(); phase='you'; charging=false; power=0; ball={onShooter:true,t:0}; score=0; cpu=0; gameClock=120; shotClock=24; running=true; tt=0; sparks=[]; msg='HOLD & release on GREEN!'; rebFrames=0; cpuT=0; cpuBlocked=false;
     document.getElementById('over').style.display='none'; document.getElementById('start').style.display='none'; if(timer)clearInterval(timer); timer=setInterval(tick,1000); }
-  var timer=null; function tick(){ if(!running)return; tleft--; if(tleft<=0){ tleft=0; gameover(); } }
+  var timer=null; function tick(){ if(!running)return; gameClock--; if(phase==='you'){ shotClock--; if(shotClock<=0){ msg='🔴 SHOT CLOCK! Turnover'; beep(150,0.18,'sawtooth'); toCpu(); } } if(gameClock<=0){ gameClock=0; gameover(); } }
   function pt(ev){ var t0=ev.changedTouches?ev.changedTouches[0]:ev; var r=cv.getBoundingClientRect(); return {x:t0.clientX-r.left,y:t0.clientY-r.top}; }
   function down(e){ if(!running)return;
     if(phase==='reb'){ var p=pt(e),rb=rebRect(); if(p.x>=rb.x&&p.x<=rb.x+rb.w&&p.y>=rb.y&&p.y<=rb.y+rb.h) grabRebound(); return; }
+    if(phase==='cpu'){ if(cpuBlocked)return; var p2=pt(e),bb=blockRect(),st=stealRect();
+      if(p2.x>=bb.x&&p2.x<=bb.x+bb.w&&p2.y>=bb.y&&p2.y<=bb.y+bb.h){ if(Math.random()<0.6){ cpuBlocked=true; msg='🚫 YOU BLOCKED IT!'; beep(320,0.1); } else { msg='...missed the block!'; beep(200,0.08); } }
+      else if(p2.x>=st.x&&p2.x<=st.x+st.w&&p2.y>=st.y&&p2.y<=st.y+st.h){ if(Math.random()<0.45){ cpuBlocked=true; score+=2; msg='🖐️ STEAL! Fast break +2!'; var g=G(); for(var i=0;i<14;i++)sparks.push({x:W/2,y:g.mid,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6-1,life:24,c:['#8fffcf','#ffe27a','#fff','#43c6ff'][i%4]}); beep(680,0.09); setTimeout(function(){beep(980,0.08);},70); } else { msg='...missed the steal!'; beep(200,0.08); } } return; }
     if(phase==='you' && !charging){ charging=true; power=0; } }
   function up(e){ if(phase==='you' && charging){ charging=false; release(power); } }
   cv.addEventListener('touchstart',function(e){ down(e); e.preventDefault(); },{passive:false});
   cv.addEventListener('touchend',function(e){ up(e); e.preventDefault(); },{passive:false});
   cv.addEventListener('mousedown',function(e){ down(e); });
   window.addEventListener('mouseup',function(e){ up(e); });
-  function release(p){ var g=G(); phase='shot'; ball.onShooter=false; ball.t=0; ball.sx=shooter.x; ball.sy=shooter.y; ball.ex=W/2; ball.ey=g.ctp+H*0.015;
-    ball.make=(p>=70 && p<=92); ball.perfect=(p>=77 && p<=86); ball.arc=H*0.18; beep(360+p*4,0.08);
-    if(!ball.make){ ball.ex=W/2+(p<70?-1:1)*W*0.10; ball.ey=g.ctp+H*0.05; } }
+  function release(p){ if(p>96){ msg='🚫 BLOCKED! (rushed it)'; beep(150,0.16,'sawtooth'); toCpu(); return; }
+    var made=(p>=70 && p<=92); if(made && Math.random()<0.10){ msg='🚫 BLOCKED at the rim!'; beep(150,0.16,'sawtooth'); toCpu(); return; }
+    var g=G(); phase='shot'; ball.onShooter=false; ball.t=0; ball.sx=shooter.x; ball.sy=shooter.y; ball.ex=W/2; ball.ey=g.ctp+H*0.015;
+    ball.make=made; ball.perfect=(p>=77 && p<=86); ball.arc=H*0.18; ball.done=false; beep(360+p*4,0.08);
+    if(!made){ ball.ex=W/2+(p<70?-1:1)*W*0.10; ball.ey=g.ctp+H*0.05; } }
   function scored(){ var pts=ball.perfect?3:2; score+=pts; msg=ball.perfect?('✨ SWISH! +'+pts):('🏀 BUCKET! +'+pts); var g=G(); for(var i=0;i<16;i++)sparks.push({x:W/2,y:g.ctp+H*0.02,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6-1,life:26,c:['#ffe27a','#ff8a3a','#fff','#8fffcf'][i%4]}); beep(760,0.08); setTimeout(function(){beep(1040,0.09);},70); toCpu(); }
   function startRebound(){ var g=G(); phase='reb'; rebFrames=0; ball.onShooter=false; ball.rx=W/2+(Math.random()<0.5?-1:1)*W*0.06; ball.ry=g.ctp+g.kh*0.6; msg='MISS! Tap 🙌 REBOUND!'; beep(180,0.1,'sawtooth'); }
   function grabRebound(){ score++; msg='🙌 PUT-BACK! +2'; var g=G(); for(var i=0;i<16;i++)sparks.push({x:W/2,y:g.ctp+H*0.02,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6-1,life:26,c:['#ffe27a','#8fffcf','#fff','#ff8a3a'][i%4]}); beep(700,0.08); setTimeout(function(){beep(980,0.09);},70); toCpu(); }
-  function toCpu(){ phase='cpu'; cpuT=0; ball.onShooter=false; }
-  function cpuDone(){ if(Math.random()<0.5){ cpu+=2; msg='CPU scores 2'; } else { msg='CPU misses!'; } place(); phase='you'; charging=false; power=0; ball={onShooter:true,t:0}; }
+  function toCpu(){ phase='cpu'; cpuT=0; cpuBlocked=false; ball.onShooter=false; }
+  function cpuDone(){ if(cpuBlocked){ msg='🚫 CPU blocked — no good!'; } else if(Math.random()<0.5){ cpu+=2; msg='🔴 CPU scores 2'; } else { msg='CPU misses!'; } place(); phase='you'; charging=false; power=0; shotClock=24; ball={onShooter:true,t:0}; }
   function gameover(){ running=false; if(timer)clearInterval(timer); if(score>best){ best=score; try{localStorage.setItem('mo2k5v5',best);}catch(e){} }
     var win=score>=cpu; document.getElementById('ot').innerHTML=win?'🏆 MO WINS!':'🏀 FINAL'; document.getElementById('om').textContent='MO '+score+'  —  CPU '+cpu+(win?'  ·  MVP! 🌟':'  ·  so close!')+'   Best: '+best;
     document.getElementById('over').style.display='flex'; if(win&&window.MO_MVP)window.MO_MVP(); }
@@ -87,9 +95,11 @@
   function draw(){ tt+=0.05; ctx.fillStyle='#0e0a14'; ctx.fillRect(0,0,W,H); drawFans(); court(); var g=G();
     ctx.fillStyle='#14101c'; ctx.fillRect(0,0,W,H*0.10);
     ctx.fillStyle='#8fbaff'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='bold 20px Trebuchet MS'; ctx.fillText('MO '+score,W*0.22,H*0.042);
-    ctx.fillStyle='#ff9a9a'; ctx.fillText('CPU '+cpu,W*0.55,H*0.042);
-    ctx.fillStyle=tleft<=10?'#ff6a6a':'#ffd23f'; ctx.fillText('⏱ '+tleft,W*0.85,H*0.042);
-    ctx.fillStyle='#cbb68a'; ctx.font='bold 11px Trebuchet MS'; ctx.fillText('MO 2K26 · 5v5 FULL COURT · 🏟️ FANS',W*0.5,H*0.082);
+    ctx.fillStyle='#ff9a9a'; ctx.fillText('CPU '+cpu,W*0.50,H*0.042);
+    ctx.fillStyle=gameClock<=15?'#ff6a6a':'#ffd23f'; ctx.fillText('⏱ '+fmtClock(gameClock),W*0.80,H*0.042);
+    ctx.fillStyle='#cbb68a'; ctx.font='bold 11px Trebuchet MS'; ctx.fillText('MO 2K26 · 5v5 · 🏟️ FANS · SHOT CLOCK',W*0.5,H*0.082);
+    // NBA shot clock atop the court
+    if(phase==='you'||phase==='shot'){ ctx.fillStyle='#120e18'; ctx.fillRect(W*0.5-24,g.ctp+3,48,22); ctx.strokeStyle='#5a4a2a'; ctx.lineWidth=1; ctx.strokeRect(W*0.5-24,g.ctp+3,48,22); ctx.fillStyle=shotClock<=5?'#ff5a5a':'#ff8a3a'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='bold 16px Trebuchet MS'; ctx.fillText(':'+(shotClock<10?'0':'')+shotClock,W*0.5,g.ctp+14); }
     // charge meter
     if(phase==='you' && charging){ power+=2.0; if(power>115)power=115; }
     // teammates + defenders
@@ -103,7 +113,11 @@
     if(phase==='reb'){ rebFrames++; if(rebFrames>100){ msg='😬 They boarded it!'; beep(150,0.14,'sawtooth'); toCpu(); }
       else { var rb=rebRect(); ctx.save(); ctx.globalAlpha=0.7+0.3*Math.sin(tt*8); ctx.fillStyle='#e8792a'; rr(rb.x,rb.y,rb.w,rb.h,16); ctx.fill(); ctx.restore(); ctx.fillStyle='#ffab5a'; rr(rb.x,rb.y,rb.w,rb.h*0.55,16); ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; rr(rb.x,rb.y,rb.w,rb.h,16); ctx.stroke(); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='bold 22px Trebuchet MS'; ctx.fillText('🙌 REBOUND!',W/2,rb.y+rb.h/2); } }
     // cpu possession
-    if(phase==='cpu'){ cpuT++; ctx.fillStyle='#ff9a9a'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='bold 20px Trebuchet MS'; ctx.fillText('🔴 CPU has the ball...',W/2,g.mid+H*0.10); if(cpuT>66){ cpuDone(); } }
+    if(phase==='cpu'){ cpuT++; ctx.fillStyle='#ff9a9a'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='bold 20px Trebuchet MS'; ctx.fillText(cpuBlocked?'🚫 BLOCKED!':'🔴 CPU shooting...',W/2,g.mid+H*0.10);
+      if(!cpuBlocked){ var bb=blockRect(),st=stealRect(),pu=0.72+0.28*Math.sin(tt*8);
+        ctx.save(); ctx.globalAlpha=pu; ctx.fillStyle='#43c6ff'; rr(bb.x,bb.y,bb.w,bb.h,16); ctx.fill(); ctx.restore(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; rr(bb.x,bb.y,bb.w,bb.h,16); ctx.stroke(); ctx.fillStyle='#0a2a3a'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='bold 20px Trebuchet MS'; ctx.fillText('🚫 BLOCK',bb.x+bb.w/2,bb.y+bb.h/2);
+        ctx.save(); ctx.globalAlpha=pu; ctx.fillStyle='#8fd060'; rr(st.x,st.y,st.w,st.h,16); ctx.fill(); ctx.restore(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; rr(st.x,st.y,st.w,st.h,16); ctx.stroke(); ctx.fillStyle='#173a10'; ctx.font='bold 20px Trebuchet MS'; ctx.fillText('🖐️ STEAL',st.x+st.w/2,st.y+st.h/2); }
+      if(cpuT>80){ cpuDone(); } }
     // ball
     var br=Math.min(W*0.03,13), bx,by; if(phase==='reb'){ bx=ball.rx; by=ball.ry+Math.abs(Math.sin(tt*8))*8; } else if(phase==='shot'){ bx=ball.bx; by=ball.by; } else if(ball.onShooter){ bx=shooter.x+14; by=shooter.y+4; } else { bx=-99; by=-99; }
     if(bx>-50){ ctx.save(); ctx.translate(bx,by); ctx.fillStyle='#e8792a'; ctx.beginPath(); ctx.arc(0,0,br,0,6.29); ctx.fill(); ctx.strokeStyle='#7a3a12'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(0,0,br,0,6.29); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-br,0); ctx.lineTo(br,0); ctx.moveTo(0,-br); ctx.lineTo(0,br); ctx.stroke(); ctx.restore(); }
