@@ -295,6 +295,8 @@
   document.getElementById('auto').onclick=function(){ if(!car.driving){ says.push({x:mo.x,y:mo.y-32,t:1.8,txt:'🚗 Get in the Chevy first!'}); beep(200,0.1,'sawtooth',0.04); return; } if(!navTarget){ document.getElementById('nav').onclick(); return; } autoDrive=!autoDrive; this.textContent=autoDrive?'🛑 STOP':'🤖 AUTO'; this.style.borderColor=autoDrive?'#7bff9e':'#7bd0ff'; beep(autoDrive?720:300,0.08,'square',0.05); if(autoDrive){ says.push({x:car.x,y:car.y-40,t:2,txt:'🤖 Self-driving to '+navTarget.name+'!'}); cleanSpeak('Self driving to '+navTarget.name.toLowerCase()); } };
   var HGAMES=[
     {u:'../mo-3devent/mo-3devent.html',e:'🌟',n:'MO 3D Event'},
+    {u:'../mo-3dcity/mo-3dcity.html',e:'🏙️',n:'MO 3D City'},
+    {u:'../mo-northamerica/mo-northamerica.html',e:'✈️',n:'MO Fly & Live'},
     {u:'../mo-myteam/mo-myteam.html',e:'🃏',n:'MO MyTEAM'},
     {u:'../mo-bigtrip/mo-bigtrip.html',e:'✈️',n:'MO Big Trip'},
     {u:'../mo-arffhotel/mo-arffhotel.html',e:'🐶',n:'MO Arff Hotel'},

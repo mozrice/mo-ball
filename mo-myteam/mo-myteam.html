@@ -116,7 +116,13 @@
   var EMOJIS=['','maltipoo','🏀','🔥','⚡','💥','🌟','👑','🚀','🎯','🦁','🐉','🦅','🐶','🐕','🦮','🐩','🐺','🐱','😎','🤖','👦','👧','👩'];
   var PRESETS=[{n:'Mommy',e:'👩',de:'👩'},{n:'Daddy',e:'🧑',de:'🧑'},{n:'Arff',e:'maltipoo',de:'🐶'},{n:'Arf',e:'maltipoo',de:'🐶'},{n:'Arfy',e:'maltipoo',de:'🐶'},{n:'Woof',e:'🐺',de:'🐺'},{n:'Me',e:'🏀',de:'🏀'}];
   var POS=['PG','SG','SF','PF','C'];
-  var month=(function(){ try{ return new Date().toLocaleDateString('en-US',{month:'long'}); }catch(e){ return 'This Month'; } })();
+  var MN=(function(){ try{ return new Date().getMonth(); }catch(e){ return 0; } })();
+  var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var EVENTNAMES=['New Year Jam','All-Star Slam','March Madness','Spring Slam','Playoff Push','Finals Fever','Summer Hoops','Summer Slam','Tip-Off Time','Opening Night','Turkey Shootout','Holiday Hoops'];
+  var SEASONS=['Winter','Winter','Spring','Spring','Spring','Summer','Summer','Summer','Fall','Fall','Fall','Winter'];
+  var month=MONTHS[MN]||'This Month';
+  var eventName=EVENTNAMES[MN]||(month+' Event');
+  var seasonName=SEASONS[MN]||'';
   function tier(r){ if(r>=99)return {n:'GALAXY OPAL',a:'#6ad0ff',b:'#c86aff',t:'#fff',gem:'🌌'}; if(r>=97)return {n:'PINK DIAMOND',a:'#ff8ac8',b:'#ffd6ec',t:'#7a2a5a',gem:'💗'}; if(r>=93)return {n:'DIAMOND',a:'#cdeaff',b:'#7fc8f0',t:'#0a3a5a',gem:'💎'}; if(r>=90)return {n:'AMETHYST',a:'#a95cff',b:'#e0b6ff',t:'#fff',gem:'🔮'}; if(r>=87)return {n:'RUBY',a:'#e0435a',b:'#ff8a9a',t:'#fff',gem:'🔴'}; if(r>=84)return {n:'SAPPHIRE',a:'#2a6ad0',b:'#7aa8ff',t:'#fff',gem:'🔷'}; if(r>=80)return {n:'EMERALD',a:'#1f9a5a',b:'#7fe0a0',t:'#08331a',gem:'🟢'}; if(r>=75)return {n:'GOLD',a:'#e0a020',b:'#ffe888',t:'#5a3a00',gem:'🥇'}; if(r>=70)return {n:'SILVER',a:'#9aa0ad',b:'#e4e9f0',t:'#2a2f3a',gem:'⚪'}; return {n:'BRONZE',a:'#a06a3a',b:'#d6a878',t:'#3a2410',gem:'🥉'}; }
   function cardStyle(c){ var t=tier(c.r); return 'background:linear-gradient(140deg,'+t.a+' 0%,'+t.b+' 100%);color:'+t.t+';'; }
   function maltipoo(sz){ sz=sz||46; return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 100 100" style="filter:drop-shadow(0 3px 4px rgba(0,0,0,.4));">'+
@@ -144,8 +150,8 @@
   function addXP(n){ seasonXP+=n; }
   function slevel(){ return Math.floor(seasonXP/100)+1; }
   function renderSeason(){ var lv=slevel(); var into=seasonXP%100; var el=document.getElementById('season');
-    el.innerHTML='<div class="slvl"><span>🏅 Season Level '+lv+'</span><span class="snm">'+month.toUpperCase()+' SEASON</span></div><div class="strack"><div class="sfill" style="width:'+into+'%"></div></div>';
-    document.getElementById('eventbn').innerHTML='🌟 EVENT OF THE MONTH: '+month.toUpperCase()+' — play the 3D BASKETBALL game! 🏀'; }
+    el.innerHTML='<div class="slvl"><span>🏅 Season Level '+lv+'</span><span class="snm">'+seasonName.toUpperCase()+' · '+month.toUpperCase()+'</span></div><div class="strack"><div class="sfill" style="width:'+into+'%"></div></div>';
+    document.getElementById('eventbn').innerHTML='🌟 '+month.toUpperCase()+' EVENT: '+eventName.toUpperCase()+' — play the 3D game! 🏀'; }
   function render(){
     var ln=document.getElementById('line'); ln.innerHTML='';
     for(var i=0;i<5;i++){ var id=lineup[i]; var s=document.createElement('div'); if(id==null){ s.className='slot'; s.innerHTML='<div class="se">➕</div>pick a card'; } else { var c=getCard(id); s.className='slot filled'; s.innerHTML='<div class="se">'+(c.e==='maltipoo'?maltipoo(24):c.e)+'</div>'+c.n+'<br><b>'+c.r+'</b>'; s.onclick=(function(i){return function(){ lineup.splice(i,1); save(); render(); };})(i); } ln.appendChild(s); }
