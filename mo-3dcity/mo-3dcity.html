@@ -94,7 +94,7 @@
   for(var gi=-GRID;gi<=GRID;gi++){ for(var gj=-GRID;gj<=GRID;gj++){
     var cxp=gi*PITCH, czp=gj*PITCH;
     // sidewalk/grass block
-    var blk=new THREE.Mesh(new THREE.BoxGeometry(BLOCK,0.4,BLOCK),new THREE.MeshLambertMaterial({color:0x8a8f98})); blk.position.set(cxp,0.2,czp); scene.add(blk);
+    var blk=new THREE.Mesh(new THREE.BoxGeometry(BLOCK,0.1,BLOCK),new THREE.MeshLambertMaterial({color:0x8a8f98})); blk.position.set(cxp,0.05,czp); scene.add(blk);
     // buildings on the block
     var n=1+Math.floor(Math.random()*3);
     for(var k=0;k<n;k++){ var bw=4+Math.random()*6, bd=4+Math.random()*6, bh=6+Math.random()*46;
@@ -102,7 +102,7 @@
       var mat= isHotel? new THREE.MeshLambertMaterial({color:0xc85a8a}) : winMats[Math.floor(Math.random()*winMats.length)].clone();
       if(mat.map){ mat.map.repeat.set(Math.max(1,bw/4),Math.max(1,bh/6)); }
       var b=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd),mat);
-      b.position.set(cxp+(Math.random()-0.5)*(BLOCK-bw), bh/2+0.4, czp+(Math.random()-0.5)*(BLOCK-bd)); scene.add(b);
+      b.position.set(cxp+(Math.random()-0.5)*(BLOCK-bw), bh/2+0.05, czp+(Math.random()-0.5)*(BLOCK-bd)); scene.add(b);
       if(isHotel){ var sign=makeSign('🏨 HOTEL'); sign.position.set(b.position.x, bh+2, b.position.z); scene.add(sign); }
     }
   }}
@@ -173,9 +173,9 @@
   (function(){ var st=document.getElementById('stick'), kn=document.getElementById('knob'); var pid=null,R=42;
     function set(dx,dy){ var d=Math.hypot(dx,dy); if(d>R){ dx=dx/d*R; dy=dy/d*R; } kn.style.left=(43+dx)+'px'; kn.style.top=(43+dy)+'px'; jx=dx/R; jz=dy/R; }
     function rel(){ pid=null; kn.style.left='43px'; kn.style.top='43px'; jx=0; jz=0; }
-    st.addEventListener('pointerdown',function(e){ e.preventDefault(); pid=e.pointerId; var r=st.getBoundingClientRect(); set(e.clientX-r.left-65,e.clientY-r.top-65); });
+    st.addEventListener('pointerdown',function(e){ e.preventDefault(); pid=e.pointerId; try{st.setPointerCapture(e.pointerId);}catch(_){} var r=st.getBoundingClientRect(); set(e.clientX-r.left-65,e.clientY-r.top-65); });
     st.addEventListener('pointermove',function(e){ if(pid===null)return; var r=st.getBoundingClientRect(); set(e.clientX-r.left-65,e.clientY-r.top-65); });
-    addEventListener('pointerup',function(){ if(pid!==null)rel(); }); st.addEventListener('pointercancel',rel);
+    addEventListener('pointerup',function(){ if(pid!==null)rel(); }); st.addEventListener('pointerup',rel); st.addEventListener('pointercancel',rel); st.addEventListener('lostpointercapture',rel); addEventListener('blur',rel); addEventListener('pointercancel',rel);
   })();
   function commas(n){ return (n||0).toString().replace(/\B(?=(\d{3})+(?!\d))/g,','); }
   function markMode(){ document.getElementById('carBtn').classList.toggle('b-on',pmode==='car'); document.getElementById('busBtn').classList.toggle('b-on',pmode==='bus'); }
@@ -197,8 +197,9 @@
 
   var clock=new THREE.Clock(), walkT=0, gt=0;
   function tick(){ var dt=Math.min(clock.getDelta(),0.05); gt+=dt;
+    mo.position.y=0; if(!isFinite(mo.position.x)||!isFinite(mo.position.z)){ mo.position.set(15,0,15); jx=0; jz=0; }
     var sp=(pmode==='car'?62:pmode==='bus'?44:26)*dt; var moved=Math.hypot(jx,jz)>0.05;
-    if(moved){ mo.position.x+=jx*sp; mo.position.z+=jz*sp; mo.rotation.y=Math.atan2(jx,jz); walkT+=dt*(running?16:10);
+    if(moved){ mo.position.x+=jx*sp; mo.position.z+=jz*sp; mo.rotation.y=Math.atan2(jx,jz); walkT+=dt*((pmode!=='walk'?16:10));
       var sw=Math.sin(walkT)*0.5; lLeg.rotation.x=sw; rLeg.rotation.x=-sw; lArm.rotation.x=-sw; rArm.rotation.x=sw;
     } else { lLeg.rotation.x=rLeg.rotation.x=lArm.rotation.x=rArm.rotation.x=0; }
     var lim=HALF+PITCH; mo.position.x=Math.max(-lim,Math.min(lim,mo.position.x)); mo.position.z=Math.max(-lim,Math.min(lim,mo.position.z));
