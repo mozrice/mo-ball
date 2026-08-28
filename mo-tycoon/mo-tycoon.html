@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Tycoon</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#8fd0ff;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:rgba(20,40,70,.6);}
+  #obox{background:#fff;color:#222;border-radius:18px;padding:26px 30px;text-align:center;max-width:80%;}
+  #obox h1{color:#2a7fd0;margin:0 0 6px;}
+  #go{margin-top:14px;border:none;background:#2a7fd0;color:#fff;font-family:inherit;font-weight:900;font-size:20px;padding:12px 28px;border-radius:14px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div id="over"><div id="obox"><h1>🏙️ MO Tycoon</h1><div id="omsg">A floor slides side to side.<br>Tap to drop it — line it up straight!</div><button id="go">BUILD</button></div></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  var playing=false, score=0, best=+(localStorage.getItem('moTycoonBest')||0);
+  var stack=[], cur=null, dir=1, camY=0, floorH=34, t=0;
+  var COLORS=['#e2342f','#e0803a','#e0b040','#7bcf7b','#3aa0e0','#b06ae0','#e0439a'];
+  function reset(){ score=0; camY=0; var bw=W*0.44; stack=[{x:(W-bw)/2,w:bw}]; newFloor(); }
+  function newFloor(){ var w=stack[stack.length-1].w; cur={x:0,w:w,speed:3+score*0.08}; dir=1; }
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function beep(f,d){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.08)); }
+  function baseY(){ return H-40; }
+  function loop(){ t++;
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,'#6ab0ff'); g.addColorStop(1,'#bfe6ff'); x.fillStyle=g; x.fillRect(0,0,W,H);
+    x.fillStyle='#ffe07a'; x.beginPath(); x.arc(W*0.85,H*0.15,W*0.06,0,7); x.fill();
+    var targetCam = Math.max(0,(stack.length-6)*floorH); camY += (targetCam-camY)*0.15;
+    // draw stack
+    for(var i=0;i<stack.length;i++){ var s=stack[i]; var y=baseY()-i*floorH+camY; if(y>H+40||y<-40)continue; x.fillStyle=COLORS[i%COLORS.length]; x.fillRect(s.x,y-floorH,s.w,floorH-2); x.fillStyle='rgba(255,255,255,.5)'; for(var wx=s.x+6;wx<s.x+s.w-8;wx+=18)x.fillRect(wx,y-floorH+8,10,floorH-18); }
+    // moving floor
+    if(playing && cur){ cur.x+=dir*cur.speed; if(cur.x+cur.w>W){cur.x=W-cur.w;dir=-1;} if(cur.x<0){cur.x=0;dir=1;}
+      var y=baseY()-stack.length*floorH+camY; x.fillStyle=COLORS[stack.length%COLORS.length]; x.fillRect(cur.x,y-floorH,cur.w,floorH-2); }
+    x.fillStyle='#fff'; x.font='900 '+Math.round(W*0.09)+'px Trebuchet MS'; x.textAlign='center'; x.strokeStyle='#2a5a8a'; x.lineWidth=3; x.strokeText(score,W/2,H*0.14); x.fillText(score,W/2,H*0.14);
+    x.font='900 '+Math.round(W*0.04)+'px Trebuchet MS'; x.textAlign='right'; x.fillStyle='#2a5a8a'; x.fillText('Best '+best, W-14, 36);
+    requestAnimationFrame(loop);
+  }
+  function drop(){ if(!playing||!cur)return; var prev=stack[stack.length-1];
+    var left=Math.max(cur.x,prev.x), right=Math.min(cur.x+cur.w,prev.x+prev.w); var over2=right-left;
+    if(over2<=0){ playing=false; over(); return; }
+    stack.push({x:left,w:over2}); score++; beep(700+score*10); newFloor();
+    if(over2>prev.w-6){ score++; beep(1400); } }
+  function over(){ beep(160,0.3); if(score>best){ best=score; try{localStorage.setItem('moTycoonBest',score);}catch(e){} }
+    document.getElementById('omsg').innerHTML='Your tower was <b>'+score+'</b> floors!<br>Best: '+best; document.getElementById('go').textContent='BUILD AGAIN'; document.getElementById('over').style.display='flex'; }
+  document.getElementById('go').addEventListener('click',function(){ reset(); playing=true; document.getElementById('over').style.display='none'; });
+  cv.addEventListener('pointerdown',function(){ drop(); }); addEventListener('keydown',function(e){ if(e.key===' ')drop(); });
+  document.getElementById('over').style.display='flex'; loop();
+})();
+</script>
+</body></html>

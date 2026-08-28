@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Fruit Slice</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#2a1a3a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:rgba(30,16,40,.7);}
+  #obox{background:#fff;color:#222;border-radius:18px;padding:26px 30px;text-align:center;max-width:80%;}
+  #obox h1{color:#e0439a;margin:0 0 6px;}
+  #go{margin-top:14px;border:none;background:#e0439a;color:#fff;font-family:inherit;font-weight:900;font-size:20px;padding:12px 28px;border-radius:14px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div id="over"><div id="obox"><h1>🍉 MO Fruit Slice</h1><div id="omsg">Swipe your finger to slice fruit!<br>Slice fruit 🍎🍊🍉, but NOT the bombs 💣!</div><button id="go">SLICE</button></div></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  var FRUIT=['🍎','🍊','🍉','🍌','🍓','🍑','🥝'];
+  var playing=false, score=0, lives=3, best=+(localStorage.getItem('moFruitBest')||0);
+  var obj=[], trail=[], t=0, cutting=false, lx=0, ly=0;
+  function reset(){ obj=[]; trail=[]; score=0; lives=3; t=0; }
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function beep(f,d){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.08)); }
+  function toss(){ var bomb=Math.random()<0.16; obj.push({x:40+Math.random()*(W-80), y:H+40, vx:(Math.random()-0.5)*4, vy:-(15+Math.random()*6), r:W*0.06, e:bomb?'💣':FRUIT[Math.floor(Math.random()*FRUIT.length)], bomb:bomb, sliced:false, rot:Math.random()*6, vr:(Math.random()-0.5)*0.2}); }
+  function loop(){ t++;
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,'#3a2a5a'); g.addColorStop(1,'#1a0f2a'); x.fillStyle=g; x.fillRect(0,0,W,H);
+    if(playing){ if(t%Math.max(28,55-Math.floor(score/10))===0)toss(); if(Math.random()<0.006)toss(); }
+    for(var i=obj.length-1;i>=0;i--){ var o=obj[i]; o.x+=o.vx; o.y+=o.vy; o.vy+=0.4; o.rot+=o.vr;
+      x.save(); x.translate(o.x,o.y); x.rotate(o.rot); x.font=Math.round(o.r*2)+'px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(o.e,0,0); x.textBaseline='alphabetic'; x.restore();
+      if(o.y>H+80){ if(!o.bomb && !o.sliced && playing){ lives--; beep(200); if(lives<=0){ playing=false; over(); } } obj.splice(i,1); } }
+    // blade trail
+    if(cutting){ for(var i=0;i<obj.length;i++){ var o=obj[i]; if(o.sliced)continue; if(Math.hypot(o.x-lx,o.y-ly)<o.r+10){ if(o.bomb){ playing=false; over(); } else { o.sliced=true; score++; beep(1000); splash(o.x,o.y); obj.splice(i,1); i--; } } } }
+    trail.push({x:lx,y:ly,life:10}); for(var i=trail.length-1;i>=0;i--){ trail[i].life--; if(trail[i].life<=0)trail.splice(i,1); }
+    x.strokeStyle='#fff'; x.lineCap='round'; for(var i=1;i<trail.length;i++){ x.lineWidth=trail[i].life; x.globalAlpha=trail[i].life/12; x.beginPath(); x.moveTo(trail[i-1].x,trail[i-1].y); x.lineTo(trail[i].x,trail[i].y); x.stroke(); } x.globalAlpha=1;
+    // splashes
+    for(var i=parts.length-1;i>=0;i--){ var pp=parts[i]; pp.x+=pp.vx; pp.y+=pp.vy; pp.vy+=0.4; pp.life--; if(pp.life<=0){parts.splice(i,1);continue;} x.fillStyle=pp.c; x.globalAlpha=pp.life/20; x.beginPath(); x.arc(pp.x,pp.y,pp.r,0,7); x.fill(); x.globalAlpha=1; }
+    x.fillStyle='#fff'; x.font='900 '+Math.round(W*0.06)+'px Trebuchet MS'; x.textAlign='left'; x.fillText('🍉 '+score, 14, 40);
+    x.textAlign='center'; x.fillText('❤️'.repeat(Math.max(0,lives)), W/2, 40);
+    x.textAlign='right'; x.font='900 '+Math.round(W*0.04)+'px Trebuchet MS'; x.fillText('Best '+best, W-14, 36);
+    requestAnimationFrame(loop);
+  }
+  var parts=[]; function splash(px,py){ var cols=['#e2342f','#ff8a3a','#7bcf7b','#ffd23f','#e0439a']; for(var k=0;k<12;k++)parts.push({x:px,y:py,vx:(Math.random()-0.5)*8,vy:-2-Math.random()*6,r:3+Math.random()*4,life:20,c:cols[Math.floor(Math.random()*cols.length)]}); }
+  function over(){ beep(150,0.4); if(score>best){ best=score; try{localStorage.setItem('moFruitBest',score);}catch(e){} }
+    document.getElementById('omsg').innerHTML='You sliced <b>'+score+'</b>!<br>Best: '+best; document.getElementById('go').textContent='SLICE AGAIN'; document.getElementById('over').style.display='flex'; }
+  document.getElementById('go').addEventListener('click',function(){ reset(); playing=true; document.getElementById('over').style.display='none'; });
+  cv.addEventListener('pointerdown',function(e){ cutting=true; lx=e.clientX; ly=e.clientY; });
+  cv.addEventListener('pointermove',function(e){ if(cutting){ lx=e.clientX; ly=e.clientY; } });
+  addEventListener('pointerup',function(){ cutting=false; });
+  document.getElementById('over').style.display='flex'; loop();
+})();
+</script>
+</body></html>

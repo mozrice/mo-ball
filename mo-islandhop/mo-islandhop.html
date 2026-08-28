@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Island</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#6ac0e0;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:rgba(20,80,110,.6);}
+  #obox{background:#fff;color:#222;border-radius:18px;padding:26px 30px;text-align:center;max-width:80%;}
+  #obox h1{color:#0a9ad0;margin:0 0 6px;}
+  #go{margin-top:14px;border:none;background:#f2a03a;color:#fff;font-family:inherit;font-weight:900;font-size:20px;padding:12px 28px;border-radius:14px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div id="over"><div id="obox"><h1>🏝️ MO Island</h1><div id="omsg">Tap the crabs 🦀 and coconuts 🥥 when they pop up!<br>Don't miss too many!</div><button id="go">START</button></div></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  var playing=false, score=0, miss=0, best=+(localStorage.getItem('moIslandBest')||0);
+  var holes=[], t=0, spawnT=0;
+  function layout(){ holes=[]; var cols=3, rows=3; var gx=W*0.16, gy=H*0.3, cw=(W-2*gx)/(cols-1), ch=(H*0.62)/(rows-1); for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){ holes.push({x:gx+c*cw, y:gy+r*ch, up:0, kind:0, tmr:0}); } }
+  function reset(){ layout(); score=0; miss=0; t=0; spawnT=0; }
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function beep(f,d){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.08)); }
+  function loop(){ t++;
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,'#8fd0ff'); g.addColorStop(0.4,'#bfe6ff'); x.fillStyle=g; x.fillRect(0,0,W,H*0.34);
+    x.fillStyle='#2f9fd8'; x.fillRect(0,H*0.34,W,H*0.06);
+    x.fillStyle='#f2d9a0'; x.fillRect(0,H*0.4,W,H*0.6);
+    x.fillStyle='#ffe07a'; x.beginPath(); x.arc(W*0.85,H*0.13,W*0.05,0,7); x.fill();
+    if(playing){ spawnT--; if(spawnT<=0){ var free=holes.filter(function(h){return h.up<=0;}); if(free.length){ var hh=free[Math.floor(Math.random()*free.length)]; hh.up=1; hh.kind=Math.random()<0.75?1:2; hh.tmr=Math.max(40,90-Math.floor(score/5)); } spawnT=Math.max(18,40-Math.floor(score/3)); } }
+    for(var i=0;i<holes.length;i++){ var h=holes[i];
+      x.fillStyle='#c8a86a'; x.beginPath(); x.ellipse(h.x,h.y+14,34,14,0,0,7); x.fill(); x.fillStyle='#7a5a2a'; x.beginPath(); x.ellipse(h.x,h.y+14,26,10,0,0,7); x.fill();
+      if(h.up>0){ h.tmr--; if(h.tmr<=0){ h.up=0; if(h.kind===1){ miss++; if(miss>=6){ playing=false; over(); } } }
+        x.save(); x.translate(h.x,h.y-6);
+        if(h.kind===1){ x.fillStyle='#e2342f'; x.beginPath(); x.ellipse(0,0,20,15,0,0,7); x.fill(); x.fillStyle='#c01f1a'; x.fillRect(-24,-2,8,4); x.fillRect(16,-2,8,4); x.fillStyle='#fff'; x.beginPath(); x.arc(-7,-6,4,0,7); x.arc(7,-6,4,0,7); x.fill(); x.fillStyle='#111'; x.beginPath(); x.arc(-7,-6,2,0,7); x.arc(7,-6,2,0,7); x.fill(); }
+        else { x.fillStyle='#7a4a2a'; x.beginPath(); x.arc(0,0,17,0,7); x.fill(); x.fillStyle='#3a2410'; x.beginPath(); x.arc(-5,-4,3,0,7); x.arc(6,-2,3,0,7); x.arc(0,6,3,0,7); x.fill(); }
+        x.restore(); }
+    }
+    x.fillStyle='#5a3a1a'; x.font='900 '+Math.round(W*0.06)+'px Trebuchet MS'; x.textAlign='left'; x.fillText('🦀 '+score, 14, 40);
+    x.textAlign='center'; x.fillStyle=miss>=4?'#e2342f':'#5a3a1a'; x.fillText('Missed '+miss+'/6', W/2, 40);
+    x.textAlign='right'; x.font='900 '+Math.round(W*0.04)+'px Trebuchet MS'; x.fillText('Best '+best, W-14, 36);
+    requestAnimationFrame(loop);
+  }
+  function over(){ beep(160,0.3); if(score>best){ best=score; try{localStorage.setItem('moIslandBest',score);}catch(e){} }
+    document.getElementById('omsg').innerHTML='You tapped <b>'+score+'</b>!<br>Best: '+best; document.getElementById('go').textContent='PLAY AGAIN'; document.getElementById('over').style.display='flex'; }
+  document.getElementById('go').addEventListener('click',function(){ reset(); playing=true; document.getElementById('over').style.display='none'; });
+  cv.addEventListener('pointerdown',function(e){ if(!playing)return; for(var i=0;i<holes.length;i++){ var h=holes[i]; if(h.up>0 && Math.hypot(e.clientX-h.x,e.clientY-(h.y-6))<32){ if(h.kind===1){ score++; beep(1000); } else { score=Math.max(0,score-1); beep(240); } h.up=0; break; } } });
+  document.getElementById('over').style.display='flex'; layout(); loop();
+})();
+</script>
+</body></html>

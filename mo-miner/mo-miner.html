@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Miner</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#3a2416;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:rgba(30,18,8,.72);}
+  #obox{background:#fff;color:#222;border-radius:18px;padding:26px 30px;text-align:center;max-width:80%;}
+  #obox h1{color:#b06a2a;margin:0 0 6px;}
+  #go{margin-top:14px;border:none;background:#b06a2a;color:#fff;font-family:inherit;font-weight:900;font-size:20px;padding:12px 28px;border-radius:14px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div id="over"><div id="obox"><h1>⛏️ MO Miner</h1><div id="omsg">Tap a block next to MO to dig it.<br>Grab gems 💎, dodge falling rocks!</div><button id="go">DIG!</button></div></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  var COLS=7, cell=0, ox=0, oy=0, rows=0;
+  var playing=false, score=0, best=+(localStorage.getItem('moMinerBest')||0);
+  var grid=[], mo={c:3,r:0}, t=0, camR=0;
+  function layout(){ cell=Math.floor(W/COLS); ox=Math.floor((W-cell*COLS)/2); oy=Math.floor(H*0.16); rows=Math.ceil((H-oy)/cell)+2; }
+  function genRow(r){ var row=[]; for(var c=0;c<COLS;c++){ var v='dirt'; var q=Math.random(); if(r<1)v='air'; else if(q<0.12)v='gem'; else if(q<0.22)v='rock'; else if(q<0.30)v='air'; row.push(v);} return row; }
+  function reset(){ layout(); grid=[]; for(var r=0;r<40;r++)grid.push(genRow(r)); grid[0]=['air','air','air','air','air','air','air']; mo={c:3,r:0}; score=0; t=0; camR=0; }
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function beep(f,d){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.08)); }
+  function cellXY(c,r){ return {x:ox+c*cell, y:oy+(r-camR)*cell}; }
+  function rr(a,b,c,d,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+c,b,a+c,b+d,r); x.arcTo(a+c,b+d,a,b+d,r); x.arcTo(a,b+d,a,b,r); x.arcTo(a,b,a+c,b,r); x.closePath(); }
+  function loop(){ t++;
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,'#8fd0ff'); g.addColorStop(0.16,'#c9a06a'); g.addColorStop(1,'#3a2416'); x.fillStyle=g; x.fillRect(0,0,W,H);
+    camR += ((mo.r-2) - camR)*0.12; if(camR<0)camR=0;
+    // ensure enough rows generated
+    while(grid.length < mo.r+12)grid.push(genRow(grid.length));
+    var startR=Math.floor(camR), endR=startR+Math.ceil(H/cell)+2;
+    for(var r=startR;r<endR;r++){ if(r<0||r>=grid.length)continue; for(var c=0;c<COLS;c++){ var p=cellXY(c,r); var v=grid[r][c];
+      if(v==='air'){ x.fillStyle='#2a1a10'; x.fillRect(p.x,p.y,cell,cell); }
+      else if(v==='dirt'){ x.fillStyle='#8a5a2a'; x.fillRect(p.x+1,p.y+1,cell-2,cell-2); x.fillStyle='#7a4a22'; x.fillRect(p.x+cell*0.2,p.y+cell*0.3,cell*0.12,cell*0.12); x.fillRect(p.x+cell*0.6,p.y+cell*0.6,cell*0.12,cell*0.12); }
+      else if(v==='rock'){ x.fillStyle='#6a6a72'; x.fillRect(p.x+1,p.y+1,cell-2,cell-2); x.fillStyle='#54545c'; x.beginPath(); x.arc(p.x+cell/2,p.y+cell/2,cell*0.22,0,7); x.fill(); }
+      else if(v==='gem'){ x.fillStyle='#8a5a2a'; x.fillRect(p.x+1,p.y+1,cell-2,cell-2); x.save(); x.translate(p.x+cell/2,p.y+cell/2); x.fillStyle='#3ad0e0'; x.beginPath(); x.moveTo(0,-cell*0.22); x.lineTo(cell*0.2,0); x.lineTo(0,cell*0.22); x.lineTo(-cell*0.2,0); x.closePath(); x.fill(); x.fillStyle='#bff4ff'; x.beginPath(); x.moveTo(0,-cell*0.22); x.lineTo(cell*0.08,-cell*0.02); x.lineTo(-cell*0.08,-cell*0.02); x.fill(); x.restore(); }
+    } }
+    // gravity for MO: fall if air below
+    if(playing && t%8===0){ if(mo.r+1<grid.length && grid[mo.r+1][mo.c]==='air'){ mo.r++; } }
+    // MO
+    var mp=cellXY(mo.c,mo.r); x.save(); x.translate(mp.x+cell/2,mp.y+cell/2);
+    x.fillStyle='#e2342f'; rr(-cell*0.3,-cell*0.32,cell*0.6,cell*0.62,cell*0.15); x.fill(); x.fillStyle='#f4c9a0'; x.beginPath(); x.arc(0,-cell*0.12,cell*0.2,0,7); x.fill(); x.fillStyle='#ffd23f'; x.fillRect(-cell*0.24,-cell*0.34,cell*0.48,cell*0.1); // helmet
+    x.fillStyle='#111'; x.beginPath(); x.arc(-cell*0.06,-cell*0.12,cell*0.03,0,7); x.arc(cell*0.06,-cell*0.12,cell*0.03,0,7); x.fill();
+    x.fillStyle='#fff'; x.font='900 '+Math.round(cell*0.16)+'px Trebuchet MS'; x.textAlign='center'; x.fillText('MO',0,cell*0.16); x.restore();
+    if(playing)score+=0;
+    x.fillStyle='#fff'; x.font='900 '+Math.round(W*0.06)+'px Trebuchet MS'; x.textAlign='left'; x.fillText('💎 '+score, 14, 40);
+    x.textAlign='right'; x.font='900 '+Math.round(W*0.04)+'px Trebuchet MS'; x.fillText('Best '+best, W-14, 36);
+    x.textAlign='center'; x.font='900 '+Math.round(W*0.035)+'px Trebuchet MS'; x.fillText('Depth '+mo.r+'m', W/2, 36);
+    requestAnimationFrame(loop);
+  }
+  function dig(c,r){ if(!playing)return; if(Math.abs(c-mo.c)+Math.abs(r-mo.r)!==1)return; if(r<0||r>=grid.length||c<0||c>=COLS)return; var v=grid[r][c];
+    if(v==='rock'){ return; } if(v==='gem'){ score+=10; beep(1200); } else if(v==='dirt'){ score+=1; beep(600); } grid[r][c]='air'; mo.c=c; mo.r=r; }
+  function over(){ beep(180,0.3); if(score>best){ best=score; try{localStorage.setItem('moMinerBest',score);}catch(e){} }
+    document.getElementById('omsg').innerHTML='You mined <b>'+score+'</b>!<br>Best: '+best; document.getElementById('go').textContent='DIG AGAIN'; document.getElementById('over').style.display='flex'; }
+  document.getElementById('go').addEventListener('click',function(){ reset(); playing=true; document.getElementById('over').style.display='none'; });
+  cv.addEventListener('pointerdown',function(e){ if(!playing)return; var c=Math.floor((e.clientX-ox)/cell); var r=Math.round(camR+(e.clientY-oy)/cell - 0.5)+0; r=Math.floor(camR)+Math.floor((e.clientY-oy)/cell); dig(c,r); });
+  document.getElementById('over').style.display='flex'; layout(); loop();
+})();
+</script>
+</body></html>

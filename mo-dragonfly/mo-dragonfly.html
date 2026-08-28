@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Dragon</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#ffb26a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:rgba(120,60,20,.6);}
+  #obox{background:#fff;color:#222;border-radius:18px;padding:26px 30px;text-align:center;max-width:80%;}
+  #obox h1{color:#3a9d3a;margin:0 0 6px;}
+  #go{margin-top:14px;border:none;background:#3a9d3a;color:#fff;font-family:inherit;font-weight:900;font-size:20px;padding:12px 28px;border-radius:14px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div id="over"><div id="obox"><h1>🐉 MO Dragon</h1><div id="omsg">Tap to flap your wings!<br>Fly through the rings, don't hit them!</div><button id="go">FLY</button></div></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  var playing=false, score=0, best=+(localStorage.getItem('moDragonBest')||0);
+  var dy=0, vy=0, pipes=[], t=0, wing=0, clouds=[];
+  for(var i=0;i<5;i++)clouds.push({x:Math.random(),y:0.1+Math.random()*0.4,s:0.6+Math.random()*0.8});
+  function reset(){ dy=H/2; vy=0; pipes=[]; score=0; t=0; }
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function beep(f,d){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.08)); }
+  function dragon(cx,cy){ x.save(); x.translate(cx,cy); x.rotate(Math.max(-0.4,Math.min(0.7,vy*0.05))); wing+=0.3;
+    var wf=Math.sin(wing)*10;
+    x.fillStyle='#2a9d4a'; x.beginPath(); x.moveTo(-4,-2); x.quadraticCurveTo(-30,-20-wf,-38,2); x.quadraticCurveTo(-24,4,-4,6); x.fill(); // wing
+    x.fillStyle='#3aba5a'; x.beginPath(); x.ellipse(0,0,22,16,0,0,7); x.fill(); // body
+    x.fillStyle='#3aba5a'; x.beginPath(); x.arc(18,-6,12,0,7); x.fill(); // head
+    x.fillStyle='#2a7d3a'; for(var s=0;s<4;s++){ x.beginPath(); x.moveTo(-18+s*8,-14); x.lineTo(-14+s*8,-22); x.lineTo(-10+s*8,-14); x.fill(); } // spikes
+    x.fillStyle='#fff'; x.beginPath(); x.arc(22,-9,4,0,7); x.fill(); x.fillStyle='#111'; x.beginPath(); x.arc(23,-9,2,0,7); x.fill();
+    x.fillStyle='#ffb04a'; x.beginPath(); x.moveTo(28,-2); x.lineTo(40,-4); x.lineTo(40,2); x.fill(); // snout/fire
+    x.fillStyle='#e2342f'; x.font='900 9px Trebuchet MS'; x.textAlign='center'; x.fillText('MO',0,3); x.restore(); }
+  function loop(){ t++;
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,'#8fd0ff'); g.addColorStop(1,'#ffd9a0'); x.fillStyle=g; x.fillRect(0,0,W,H);
+    for(var i=0;i<clouds.length;i++){ var c=clouds[i]; c.x-=(playing?0.0009:0.0003); if(c.x<-0.1)c.x=1.1; var cx=c.x*W,cy=c.y*H,r=W*0.05*c.s; x.fillStyle='rgba(255,255,255,0.85)'; x.beginPath(); x.arc(cx,cy,r,0,7); x.arc(cx+r,cy+4,r*0.8,0,7); x.arc(cx-r,cy+4,r*0.8,0,7); x.fill(); }
+    if(playing){ vy+=0.7; dy+=vy;
+      if(t%90===0){ var gap=H*0.32; var cy=H*0.2+Math.random()*(H*0.5); pipes.push({x:W+40,cy:cy,gap:gap,passed:false}); }
+      if(dy<20||dy>H-20){ playing=false; over(); }
+    }
+    var px=W*0.3;
+    for(var j=pipes.length-1;j>=0;j--){ var p=pipes[j]; p.x-=4.2;
+      // ring pillars
+      x.fillStyle='#c0392b'; x.fillRect(p.x-24,0,48,p.cy-p.gap/2); x.fillRect(p.x-24,p.cy+p.gap/2,48,H-(p.cy+p.gap/2));
+      x.fillStyle='#e0533b'; x.fillRect(p.x-28,p.cy-p.gap/2-16,56,16); x.fillRect(p.x-28,p.cy+p.gap/2,56,16);
+      if(playing && Math.abs(p.x-px)<28 && (dy<p.cy-p.gap/2+12 || dy>p.cy+p.gap/2-12)){ playing=false; over(); }
+      if(!p.passed && p.x<px){ p.passed=true; score++; beep(1000); }
+      if(p.x<-40)pipes.splice(j,1); }
+    dragon(px,dy);
+    x.fillStyle='#fff'; x.font='900 '+Math.round(W*0.09)+'px Trebuchet MS'; x.textAlign='center'; x.strokeStyle='#a0522a'; x.lineWidth=3; x.strokeText(score,W/2,H*0.14); x.fillText(score,W/2,H*0.14);
+    x.font='900 '+Math.round(W*0.04)+'px Trebuchet MS'; x.textAlign='right'; x.fillStyle='#7a4a1a'; x.fillText('Best '+best, W-14, 36);
+    requestAnimationFrame(loop);
+  }
+  function over(){ beep(160,0.3); if(score>best){ best=score; try{localStorage.setItem('moDragonBest',score);}catch(e){} }
+    document.getElementById('omsg').innerHTML='You scored <b>'+score+'</b>!<br>Best: '+best; document.getElementById('go').textContent='FLY AGAIN'; document.getElementById('over').style.display='flex'; }
+  document.getElementById('go').addEventListener('click',function(){ reset(); playing=true; document.getElementById('over').style.display='none'; });
+  function flap(){ if(!playing)return; vy=-10; beep(600); }
+  cv.addEventListener('pointerdown',function(){ flap(); }); addEventListener('keydown',function(e){ if(e.key===' '||e.key==='ArrowUp')flap(); });
+  document.getElementById('over').style.display='flex'; loop();
+})();
+</script>
+</body></html>

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Castle</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#2a2440;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:rgba(20,16,40,.72);}
+  #obox{background:#fff;color:#222;border-radius:18px;padding:26px 30px;text-align:center;max-width:80%;}
+  #obox h1{color:#8a5ad0;margin:0 0 6px;}
+  #go{margin-top:14px;border:none;background:#8a5ad0;color:#fff;font-family:inherit;font-weight:900;font-size:20px;padding:12px 28px;border-radius:14px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div id="over"><div id="obox"><h1>🏰 MO Castle</h1><div id="omsg">Hold the left or right side to move.<br>Bounce up the castle, grab the gems!</div><button id="go">CLIMB</button></div></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  var playing=false, score=0, best=+(localStorage.getItem('moCastleBest')||0);
+  var mo={x:0,y:0,vy:0}, plats=[], gems=[], camY=0, dirH=0, t=0, maxUp=0;
+  function reset(){ mo={x:W/2,y:H*0.7,vy:-14}; plats=[]; gems=[]; camY=0; score=0; maxUp=H*0.7; dirH=0;
+    for(var i=0;i<12;i++){ var py=H*0.85-i*(H*0.13); plats.push({x:Math.random()*(W-90)+45,y:py,w:80}); if(Math.random()<0.4)gems.push({x:Math.random()*(W-40)+20,y:py-30,got:false}); } }
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function beep(f,d){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.08)); }
+  function rr(a,b,c,d,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+c,b,a+c,b+d,r); x.arcTo(a+c,b+d,a,b+d,r); x.arcTo(a,b+d,a,b,r); x.arcTo(a,b,a+c,b,r); x.closePath(); }
+  function loop(){ t++;
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,'#3a2a6a'); g.addColorStop(1,'#6a4a9a'); x.fillStyle=g; x.fillRect(0,0,W,H);
+    // stars
+    for(var s=0;s<30;s++){ x.fillStyle='rgba(255,255,255,0.4)'; x.fillRect((s*89%W),((s*57)%H),2,2); }
+    if(playing){ mo.x+=dirH*7; if(mo.x<-20)mo.x=W+20; if(mo.x>W+20)mo.x=-20; mo.vy+=0.55; mo.y+=mo.vy;
+      // camera scroll when going up
+      if(mo.y<H*0.42){ var dy=H*0.42-mo.y; mo.y=H*0.42; camY+=dy; score=Math.max(score,Math.floor(camY/10)); }
+      // land on platform
+      if(mo.vy>0){ for(var i=0;i<plats.length;i++){ var p=plats[i]; var sy=p.y+camY; if(mo.x>p.x-10 && mo.x<p.x+p.w+10 && mo.y+20>sy && mo.y+20<sy+16){ mo.vy=-15; beep(700); } } }
+      // recycle platforms
+      for(var i=0;i<plats.length;i++){ if(plats[i].y+camY>H+20){ plats[i].y-=H*0.13*12; plats[i].x=Math.random()*(W-90)+45; if(Math.random()<0.4)gems.push({x:plats[i].x+40,y:plats[i].y-30,got:false}); } }
+      if(mo.y>H+40){ playing=false; over(); }
+    }
+    // platforms
+    for(var i=0;i<plats.length;i++){ var p=plats[i]; var sy=p.y+camY; if(sy<-20||sy>H+20)continue; x.fillStyle='#8a6a3a'; rr(p.x,sy,p.w,14,5); x.fill(); x.fillStyle='#6a4a2a'; for(var b=0;b<3;b++)x.fillRect(p.x+8+b*24,sy+2,20,10); }
+    // gems
+    for(var j=gems.length-1;j>=0;j--){ var gm=gems[j]; if(gm.got){ gems.splice(j,1); continue; } var sy=gm.y+camY; if(sy>H+20){ gems.splice(j,1); continue; } if(sy<-20)continue;
+      x.save(); x.translate(gm.x,sy); x.fillStyle='#3ad0e0'; x.beginPath(); x.moveTo(0,-12); x.lineTo(10,0); x.lineTo(0,12); x.lineTo(-10,0); x.closePath(); x.fill(); x.restore();
+      if(Math.hypot(gm.x-mo.x,sy-mo.y)<26){ gm.got=true; score+=10; beep(1100); } }
+    // MO
+    x.save(); x.translate(mo.x,mo.y); x.fillStyle='#e2342f'; rr(-16,-18,32,36,10); x.fill(); x.fillStyle='#ffd23f'; x.beginPath(); x.moveTo(-14,-18); x.lineTo(-10,-30); x.lineTo(-6,-18); x.lineTo(-2,-30); x.lineTo(2,-18); x.lineTo(6,-30); x.lineTo(10,-18); x.fill(); x.fillStyle='#fff'; x.font='900 13px Trebuchet MS'; x.textAlign='center'; x.fillText('MO',0,4); x.restore();
+    x.fillStyle='#fff'; x.font='900 '+Math.round(W*0.06)+'px Trebuchet MS'; x.textAlign='left'; x.fillText('🏰 '+score, 14, 40);
+    x.textAlign='right'; x.font='900 '+Math.round(W*0.04)+'px Trebuchet MS'; x.fillText('Best '+best, W-14, 36);
+    requestAnimationFrame(loop);
+  }
+  function over(){ beep(180,0.3); if(score>best){ best=score; try{localStorage.setItem('moCastleBest',score);}catch(e){} }
+    document.getElementById('omsg').innerHTML='You climbed to <b>'+score+'</b>!<br>Best: '+best; document.getElementById('go').textContent='CLIMB AGAIN'; document.getElementById('over').style.display='flex'; }
+  document.getElementById('go').addEventListener('click',function(){ reset(); playing=true; document.getElementById('over').style.display='none'; });
+  function press(e){ dirH = e.clientX < W/2 ? -1 : 1; } function rel(){ dirH=0; }
+  cv.addEventListener('pointerdown',press); cv.addEventListener('pointermove',function(e){ if(dirH!==0)press(e); }); addEventListener('pointerup',rel);
+  addEventListener('keydown',function(e){ if(e.key==='ArrowLeft')dirH=-1; if(e.key==='ArrowRight')dirH=1; }); addEventListener('keyup',rel);
+  document.getElementById('over').style.display='flex'; loop();
+})();
+</script>
+</body></html>

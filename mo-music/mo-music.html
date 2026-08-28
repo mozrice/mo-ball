@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Music</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#1a1030;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:rgba(26,16,48,.72);}
+  #obox{background:#fff;color:#222;border-radius:18px;padding:26px 30px;text-align:center;max-width:80%;}
+  #obox h1{color:#e0439a;margin:0 0 6px;}
+  #go{margin-top:14px;border:none;background:#e0439a;color:#fff;font-family:inherit;font-weight:900;font-size:20px;padding:12px 28px;border-radius:14px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div id="over"><div id="obox"><h1>🎸 MO Music</h1><div id="omsg">Tap a lane when its note hits the line!<br>Keep the beat!</div><button id="go">PLAY</button></div></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  var LANES=4, playing=false, score=0, combo=0, best=+(localStorage.getItem('moMusicBest')||0);
+  var notes=[], t=0, miss=0, hitY=0, flash=[0,0,0,0];
+  var LC=['#e2342f','#e0b040','#3aa0e0','#7bcf7b'], NOTEHZ=[330,392,494,587];
+  function laneX(i){ return W*(0.5+(i-1.5)*0.22); }
+  function reset(){ notes=[]; score=0; combo=0; miss=0; t=0; hitY=H*0.82; }
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function tone(f){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='triangle';o.connect(g);g.connect(a.destination);g.gain.value=0.08;o.start();g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+0.25);o.stop(a.currentTime+0.26); }
+  function beep(f,d){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.08)); }
+  function loop(){ t++;
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,'#2a1a4a'); g.addColorStop(1,'#4a2a6a'); x.fillStyle=g; x.fillRect(0,0,W,H);
+    // lanes
+    for(var i=0;i<LANES;i++){ var lx=laneX(i); x.fillStyle='rgba(255,255,255,0.05)'; x.fillRect(lx-W*0.1,0,W*0.2,H); if(flash[i]>0){ x.fillStyle='rgba(255,255,255,'+(flash[i]/20)+')'; x.fillRect(lx-W*0.1,0,W*0.2,H); flash[i]--; } }
+    // hit line
+    x.strokeStyle='#fff'; x.lineWidth=4; x.beginPath(); x.moveTo(W*0.06,hitY); x.lineTo(W*0.94,hitY); x.stroke();
+    for(var i=0;i<LANES;i++){ x.fillStyle=LC[i]; x.beginPath(); x.arc(laneX(i),hitY,W*0.075,0,7); x.fill(); x.strokeStyle='rgba(0,0,0,0.3)'; x.lineWidth=3; x.stroke(); }
+    var speed=4+score*0.01;
+    if(playing){ if(t%Math.max(26,50-Math.floor(score/8))===0){ notes.push({l:Math.floor(Math.random()*LANES),y:-30}); } }
+    for(var j=notes.length-1;j>=0;j--){ var n=notes[j]; n.y+=speed; x.fillStyle=LC[n.l]; x.beginPath(); x.arc(laneX(n.l),n.y,W*0.06,0,7); x.fill(); x.fillStyle='rgba(255,255,255,0.5)'; x.beginPath(); x.arc(laneX(n.l)-4,n.y-4,W*0.02,0,7); x.fill();
+      if(n.y>hitY+W*0.09){ notes.splice(j,1); combo=0; miss++; if(miss>=8){ playing=false; over(); } } }
+    x.fillStyle='#fff'; x.font='900 '+Math.round(W*0.07)+'px Trebuchet MS'; x.textAlign='center'; x.fillText(score, W/2, H*0.1);
+    if(combo>2){ x.fillStyle='#ffd23f'; x.font='900 '+Math.round(W*0.05)+'px Trebuchet MS'; x.fillText(combo+' combo!', W/2, H*0.16); }
+    x.textAlign='right'; x.fillStyle='#ddd'; x.font='900 '+Math.round(W*0.04)+'px Trebuchet MS'; x.fillText('Best '+best, W-14, 36);
+    requestAnimationFrame(loop);
+  }
+  function hit(l){ if(!playing)return; var bestN=null,bd=1e9; for(var j=0;j<notes.length;j++){ if(notes[j].l!==l)continue; var d=Math.abs(notes[j].y-hitY); if(d<bd){bd=d;bestN=notes[j];} }
+    flash[l]=20; if(bestN && bd<W*0.09){ var idx=notes.indexOf(bestN); notes.splice(idx,1); combo++; score+= bd<W*0.04?2:1; tone(NOTEHZ[l]); } else { combo=0; beep(200); } }
+  function over(){ beep(160,0.3); if(score>best){ best=score; try{localStorage.setItem('moMusicBest',score);}catch(e){} }
+    document.getElementById('omsg').innerHTML='You scored <b>'+score+'</b>!<br>Best: '+best; document.getElementById('go').textContent='PLAY AGAIN'; document.getElementById('over').style.display='flex'; }
+  document.getElementById('go').addEventListener('click',function(){ reset(); playing=true; document.getElementById('over').style.display='none'; });
+  cv.addEventListener('pointerdown',function(e){ if(!playing)return; var best2=0,bd=1e9; for(var i=0;i<LANES;i++){ var d=Math.abs(e.clientX-laneX(i)); if(d<bd){bd=d;best2=i;} } hit(best2); });
+  addEventListener('keydown',function(e){ var m={'a':0,'s':1,'d':2,'f':3}; if(m[e.key]!==undefined)hit(m[e.key]); });
+  document.getElementById('over').style.display='flex'; loop();
+})();
+</script>
+</body></html>
