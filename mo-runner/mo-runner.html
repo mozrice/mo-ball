@@ -12,6 +12,8 @@
   body{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:10px;}
   #wrap{width:100%;max-width:440px;text-align:center;}
   h1{font-size:22px;margin:2px 0 8px;color:#5a3a1a;}
+  .namebtn{display:block;width:100%;max-width:440px;margin:0 auto 8px;background:linear-gradient(135deg,#D4A574,#C4956A);color:#fff;border:none;border-radius:14px;padding:12px 10px;font-size:20px;font-weight:bold;font-family:inherit;box-shadow:0 4px 12px rgba(0,0,0,.2);cursor:pointer;}
+  .namebtn:active{transform:translateY(2px);}
   #stage{position:relative;width:100%;height:70vh;max-height:560px;min-height:380px;
     border-radius:20px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.25);background:#F5DEB3;}
   #cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;}
@@ -24,7 +26,7 @@
 </head>
 <body>
 <div id="wrap">
-  <h1>🏃 Endless Runner</h1>
+  <button class="namebtn" onclick="location.href='../index.html'">🏃 Endless Runner</button>
   <div id="stage"><canvas id="cv"></canvas></div>
   <div class="btns">
     <a class="btn" href="../index.html">← Back</a>
@@ -49,6 +51,7 @@ const CFG = {"mode": "runner", "emoji": "🏃", "title": "Endless Runner", "key"
   function setHs(s){ try{ if(s>hs()) localStorage.setItem(CFG.key,String(s)); }catch(e){} }
 
   var state='menu', score=0, best=hs(), timeLeft=CFG.time||45, last=0, combo=0;
+  var players=1, curP=1, pscores=[];
   var parts=[];
   function burst(x,y,c){ for(var i=0;i<12;i++){ parts.push({x:x,y:y,vx:(Math.random()*2-1)*140,vy:(Math.random()*2-1)*140-40,life:0.6,c:c||'#ffcf5a'}); } }
 
@@ -64,8 +67,16 @@ const CFG = {"mode": "runner", "emoji": "🏃", "title": "Endless Runner", "key"
   var M={}, g={};
 
   function start(){ resize(); state='play'; score=0; combo=0; timeLeft=CFG.time||45; parts=[]; M[CFG.mode].init(); last=performance.now(); beep(660,0.09,'square',0.05); }
-  function over(){ state='over'; setHs(score); best=hs(); beep(200,0.3,'sawtooth',0.05); }
-  function handle(x,y,type){ if(state==='menu'){ if(type==='down') start(); return; } if(state==='over'){ if(type==='down') start(); return; } var m=M[CFG.mode]; if(m.pointer) m.pointer(x,y,type); }
+  function over(){ setHs(score); best=hs(); beep(200,0.3,'sawtooth',0.05); if(players>1&&CFG.mode!=='party'){ pscores.push({p:curP,s:score}); if(curP<players){ curP++; state='handoff'; } else { pscores.sort(function(a,b){return b.s-a.s;}); state='vsresult'; } } else { state='over'; } }
+  function beginGame(){ curP=1; pscores=[]; if(players>1){ state='handoff'; } else { start(); } }
+  function handle(x,y,type){ if(type!=='down'){ if(state==='play'){ var mm=M[CFG.mode]; if(mm.pointer)mm.pointer(x,y,type); } return; }
+    if(state==='menu'){ if(CFG.mode==='party'){ start(); return; }
+      if(y>H*0.56&&y<H*0.56+48){ if(x>W/2-96&&x<W/2-42)players=Math.max(1,players-1); else if(x>W/2+42&&x<W/2+96)players=Math.min(9,players+1); beep(500,0.05,'square',0.04); return; }
+      if(y>H*0.7&&y<H*0.7+54&&x>W/2-92&&x<W/2+92){ beginGame(); } return; }
+    if(state==='handoff'){ start(); return; }
+    if(state==='vsresult'){ state='menu'; return; }
+    if(state==='over'){ if(players>1){ state='menu'; } else { start(); } return; }
+    var m=M[CFG.mode]; if(m.pointer) m.pointer(x,y,type); }
 
   function loop(t){ var dt=Math.min((t-last)/1000,0.05); last=t;
     if(state==='play'){ timeLeft-=dt; if(timeLeft<=0){ timeLeft=0; over(); } var m=M[CFG.mode]; if(m.update)m.update(dt); }
@@ -80,12 +91,16 @@ const CFG = {"mode": "runner", "emoji": "🏃", "title": "Endless Runner", "key"
   function hud(){ text('⭐ '+score, 12, 20, 20, '#7a4a10','left'); text('⏱ '+Math.ceil(timeLeft), W-12,20,20,'#7a4a10','right'); if(combo>1){ text('🔥 x'+combo, W/2, 20, 18, '#e0453a'); } }
 
   function render(){ bg();
-    if(state==='menu'){ emo(CFG.emoji, W/2, H*0.30, 74); text(CFG.title, W/2, H*0.49, 21, '#5a3a1a'); text('Best: '+best, W/2, H*0.57, 16, '#a06a30');
-      cx.fillStyle='#D4A574'; roundRect(W/2-88,H*0.65,176,54,15); cx.fill(); text('▶ TAP TO PLAY', W/2, H*0.65+27, 18, '#fff');
-      wrapText(CFG.hint||'', W/2, H*0.82, 14, W-50, '#8a6a40'); }
-    else if(state==='play'){ var m=M[CFG.mode]; if(m.render)m.render(); hud(); }
-    else { emo('🏆', W/2, H*0.27, 62); text('Score: '+score, W/2, H*0.44, 26, '#5a3a1a'); text('Best: '+best, W/2, H*0.52, 18, '#a06a30'); if(score>=best&&score>0) text('🎉 NEW BEST!', W/2, H*0.6, 18, '#e0453a');
+    if(state==='menu'){ if(CFG.mode==='party'){ emo(CFG.emoji,W/2,H*0.32,74); text(CFG.title,W/2,H*0.5,21,'#5a3a1a'); cx.fillStyle='#D4A574'; roundRect(W/2-88,H*0.64,176,54,15); cx.fill(); text('▶ TAP TO PLAY',W/2,H*0.64+27,18,'#fff'); wrapText(CFG.hint||'',W/2,H*0.8,14,W-50,'#8a6a40'); }
+      else { emo(CFG.emoji,W/2,H*0.22,64); text(CFG.title,W/2,H*0.38,21,'#5a3a1a'); text('Best: '+best,W/2,H*0.45,15,'#a06a30'); text('Players',W/2,H*0.52,15,'#8a6a40');
+        cx.fillStyle='#D4A574'; roundRect(W/2-96,H*0.56,54,48,10); cx.fill(); text('-',W/2-69,H*0.56+24,28,'#fff'); text(''+players,W/2,H*0.56+24,30,'#5a3a1a'); cx.fillStyle='#D4A574'; roundRect(W/2+42,H*0.56,54,48,10); cx.fill(); text('+',W/2+69,H*0.56+24,28,'#fff');
+        cx.fillStyle='#7bd07b'; roundRect(W/2-92,H*0.7,184,54,14); cx.fill(); text(players>1?'▶ VERSUS':'▶ PLAY',W/2,H*0.7+27,20,'#fff');
+        wrapText(players>1?('Pass & play - '+players+' players take turns, most points wins!'):(CFG.hint||''),W/2,H*0.84,13,W-40,'#8a6a40'); } }
+    else if(state==='play'){ var m=M[CFG.mode]; if(m.render)m.render(); if(CFG.mode!=='party')hud(); }
+    else if(state==='over'){ emo('🏆', W/2, H*0.27, 62); text('Score: '+score, W/2, H*0.44, 26, '#5a3a1a'); text('Best: '+best, W/2, H*0.52, 18, '#a06a30'); if(score>=best&&score>0) text('🎉 NEW BEST!', W/2, H*0.6, 18, '#e0453a');
       cx.fillStyle='#D4A574'; roundRect(W/2-88,H*0.68,176,54,15); cx.fill(); text('↻ PLAY AGAIN', W/2, H*0.68+27, 18, '#fff'); }
+    else if(state==='handoff'){ emo(CFG.emoji,W/2,H*0.26,60); if(pscores.length>0) text('Player '+pscores[pscores.length-1].p+' got '+pscores[pscores.length-1].s,W/2,H*0.42,17,'#a06a30'); text('Player '+curP,W/2,H*0.54,30,'#e0453a'); text('Get Ready!',W/2,H*0.62,20,'#5a3a1a'); cx.fillStyle='#7bd07b'; roundRect(W/2-92,H*0.72,184,54,14); cx.fill(); text('▶ TAP TO START',W/2,H*0.72+27,19,'#fff'); }
+    else if(state==='vsresult'){ emo('🏆',W/2,H*0.13,48); text('RESULTS',W/2,H*0.22,24,'#5a3a1a'); var md=['🥇','🥈','🥉']; for(var i=0;i<pscores.length;i++){ text((i<3?md[i]:'  ')+' Player '+pscores[i].p+' - '+pscores[i].s+' pts',W/2,H*0.31+i*32,17,i===0?'#e0453a':'#5a3a1a'); } cx.fillStyle='#7bd07b'; roundRect(W/2-92,H*0.87,184,50,14); cx.fill(); text('↻ PLAY AGAIN',W/2,H*0.87+25,18,'#fff'); }
     for(var i=0;i<parts.length;i++){ var p=parts[i]; cx.globalAlpha=Math.max(p.life,0); cx.fillStyle=p.c; cx.beginPath(); cx.arc(p.x,p.y,4,0,7); cx.fill(); } cx.globalAlpha=1;
   }
   function wrapText(str,cx0,cy0,size,maxw,col){ cx.font='bold '+size+'px Trebuchet MS, sans-serif'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillStyle=col||'#5a3a1a'; var words=str.split(' '); var line='',lines=[]; for(var i=0;i<words.length;i++){ var test=line?line+' '+words[i]:words[i]; if(cx.measureText(test).width>maxw&&line){ lines.push(line); line=words[i]; } else line=test; } if(line)lines.push(line); for(var i=0;i<lines.length;i++){ cx.fillText(lines[i], cx0, cy0+i*(size+4)); } }
@@ -275,26 +290,36 @@ const CFG = {"mode": "runner", "emoji": "🏃", "title": "Endless Runner", "key"
   };
   function addStep(){ g.seq.push((Math.random()*4)|0); }
 
-  // ===== PARTY (2-9 players split screen) =====
+  // ===== PARTY (1-9 players, real scoring, multi-touch) =====
   M.party={
-    init:function(){ g.stage='setup'; g.np=2; g.zones=[]; g.round=0; g.maxR=5; g.state='wait'; g.stateT=0; g.msg=''; },
-    layout:function(){ g.zones=[]; var n=g.np, cols=Math.ceil(Math.sqrt(n)), rows=Math.ceil(n/cols), pad=6; var zw=(W-pad*(cols+1))/cols, zh=(H-40-pad*(rows+1))/rows; for(var i=0;i<n;i++){ var c=i%cols,r=(i/cols)|0; g.zones.push({x:pad+c*(zw+pad),y:32+pad+r*(zh+pad),w:zw,h:zh,wins:0,out:false,tapped:false}); } },
-    update:function(dt){ if(g.stage!=='play')return; g.stateT-=dt;
-      if(g.state==='wait'){ if(g.stateT<=0){ g.state='go'; g.stateT=3; for(var i=0;i<g.zones.length;i++){g.zones[i].out=false;g.zones[i].tapped=false;} beep(720,0.1,'square',0.06); } }
-      else if(g.state==='go'){ if(g.stateT<=0){ g.round++; g.state='result'; g.stateT=1.3; g.msg='Too slow - nobody won!'; } }
-      else if(g.state==='result'){ if(g.stateT<=0){ if(g.round>=g.maxR){ finishParty(); } else { g.state='wait'; g.stateT=0.9+Math.random()*1.6; } } } },
-    render:function(){ if(g.stage==='setup'){ emo('🎉',W/2,H*0.18,50); text('PARTY MODE',W/2,H*0.3,26,'#5a3a1a'); text('How many players?',W/2,H*0.4,17,'#8a6a40'); text(''+g.np,W/2,H*0.52,58,'#e0453a');
-        cx.fillStyle='#D4A574'; roundRect(W/2-96,H*0.58,80,58,12); cx.fill(); text('-',W/2-56,H*0.58+29,34,'#fff'); cx.fillStyle='#D4A574'; roundRect(W/2+16,H*0.58,80,58,12); cx.fill(); text('+',W/2+56,H*0.58+29,34,'#fff');
-        cx.fillStyle='#7bd07b'; roundRect(W/2-90,H*0.72,180,56,14); cx.fill(); text('▶ START',W/2,H*0.72+28,22,'#fff'); text('2 to 9 players - first to tap the GREEN wins!',W/2,H*0.86,12,'#8a6a40'); return; }
-      for(var i=0;i<g.zones.length;i++){ var z=g.zones[i]; var col=g.state==='go'?(z.tapped?'#2a8a2a':'#4caf50'):(z.out?'#9a6a6a':'#c99a6a'); cx.fillStyle=col; roundRect(z.x,z.y,z.w,z.h,10); cx.fill();
-        cx.fillStyle='#fff'; cx.textAlign='center'; cx.textBaseline='middle'; cx.font='bold 15px Trebuchet MS,sans-serif'; cx.fillText('P'+(i+1),z.x+z.w/2,z.y+z.h/2-11); cx.font='bold 18px Trebuchet MS,sans-serif'; var lab=g.state==='wait'?'wait':(g.state==='go'?(z.out?'X':'TAP!'):(z.wins+' 🏆')); cx.fillText(lab,z.x+z.w/2,z.y+z.h/2+11); }
-      text(g.state==='wait'?'Get ready - do NOT tap early!':(g.state==='go'?'GO! Tap your box!':g.msg),W/2,16,15,'#5a3a1a'); text('Round '+g.round+'/'+g.maxR,W/2,H-10,11,'#8a6a40'); },
+    init:function(){ g.stage='setup'; g.np=2; g.game=0; g.playDur=25; g.t=0; g.zones=[]; g.rank=[];
+      if(!g._pl){ g._pl=true;
+        cv.addEventListener('touchstart',function(e){ if(CFG.mode!=='party')return; if(e.cancelable)e.preventDefault(); var r=cv.getBoundingClientRect(); for(var i=0;i<e.changedTouches.length;i++){ var t=e.changedTouches[i]; partyScore(t.clientX-r.left,t.clientY-r.top);} },{passive:false});
+        cv.addEventListener('mousedown',function(e){ if(CFG.mode!=='party')return; var r=cv.getBoundingClientRect(); partyScore(e.clientX-r.left,e.clientY-r.top); }); } },
+    layout:function(){ g.zones=[]; var n=g.np, cols=Math.ceil(Math.sqrt(n)), rows=Math.ceil(n/cols), pad=6; var zw=(W-pad*(cols+1))/cols, zh=(H-44-pad*(rows+1))/rows; for(var i=0;i<n;i++){ var c=i%cols,r=(i/cols)|0; g.zones.push({x:pad+c*(zw+pad),y:38+pad+r*(zh+pad),w:zw,h:zh,score:0,items:[],spawn:Math.random()*0.5,mole:null}); } },
+    update:function(dt){ if(g.stage!=='play')return; g.t-=dt; if(g.t<=0){ g.stage='done'; g.rank=g.zones.map(function(z,i){return {p:i+1,s:z.score};}).sort(function(a,b){return b.s-a.s;}); return; }
+      if(g.t>g.playDur)return;
+      for(var i=0;i<g.zones.length;i++){ var z=g.zones[i];
+        if(g.game===1){ z.spawn-=dt; if(z.spawn<=0){ z.spawn=0.45+Math.random()*0.5; z.items.push({x:z.x+16+Math.random()*(z.w-32),y:z.y+18,v:60+Math.random()*70,ch:Math.random()<0.15?'BOMB':'STAR'}); } for(var k=z.items.length-1;k>=0;k--){ var it=z.items[k]; it.y+=it.v*dt; if(it.y>z.y+z.h) z.items.splice(k,1); } }
+        else if(g.game===2){ if(!z.mole){ z.mole={up:false,t:0.4+Math.random()*0.6,x:0,y:0,r:18,bomb:false}; } if(!z.mole.up){ z.mole.t-=dt; if(z.mole.t<=0){ z.mole.up=true; z.mole.t=0.8+Math.random()*0.5; z.mole.x=z.x+z.w*0.5; z.mole.y=z.y+z.h*0.58; z.mole.r=Math.min(z.w,z.h)*0.22; z.mole.bomb=Math.random()<0.15; } } else { z.mole.t-=dt; if(z.mole.t<=0)z.mole.up=false; } } } },
+    render:function(){ if(g.stage==='setup'){ emo('🎉',W/2,H*0.12,42); text('PARTY MODE',W/2,H*0.2,25,'#5a3a1a'); text('Players (1 = solo)',W/2,H*0.28,14,'#8a6a40'); text(''+g.np,W/2,H*0.36,42,'#e0453a');
+        cx.fillStyle='#D4A574'; roundRect(W/2-96,H*0.32,64,52,12); cx.fill(); text('-',W/2-64,H*0.32+26,30,'#fff'); cx.fillStyle='#D4A574'; roundRect(W/2+32,H*0.32,64,52,12); cx.fill(); text('+',W/2+64,H*0.32+26,30,'#fff');
+        text('Game',W/2,H*0.47,15,'#8a6a40'); var gn=['👆 Tap Race','⭐ Star Grab','🔨 Whack']; for(var i=0;i<3;i++){ var y=H*0.51+i*52; cx.fillStyle=g.game===i?'#7bd07b':'#e8d4b8'; roundRect(W/2-110,y,220,44,12); cx.fill(); text(gn[i],W/2,y+22,18,g.game===i?'#fff':'#5a3a1a'); }
+        cx.fillStyle='#f0b429'; roundRect(W/2-100,H*0.86,200,50,14); cx.fill(); text('▶ START',W/2,H*0.86+25,22,'#3a2a00'); return; }
+      if(g.stage==='play'){ var ready=g.t>g.playDur; for(var i=0;i<g.zones.length;i++){ var z=g.zones[i]; cx.fillStyle=i%2?'#dcc29a':'#e8d4b8'; roundRect(z.x,z.y,z.w,z.h,10); cx.fill();
+          if(g.game===0){ emo('👆',z.x+z.w/2,z.y+z.h*0.56,Math.min(z.w,z.h)*0.5); }
+          else if(g.game===1){ for(var k=0;k<z.items.length;k++) emo(z.items[k].ch==='BOMB'?'💣':'⭐',z.items[k].x,z.items[k].y,Math.min(z.w,z.h)*0.26); }
+          else { if(z.mole&&z.mole.up) emo(z.mole.bomb?'💣':'🐹',z.mole.x,z.mole.y,z.mole.r*2); }
+          cx.fillStyle='#3a2a10'; cx.font='bold 14px Trebuchet MS,sans-serif'; cx.textAlign='center'; cx.textBaseline='top'; cx.fillText('P'+(i+1)+': '+z.score, z.x+z.w/2, z.y+4); }
+        text(ready?'GET READY...':('⏱ '+Math.ceil(g.t)+'s - GO!'), W/2, 18, 18, ready?'#e0453a':'#2a8a2a'); return; }
+      emo('🏆',W/2,H*0.12,42); text('RESULTS',W/2,H*0.2,24,'#5a3a1a'); var medals=['🥇','🥈','🥉'];
+      for(var i=0;i<g.rank.length;i++){ var y=H*0.28+i*38; text((i<3?medals[i]:'  ')+' Player '+g.rank[i].p+' - '+g.rank[i].s+' pts', W/2, y, 18, i===0?'#e0453a':'#5a3a1a'); }
+      cx.fillStyle='#7bd07b'; roundRect(W/2-100,H*0.88,200,48,14); cx.fill(); text('↻ PLAY AGAIN',W/2,H*0.88+24,18,'#fff'); },
     pointer:function(x,y,type){ if(type!=='down')return;
-      if(g.stage==='setup'){ if(y>H*0.58&&y<H*0.58+58){ if(x>W/2-96&&x<W/2-16)g.np=Math.max(2,g.np-1); else if(x>W/2+16&&x<W/2+96)g.np=Math.min(9,g.np+1); beep(500,0.06,'square',0.05);} else if(y>H*0.72&&y<H*0.72+56&&x>W/2-90&&x<W/2+90){ g.stage='play'; g.round=0; this.layout(); g.state='wait'; g.stateT=1+Math.random()*1.5; beep(660,0.09,'square',0.05);} return; }
-      for(var i=0;i<g.zones.length;i++){ var z=g.zones[i]; if(x>z.x&&x<z.x+z.w&&y>z.y&&y<z.y+z.h){ if(g.state==='wait'){ z.out=true; beep(150,0.15,'sawtooth',0.05);} else if(g.state==='go'&&!z.out&&!partyWon()){ z.tapped=true; z.wins++; g.round++; g.state='result'; g.stateT=1.4; g.msg='Player '+(i+1)+' wins the round! 🏆'; score=Math.max(score,z.wins*20); burst(z.x+z.w/2,z.y+z.h/2,'#7bd07b'); beep(760,0.12,'square',0.06);} return; } } }
+      if(g.stage==='setup'){ if(y>H*0.32&&y<H*0.32+52){ if(x>W/2-96&&x<W/2-32)g.np=Math.max(1,g.np-1); else if(x>W/2+32&&x<W/2+96)g.np=Math.min(9,g.np+1);} for(var i=0;i<3;i++){ var yy=H*0.51+i*52; if(y>yy&&y<yy+44&&x>W/2-110&&x<W/2+110)g.game=i; } if(y>H*0.86&&y<H*0.86+50&&x>W/2-100&&x<W/2+100){ g.stage='play'; this.layout(); g.t=g.playDur+2; } beep(500,0.06,'square',0.05); return; }
+      if(g.stage==='done'){ if(y>H*0.88&&y<H*0.88+48&&x>W/2-100&&x<W/2+100) g.stage='setup'; return; } }
   };
-  function partyWon(){ for(var i=0;i<g.zones.length;i++) if(g.zones[i].tapped) return true; return false; }
-  function finishParty(){ var best=-1,bi=0; for(var i=0;i<g.zones.length;i++){ if(g.zones[i].wins>best){best=g.zones[i].wins;bi=i;} } score=best*20; g.msg='Player '+(bi+1)+' WINS!'; over(); }
+  function partyScore(x,y){ if(g.stage!=='play'||g.t>g.playDur)return; for(var i=0;i<g.zones.length;i++){ var z=g.zones[i]; if(x>z.x&&x<z.x+z.w&&y>z.y&&y<z.y+z.h){ if(g.game===0){ z.score++; } else if(g.game===1){ for(var k=z.items.length-1;k>=0;k--){ var it=z.items[k]; if(Math.hypot(x-it.x,y-it.y)<Math.min(z.w,z.h)*0.22){ if(it.ch==='BOMB')z.score=Math.max(0,z.score-2); else z.score++; z.items.splice(k,1);} } } else { if(z.mole&&z.mole.up&&Math.hypot(x-z.mole.x,y-z.mole.y)<z.mole.r+8){ if(z.mole.bomb)z.score=Math.max(0,z.score-2); else z.score++; z.mole.up=false; z.mole.t=0.3+Math.random()*0.4;} } beep(520+Math.random()*160,0.03,'square',0.04); return; } } }
 
   // ===== RUNNER (tap to jump) =====
   M.runner={
