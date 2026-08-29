@@ -655,6 +655,23 @@
     {u:'../mo-meandmommy-themepark/mo-meandmommy-themepark.html',e:'🎡',n:'MM Park'},
     {u:'../mo-meandmommy-movienight/mo-meandmommy-movienight.html',e:'🎬',n:'MM Movie'},
 
+    {u:'../mo-swipeslice/mo-swipeslice.html',e:'🍉',n:'Slice'},
+    {u:'../mo-whackcritter/mo-whackcritter.html',e:'🔨',n:'Whack'},
+    {u:'../mo-flappyfly/mo-flappyfly.html',e:'🐤',n:'Flappy'},
+    {u:'../mo-laneracer/mo-laneracer.html',e:'🏎️',n:'Lane 3D'},
+    {u:'../mo-dragmaze/mo-dragmaze.html',e:'🔵',n:'Maze'},
+    {u:'../mo-colormemory/mo-colormemory.html',e:'🎵',n:'Colors'},
+    {u:'../mo-gamemodes/mo-gamemodes.html',e:'🎮',n:'MODES'},
+    {u:'../mo-party/mo-party.html',e:'🎉',n:'Party'},
+    {u:'../mo-runner/mo-runner.html',e:'🏃',n:'Runner'},
+    {u:'../mo-tiltball/mo-tiltball.html',e:'⚖️',n:'Tilt'},
+    {u:'../mo-traceit/mo-traceit.html',e:'✏️',n:'Trace'},
+    {u:'../mo-fishingcast/mo-fishingcast.html',e:'🎣',n:'Fish Cast'},
+    {u:'../mo-matchconnect/mo-matchconnect.html',e:'🔗',n:'Connect'},
+    {u:'../mo-rocketlaunch/mo-rocketlaunch.html',e:'🚀',n:'Rocket'},
+    {u:'../mo-foodtruck/mo-foodtruck.html',e:'🍔',n:'Food Truck'},
+    {u:'../mo-aquariumfeed/mo-aquariumfeed.html',e:'🐠',n:'Aquarium'},
+    {u:'../mo-carnival/mo-carnival.html',e:'🎯',n:'Carnival'},
     {u:'../games.html',e:'🎮',n:'All Games'}
   ];
   document.getElementById('gamesb').onclick=function(){ var p=document.getElementById('gpanel'); var h='<div style="text-align:center;width:100%;color:#ffd23f;font-size:24px;font-weight:bold;margin:4px 0 12px;">🕹️ MO GAME ROOM</div>'; h+='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-width:460px;margin:0 auto;width:100%;">'; for(var i=0;i<HGAMES.length;i++){ h+='<button class="grb" data-u="'+HGAMES[i].u+'" style="background:linear-gradient(#ffffff,#dbe6f6);border:none;border-radius:16px;padding:16px 8px;color:#16233c;font-weight:bold;font-family:inherit;box-shadow:0 4px 0 #0007;"><div style="font-size:38px;line-height:1;">'+HGAMES[i].e+'</div><div style="margin-top:6px;font-size:14px;">'+HGAMES[i].n+'</div></button>'; } h+='</div>'; h+='<button id="gclose" style="display:block;margin:16px auto 6px;background:#3a1020;border:2px solid #ff8aa0;color:#ffd0da;font-weight:bold;font-size:16px;padding:10px 26px;border-radius:14px;font-family:inherit;">🚪 CLOSE</button>'; p.innerHTML=h; p.style.display='flex'; beep(660,0.08,'square',0.05);

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>🎮 MO Arcade — Game Modes</title>
+<meta name="description" content="Pick a way to play in MO Arcade!">
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;}
+  html,body{min-height:100%;background:radial-gradient(1200px 800px at 50% -10%,#26355a,#0a0f1e 70%);font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;}
+  header{position:sticky;top:0;z-index:20;text-align:center;padding:14px 12px 12px;background:linear-gradient(#0a0f1eF2,#0a0f1eCC);backdrop-filter:blur(8px);border-bottom:1px solid #ffffff16;}
+  header h1{margin:0;font-size:26px;letter-spacing:1px;color:#ffcf5a;text-shadow:0 3px 0 #0008;}
+  header p{margin:5px 0 0;color:#bcd0ea;font-size:13px;}
+  .back{display:inline-block;margin-top:10px;background:linear-gradient(#ffe07a,#f0b429);color:#3a2a00;font-weight:bold;font-size:14px;text-decoration:none;padding:8px 18px;border-radius:20px;box-shadow:0 3px 0 #a06a00;}
+  #wrap{max-width:1040px;margin:0 auto;padding:10px 14px 50px;}
+  .mode{margin:18px 0;background:#121a30;border:1px solid #2e3f66;border-radius:18px;padding:14px 14px 16px;box-shadow:0 6px 18px #0006;}
+  .mhead{display:flex;align-items:center;gap:12px;margin-bottom:4px;}
+  .mhead .ico{font-size:38px;line-height:1;filter:drop-shadow(0 2px 2px #0006);}
+  .mhead .txt h2{font-size:20px;color:#ffe6a3;margin:0;}
+  .mhead .txt p{font-size:13px;color:#9fb2d4;margin:2px 0 0;}
+  .new{background:#e0453a;color:#fff;font-size:10px;font-weight:bold;padding:3px 8px;border-radius:20px;letter-spacing:.5px;margin-left:6px;vertical-align:middle;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:12px;}
+  a.card{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;
+    background:linear-gradient(#ffffff,#dbe6f5);border-radius:14px;padding:14px 6px;min-height:96px;box-shadow:0 4px 0 #0006,0 7px 16px #0006;transition:transform .1s,box-shadow .1s;}
+  @media(hover:hover){a.card:hover{transform:translateY(-3px);box-shadow:0 7px 0 #0006,0 12px 22px #0007;}}
+  a.card:active{transform:translateY(3px);box-shadow:0 1px 0 #0006;}
+  a.card .emo{font-size:36px;line-height:1;}
+  a.card .name{margin-top:7px;font-weight:bold;font-size:12.5px;text-align:center;color:#16233c;line-height:1.15;}
+  footer{text-align:center;color:#8ea4c4;font-size:12px;padding:6px 0 30px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎮 GAME MODES</h1>
+  <p>Pick a <b>way to play</b> — each mode plays differently!</p>
+  <a class="back" href="../index.html">← All Games</a> <a class="back" id="surprise" href="#" style="background:linear-gradient(#7bff9e,#2ad17a);box-shadow:0 3px 0 #17913f;">🎲 Surprise Me</a>
+</header>
+<div id="wrap"></div>
+<footer>MO ARCADE • Game Modes • made by Morgan 🎮</footer>
+<script>
+var MODES=[
+  {ico:"🎉",name:"Party (2-9 Players)",badge:1,how:"Split screen for 2 to 9 players — first to tap the green box wins!",games:[
+    {u:"mo-party",e:"🎉",n:"Party Mode"}]},
+  {ico:"🕹️",name:"New Controls",badge:1,how:"Fresh ways to play — jump, tilt, trace, cast and connect!",games:[
+    {u:"mo-runner",e:"🏃",n:"Endless Runner"},{u:"mo-tiltball",e:"⚖️",n:"Tilt Ball"},
+    {u:"mo-traceit",e:"✏️",n:"Trace It"},{u:"mo-fishingcast",e:"🎣",n:"Fishing Cast"},
+    {u:"mo-matchconnect",e:"🔗",n:"Match Connect"}]},
+  {ico:"🎯",name:"Aim &amp; Shoot",badge:1,how:"DRAG to aim → set the POWER → tap the GREEN to shoot!",games:[
+    {u:"mo-familysoccer",e:"⚽",n:"Soccer"},{u:"mo-familybasketball",e:"🏀",n:"Basketball"},
+    {u:"mo-familybowling",e:"🎳",n:"Bowling"},{u:"mo-familyhockey",e:"🏒",n:"Hockey"},
+    {u:"mo-familybaseball",e:"⚾",n:"Baseball"},{u:"mo-meandmommy-basketball",e:"🏀",n:"Me vs Mommy Hoop"},
+    {u:"mo-meandmommy-slingshot",e:"🎯",n:"Slingshot"},{u:"mo-arffmarksman",e:"🎯",n:"Arff Marksman"},
+    {u:"mo-meandmommy-safari",e:"🦁",n:"Safari Snap"},{u:"mo-meandmommy-space",e:"🚀",n:"Space Blast"},
+    {u:"mo-firefighter",e:"🚒",n:"Firefighter"},{u:"mo-arffkungfu",e:"🥋",n:"Kung Fu"},
+    {u:"mo-familytreasuredef",e:"🛡️",n:"Treasure Defense"},{u:"mo-photohunt",e:"📸",n:"Photo Hunt"},{u:"mo-rocketlaunch",e:"🚀",n:"Rocket Launch"},{u:"mo-carnival",e:"🎯",n:"Carnival"}]},
+  {ico:"🍉",name:"Swipe Slice",badge:1,how:"SWIPE your finger to slice the fruit — miss the bombs!",games:[
+    {u:"mo-swipeslice",e:"🍉",n:"Swipe Slice"}]},
+  {ico:"🔨",name:"Tap &amp; Whack",badge:1,how:"TAP the critters as they pop up — not the bombs!",games:[
+    {u:"mo-whackcritter",e:"🔨",n:"Whack Critters"}]},
+  {ico:"🐤",name:"Flappy Fly",badge:1,how:"TAP to flap and fly through the gaps!",games:[
+    {u:"mo-flappyfly",e:"🐤",n:"Flappy Fly"}]},
+  {ico:"🏎️",name:"Lane Racer 3D",badge:1,how:"A 3D road! TAP left or right to switch lanes and grab stars.",games:[
+    {u:"mo-laneracer",e:"🏎️",n:"Lane Racer 3D"}]},
+  {ico:"🔵",name:"Drag Maze",badge:1,how:"DRAG the ball to the flag without touching the walls!",games:[
+    {u:"mo-dragmaze",e:"🔵",n:"Drag Maze"}]},
+  {ico:"🎨",name:"Color Memory",badge:1,how:"WATCH the color pattern, then TAP it back. It grows each round!",games:[
+    {u:"mo-colormemory",e:"🎵",n:"Color Memory"}]},
+  {ico:"🫳",name:"Catch &amp; Grab",badge:0,how:"TAP the good stuff falling — dodge the bad!",games:[
+    {u:"mo-meandmommy-cooking",e:"👨‍🍳",n:"Cooking"},{u:"mo-meandmommy-catch",e:"🤾",n:"Catch"},
+    {u:"mo-familytreasure",e:"💎",n:"Treasure"},{u:"mo-citygardener",e:"🌻",n:"Gardener"},
+    {u:"mo-meandmommy-camping",e:"⛺",n:"Camping"},{u:"mo-meandmommy-bakery",e:"🧁",n:"Bakery"},{u:"mo-foodtruck",e:"🍔",n:"Food Truck"},{u:"mo-aquariumfeed",e:"🐠",n:"Aquarium Feed"}]},
+  {ico:"🎴",name:"Memory Match",badge:0,how:"Flip the cards and find the matching pairs!",games:[
+    {u:"mo-meandmommy-memory",e:"🎴",n:"Memory"},{u:"mo-familymemory",e:"🧠",n:"Family Memory"},
+    {u:"mo-meandmommy-mystery",e:"🏚️",n:"Mystery"},{u:"mo-citylibrary",e:"📖",n:"Library"}]},
+  {ico:"💃",name:"Rhythm &amp; Music",badge:0,how:"TAP when the marker hits the green zone!",games:[
+    {u:"mo-meandmommy-dance",e:"💃",n:"Dance"},{u:"mo-meandmommy-music",e:"🎵",n:"Music"},
+    {u:"mo-familydanceoff",e:"💃",n:"Dance Off"},{u:"mo-meandmommy-freezedance",e:"💃",n:"Freeze Dance"}]},
+  {ico:"🏃",name:"Dodge &amp; Race",badge:0,how:"DRAG to dodge the obstacles and grab the stars!",games:[
+    {u:"mo-meandmommy-racing",e:"🏎️",n:"Racing"},{u:"mo-meandmommy-marble",e:"🔵",n:"Marble"},
+    {u:"mo-taxidriver",e:"🚕",n:"Taxi"},{u:"mo-cityracing",e:"🏎️",n:"City Racing"}]},
+  {ico:"🏗️",name:"Stack &amp; Build",badge:0,how:"TAP to drop each block and build it tall!",games:[
+    {u:"mo-meandmommy-build",e:"🏠",n:"Build a House"},{u:"mo-cityplanner",e:"🏗️",n:"City Planner"},
+    {u:"mo-skyscraper",e:"🏢",n:"Skyscraper"},{u:"mo-familybuilding",e:"🧱",n:"Family Build"}]},
+  {ico:"🧠",name:"Quiz &amp; Brain",badge:0,how:"Answer fast for bonus points!",games:[
+    {u:"mo-meandmommy-trivia",e:"🧠",n:"Trivia"},{u:"mo-familytrivia",e:"🧠",n:"Family Trivia"},
+    {u:"mo-familyriddle",e:"🤔",n:"Riddles"},{u:"mo-meandmommy-wordbattle",e:"📝",n:"Word Battle"}]}
+];
+var sb=document.getElementById('surprise'); if(sb) sb.addEventListener('click',function(ev){ ev.preventDefault(); var all=[]; MODES.forEach(function(m){ m.games.forEach(function(g){ all.push(g.u); }); }); var pick=all[Math.floor(Math.random()*all.length)]; location.href='../'+pick+'/'+pick+'.html'; });
+  var wrap=document.getElementById('wrap');
+MODES.forEach(function(m){
+  var sec=document.createElement('div'); sec.className='mode';
+  var h='<div class="mhead"><div class="ico">'+m.ico+'</div><div class="txt"><h2>'+m.name+(m.badge?'<span class="new">NEW</span>':'')+'</h2><p>'+m.how+'</p></div></div>';
+  h+='<div class="grid">';
+  m.games.forEach(function(g){ h+='<a class="card" href="../'+g.u+'/'+g.u+'.html"><span class="emo">'+g.e+'</span><span class="name">'+g.n+'</span></a>'; });
+  h+='</div>';
+  sec.innerHTML=h; wrap.appendChild(sec);
+});
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){ window.addEventListener("load",function(){ navigator.serviceWorker.register("../sw.js").catch(function(){}); }); }
+</script>
+</body>
+</html>
