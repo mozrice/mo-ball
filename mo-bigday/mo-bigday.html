@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>🚗 Mo's Big Day</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:#101a26;color:#eaf2f7;font-family:'Trebuchet MS',Verdana,sans-serif;overflow:hidden;}
+  #wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;padding:8px;}
+  .namebtn{display:block;margin:6px auto 2px;background:linear-gradient(#ffd23f,#f7a72b);color:#5a3a1a;font-weight:bold;border:none;border-radius:14px;padding:9px 22px;font-size:16px;font-family:inherit;box-shadow:0 4px 0 #0006;text-decoration:none;}
+  h1{margin:2px 0;font-size:20px;color:#ffd23f;text-shadow:0 2px 0 #0007;}
+  #steps{font-size:13px;color:#9fd3ff;margin:2px 0 6px;font-weight:bold;}
+  canvas{background:#bfe3ff;border-radius:16px;box-shadow:0 8px 24px #0009;touch-action:none;max-width:100%;height:auto;}
+  #nav{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center;}
+  .nb{background:#16283a;border:2px solid #35617e;color:#dceaf5;font-weight:bold;font-size:14px;padding:8px 14px;border-radius:12px;font-family:inherit;text-decoration:none;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <a class="namebtn" href="../index.html">🏠 MO ARCADE</a>
+  <h1>🚗 Mo's Big Day</h1>
+  <div id="steps">Tap to start!</div>
+  <canvas id="cv" width="440" height="620"></canvas>
+  <div id="nav">
+    <a class="nb" href="../index.html">← Back</a>
+    <a class="nb" href="../mo-home.html">🏠 MO Home</a>
+    <a class="nb" href="../games.html">🎮 All Games</a>
+  </div>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById("cv"), cx=cv.getContext("2d"), steps=document.getElementById("steps");
+  var W=cv.width, H=cv.height, t=0, carColor="#e0453a";
+  var stage="menu", g={}, ptr={x:W/2,y:0,down:false};
+
+  var AC=null; function beep(f,d,ty){ try{ if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)(); var o=AC.createOscillator(),ga=AC.createGain(); o.frequency.value=f;o.type=ty||"square";o.connect(ga);ga.connect(AC.destination);ga.gain.value=.06;o.start();ga.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+(d||.08));o.stop(AC.currentTime+(d||.08)); }catch(e){} }
+  function rr(x,y,w,h,r){ cx.beginPath();cx.moveTo(x+r,y);cx.arcTo(x+w,y,x+w,y+h,r);cx.arcTo(x+w,y+h,x,y+h,r);cx.arcTo(x,y+h,x,y,r);cx.arcTo(x,y,x+w,y,r);cx.closePath(); }
+  function text(s,x,y,sz,c,al){ cx.fillStyle=c||"#fff";cx.font="bold "+sz+"px Trebuchet MS,sans-serif";cx.textAlign=al||"center";cx.textBaseline="middle";cx.fillText(s,x,y); }
+  function emo(ch,x,y,s){ cx.font=s+"px serif";cx.textAlign="center";cx.textBaseline="middle";cx.fillText(ch,x,y); }
+  function btn(label,y){ cx.fillStyle="#7bd07b"; rr(W/2-110,y,220,52,14); cx.fill(); text(label,W/2,y+26,18,"#06280f"); }
+
+  function drawCar(x,y,s,parts){                       // parts 0..4 (build), 4 = complete
+    cx.save(); cx.translate(x,y); cx.scale(s,s);
+    if(parts>=1){ cx.fillStyle=carColor; rr(-40,-6,80,26,8); cx.fill(); }       // chassis
+    if(parts>=4){ cx.fillStyle=carColor; rr(-22,-26,44,24,8); cx.fill();        // cabin
+      cx.fillStyle="#bfe6ff"; rr(-16,-22,15,14,3); cx.fill(); rr(3,-22,15,14,3); cx.fill(); }
+    if(parts>=2){ cx.fillStyle="#222"; cx.beginPath(); cx.arc(-24,20,10,0,7); cx.fill(); cx.fillStyle="#888"; cx.beginPath(); cx.arc(-24,20,4,0,7); cx.fill(); }
+    if(parts>=3){ cx.fillStyle="#222"; cx.beginPath(); cx.arc(24,20,10,0,7); cx.fill(); cx.fillStyle="#888"; cx.beginPath(); cx.arc(24,20,4,0,7); cx.fill(); }
+    if(parts>=4){ cx.fillStyle="#ffe38a"; cx.beginPath(); cx.arc(40,6,4,0,7); cx.fill(); }  // headlight
+    cx.restore();
+  }
+  function drawArff(x,y,s){                             // the dog
+    cx.save(); cx.translate(x,y); cx.scale(s,s);
+    cx.fillStyle="#b5793f"; rr(-16,-8,30,16,8); cx.fill();                       // body
+    cx.beginPath(); cx.arc(16,-8,10,0,7); cx.fill();                             // head
+    cx.fillStyle="#8a5a2f"; cx.beginPath(); cx.ellipse(11,-16,4,6,-.4,0,7); cx.fill(); // ear
+    cx.fillStyle="#222"; cx.beginPath(); cx.arc(20,-9,1.6,0,7); cx.fill();       // eye
+    cx.fillStyle="#3a2a1a"; cx.beginPath(); cx.arc(24,-6,2.4,0,7); cx.fill();    // nose
+    cx.strokeStyle="#8a5a2f"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(-16,6); cx.lineTo(-24,-2+Math.sin(t*0.2)*4); cx.stroke(); // tail wag
+    cx.fillStyle="#b5793f"; [-10,8].forEach(function(lx){ cx.fillRect(lx,6,4,10); });
+    cx.restore();
+  }
+  function drawMorgan(x,y,s){
+    cx.save(); cx.translate(x,y); cx.scale(s,s);
+    cx.strokeStyle="#2b5aa0"; cx.lineWidth=4; cx.lineCap="round"; cx.beginPath(); cx.moveTo(-4,10); cx.lineTo(-4,22); cx.moveTo(4,10); cx.lineTo(4,22); cx.stroke();
+    cx.fillStyle="#e0453a"; rr(-9,-10,18,22,6); cx.fill();
+    cx.fillStyle="#f6c9a0"; cx.beginPath(); cx.arc(0,-18,9,0,7); cx.fill();
+    cx.fillStyle="#6b4423"; cx.beginPath(); cx.arc(0,-21,9,Math.PI,2*Math.PI); cx.fill();
+    cx.fillStyle="#222"; cx.beginPath(); cx.arc(3,-18,1.5,0,7); cx.fill();
+    cx.restore();
+  }
+  function stepLabel(n,s){ steps.textContent="Step "+n+" of 5 — "+s; }
+
+  // ============ STAGES ============
+  var S={};
+  S.menu={ init:function(){ steps.textContent="Tap to start Mo's Big Day!"; },
+    render:function(){ sky("#bfe3ff","#e9f7ff"); ground("#7cc46a"); drawCar(W/2,H*0.4,1.3,4); emo("🐕",W*0.66,H*0.46,34);
+      text("MO'S BIG DAY",W/2,H*0.62,26,"#5a3a1a");
+      text("Build a car, drive to the city, sleep,",W/2,H*0.7,14,"#3a5a2a");
+      text("play basketball, then walk Arff!",W/2,H*0.74,14,"#3a5a2a");
+      btn("▶ START",H*0.82); },
+    tap:function(){ go("build"); } };
+
+  S.build={ init:function(){ g={parts:0,pop:0}; stepLabel(1,"Build the car! Tap to add parts."); },
+    update:function(){ if(g.pop>0)g.pop-=0.05; },
+    render:function(){ sky("#dfe9f2","#f2f7fb"); cx.fillStyle="#9aa0a6"; cx.fillRect(0,H*0.62,W,H*0.38);
+      text("🔧 BUILD YOUR CAR",W/2,50,20,"#3a4a5a");
+      var s=1.6+ (g.pop>0?g.pop*0.15:0);
+      drawCar(W/2,H*0.5,s,g.parts);
+      var names=["Add the body!","Add a wheel!","Add a wheel!","Add the windows!"];
+      if(g.parts<4) text(names[g.parts],W/2,H*0.74,18,"#2a3a4a");
+      else { text("Awesome car! 🚗",W/2,H*0.72,20,"#2a7d3a"); btn("▶ DRIVE TO THE CITY",H*0.8); }
+      for(var i=0;i<4;i++){ cx.fillStyle=i<g.parts?"#7bd07b":"#cfd6dc"; cx.beginPath(); cx.arc(W/2-30+i*20,H*0.86,7,0,7); cx.fill(); } },
+    tap:function(){ if(g.parts<4){ g.parts++; g.pop=1; beep(500+g.parts*80,.08); } else go("drive"); } };
+
+  S.drive={ init:function(){ g={dist:0,px:W/2,obs:[],road:0,shake:0,arrived:false}; stepLabel(2,"Drive to the city! Drag to steer."); },
+    update:function(){ if(g.arrived)return;
+      g.road=(g.road+5)%40; g.dist+=0.35; g.px+=(ptr.x-g.px)*0.2; g.px=Math.max(60,Math.min(W-60,g.px));
+      if(t%36===0){ g.obs.push({x:60+Math.random()*(W-120),y:-40,type:Math.random()<.5?"car":"cone"}); }
+      for(var i=g.obs.length-1;i>=0;i--){ var o=g.obs[i]; o.y+=5;
+        if(Math.abs(o.x-g.px)<44 && Math.abs(o.y-(H-90))<34){ g.obs.splice(i,1); g.shake=8; g.dist=Math.max(0,g.dist-3); beep(160,.15,"sawtooth"); continue; }
+        if(o.y>H+40) g.obs.splice(i,1); }
+      if(g.shake>0)g.shake-=0.6;
+      if(g.dist>=100){ g.arrived=true; beep(880,.2); } },
+    render:function(){ var sh=g.shake>0?(Math.random()*2-1)*g.shake:0; cx.save(); cx.translate(sh,0);
+      sky("#a9d4f0","#dfeefb"); // city skyline near top when close
+      cx.fillStyle="#5b5b66"; cx.fillRect(40,0,W-80,H);
+      cx.fillStyle="#9a9aa6"; cx.fillRect(30,0,10,H); cx.fillRect(W-40,0,10,H);
+      cx.fillStyle="#f2d24a"; for(var y=-40+g.road;y<H;y+=40){ cx.fillRect(W/2-4,y,8,20); }
+      // city buildings appear as you get close
+      if(g.dist>60){ var a=Math.min(1,(g.dist-60)/40); cx.globalAlpha=a; cx.fillStyle="#8a95a5"; for(var i=0;i<6;i++){ cx.fillRect(45+i*(W-90)/6, 20, (W-90)/6-6, 60+i%3*30); } cx.globalAlpha=1; text("🏙️ CITY AHEAD!",W/2,110,18,"#fff"); }
+      g.obs.forEach(function(o){ if(o.type==="car"){ drawCar(o.x,o.y,0.9,4); } else { cx.fillStyle="#ff8c2a"; cx.beginPath(); cx.moveTo(o.x,o.y-12); cx.lineTo(o.x-9,o.y+10); cx.lineTo(o.x+9,o.y+10); cx.closePath(); cx.fill(); cx.fillStyle="#fff"; cx.fillRect(o.x-9,o.y+2,18,3); } });
+      drawCar(g.px,H-90,1.1,4);
+      cx.restore();
+      // progress
+      cx.fillStyle="rgba(0,0,0,.4)"; rr(20,H-26,W-40,14,7); cx.fill(); cx.fillStyle="#7bd07b"; rr(22,H-24,(W-44)*Math.min(1,g.dist/100),10,5); cx.fill();
+      if(g.arrived){ cx.fillStyle="rgba(0,0,0,.5)"; cx.fillRect(0,0,W,H); text("🏙️ You reached the CITY!",W/2,H*0.42,22,"#ffd23f"); btn("▶ GO TO THE HOTEL",H*0.55); } },
+    drag:function(x){ ptr.x=x; },
+    tap:function(){ if(g.arrived) go("hotel"); } };
+
+  S.hotel={ init:function(){ g={ph:"arrive",tm:0}; stepLabel(3,"Hotel for the night. Tap the bed to sleep."); },
+    update:function(){ if(g.ph==="sleep"){ g.tm+=0.012; if(g.tm>=1){ g.ph="morning"; beep(700,.15);} } },
+    render:function(){
+      var night = g.ph==="sleep"||g.ph==="arrive";
+      sky(g.ph==="morning"?"#ffd9a0":"#12183a", g.ph==="morning"?"#ffe9c6":"#2a3a70");
+      if(night){ cx.fillStyle="#fff"; [[60,60],[120,40],[300,70],[380,50],[200,90]].forEach(function(p){ cx.globalAlpha=.7+Math.sin(t*0.1+p[0])*0.3; cx.beginPath(); cx.arc(p[0],p[1],1.6,0,7); cx.fill(); }); cx.globalAlpha=1;
+        cx.fillStyle="#f4f0d0"; cx.beginPath(); cx.arc(W-70,70,18,0,7); cx.fill(); }
+      else { cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(70,70,22,0,7); cx.fill(); }
+      cx.fillStyle="#3a4a2a"; cx.fillRect(0,H*0.7,W,H*0.3);
+      // hotel building
+      cx.fillStyle="#c9b79b"; cx.fillRect(W/2-90,H*0.34,180,H*0.36);
+      cx.fillStyle="#8a5a2f"; cx.fillRect(W/2-100,H*0.3,200,20);
+      cx.fillStyle="#ffd23f"; text("🏨 HOTEL",W/2,H*0.32,15,"#5a3a1a");
+      for(var r=0;r<3;r++)for(var c=0;c<4;c++){ cx.fillStyle=(g.ph==="sleep"&&r+c>1)?"#3a3a2a":"#ffe27a"; cx.fillRect(W/2-72+c*36,H*0.4+r*36,22,22); }
+      // bed prompt
+      if(g.ph==="arrive"){ emo("🛏️",W/2,H*0.82,40); text("Tap the bed to sleep 😴",W/2,H*0.92,16,"#fff"); }
+      else if(g.ph==="sleep"){ emo("🛏️",W/2,H*0.82,40); text("Zzz... 💤",W/2,H*0.9,20,"#cfe"); }
+      else { text("☀️ Good morning!",W/2,H*0.82,22,"#5a3a1a"); btn("▶ PLAY BASKETBALL",H*0.88); } },
+    tap:function(){ if(g.ph==="arrive"){ g.ph="sleep"; g.tm=0; beep(300,.2,"sine"); stepLabel(3,"Sleeping..."); } else if(g.ph==="morning"){ go("bball"); } } };
+
+  S.bball={ init:function(){ g={made:0,need:3,ball:{x:W/2,y:H-70,vx:0,vy:0,live:false},aim:null}; stepLabel(4,"Play basketball! Drag the ball to shoot."); },
+    update:function(){ var b=g.ball; if(b.live){ b.x+=b.vx; b.y+=b.vy; b.vy+=0.35;
+        // hoop at (W/2, 110), rim y ~120, width 60
+        if(b.vy>0 && b.y>110 && b.y<134 && Math.abs(b.x-W/2)<30){ g.made++; beep(880,.15); b.live=false; setTimeout(reset,600); }
+        if(b.y>H+40||b.x<-40||b.x>W+40){ b.live=false; setTimeout(reset,400); }
+      }
+      function reset(){ if(g.made<g.need){ g.ball={x:W/2,y:H-70,vx:0,vy:0,live:false}; } }
+    },
+    render:function(){ sky("#e8a03c","#ffd98a"); cx.fillStyle="#b3712f"; cx.fillRect(0,H*0.7,W,H*0.3);
+      cx.strokeStyle="#fff"; cx.lineWidth=2; cx.beginPath(); cx.arc(W/2,H*0.7,60,Math.PI,0); cx.stroke();
+      // backboard + hoop
+      cx.fillStyle="#fff"; cx.fillRect(W/2-34,70,68,44); cx.strokeStyle="#e0453a"; cx.lineWidth=2; cx.strokeRect(W/2-16,86,32,20);
+      cx.strokeStyle="#ff8c2a"; cx.lineWidth=4; cx.beginPath(); cx.moveTo(W/2-30,120); cx.lineTo(W/2+30,120); cx.stroke();
+      cx.strokeStyle="rgba(255,255,255,.7)"; cx.lineWidth=1; for(var i=-2;i<=2;i++){ cx.beginPath(); cx.moveTo(W/2+i*12,120); cx.lineTo(W/2+i*7,138); cx.stroke(); }
+      // ball
+      var b=g.ball; cx.fillStyle="#e8821e"; cx.beginPath(); cx.arc(b.x,b.y,13,0,7); cx.fill(); cx.strokeStyle="#7a3a10"; cx.lineWidth=1.5; cx.beginPath(); cx.moveTo(b.x-13,b.y); cx.lineTo(b.x+13,b.y); cx.moveTo(b.x,b.y-13); cx.lineTo(b.x,b.y+13); cx.stroke();
+      if(g.aim && !b.live){ cx.strokeStyle="rgba(255,255,255,.7)"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(b.x,b.y); cx.lineTo(g.aim.x,g.aim.y); cx.stroke(); }
+      text("Baskets: "+g.made+" / "+g.need,W/2,H-24,18,"#5a3a1a");
+      if(g.made>=g.need){ cx.fillStyle="rgba(0,0,0,.5)"; cx.fillRect(0,0,W,H); text("🏀 Great shooting!",W/2,H*0.42,24,"#ffd23f"); btn("▶ WALK ARFF",H*0.55); } },
+    down:function(x,y){ if(g.made>=g.need)return; var b=g.ball; if(!b.live && Math.abs(x-b.x)<40 && Math.abs(y-b.y)<40) g.aim={x:x,y:y}; },
+    move:function(x,y){ if(g.aim) g.aim={x:x,y:y}; },
+    up:function(){ if(g.made>=g.need){ return; } if(g.aim && !g.ball.live){ var b=g.ball; b.vx=(b.x-g.aim.x)*0.14; b.vy=(b.y-g.aim.y)*0.14; b.live=true; g.aim=null; beep(600,.06); } },
+    tap:function(){ if(g.made>=g.need) go("walk"); } };
+
+  S.walk={ init:function(){ g={d:0,goal:100,bones:0,step:0}; stepLabel(5,"Walk Arff! Tap to take steps."); },
+    update:function(){ if(g.step>0)g.step-=0.1; },
+    render:function(){ sky("#a9dcff","#e9f8ff"); cx.fillStyle="#ffe680"; cx.beginPath(); cx.arc(W*0.82,70,24,0,7); cx.fill();
+      cx.fillStyle="#6cbf5a"; cx.fillRect(0,H*0.6,W,H*0.4); cx.fillStyle="#c9a06a"; cx.fillRect(0,H*0.7,W,26); // path
+      // trees scroll
+      for(var i=0;i<6;i++){ var tx=((i*120 - g.d*3)%(W+120)+W+120)%(W+120)-60; cx.fillStyle="#7a5230"; cx.fillRect(tx-4,H*0.5,8,H*0.12); cx.fillStyle="#4f9e46"; cx.beginPath(); cx.arc(tx,H*0.49,20,0,7); cx.fill(); }
+      var bob=Math.sin(g.step*3)*3;
+      drawMorgan(W*0.42,H*0.72-bob,1.15);
+      drawArff(W*0.6,H*0.74-Math.sin(g.step*3+1)*3,1.1);
+      emo("🐾",W*0.3,H*0.8,16);
+      text("🐕 Walking Arff!",W/2,50,20,"#3a5a2a");
+      cx.fillStyle="rgba(0,0,0,.35)"; rr(20,H-26,W-40,14,7); cx.fill(); cx.fillStyle="#7bd07b"; rr(22,H-24,(W-44)*Math.min(1,g.d/g.goal),10,5); cx.fill();
+      if(g.d<g.goal) text("Tap to walk! 🐾",W/2,H*0.9,16,"#2a4a2a");
+      else { cx.fillStyle="rgba(0,0,0,.5)"; cx.fillRect(0,0,W,H); text("🏡 You walked Arff home!",W/2,H*0.42,20,"#ffd23f"); btn("▶ FINISH THE DAY",H*0.55); } },
+    tap:function(){ if(g.d<g.goal){ g.d+=6; g.step=1; beep(440+g.d,.05); } else go("done"); } };
+
+  S.done={ init:function(){ steps.textContent="🎉 You did it all!"; g={c:0}; },
+    update:function(){ g.c++; },
+    render:function(){ sky("#7bb0ff","#dfeefb"); ground("#7cc46a");
+      // confetti
+      for(var i=0;i<40;i++){ var px=(i*137)%W, py=((g.c*3+i*40)%(H+40))-20; cx.save(); cx.translate(px,py); cx.rotate(g.c*0.05+i); cx.fillStyle=["#ff6b6b","#ffd23f","#4fd18b","#3a7bd5","#e07be0"][i%5]; cx.fillRect(-4,-4,8,8); cx.restore(); }
+      drawCar(W*0.28,H*0.5,1,4); emo("🏀",W*0.55,H*0.46,30); emo("🐕",W*0.72,H*0.5,30);
+      text("🎉 WHAT A DAY! 🎉",W/2,H*0.62,24,"#ffd23f");
+      text("Built a car · drove to the city · slept",W/2,H*0.7,13,"#2a3a4a");
+      text("played basketball · walked Arff!",W/2,H*0.74,13,"#2a3a4a");
+      btn("↻ DO IT AGAIN",H*0.82); },
+    tap:function(){ go("menu"); } };
+
+  // ---- shared bg ----
+  function sky(a,b){ var gr=cx.createLinearGradient(0,0,0,H); gr.addColorStop(0,a); gr.addColorStop(1,b); cx.fillStyle=gr; cx.fillRect(0,0,W,H); }
+  function ground(c){ cx.fillStyle=c; cx.fillRect(0,H*0.72,W,H*0.28); }
+
+  function go(name){ stage=name; if(S[name].init)S[name].init(); }
+
+  // ---- input ----
+  function pos(e){ var r=cv.getBoundingClientRect(); var tt=e.touches&&e.touches[0]?e.touches[0]:e; return {x:(tt.clientX-r.left)/r.width*W, y:(tt.clientY-r.top)/r.height*H}; }
+  function down(e){ e.preventDefault(); if(AC&&AC.state==="suspended")AC.resume(); var p=pos(e); ptr.x=p.x;ptr.y=p.y;ptr.down=true; var s=S[stage]; if(s.down)s.down(p.x,p.y); }
+  function move(e){ if(e.cancelable)e.preventDefault(); var p=pos(e); ptr.x=p.x;ptr.y=p.y; var s=S[stage]; if(s.drag)s.drag(p.x,p.y); if(s.move)s.move(p.x,p.y); }
+  function up(e){ ptr.down=false; var s=S[stage]; if(s.up)s.up(); if(s.tap)s.tap(); }
+  cv.addEventListener("mousedown",down); cv.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
+  cv.addEventListener("touchstart",down,{passive:false}); cv.addEventListener("touchmove",move,{passive:false}); cv.addEventListener("touchend",up);
+
+  function loop(){ t++; var s=S[stage]; if(s.update)s.update(); s.render(); requestAnimationFrame(loop); }
+  go("menu"); loop();
+})();
+</script>
+</body>
+</html>

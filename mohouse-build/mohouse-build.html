@@ -177,11 +177,13 @@
   <div id="views">
     <button id="outBtn" class="vbtn sel">🏠 Outside</button>
     <button id="inBtn" class="vbtn">🛋️ Inside</button>
+    <button id="backBtn" class="vbtn">🌳 Backyard</button>
     <button id="tourBtn" class="vbtn">🎥 Tour</button>
     <button id="dayBtn" class="vbtn">🌙 Night</button>
     <button id="shopBtn" class="vbtn">🛒 Shop</button>
     <button id="photoBtn" class="vbtn">📸 Photo</button>
     <button id="fixBtn" class="vbtn">🧹 Fix &amp; Flip</button>
+    <button id="rentBtn" class="vbtn">🔑 Rent Room</button>
     <button id="workBtn" class="vbtn">💼 Work</button>
     <button id="tourneyBtn" class="vbtn">🎮 Tournament</button>
     <button id="bankBtn" class="vbtn">🏦 Bank</button>
@@ -195,6 +197,8 @@
     <button id="partyBtn" class="vbtn">🎂 Party</button>
     <button id="musicBtn" class="vbtn">🎵 Music</button>
     <input id="petName" class="petin" maxlength="12" placeholder="🏷️ name a pet">
+    <input id="houseNameInput" class="petin" maxlength="8" placeholder="🏷️ mailbox name">
+    <input id="houseNumInput" class="petin" maxlength="4" placeholder="🔢 house number">
     <label class="baby"><input type="checkbox" id="babyChk"> 🍼 baby</label>
     <span class="stylabel">Styles:</span>
     <button class="sbtn" data-style="cottage">🏡 Cottage</button>
@@ -414,15 +418,27 @@
     { id: "window", name: "Window",  col: "#8fc3e6" },
     { id: "door",   name: "Door",    col: "#7a4b25" },
     { id: "garage", name: "Garage",  col: "#d3d8dd" },
+    { id: "garage2", name: "🚗 2-Car Garage", col: "#cdd2d7" },
+    { id: "balcony", name: "🏠 Balcony", col: "#c9b79b" },
     { id: "grass",  name: "Grass",   col: "#4bbf5a" },
     { id: "tree",   name: "Tree",    col: "#2e8b40" },
     { id: "hedge",  name: "Hedge",   col: "#3a9e4e" },
     { id: "flower", name: "Flower",  col: "#ff6fae" },
     { id: "fence",  name: "Fence",   col: "#f2f2f2" },
+    { id: "picket", name: "🏡 Picket", col: "#fbfaf6" },
+    { id: "treehouse", name: "🌳 Treehouse", col: "#a06a38" },
+    { id: "hwpumpkin", name: "🎃 Pumpkin", col: "#e8821e" },
+    { id: "hwghost", name: "👻 Ghost", col: "#f4f4f4" },
+    { id: "hwbat", name: "🦇 Bat", col: "#2a2733" },
+    { id: "hwtomb", name: "🪦 Tombstone", col: "#9aa0a6" },
+    { id: "hwtree", name: "🌲 Spooky Tree", col: "#2f2a26" },
+    { id: "gate",   name: "🚪 Gate",   col: "#fbfaf6" },
     { id: "mailbox",name: "Mailbox", col: "#4a6b8a" },
+    { id: "housenum", name: "🔢 House #", col: "#2a2f34" },
     { id: "lamp",   name: "Lamp",    col: "#ffd257" },
     { id: "car",    name: "Car",     col: "#d23b3b" },
     { id: "solar",  name: "☀️ Solar", col: "#1a3a5a" },
+    { id: "sell",   name: "💰 Sell",  col: "#6bd18a" },
     { id: "drive",  name: "Driveway",col: "#55606a" },
     { id: "pool",   name: "🏊 Pool",  col: "#38b6ff" },
     { id: "hottub", name: "♨️ Hot Tub",col: "#8a5a2f" },
@@ -456,7 +472,10 @@
   const TOOLS_IN = [
     { id: "rug",     name: "Rug",      col: "#c85b6b", price: 4 },
     { id: "sofa",    name: "Sofa",     col: "#7a8b99", price: 18 },
+    { id: "sectional", name: "Sectional", col: "#6d8a99", price: 26 },
     { id: "tv",      name: "TV",       col: "#222a30", price: 22 },
+    { id: "screen",  name: "🎬 Movie Screen", col: "#1a1a1a", price: 45 },
+    { id: "theaterseat", name: "🍿 Theater Seat", col: "#8a2a2a", price: 18 },
     { id: "fireplace",name:"Fireplace",col: "#a54a2a", price: 24 },
     { id: "piano",   name: "Piano",    col: "#2a2f34", price: 30 },
     { id: "pooltable",name:"Pool Table",col: "#1f7a3f", price: 28 },
@@ -470,27 +489,41 @@
     { id: "sports",  name: "🏅 Sports",  col: "#3aa856", price: 40 },
     { id: "cooking", name: "🍳 Cooking", col: "#e8a03c", price: 34 },
     { id: "aquarium",name: "Fish Tank",col: "#50b4e6", price: 20 },
+    { id: "aquawall", name: "🐠 Big Aquarium", col: "#1f83c4", price: 40 },
     { id: "table",   name: "Table",    col: "#b3712f", price: 10 },
     { id: "chair",   name: "Chair",    col: "#c88a4a", price: 6 },
     { id: "bookshelf",name:"Bookshelf",col: "#7a4b25", price: 14 },
     { id: "bed",     name: "Bed",      col: "#6fa8dc", price: 20 },
+    { id: "canopybed", name: "Canopy Bed", col: "#c85b6b", price: 30 },
     { id: "bunkbed", name: "Bunk Bed", col: "#6fa8dc", price: 26 },
     { id: "dresser", name: "Dresser",  col: "#8a5a2f", price: 14 },
     { id: "lamp2",   name: "Lamp",     col: "#ffd257", price: 6 },
+    { id: "fan",     name: "🌀 Ceiling Fan", col: "#8a929a", price: 16 },
     { id: "fridge",  name: "Fridge",   col: "#e8edf2", price: 16 },
     { id: "stove",   name: "Stove",    col: "#dfe3e7", price: 16 },
+    { id: "doubleoven", name: "🔥 Double Oven", col: "#dfe3e7", price: 24 },
     { id: "island",  name: "Island",   col: "#e8edf2", price: 18 },
     { id: "counter", name: "Counter",  col: "#e8edf2", price: 10 },
     { id: "sink",    name: "Sink",     col: "#9fb0bd", price: 8 },
     { id: "toilet",  name: "Toilet",   col: "#ffffff", price: 10 },
     { id: "bath",    name: "Bath",     col: "#dfe9f2", price: 16 },
     { id: "shower",  name: "Shower",   col: "#bee6f5", price: 18 },
+    { id: "clawtub", name: "🛁 Clawfoot Tub", col: "#f4f1ea", price: 26 },
+    { id: "glassshower", name: "🚿 Glass Shower", col: "#c9cdd2", price: 28 },
     { id: "plant",   name: "Plant",    col: "#3a9e4e", price: 5 },
     { id: "desk",    name: "Desk",     col: "#8a5a2f", price: 14 },
     { id: "wardrobe",name: "Wardrobe", col: "#8a5a2f", price: 18 },
+    { id: "closetsys", name: "🚪 Walk-in Closet", col: "#c9a06a", price: 26 },
     { id: "cabinet", name: "Cabinet",  col: "#b3712f", price: 12 },
     { id: "washer",  name: "Washer",   col: "#e8edf2", price: 16 },
     { id: "crib",    name: "Crib",     col: "#c88a4a", price: 16 },
+    { id: "racecarbed", name: "🏎️ Race-Car Bed", col: "#e0453a", price: 30 },
+    { id: "rockinghorse", name: "🐴 Rocking Horse", col: "#e8c07a", price: 12 },
+    { id: "toybox",  name: "🧸 Toy Box", col: "#c98a4a", price: 12 },
+    { id: "blocks",  name: "🧱 Toy Blocks", col: "#3f7fd2", price: 6 },
+    { id: "homeworkdesk", name: "📚 Homework Desk", col: "#c88a4a", price: 14 },
+    { id: "growthchart", name: "📏 Growth Chart", col: "#e8dcc4", price: 6 },
+    { id: "kidart",  name: "🖍️ Kids' Art", col: "#e0453a", price: 5 },
     { id: "mirror",  name: "Mirror",   col: "#cfe6f2", price: 8 },
     { id: "clock",   name: "Clock",    col: "#f4f1ea", price: 6 },
     { id: "painting",name: "Painting", col: "#8fd0ff", price: 8 },
@@ -518,6 +551,7 @@
     { id: "wall",    name: "Wall",     col: "#d8cdb8", price: 4 },
     { id: "window",  name: "Window",   col: "#8fc3e6", price: 8 },
     { id: "door",    name: "Door",     col: "#7a4b25", price: 6 },
+    { id: "sell",    name: "💰 Sell",   col: "#6bd18a" },
     { id: "lock",    name: "🔒 Lock",   col: "#8a929a" },
     { id: "move",    name: "✋ Move",   col: "#ffd257" },
     { id: "erase",   name: "Sell back", col: "#efe7db" }
@@ -572,10 +606,13 @@
   // ---- grids ----
   function blankGrid() { const g = []; for (let r = 0; r < ROWS; r++) g.push(new Array(COLS).fill("")); return g; }
   function nonEmpty(g) { return g.some(function (row) { return row.some(function (c) { return c; }); }); }
-  const ROOM_KEYS = ["living", "bedroom", "kitchen", "bathroom", "dining", "office", "kids", "laundry"];
-  const ROOM_NAMES = { living: "🛋️ Living", bedroom: "🛏️ Bedroom", kitchen: "🍳 Kitchen", bathroom: "🛁 Bathroom", dining: "🍽️ Dining", office: "💼 Office", kids: "🧸 Kids", laundry: "🧺 Laundry" };
+  const ROOM_KEYS = ["living", "bedroom", "kitchen", "bathroom", "dining", "office", "kids", "laundry", "attic", "basement", "theater", "gym", "closet", "sunroom"];
+  const ROOM_NAMES = { living: "🛋️ Living", bedroom: "🛏️ Bedroom", kitchen: "🍳 Kitchen", bathroom: "🛁 Bathroom", dining: "🍽️ Dining", office: "💼 Office", kids: "🧸 Kids", laundry: "🧺 Laundry", attic: "🪜 Attic", basement: "🧱 Basement", theater: "🎬 Theater", gym: "🏋️ Gym", closet: "🚪 Closet", sunroom: "🌞 Sunroom" };
   let gridOut = blankGrid();
-  let rooms = { living: blankGrid(), bedroom: blankGrid(), kitchen: blankGrid(), bathroom: blankGrid(), dining: blankGrid(), office: blankGrid(), kids: blankGrid(), laundry: blankGrid() };
+  let gridBack = blankGrid();
+  let houseName = ""; try { houseName = (localStorage.getItem("moHouseName") || "").toUpperCase().slice(0, 8); } catch (e) {}
+  let houseNum = "1"; try { houseNum = (localStorage.getItem("moHouseNum") || "1").slice(0, 4); } catch (e) {}
+  let rooms = { living: blankGrid(), bedroom: blankGrid(), kitchen: blankGrid(), bathroom: blankGrid(), dining: blankGrid(), office: blankGrid(), kids: blankGrid(), laundry: blankGrid(), attic: blankGrid(), basement: blankGrid(), theater: blankGrid(), gym: blankGrid(), closet: blankGrid(), sunroom: blankGrid() };
   let roomColors = {
     living:   { wall: "#efe7db", floor: "#b9905a", wallPat: "plain", floorPat: "plain" },
     bedroom:  { wall: "#e2ecf2", floor: "#caa06a", wallPat: "plain", floorPat: "plain" },
@@ -584,11 +621,19 @@
     dining:   { wall: "#f2e6cf", floor: "#9c6b3f", wallPat: "plain", floorPat: "planks" },
     office:   { wall: "#dfeae0", floor: "#7a5230", wallPat: "plain", floorPat: "planks" },
     kids:     { wall: "#f7dfe0", floor: "#d8c9a8", wallPat: "dots",  floorPat: "plain" },
-    laundry:  { wall: "#dfeaf7", floor: "#a9b0b6", wallPat: "plain", floorPat: "tile" }
+    laundry:  { wall: "#dfeaf7", floor: "#a9b0b6", wallPat: "plain", floorPat: "tile" },
+    attic:    { wall: "#e8dcc4", floor: "#b3712f", wallPat: "plain", floorPat: "planks" },
+    basement: { wall: "#cfd4d8", floor: "#8a8f96", wallPat: "plain", floorPat: "plain" },
+    theater:  { wall: "#2e2740", floor: "#3a2f4a", wallPat: "plain", floorPat: "plain" },
+    gym:      { wall: "#dfeae0", floor: "#6b7d55", wallPat: "plain", floorPat: "plain" },
+    closet:   { wall: "#f2ead0", floor: "#caa06a", wallPat: "plain", floorPat: "planks" },
+    sunroom:  { wall: "#fbe8d3", floor: "#dcc7a0", wallPat: "plain", floorPat: "tile" }
   };
   let roomKey = "living", grid = gridOut;
   let roomWalk = { active: false, t: 0, dir: 1, toKey: null };
   let locks = {};
+  let rentedRooms = {}; try { rentedRooms = JSON.parse(localStorage.getItem("moHouseRent") || "{}") || {}; } catch (e) { rentedRooms = {}; }
+  let roomSizes = {}; try { roomSizes = JSON.parse(localStorage.getItem("moHouseSizes") || "{}") || {}; } catch (e) { roomSizes = {}; }
 
   // ---- house styles (wide, two-story) ----
   function ground(g) { for (let c = 0; c < COLS; c++) { g[15][c] = "grass"; g[14][c] = "grass"; } }
@@ -728,6 +773,7 @@
       if (Array.isArray(s)) gridOut = normalizeGrid(s);
       else {
         if (s.out) gridOut = normalizeGrid(s.out);
+        if (s.back) gridBack = normalizeGrid(s.back);
         if (s.rooms) ROOM_KEYS.forEach(function (k) { if (s.rooms[k]) rooms[k] = normalizeGrid(s.rooms[k]); });
         else if (s.in) rooms.living = normalizeGrid(s.in);               // migrate old single room
         if (s.colors) curColor = s.colors;
@@ -743,7 +789,7 @@
   if (!nonEmpty(gridOut)) buildCottage(gridOut);
   grid = gridOut;
   function persist() {
-    try { localStorage.setItem("moHouse", JSON.stringify({ out: gridOut, rooms: rooms, colors: curColor, roomColors: roomColors, night: night, pets: petList, people: people, season: season, crops: crops })); return true; }
+    try { localStorage.setItem("moHouse", JSON.stringify({ out: gridOut, back: gridBack, rooms: rooms, colors: curColor, roomColors: roomColors, night: night, pets: petList, people: people, season: season, crops: crops })); return true; }
     catch (e) { return false; }
   }
 
@@ -751,6 +797,7 @@
   const coinEl = document.getElementById("coins");
   let coins = 0;
   try { coins = parseInt(localStorage.getItem("hoopCoins") || "0", 10) || 0; } catch (e) {}
+  try { const _today = new Date().toDateString(); if (localStorage.getItem("moHouseDaily") !== _today) { coins += 100; localStorage.setItem("moHouseDaily", _today); localStorage.setItem("hoopCoins", String(coins)); setTimeout(function () { try { flash("🌞 Daily bonus! +100 coins for Morgan"); } catch (e) {} }, 900); } } catch (e) {}
   let coinAnim = coins, earned = 0;
   function showCoins() { }                       // display now ticks up in the animation loop
   function renderCoins() {
@@ -761,6 +808,8 @@
   renderCoins();
 
   const msg = document.getElementById("msg"), hint = document.getElementById("hint"), valEl = document.getElementById("value"), petName = document.getElementById("petName"), babyChk = document.getElementById("babyChk");
+  const houseNameInput = document.getElementById("houseNameInput"); if (houseNameInput) { houseNameInput.value = houseName; houseNameInput.addEventListener("input", function () { houseName = houseNameInput.value.toUpperCase().slice(0, 8); try { localStorage.setItem("moHouseName", houseName); } catch (e) {} drawAll(); }); }
+  const houseNumInput = document.getElementById("houseNumInput"); if (houseNumInput) { houseNumInput.value = houseNum; houseNumInput.addEventListener("input", function () { houseNum = houseNumInput.value.slice(0, 4); try { localStorage.setItem("moHouseNum", houseNum); } catch (e) {} drawAll(); }); }
   function flash(t) { msg.textContent = t; const cur = t; setTimeout(function () { if (msg.textContent === cur) msg.textContent = ""; }, 2400); }
   function roomValue(k) { const g = rooms[k]; let t = 0; for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const v = PRICE[baseId(g[r][c])]; if (v) t += v; } petList.forEach(function (pt) { if (pt.scene === k) t += PRICE[pt.type] || 0; }); return t; }
   let best = 0; try { best = parseInt(localStorage.getItem("moHouseBest") || "0", 10) || 0; } catch (e) {}
@@ -785,6 +834,8 @@
     else if (pat === "tile") { ctx.strokeStyle = "rgba(0,0,0,.22)"; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, S / 2, S / 2); ctx.strokeRect(x + S / 2 + 0.5, y + 0.5, S / 2, S / 2); ctx.strokeRect(x + 0.5, y + S / 2 + 0.5, S / 2, S / 2); ctx.strokeRect(x + S / 2 + 0.5, y + S / 2 + 0.5, S / 2, S / 2); }
     else if (pat === "herring") { ctx.strokeStyle = "rgba(0,0,0,.24)"; ctx.lineWidth = 1.5; for (let i = -1; i < 3; i++) { ctx.beginPath(); ctx.moveTo(x + i * S / 2, y); ctx.lineTo(x + i * S / 2 + S / 2, y + S / 2); ctx.lineTo(x + i * S / 2, y + S); ctx.stroke(); } }
     else if (pat === "checker") { if ((col + rw) % 2) { ctx.fillStyle = "rgba(0,0,0,.17)"; ctx.fillRect(x, y, S, S); } }
+    else if (pat === "carpet") { ctx.fillStyle = "rgba(0,0,0,.05)"; ctx.fillRect(x, y, S, S); ctx.fillStyle = "rgba(255,255,255,.07)"; for (let i = 0; i < 16; i++) { ctx.fillRect(x + ((i * 37 + rw * 11) % S), y + ((i * 53 + col * 7) % S), 2, 2); } ctx.fillStyle = "rgba(0,0,0,.05)"; for (let i = 0; i < 12; i++) { ctx.fillRect(x + ((i * 29 + 9) % S), y + ((i * 41 + 5) % S), 2, 2); } }
+    else if (pat === "vinyl") { ctx.strokeStyle = "rgba(0,0,0,.13)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y + S / 2); ctx.lineTo(x + S, y + S / 2); ctx.stroke(); const off = (rw % 2) ? S * 0.33 : 0; ctx.beginPath(); ctx.moveTo(x + off, y); ctx.lineTo(x + off, y + S / 2); ctx.moveTo(x + ((rw % 2) ? S * 0.66 : S * 0.33), y + S / 2); ctx.lineTo(x + ((rw % 2) ? S * 0.66 : S * 0.33), y + S); ctx.stroke(); ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.fillRect(x, y + 2, S, 2); ctx.fillRect(x, y + S / 2 + 2, S, 2); }
     else if (pat === "diag") { ctx.strokeStyle = "rgba(255,255,255,.24)"; ctx.lineWidth = 2.2; for (let i = -1; i < 3; i++) { ctx.beginPath(); ctx.moveTo(x + i * S / 2, y + S); ctx.lineTo(x + i * S / 2 + S, y); ctx.stroke(); } }
     ctx.restore();
   }
@@ -819,7 +870,7 @@
   function grassBase(x, y) { const g = ctx.createLinearGradient(x, y + S * 0.6, x, y + S); g.addColorStop(0, "#5fc85c"); g.addColorStop(1, "#3f9e46"); ctx.fillStyle = g; ctx.fillRect(x, y + S * 0.72, S, S * 0.28); }
   function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
-  const BIG = { coffeetable: 1, armchair: 1, stairs: 1, nightstand: 1, vanity: 1, tallplant: 1, sofa: 1, tv: 1, fireplace: 1, piano: 1, pooltable: 1, gaming: 1, ps5: 1, gametv: 1, aquarium: 1, table: 1, chair: 1, bookshelf: 1, bed: 1, bunkbed: 1, dresser: 1, lamp2: 1, fridge: 1, stove: 1, island: 1, counter: 1, sink: 1, toilet: 1, bath: 1, shower: 1, plant: 1,
+  const BIG = { clawtub: 1, glassshower: 1, doubleoven: 1, closetsys: 1, racecarbed: 1, homeworkdesk: 1, toybox: 1, rockinghorse: 1, canopybed: 1, screen: 1, theaterseat: 1, aquawall: 1, sectional: 1, coffeetable: 1, armchair: 1, stairs: 1, nightstand: 1, vanity: 1, tallplant: 1, sofa: 1, tv: 1, fireplace: 1, piano: 1, pooltable: 1, gaming: 1, ps5: 1, gametv: 1, aquarium: 1, table: 1, chair: 1, bookshelf: 1, bed: 1, bunkbed: 1, dresser: 1, lamp2: 1, fridge: 1, stove: 1, island: 1, counter: 1, sink: 1, toilet: 1, bath: 1, shower: 1, plant: 1,
     desk: 1, wardrobe: 1, cabinet: 1, washer: 1, crib: 1, mirror: 1, clock: 1, painting: 1,
     relaxbed: 1, lounge: 1, beanbag: 1, diningset: 1, treadmill: 1, ladshelf: 1, trophy: 1, crown: 1, cake: 1, balloon: 1,
     dog: 1, cat: 1, puppy: 1, rabbit: 1, bird: 1, hamster: 1, turtle: 1, snake: 1, parrot: 1, frog: 1, fishpet: 1, horse: 1,
@@ -842,6 +893,8 @@
       case "window": drawWindow(x, y); break;
       case "door": drawDoor(x, y, col); break;
       case "garage": drawGarage(x, y); break;
+      case "garage2": drawGarage2(x, y); break;
+      case "balcony": drawBalcony(x, y); break;
       case "solar": drawSolar(x, y); break;
       case "grass": drawGrass(x, y); break;
       case "stone": drawPaver(x, y); break;
@@ -868,16 +921,29 @@
       case "hedge": drawHedge(x, y); break;
       case "flower": drawFlower(x, y); break;
       case "fence": drawFence(x, y); break;
+      case "picket": drawPicket(x, y); break;
+      case "treehouse": drawTreehouse(x, y); break;
+      case "hwpumpkin": drawHwPumpkin(x, y); break;
+      case "hwghost": drawHwGhost(x, y); break;
+      case "hwbat": drawHwBat(x, y); break;
+      case "hwtomb": drawHwTomb(x, y); break;
+      case "hwtree": drawHwTree(x, y); break;
+      case "gate": drawGate(x, y); break;
       case "mailbox": drawMailbox(x, y); break;
+      case "housenum": drawHouseNum(x, y); break;
       case "lamp": drawLamp(x, y); break;
       case "car": drawCar(x, y); break;
       case "sun": drawSun(x, y); break;
       case "cloud": drawCloud(x, y); break;
       case "rug": drawRug(x, y); break;
       case "bed": drawBed(x, y); break;
+      case "canopybed": drawCanopyBed(x, y); break;
       case "bunkbed": drawBunk(x, y); break;
       case "sofa": drawSofa(x, y); break;
+      case "sectional": drawSectional(x, y); break;
       case "tv": drawTV(x, y); break;
+      case "screen": drawScreen(x, y); break;
+      case "theaterseat": drawTheaterSeat(x, y); break;
       case "fireplace": drawFireplace(x, y); break;
       case "piano": drawPiano(x, y); break;
       case "pooltable": drawPoolTable(x, y); break;
@@ -891,13 +957,18 @@
       case "sports": drawSportsCase(x, y); break;
       case "cooking": drawCookingCase(x, y); break;
       case "aquarium": drawAquarium(x, y); break;
+      case "aquawall": drawAquawall(x, y); break;
       case "shower": drawShower(x, y); break;
+      case "clawtub": drawClawTub(x, y); break;
+      case "glassshower": drawGlassShower(x, y); break;
       case "island": drawIsland(x, y); break;
       case "table": drawTable(x, y); break;
       case "chair": drawChair(x, y); break;
       case "lamp2": drawFloorLamp(x, y); break;
+      case "fan": drawFan(x, y); break;
       case "fridge": drawFridge(x, y); break;
       case "stove": drawStove(x, y); break;
+      case "doubleoven": drawDoubleOven(x, y); break;
       case "counter": drawCounter(x, y); break;
       case "sink": drawSink(x, y); break;
       case "dresser": drawDresser(x, y); break;
@@ -918,9 +989,17 @@
       case "bath": drawBath(x, y); break;
       case "desk": drawDesk(x, y); break;
       case "wardrobe": drawWardrobe(x, y); break;
+      case "closetsys": drawClosetSys(x, y); break;
       case "cabinet": drawCabinet(x, y); break;
       case "washer": drawWasher(x, y); break;
       case "crib": drawCrib(x, y); break;
+      case "racecarbed": drawRaceCarBed(x, y); break;
+      case "rockinghorse": drawRockingHorse(x, y); break;
+      case "toybox": drawToyBox(x, y); break;
+      case "blocks": drawBlocks(x, y); break;
+      case "homeworkdesk": drawHomeworkDesk(x, y); break;
+      case "growthchart": drawGrowthChart(x, y); break;
+      case "kidart": drawKidArt(x, y); break;
       case "mirror": drawMirror(x, y); break;
       case "clock": drawClock(x, y); break;
       case "painting": drawPainting(x, y); break;
@@ -955,7 +1034,7 @@
   }
 
   // ---- exterior ----
-  function drawBrick(x, y) { const g = ctx.createLinearGradient(x, y, x, y + S); g.addColorStop(0, "#cdc3b6"); g.addColorStop(1, "#ab9f8f"); ctx.fillStyle = g; ctx.fillRect(x, y, S, S); ctx.fillStyle = "rgba(255,255,255,.10)"; ctx.fillRect(x, y, S, S * 0.22); ctx.fillStyle = "rgba(0,0,0,.05)"; ctx.fillRect(x, y + S * 0.8, S, S * 0.2); shade(x, y, .05); }
+  function drawBrick(x, y) { const g = ctx.createLinearGradient(x, y, x, y + S); g.addColorStop(0, "#d4d7db"); g.addColorStop(1, "#b6babf"); ctx.fillStyle = g; ctx.fillRect(x, y, S, S); ctx.fillStyle = "rgba(255,255,255,.12)"; ctx.fillRect(x, y, S, S * 0.2); ctx.fillStyle = "rgba(0,0,0,.05)"; ctx.fillRect(x, y + S * 0.8, S, S * 0.2); shade(x, y, .04); }
   function drawWood(x, y) { const g = ctx.createLinearGradient(x, y, x, y + S); g.addColorStop(0, "#cd934f"); g.addColorStop(1, "#b3712f"); ctx.fillStyle = g; ctx.fillRect(x, y, S, S); ctx.strokeStyle = "rgba(90,50,15,.4)"; ctx.lineWidth = 1.5; for (let i = 1; i < 4; i++) { const yy = y + i * S / 4; ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + S, yy); ctx.stroke(); } ctx.strokeStyle = "rgba(120,70,20,.22)"; ctx.lineWidth = 1; for (let i = 0; i < 4; i++) { const yy = y + i * S / 4 + S / 8; ctx.beginPath(); ctx.moveTo(x + 3, yy); ctx.bezierCurveTo(x + S * 0.35, yy - 2, x + S * 0.65, yy + 2, x + S - 3, yy); ctx.stroke(); } shade(x, y, .08); }
   function drawSiding(x, y, col) { const base = col || "#f4f1ea"; ctx.fillStyle = base; ctx.fillRect(x, y, S, S); const n = 5, bh = S / n; for (let i = 0; i < n; i++) { const yy = y + i * bh; const g = ctx.createLinearGradient(x, yy, x, yy + bh); g.addColorStop(0, "rgba(255,255,255,.16)"); g.addColorStop(0.65, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,.12)"); ctx.fillStyle = g; ctx.fillRect(x, yy, S, bh); ctx.fillStyle = "rgba(255,255,255,.4)"; ctx.fillRect(x, yy, S, 1); } shade(x, y, .04); }
   function drawShingle(x, y, col) { const base = col || "#48555f"; const g = ctx.createLinearGradient(x, y, x, y + S); g.addColorStop(0, base); g.addColorStop(1, "#39434b"); ctx.fillStyle = g; ctx.fillRect(x, y, S, S); ctx.fillStyle = "rgba(255,255,255,.06)"; ctx.fillRect(x, y, S, 3); ctx.fillStyle = "rgba(0,0,0,.10)"; ctx.fillRect(x, y + S - 3, S, 3); shade(x, y, .05); }
@@ -979,6 +1058,16 @@
     ctx.strokeStyle = "rgba(0,0,0,.28)"; ctx.lineWidth = 2; ctx.strokeRect(x + 11, y + 15, S - 22, S * 0.3); ctx.strokeRect(x + 11, y + 15 + S * 0.38, S - 22, S * 0.3);
     ctx.fillStyle = "#ffd257"; ctx.beginPath(); ctx.arc(x + S - 13, y + S * 0.62, 2.6, 0, 7); ctx.fill();
   }
+  function drawGarage2(x, y) {
+    ctx.fillStyle = "#e8ebef"; ctx.fillRect(x + 1, y + 2, S - 2, S - 2);
+    [0.06, 0.52].forEach(function (dx) {
+      ctx.fillStyle = "#cdd2d7"; ctx.fillRect(x + S * dx, y + S * 0.28, S * 0.42, S * 0.66);
+      ctx.strokeStyle = "#9aa0a6"; ctx.lineWidth = 1; for (let i = 1; i < 4; i++) { const yy = y + S * 0.28 + i * (S * 0.66) / 4; ctx.beginPath(); ctx.moveTo(x + S * dx, yy); ctx.lineTo(x + S * dx + S * 0.42, yy); ctx.stroke(); }
+      ctx.strokeStyle = "#7a8189"; ctx.lineWidth = 2; ctx.strokeRect(x + S * dx, y + S * 0.28, S * 0.42, S * 0.66);
+    });
+    ctx.fillStyle = "#9aa0a6"; ctx.fillRect(x + 1, y + S * 0.22, S - 2, 5);
+    shade(x, y, .08);
+  }
   function drawGarage(x, y) { ctx.fillStyle = "#cdd2d7"; ctx.fillRect(x + 2, y + 2, S - 4, S - 2); ctx.strokeStyle = "#9aa0a6"; ctx.lineWidth = 1; for (let i = 1; i < 4; i++) { const yy = y + 2 + i * (S - 4) / 4; ctx.beginPath(); ctx.moveTo(x + 2, yy); ctx.lineTo(x + S - 2, yy); ctx.stroke(); } for (let i = 1; i < 3; i++) { const xx = x + 2 + i * (S - 4) / 3; ctx.beginPath(); ctx.moveTo(xx, y + 2); ctx.lineTo(xx, y + S); ctx.stroke(); } ctx.strokeStyle = "#7a8189"; ctx.lineWidth = 2; ctx.strokeRect(x + 2, y + 2, S - 4, S - 2); shade(x, y, .08); }
   function drawSolar(x, y) {
     if (view === "out") { ctx.fillStyle = "#48555f"; ctx.fillRect(x, y, S, S); }
@@ -988,6 +1077,58 @@
     for (let j = 1; j < 3; j++) { ctx.beginPath(); ctx.moveTo(x + 2, y + 4 + j * (S - 10) / 3); ctx.lineTo(x + S - 2, y + 4 + j * (S - 10) / 3); ctx.stroke(); }
     ctx.fillStyle = "rgba(140,190,255,.22)"; ctx.beginPath(); ctx.moveTo(x + 5, y + S - 8); ctx.lineTo(x + S * 0.55, y + 5); ctx.lineTo(x + S * 0.7, y + 5); ctx.lineTo(x + 12, y + S - 8); ctx.closePath(); ctx.fill();
     ctx.fillStyle = "#8a929a"; ctx.fillRect(x + 2, y + S - 6, S - 4, 3);
+  }
+  function drawBalcony(x, y) {
+    if (view === "out") { ctx.fillStyle = "#f4f1ea"; ctx.fillRect(x, y, S, S); }
+    ctx.fillStyle = "#cdefff"; ctx.fillRect(x + S * 0.3, y + S * 0.04, S * 0.4, S * 0.24); ctx.strokeStyle = "#6d4523"; ctx.lineWidth = 1.5; ctx.strokeRect(x + S * 0.3, y + S * 0.04, S * 0.4, S * 0.24); ctx.beginPath(); ctx.moveTo(x + S * 0.5, y + S * 0.04); ctx.lineTo(x + S * 0.5, y + S * 0.28); ctx.stroke();
+    ctx.fillStyle = "#c9b79b"; ctx.fillRect(x - 2, y + S * 0.55, S + 4, S * 0.12); ctx.fillStyle = "#b09c86"; ctx.fillRect(x - 2, y + S * 0.67, S + 4, 3);
+    ctx.fillStyle = "#a06a38"; ctx.fillRect(x - 2, y + S * 0.28, S + 4, 4);
+    ctx.strokeStyle = "#a06a38"; ctx.lineWidth = 1.5; for (let i = 0; i < 6; i++) { const bx = x + 2 + i * (S - 4) / 5; ctx.beginPath(); ctx.moveTo(bx, y + S * 0.32); ctx.lineTo(bx, y + S * 0.55); ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(x - 1, y + S * 0.3); ctx.lineTo(x - 1, y + S * 0.55); ctx.moveTo(x + S + 1, y + S * 0.3); ctx.lineTo(x + S + 1, y + S * 0.55); ctx.stroke();
+  }
+  function drawHouseNum(x, y) {
+    if (view === "out") { ctx.fillStyle = "#f4f1ea"; ctx.fillRect(x, y, S, S); }
+    ctx.fillStyle = "#2a2f34"; rr(x + S * 0.16, y + S * 0.34, S * 0.68, S * 0.32, 4); ctx.fill();
+    ctx.strokeStyle = "#565f68"; ctx.lineWidth = 1; ctx.strokeRect(x + S * 0.16, y + S * 0.34, S * 0.68, S * 0.32);
+    ctx.fillStyle = "#ffd257"; ctx.font = "bold 15px Trebuchet MS, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(houseNum || "1", x + S / 2, y + S * 0.51);
+  }
+  function drawHwPumpkin(x, y) {
+    grassBase(x, y);
+    ctx.fillStyle = "#e8821e"; ctx.beginPath(); ctx.ellipse(x + S / 2, y + S * 0.66, S * 0.28, S * 0.24, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#c96a10"; ctx.lineWidth = 1.5; for (let i = -1; i < 2; i++) { ctx.beginPath(); ctx.moveTo(x + S / 2 + i * S * 0.15, y + S * 0.46); ctx.quadraticCurveTo(x + S / 2 + i * S * 0.2, y + S * 0.66, x + S / 2 + i * S * 0.15, y + S * 0.86); ctx.stroke(); }
+    ctx.fillStyle = "#3a7a2a"; ctx.fillRect(x + S * 0.47, y + S * 0.4, S * 0.06, S * 0.08);
+    ctx.fillStyle = "#ffde59";
+    ctx.beginPath(); ctx.moveTo(x + S * 0.39, y + S * 0.6); ctx.lineTo(x + S * 0.46, y + S * 0.6); ctx.lineTo(x + S * 0.42, y + S * 0.67); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + S * 0.61, y + S * 0.6); ctx.lineTo(x + S * 0.54, y + S * 0.6); ctx.lineTo(x + S * 0.58, y + S * 0.67); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + S * 0.38, y + S * 0.72); ctx.lineTo(x + S * 0.42, y + S * 0.77); ctx.lineTo(x + S * 0.46, y + S * 0.72); ctx.lineTo(x + S * 0.5, y + S * 0.77); ctx.lineTo(x + S * 0.54, y + S * 0.72); ctx.lineTo(x + S * 0.58, y + S * 0.77); ctx.lineTo(x + S * 0.62, y + S * 0.72); ctx.lineTo(x + S * 0.6, y + S * 0.8); ctx.lineTo(x + S * 0.4, y + S * 0.8); ctx.closePath(); ctx.fill();
+  }
+  function drawHwGhost(x, y) {
+    ctx.fillStyle = "rgba(255,255,255,.94)";
+    ctx.beginPath(); ctx.arc(x + S / 2, y + S * 0.44, S * 0.2, Math.PI, 0);
+    ctx.lineTo(x + S * 0.7, y + S * 0.76);
+    for (let i = 0; i < 3; i++) { ctx.quadraticCurveTo(x + S * 0.7 - S * 0.067 - i * S * 0.133, y + S * 0.68, x + S * 0.7 - S * 0.133 - i * S * 0.133, y + S * 0.76); }
+    ctx.lineTo(x + S * 0.3, y + S * 0.44); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#333"; ctx.beginPath(); ctx.arc(x + S * 0.44, y + S * 0.42, 2.4, 0, 7); ctx.arc(x + S * 0.56, y + S * 0.42, 2.4, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x + S / 2, y + S * 0.52, 3, 4, 0, 0, 7); ctx.fill();
+  }
+  function drawHwBat(x, y) {
+    ctx.fillStyle = "#2a2733";
+    ctx.beginPath(); ctx.arc(x + S / 2, y + S * 0.52, S * 0.09, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + S * 0.42, y + S * 0.52); ctx.quadraticCurveTo(x + S * 0.2, y + S * 0.4, x + S * 0.1, y + S * 0.52); ctx.quadraticCurveTo(x + S * 0.26, y + S * 0.52, x + S * 0.26, y + S * 0.62); ctx.quadraticCurveTo(x + S * 0.35, y + S * 0.54, x + S * 0.42, y + S * 0.58); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + S * 0.58, y + S * 0.52); ctx.quadraticCurveTo(x + S * 0.8, y + S * 0.4, x + S * 0.9, y + S * 0.52); ctx.quadraticCurveTo(x + S * 0.74, y + S * 0.52, x + S * 0.74, y + S * 0.62); ctx.quadraticCurveTo(x + S * 0.65, y + S * 0.54, x + S * 0.58, y + S * 0.58); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + S * 0.45, y + S * 0.44); ctx.lineTo(x + S * 0.47, y + S * 0.37); ctx.lineTo(x + S * 0.5, y + S * 0.44); ctx.moveTo(x + S * 0.55, y + S * 0.44); ctx.lineTo(x + S * 0.53, y + S * 0.37); ctx.lineTo(x + S * 0.5, y + S * 0.44); ctx.fill();
+    ctx.fillStyle = "#e0453a"; ctx.beginPath(); ctx.arc(x + S * 0.47, y + S * 0.5, 1.4, 0, 7); ctx.arc(x + S * 0.53, y + S * 0.5, 1.4, 0, 7); ctx.fill();
+  }
+  function drawHwTomb(x, y) {
+    grassBase(x, y);
+    ctx.fillStyle = "#9aa0a6"; ctx.beginPath(); ctx.moveTo(x + S * 0.32, y + S * 0.9); ctx.lineTo(x + S * 0.32, y + S * 0.5); ctx.arc(x + S / 2, y + S * 0.5, S * 0.18, Math.PI, 0); ctx.lineTo(x + S * 0.68, y + S * 0.9); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#6f767d"; ctx.font = "bold 9px Trebuchet MS, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("RIP", x + S / 2, y + S * 0.56);
+  }
+  function drawHwTree(x, y) {
+    grassBase(x, y);
+    ctx.strokeStyle = "#2f2a26"; ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(x + S / 2, y + S * 0.9); ctx.lineTo(x + S / 2, y + S * 0.4); ctx.stroke();
+    ctx.lineWidth = 2; [[0.5, 0.5, 0.3, 0.34], [0.5, 0.55, 0.7, 0.4], [0.5, 0.42, 0.36, 0.28], [0.5, 0.46, 0.66, 0.3]].forEach(function (bb) { ctx.beginPath(); ctx.moveTo(x + S * bb[0], y + S * bb[1]); ctx.lineTo(x + S * bb[2], y + S * bb[3]); ctx.stroke(); });
   }
   function drawGrass(x, y) { const g = ctx.createLinearGradient(x, y, x, y + S); g.addColorStop(0, "#5fc85c"); g.addColorStop(1, "#3f9e46"); ctx.fillStyle = g; ctx.fillRect(x, y, S, S); ctx.lineCap = "round"; ctx.lineWidth = 2; ctx.strokeStyle = "rgba(40,120,50,.55)"; for (let i = 0; i < 5; i++) { const gx = x + 4 + i * 8; ctx.beginPath(); ctx.moveTo(gx, y + S); ctx.lineTo(gx + (i % 2 ? 2 : -2), y + S - 9); ctx.stroke(); } ctx.strokeStyle = "rgba(190,245,160,.5)"; for (let i = 0; i < 4; i++) { const gx = x + 8 + i * 9; ctx.beginPath(); ctx.moveTo(gx, y + S); ctx.lineTo(gx, y + S - 6); ctx.stroke(); } }
   function drawPaver(x, y) { ctx.fillStyle = "#6f767d"; ctx.fillRect(x, y, S, S); ctx.fillStyle = "#9aa2aa"; const p = [[3, 3], [S / 2 + 1, 3], [3, S / 2 + 1], [S / 2 + 1, S / 2 + 1]]; p.forEach(function (o) { ctx.fillRect(x + o[0], y + o[1], S / 2 - 4, S / 2 - 4); }); ctx.fillStyle = "rgba(255,255,255,.13)"; p.forEach(function (o) { ctx.fillRect(x + o[0] + 2, y + o[1] + 2, 4, 3); }); shade(x, y, .06); }
@@ -1014,8 +1155,37 @@
   function drawTree(x, y) { ctx.fillStyle = "#7a4b25"; ctx.fillRect(x + S / 2 - 4, y + S * 0.5, 8, S * 0.5); ctx.fillStyle = "#2e8b40"; ctx.beginPath(); ctx.arc(x + S / 2, y + S * 0.42, S * 0.42, 0, 7); ctx.fill(); ctx.fillStyle = "#3aa851"; ctx.beginPath(); ctx.arc(x + S * 0.38, y + S * 0.36, S * 0.24, 0, 7); ctx.fill(); ctx.fillStyle = "#57c56d"; ctx.beginPath(); ctx.arc(x + S * 0.4, y + S * 0.3, S * 0.13, 0, 7); ctx.fill(); }
   function drawHedge(x, y) { const g = ctx.createLinearGradient(x, y, x, y + S); g.addColorStop(0, "#4bb85e"); g.addColorStop(1, "#2f8f43"); ctx.fillStyle = g; ctx.fillRect(x + 1, y + S * 0.32, S - 2, S * 0.68); ctx.beginPath(); for (let i = 0; i <= 4; i++) { const bx = x + 3 + i * (S - 6) / 4; ctx.moveTo(bx + 6, y + S * 0.32); ctx.arc(bx, y + S * 0.32, 6, 0, Math.PI, true); } ctx.fill(); ctx.fillStyle = "rgba(20,90,40,.28)"; for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.arc(x + 6 + (i * 7 % (S - 8)), y + S * 0.5 + (i % 2) * 8, 2, 0, 7); ctx.fill(); } }
   function drawFlower(x, y) { ctx.strokeStyle = "#2f8f43"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + S / 2, y + S); ctx.lineTo(x + S / 2, y + S * 0.45); ctx.stroke(); ctx.fillStyle = "#3aa851"; ctx.beginPath(); ctx.ellipse(x + S / 2 - 6, y + S * 0.7, 6, 3, 0.6, 0, 7); ctx.fill(); ctx.fillStyle = "#ff6fae"; for (let i = 0; i < 5; i++) { const a = i / 5 * 7; ctx.beginPath(); ctx.arc(x + S / 2 + Math.cos(a) * 7, y + S * 0.4 + Math.sin(a) * 7, 5, 0, 7); ctx.fill(); } ctx.fillStyle = "#ffd93b"; ctx.beginPath(); ctx.arc(x + S / 2, y + S * 0.4, 4, 0, 7); ctx.fill(); }
+  function drawSectional(x, y) {
+    ctx.fillStyle = "#6d8a99"; rr(x + 3, y + S * 0.46, S * 0.6, S * 0.42, 6); ctx.fill(); rr(x + S * 0.58, y + S * 0.3, S * 0.36, S * 0.58, 6); ctx.fill();
+    ctx.fillStyle = "#7d9aa9"; ctx.fillRect(x + 5, y + S * 0.4, S * 0.56, S * 0.12); ctx.fillRect(x + S * 0.6, y + S * 0.3, S * 0.3, S * 0.12);
+    ctx.fillStyle = "#93aeba"; rr(x + 7, y + S * 0.56, S * 0.5, S * 0.14, 3); ctx.fill(); rr(x + S * 0.62, y + S * 0.46, S * 0.28, S * 0.14, 3); ctx.fill();
+    ctx.fillStyle = "#5a3a1e"; ctx.fillRect(x + 6, y + S * 0.87, 4, S * 0.09); ctx.fillRect(x + S - 12, y + S * 0.87, 4, S * 0.09);
+  }
+  function drawTreehouse(x, y) {
+    grassBase(x, y);
+    ctx.fillStyle = "#7a5230"; ctx.fillRect(x + S * 0.44, y + S * 0.4, S * 0.12, S * 0.5);
+    ctx.fillStyle = "#4f9e46"; ctx.beginPath(); ctx.arc(x + S / 2, y + S * 0.32, S * 0.3, 0, 7); ctx.fill();
+    ctx.fillStyle = "#a06a38"; ctx.fillRect(x + S * 0.3, y + S * 0.42, S * 0.4, S * 0.22);
+    ctx.fillStyle = "#7a4b25"; ctx.beginPath(); ctx.moveTo(x + S * 0.28, y + S * 0.42); ctx.lineTo(x + S / 2, y + S * 0.3); ctx.lineTo(x + S * 0.72, y + S * 0.42); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#3a2a1a"; ctx.fillRect(x + S * 0.45, y + S * 0.5, S * 0.1, S * 0.14);
+    ctx.strokeStyle = "#8a5a2f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + S * 0.4, y + S * 0.64); ctx.lineTo(x + S * 0.4, y + S * 0.9); ctx.stroke();
+    for (let i = 0; i < 4; i++) { const ly = y + S * 0.68 + i * S * 0.06; ctx.beginPath(); ctx.moveTo(x + S * 0.36, ly); ctx.lineTo(x + S * 0.44, ly); ctx.stroke(); }
+  }
+  function drawPicket(x, y) {
+    grassBase(x, y); const base = y + S * 0.42;
+    ctx.fillStyle = "#e6e2d6"; ctx.fillRect(x, base + 6, S, 4); ctx.fillRect(x, base + S * 0.34, S, 4);
+    for (let i = 0; i < 4; i++) { const px = x + 3 + i * (S - 6) / 4; ctx.fillStyle = "#fbfaf6"; ctx.fillRect(px, base, 7, S * 0.5); ctx.beginPath(); ctx.moveTo(px, base); ctx.lineTo(px + 3.5, base - 6); ctx.lineTo(px + 7, base); ctx.closePath(); ctx.fill(); ctx.strokeStyle = "rgba(0,0,0,.08)"; ctx.lineWidth = 1; ctx.strokeRect(px, base, 7, S * 0.5); }
+  }
+  function drawGate(x, y) {
+    grassBase(x, y); const base = y + S * 0.34;
+    ctx.fillStyle = "#fbfaf6"; ctx.fillRect(x + 4, base, S - 8, S * 0.56);
+    ctx.fillStyle = "#efeae0"; ctx.fillRect(x + 7, base + 3, S - 14, S * 0.56 - 6);
+    ctx.fillStyle = "#fbfaf6"; for (let i = 0; i < 3; i++) { const px = x + 9 + i * (S - 20) / 2; ctx.fillRect(px, base + 3, 5, S * 0.56 - 6); ctx.beginPath(); ctx.moveTo(px, base + 3); ctx.lineTo(px + 2.5, base - 2); ctx.lineTo(px + 5, base + 3); ctx.closePath(); ctx.fill(); }
+    ctx.strokeStyle = "#d8d2c4"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 6, base + S * 0.5); ctx.lineTo(x + S - 6, base + 4); ctx.stroke();
+    ctx.fillStyle = "#c9a04a"; ctx.beginPath(); ctx.arc(x + S - 9, base + S * 0.28, 2.5, 0, 7); ctx.fill();
+  }
   function drawFence(x, y) { grassBase(x, y); ctx.fillStyle = "#f4f4f4"; ctx.strokeStyle = "#cfcfcf"; ctx.lineWidth = 1; [x + 6, x + S - 14].forEach(function (px) { ctx.beginPath(); ctx.moveTo(px, y + S * 0.85); ctx.lineTo(px, y + S * 0.4); ctx.lineTo(px + 4, y + S * 0.3); ctx.lineTo(px + 8, y + S * 0.4); ctx.lineTo(px + 8, y + S * 0.85); ctx.closePath(); ctx.fill(); ctx.stroke(); }); ctx.fillStyle = "#e6e6e6"; ctx.fillRect(x, y + S * 0.5, S, 4); ctx.fillRect(x, y + S * 0.72, S, 4); }
-  function drawMailbox(x, y) { grassBase(x, y); ctx.fillStyle = "#8a5a2f"; ctx.fillRect(x + S / 2 - 2, y + S * 0.45, 4, S * 0.4); ctx.fillStyle = "#4a6b8a"; ctx.fillRect(x + S * 0.34, y + S * 0.34, S * 0.36, S * 0.18); ctx.beginPath(); ctx.arc(x + S * 0.34, y + S * 0.43, S * 0.09, Math.PI / 2, 3 * Math.PI / 2); ctx.fill(); ctx.fillStyle = "#d23b3b"; ctx.fillRect(x + S * 0.7, y + S * 0.3, 3, 8); }
+  function drawMailbox(x, y) { grassBase(x, y); ctx.fillStyle = "#8a5a2f"; ctx.fillRect(x + S / 2 - 2, y + S * 0.45, 4, S * 0.4); ctx.fillStyle = "#4a6b8a"; ctx.fillRect(x + S * 0.34, y + S * 0.34, S * 0.36, S * 0.18); ctx.beginPath(); ctx.arc(x + S * 0.34, y + S * 0.43, S * 0.09, Math.PI / 2, 3 * Math.PI / 2); ctx.fill(); ctx.fillStyle = "#d23b3b"; ctx.fillRect(x + S * 0.7, y + S * 0.3, 3, 8); if (houseName) { ctx.fillStyle = "#f4f1ea"; ctx.fillRect(x + S * 0.24, y + S * 0.56, S * 0.52, 10); ctx.fillStyle = "#3a2a1a"; ctx.font = "bold 8px Trebuchet MS, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(houseName, x + S * 0.5, y + S * 0.61); } }
   function drawLamp(x, y) { grassBase(x, y); ctx.strokeStyle = "#3a3f45"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + S / 2, y + S * 0.82); ctx.lineTo(x + S / 2, y + S * 0.3); ctx.stroke(); const g = ctx.createRadialGradient(x + S / 2, y + S * 0.24, 2, x + S / 2, y + S * 0.24, S * 0.3); g.addColorStop(0, "rgba(255,220,120,.9)"); g.addColorStop(1, "rgba(255,220,120,0)"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x + S / 2, y + S * 0.24, S * 0.3, 0, 7); ctx.fill(); ctx.fillStyle = "#ffd257"; ctx.fillRect(x + S / 2 - 5, y + S * 0.16, 10, 11); ctx.strokeStyle = "#3a3f45"; ctx.lineWidth = 1.5; ctx.strokeRect(x + S / 2 - 5, y + S * 0.16, 10, 11); }
   function drawCar(x, y) { grassBase(x, y); ctx.fillStyle = "#d23b3b"; rr(x + 3, y + S * 0.52, S - 6, S * 0.26, 5); ctx.fill(); ctx.beginPath(); ctx.moveTo(x + S * 0.26, y + S * 0.55); ctx.lineTo(x + S * 0.4, y + S * 0.36); ctx.lineTo(x + S * 0.72, y + S * 0.36); ctx.lineTo(x + S * 0.82, y + S * 0.55); ctx.closePath(); ctx.fill(); ctx.fillStyle = "#bfe6ff"; ctx.fillRect(x + S * 0.42, y + S * 0.4, S * 0.26, S * 0.12); ctx.fillStyle = "#222"; ctx.beginPath(); ctx.arc(x + S * 0.3, y + S * 0.8, 4.5, 0, 7); ctx.arc(x + S * 0.72, y + S * 0.8, 4.5, 0, 7); ctx.fill(); ctx.fillStyle = "#ffe38a"; ctx.fillRect(x + S - 8, y + S * 0.56, 4, 4); }
   function drawSun(x, y) { const cx = x + S / 2, cy = y + S / 2; const g = ctx.createRadialGradient(cx, cy, 4, cx, cy, S * 0.5); g.addColorStop(0, "rgba(255,228,120,.85)"); g.addColorStop(1, "rgba(255,228,120,0)"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, S * 0.5, 0, 7); ctx.fill(); ctx.strokeStyle = "#ffcf3b"; ctx.lineWidth = 3; ctx.lineCap = "round"; for (let i = 0; i < 8; i++) { const a = i / 8 * 7; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * 13, cy + Math.sin(a) * 13); ctx.lineTo(cx + Math.cos(a) * 18, cy + Math.sin(a) * 18); ctx.stroke(); } ctx.fillStyle = "#ffd93b"; ctx.beginPath(); ctx.arc(cx, cy, 10, 0, 7); ctx.fill(); ctx.fillStyle = "#ffe98a"; ctx.beginPath(); ctx.arc(cx - 3, cy - 3, 4, 0, 7); ctx.fill(); }
@@ -1054,6 +1224,130 @@
     ctx.fillStyle = "rgba(255,255,255,.12)"; ctx.fillRect(x, y, 4, S);
     ctx.fillStyle = "rgba(0,0,0,.16)"; ctx.fillRect(x + S - 4, y, 4, S);
     ctx.fillStyle = "rgba(0,0,0,.10)"; ctx.fillRect(x, y, S, 3);
+  }
+  function drawAquawall(x, y) {
+    ctx.fillStyle = "#2a2f34"; rr(x + 2, y + S * 0.16, S - 4, S * 0.74, 4); ctx.fill();
+    const g = ctx.createLinearGradient(x, y, x, y + S); g.addColorStop(0, "#5cc8f5"); g.addColorStop(1, "#1f83c4"); ctx.fillStyle = g; ctx.fillRect(x + 5, y + S * 0.2, S - 10, S * 0.64);
+    ctx.fillStyle = "#e6d59a"; ctx.fillRect(x + 5, y + S * 0.78, S - 10, S * 0.06);
+    ctx.fillStyle = "#2f8f43"; for (let i = 0; i < 3; i++) { const sx = x + 9 + i * (S - 18) / 2.2; ctx.beginPath(); ctx.moveTo(sx, y + S * 0.82); ctx.quadraticCurveTo(sx - 3, y + S * 0.6, sx, y + S * 0.45); ctx.quadraticCurveTo(sx + 3, y + S * 0.6, sx, y + S * 0.82); ctx.fill(); }
+    ctx.fillStyle = "#ff8c42"; ctx.beginPath(); ctx.ellipse(x + S * 0.4, y + S * 0.4, 5, 3.4, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.moveTo(x + S * 0.34, y + S * 0.4); ctx.lineTo(x + S * 0.29, y + S * 0.36); ctx.lineTo(x + S * 0.29, y + S * 0.44); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#ffd93b"; ctx.beginPath(); ctx.ellipse(x + S * 0.62, y + S * 0.55, 4, 2.8, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.6)"; [[0.7, 0.32], [0.72, 0.44], [0.3, 0.6]].forEach(function (bb) { ctx.beginPath(); ctx.arc(x + S * bb[0], y + S * bb[1], 1.6, 0, 7); ctx.fill(); });
+    ctx.strokeStyle = "rgba(255,255,255,.22)"; ctx.lineWidth = 2; ctx.strokeRect(x + 5, y + S * 0.2, S - 10, S * 0.64);
+  }
+  function drawFan(x, y) {
+    ctx.fillStyle = "#8a929a"; ctx.fillRect(x + S * 0.47, y + 2, S * 0.06, S * 0.28);
+    ctx.fillStyle = "#6a727a"; ctx.beginPath(); ctx.arc(x + S / 2, y + S * 0.34, 5, 0, 7); ctx.fill();
+  }
+  function drawFanBlades(x, y, a) {
+    const cx = x + S / 2, cy = y + S * 0.34; ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
+    ctx.fillStyle = "rgba(120,90,60,.85)"; for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.ellipse(S * 0.26, 0, S * 0.26, 4, 0, 0, 7); ctx.fill(); }
+    ctx.restore(); ctx.fillStyle = "#6a727a"; ctx.beginPath(); ctx.arc(cx, cy, 5, 0, 7); ctx.fill();
+  }
+  function drawCanopyBed(x, y) {
+    ctx.fillStyle = "#5a3a22"; ctx.fillRect(x + 3, y + S * 0.12, 4, S * 0.8); ctx.fillRect(x + S - 7, y + S * 0.12, 4, S * 0.8);
+    ctx.fillStyle = "#7a4b25"; ctx.fillRect(x + 2, y + S * 0.1, S - 4, 5);
+    ctx.fillStyle = "#c85b6b"; ctx.beginPath(); ctx.moveTo(x + 2, y + S * 0.14); ctx.lineTo(x + S - 2, y + S * 0.14); ctx.lineTo(x + S - 8, y + S * 0.3); ctx.lineTo(x + 8, y + S * 0.3); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#5a3a22"; ctx.fillRect(x + 4, y + S * 0.5, S - 8, S * 0.42);
+    ctx.fillStyle = "#e2b3c0"; ctx.fillRect(x + 5, y + S * 0.56, S - 10, S * 0.32);
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(x + 6, y + S * 0.52, S * 0.36, S * 0.14);
+  }
+  function drawScreen(x, y) {
+    ctx.fillStyle = "#161616"; rr(x + 2, y + S * 0.12, S - 4, S * 0.6, 4); ctx.fill();
+    const g = ctx.createLinearGradient(x, y, x + S, y + S); g.addColorStop(0, "#3a5a80"); g.addColorStop(1, "#122033"); ctx.fillStyle = g; ctx.fillRect(x + 5, y + S * 0.16, S - 10, S * 0.5);
+    ctx.fillStyle = "#ffd93b"; ctx.beginPath(); ctx.arc(x + S * 0.3, y + S * 0.3, 4, 0, 7); ctx.fill();
+    ctx.fillStyle = "#2f8f43"; ctx.beginPath(); ctx.moveTo(x + 5, y + S * 0.66); ctx.quadraticCurveTo(x + S * 0.5, y + S * 0.48, x + S - 5, y + S * 0.66); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#3a3f45"; ctx.fillRect(x + S * 0.44, y + S * 0.72, S * 0.12, S * 0.16);
+  }
+  function drawTheaterSeat(x, y) {
+    ctx.fillStyle = "#8a2a2a"; rr(x + 5, y + S * 0.4, S - 10, S * 0.5, 6); ctx.fill();
+    ctx.fillStyle = "#a33"; rr(x + 4, y + S * 0.46, 7, S * 0.4, 4); ctx.fill(); rr(x + S - 11, y + S * 0.46, 7, S * 0.4, 4); ctx.fill();
+    ctx.fillStyle = "#b84a4a"; rr(x + 11, y + S * 0.5, S - 22, S * 0.16, 3); ctx.fill();
+    ctx.fillStyle = "#3a1010"; ctx.fillRect(x + 8, y + S * 0.88, 4, S * 0.08); ctx.fillRect(x + S - 12, y + S * 0.88, 4, S * 0.08);
+  }
+  function drawRaceCarBed(x, y) {
+    ctx.fillStyle = "#e0453a"; rr(x + 2, y + S * 0.5, S - 4, S * 0.32, 8); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + S * 0.3, y + S * 0.5); ctx.lineTo(x + S * 0.4, y + S * 0.38); ctx.lineTo(x + S * 0.62, y + S * 0.38); ctx.lineTo(x + S * 0.7, y + S * 0.5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#bfe6ff"; ctx.fillRect(x + S * 0.42, y + S * 0.4, S * 0.16, S * 0.1);
+    ctx.fillStyle = "#fff"; rr(x + 4, y + S * 0.56, S * 0.4, S * 0.14, 3); ctx.fill();
+    ctx.fillStyle = "#222"; ctx.beginPath(); ctx.arc(x + S * 0.28, y + S * 0.84, 6, 0, 7); ctx.arc(x + S * 0.72, y + S * 0.84, 6, 0, 7); ctx.fill();
+    ctx.fillStyle = "#f6c945"; ctx.fillRect(x + S - 7, y + S * 0.6, 4, 4);
+  }
+  function drawRockingHorse(x, y) {
+    ctx.strokeStyle = "#a06a38"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x + S / 2, y + S * 0.92, S * 0.32, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    ctx.fillStyle = "#e8c07a"; rr(x + S * 0.32, y + S * 0.5, S * 0.36, S * 0.16, 5); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + S * 0.64, y + S * 0.55); ctx.lineTo(x + S * 0.8, y + S * 0.38); ctx.lineTo(x + S * 0.72, y + S * 0.58); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#a06a38"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + S * 0.4, y + S * 0.66); ctx.lineTo(x + S * 0.4, y + S * 0.82); ctx.moveTo(x + S * 0.6, y + S * 0.66); ctx.lineTo(x + S * 0.6, y + S * 0.82); ctx.stroke();
+    ctx.fillStyle = "#c85b6b"; ctx.beginPath(); ctx.moveTo(x + S * 0.72, y + S * 0.4); ctx.lineTo(x + S * 0.78, y + S * 0.5); ctx.lineTo(x + S * 0.7, y + S * 0.5); ctx.closePath(); ctx.fill();
+  }
+  function drawToyBox(x, y) {
+    ctx.fillStyle = "#c98a4a"; rr(x + S * 0.2, y + S * 0.5, S * 0.6, S * 0.4, 4); ctx.fill();
+    ctx.fillStyle = "#a06a38"; ctx.fillRect(x + S * 0.2, y + S * 0.5, S * 0.6, 5);
+    ctx.fillStyle = "#e0453a"; ctx.beginPath(); ctx.arc(x + S * 0.35, y + S * 0.47, 5, 0, 7); ctx.fill();
+    ctx.fillStyle = "#3f7fd2"; ctx.fillRect(x + S * 0.5, y + S * 0.4, 9, 9);
+    ctx.fillStyle = "#f6c945"; ctx.beginPath(); ctx.arc(x + S * 0.66, y + S * 0.46, 4, 0, 7); ctx.fill();
+  }
+  function drawBlocks(x, y) {
+    const cols = ["#e0453a", "#3f7fd2", "#3aa851"], L = ["A", "B", "C"];
+    for (let i = 0; i < 3; i++) { ctx.fillStyle = cols[i]; rr(x + S * 0.26 + i * S * 0.17, y + S * 0.64, S * 0.15, S * 0.15, 2); ctx.fill(); }
+    ctx.fillStyle = "#f6c945"; rr(x + S * 0.35, y + S * 0.48, S * 0.15, S * 0.15, 2); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.font = "bold 8px Trebuchet MS, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (let i = 0; i < 3; i++) ctx.fillText(L[i], x + S * 0.26 + i * S * 0.17 + S * 0.075, y + S * 0.64 + S * 0.075);
+    ctx.fillText("D", x + S * 0.35 + S * 0.075, y + S * 0.48 + S * 0.075);
+  }
+  function drawHomeworkDesk(x, y) {
+    ctx.fillStyle = "#c88a4a"; ctx.fillRect(x + 5, y + S * 0.5, S - 10, S * 0.1);
+    ctx.fillStyle = "#a06a30"; ctx.fillRect(x + 7, y + S * 0.6, 4, S * 0.3); ctx.fillRect(x + S - 11, y + S * 0.6, 4, S * 0.3);
+    ctx.fillStyle = "#e0453a"; ctx.fillRect(x + S * 0.28, y + S * 0.42, S * 0.16, S * 0.08); ctx.fillStyle = "#3f7fd2"; ctx.fillRect(x + S * 0.28, y + S * 0.36, S * 0.16, S * 0.06);
+    ctx.fillStyle = "#8a5a2f"; ctx.fillRect(x + S * 0.66, y + S * 0.48, S * 0.16, S * 0.1); ctx.fillRect(x + S * 0.66, y + S * 0.58, 3, S * 0.3);
+  }
+  function drawGrowthChart(x, y) {
+    ctx.fillStyle = "#e8dcc4"; ctx.fillRect(x + S * 0.42, y + S * 0.08, S * 0.16, S * 0.82);
+    ctx.strokeStyle = "#8a5a2f"; ctx.lineWidth = 1; for (let i = 1; i < 8; i++) { const yy = y + S * 0.08 + i * S * 0.1; ctx.beginPath(); ctx.moveTo(x + S * 0.42, yy); ctx.lineTo(x + S * 0.42 + (i % 2 ? S * 0.09 : S * 0.06), yy); ctx.stroke(); }
+    ctx.fillStyle = "#e0453a"; ctx.beginPath(); ctx.moveTo(x + S * 0.42, y + S * 0.42); ctx.lineTo(x + S * 0.34, y + S * 0.4); ctx.lineTo(x + S * 0.34, y + S * 0.44); ctx.closePath(); ctx.fill();
+  }
+  function drawKidArt(x, y) {
+    [[0.18, 0.2, -0.1], [0.52, 0.42, 0.1]].forEach(function (p) {
+      ctx.save(); ctx.translate(x + S * p[0], y + S * p[1]); ctx.rotate(p[2]);
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, S * 0.3, S * 0.3);
+      ctx.strokeStyle = "#e0453a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(S * 0.15, S * 0.11, 5, 0, 7); ctx.stroke();
+      ctx.strokeStyle = "#3aa851"; ctx.beginPath(); ctx.moveTo(4, S * 0.25); ctx.lineTo(S * 0.26, S * 0.25); ctx.stroke();
+      ctx.strokeStyle = "#3f7fd2"; ctx.beginPath(); ctx.moveTo(S * 0.15, S * 0.16); ctx.lineTo(S * 0.15, S * 0.26); ctx.stroke();
+      ctx.fillStyle = "rgba(255,235,120,.8)"; ctx.fillRect(S * 0.11, -2, 7, 4);
+      ctx.restore();
+    });
+  }
+  function drawClosetSys(x, y) {
+    ctx.fillStyle = "#c9a06a"; ctx.fillRect(x + 2, y + S * 0.18, S - 4, S * 0.74);
+    ctx.fillStyle = "#efe6d2"; ctx.fillRect(x + 4, y + S * 0.2, S - 8, S * 0.7);
+    ctx.strokeStyle = "#8a929a"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x + 6, y + S * 0.3); ctx.lineTo(x + S * 0.48, y + S * 0.3); ctx.stroke();
+    const cc = ["#e0453a", "#3f7fd2", "#3aa851", "#f6c945"];
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = cc[i]; const hx = x + 9 + i * S * 0.1; ctx.beginPath(); ctx.moveTo(hx, y + S * 0.3); ctx.lineTo(hx - 5, y + S * 0.42); ctx.lineTo(hx + 5, y + S * 0.42); ctx.closePath(); ctx.fill(); ctx.fillRect(hx - 5, y + S * 0.42, 10, S * 0.16); }
+    ctx.strokeStyle = "#a06a38"; ctx.lineWidth = 1; for (let i = 0; i < 2; i++) { const sy = y + S * 0.31 + i * S * 0.16; ctx.beginPath(); ctx.moveTo(x + S * 0.52, sy); ctx.lineTo(x + S - 6, sy); ctx.stroke(); ctx.fillStyle = ["#c85b6b", "#5aa0b5"][i]; ctx.fillRect(x + S * 0.56, sy - 6, S * 0.34, 5); }
+    ctx.strokeStyle = "#a06a38"; ctx.strokeRect(x + 6, y + S * 0.66, S - 12, S * 0.22); ctx.beginPath(); ctx.moveTo(x + S / 2, y + S * 0.66); ctx.lineTo(x + S / 2, y + S * 0.88); ctx.stroke();
+    ctx.fillStyle = "#5a3a1e"; ctx.fillRect(x + 10, y + S * 0.79, S * 0.13, 6); ctx.fillStyle = "#3f7fd2"; ctx.fillRect(x + S * 0.57, y + S * 0.79, S * 0.13, 6);
+  }
+  function drawDoubleOven(x, y) {
+    ctx.fillStyle = "#dfe3e7"; rr(x + 4, y + S * 0.2, S - 8, S * 0.72, 4); ctx.fill();
+    ctx.fillStyle = "#c3ccd4"; ctx.fillRect(x + 4, y + S * 0.2, S - 8, 6);
+    ctx.fillStyle = "#3a3f45"; [0.34, 0.5, 0.66].forEach(function (k) { ctx.beginPath(); ctx.arc(x + S * k, y + S * 0.26, 2.4, 0, 7); ctx.fill(); });
+    [0.36, 0.64].forEach(function (oy) { ctx.fillStyle = "#8a929a"; ctx.fillRect(x + 12, y + S * oy - 4, S - 24, 3); ctx.fillStyle = "#2a2f34"; rr(x + 8, y + S * oy, S - 16, S * 0.2, 3); ctx.fill(); ctx.fillStyle = "#5a6068"; ctx.fillRect(x + 11, y + S * oy + 4, S - 22, 5); ctx.fillStyle = "rgba(255,140,40,.35)"; ctx.fillRect(x + 11, y + S * oy + 4, S - 22, 5); });
+  }
+  function drawClawTub(x, y) {
+    ctx.fillStyle = "#f4f1ea"; rr(x + 4, y + S * 0.42, S - 8, S * 0.34, S * 0.14); ctx.fill();
+    ctx.fillStyle = "#bfe6ff"; rr(x + 8, y + S * 0.46, S - 16, S * 0.2, S * 0.08); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.6)"; ctx.fillRect(x + 10, y + S * 0.5, S * 0.3, 2);
+    ctx.fillStyle = "#c9a04a"; [0.2, 0.8].forEach(function (fx) { ctx.beginPath(); ctx.moveTo(x + S * fx - 3, y + S * 0.76); ctx.lineTo(x + S * fx + 3, y + S * 0.76); ctx.lineTo(x + S * fx + 4, y + S * 0.86); ctx.lineTo(x + S * fx - 4, y + S * 0.86); ctx.closePath(); ctx.fill(); });
+    ctx.strokeStyle = "#9fb0bd"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + S - 12, y + S * 0.42); ctx.lineTo(x + S - 12, y + S * 0.34); ctx.lineTo(x + S - 18, y + S * 0.34); ctx.stroke();
+  }
+  function drawGlassShower(x, y) {
+    ctx.fillStyle = "#c9cdd2"; ctx.fillRect(x + 4, y + S * 0.2, S - 8, S * 0.72);
+    ctx.strokeStyle = "#9aa0a6"; ctx.lineWidth = 1; for (let i = 1; i < 3; i++) { ctx.beginPath(); ctx.moveTo(x + 4, y + S * 0.2 + i * S * 0.24); ctx.lineTo(x + S - 4, y + S * 0.2 + i * S * 0.24); ctx.stroke(); }
+    ctx.fillStyle = "#9fb0bd"; ctx.beginPath(); ctx.arc(x + S * 0.28, y + S * 0.26, 5, 0, Math.PI); ctx.fill();
+    ctx.strokeStyle = "rgba(150,200,240,.6)"; ctx.lineWidth = 1.5; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(x + S * 0.22 + i * 4, y + S * 0.3); ctx.lineTo(x + S * 0.22 + i * 4, y + S * 0.62); ctx.stroke(); }
+    ctx.fillStyle = "rgba(180,220,240,.35)"; ctx.fillRect(x + S * 0.5, y + S * 0.24, S * 0.44, S * 0.64);
+    ctx.strokeStyle = "#8fb0c8"; ctx.lineWidth = 2; ctx.strokeRect(x + S * 0.5, y + S * 0.24, S * 0.44, S * 0.64);
+    ctx.fillStyle = "#dfe3e7"; ctx.fillRect(x + S * 0.9, y + S * 0.4, 4, S * 0.3);
   }
   function drawToilet(x, y) { ctx.fillStyle = "#ffffff"; ctx.fillRect(x + S * 0.34, y + S * 0.2, S * 0.3, S * 0.24); ctx.beginPath(); ctx.ellipse(x + S / 2, y + S * 0.62, S * 0.2, S * 0.16, 0, 0, 7); ctx.fill(); ctx.strokeStyle = "#c9d2da"; ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = "#dfe6ec"; ctx.beginPath(); ctx.ellipse(x + S / 2, y + S * 0.6, S * 0.12, S * 0.09, 0, 0, 7); ctx.fill(); }
   function drawBath(x, y) { ctx.fillStyle = "#dfe9f2"; rr(x + 3, y + S * 0.4, S - 6, S * 0.45, 8); ctx.fill(); ctx.fillStyle = "#bfe6ff"; rr(x + 7, y + S * 0.46, S - 14, S * 0.3, 6); ctx.fill(); ctx.fillStyle = "#eef4fa"; ctx.fillRect(x + 3, y + S * 0.36, S - 6, 5); ctx.strokeStyle = "#9fc0d8"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x + S - 10, y + S * 0.36, 3, Math.PI, 0); ctx.stroke(); }
@@ -1729,7 +2023,7 @@
     ctx.fillStyle = lg; ctx.fillRect(0, horizon, W, Hc - horizon);
   }
   function drawScene() {
-    if (view === "out") {
+    if (view === "out" || view === "back") {
       const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
       if (night) { g.addColorStop(0, "#0d1b3a"); g.addColorStop(1, "#2a3a70"); } else { g.addColorStop(0, "#a7ddf2"); g.addColorStop(1, "#dff2fb"); }
       ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1752,7 +2046,7 @@
     ctx.beginPath(); ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w / 2, y + h); ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2); ctx.stroke();
   }
   function draw3DRoom() {
-    const rc = roomColors[roomKey], W = canvas.width, Hc = canvas.height, hz = FLOOR_ROW * S, vpx = W / 2, inset = W * 0.13, top = hz * 0.14;
+    const rc = roomColors[roomKey], W = canvas.width, Hc = canvas.height, hz = FLOOR_ROW * S, vpx = W / 2, _sz = roomSizes[roomKey] || "medium", inset = W * (_sz === "large" ? 0.2 : _sz === "small" ? 0.08 : 0.13), top = hz * (_sz === "large" ? 0.06 : _sz === "small" ? 0.24 : 0.14);
     ctx.fillStyle = rc.wall; ctx.fillRect(0, 0, W, hz);                       // back wall
     ctx.fillStyle = "rgba(0,0,0,.05)"; ctx.fillRect(0, 0, W, hz);
     if (rc.wallPat && rc.wallPat !== "plain") { for (let ry = 0; ry < FLOOR_ROW; ry++) for (let cxx = 0; cxx < COLS; cxx++) drawWallPat(cxx * S, ry * S, ry, rc.wallPat); }
@@ -1776,9 +2070,9 @@
   // ================= PAINTING =================
   let painting = false;
   function cellFromEvent(e) { const rect = canvas.getBoundingClientRect(); const cx = (e.clientX - rect.left) / rect.width * canvas.width; const cy = (e.clientY - rect.top) / rect.height * canvas.height; return { c: Math.floor(cx / S), r: Math.floor(cy / S) }; }
-  function curScene() { return view === "out" ? "out" : roomKey; }
+  function curScene() { return view === "out" ? "out" : view === "back" ? "back" : roomKey; }
   function petBand() {
-    if (view === "out") return { top: (ROWS - 3) * S, bot: (ROWS - 1) * S - S * 0.2 };
+    if (view === "out" || view === "back") return { top: (ROWS - 3) * S, bot: (ROWS - 1) * S - S * 0.2 };
     return { top: (FLOOR_ROW - 1) * S, bot: (ROWS - 1) * S - S * 0.2 };
   }
   function removePetNear(p) {
@@ -1810,6 +2104,18 @@
         try { persist(); } catch (e) {}
         drawAll(); buildColors(); painting = false; return;
       } else { flash("🎨 Go Inside to paint the walls & floor!"); painting = false; return; }
+    }
+    // --- seller: tap a piece to sell it for coins ---
+    if (tool === "sell") {
+      if (removePetNear(p)) { drawAll(); updateValue(); flash("💰 Sold!"); painting = false; return; }
+      const cur = grid[p.r][p.c];
+      if (!cur) { flash("Tap a piece to sell it 💰"); painting = false; return; }
+      if (locks[curScene() + "," + p.c + "," + p.r]) { flash("🔒 Locked — unlock it first"); painting = false; return; }
+      const refund = PRICE[baseId(cur)] || 0;
+      coins += refund; saveCoins(); showCoins();
+      grid[p.r][p.c] = ""; drawAll(); updateValue();
+      flash(refund > 0 ? ("💰 Sold for +" + refund + " coins!") : "🗑️ Removed");
+      painting = false; return;
     }
     // --- lock: tap a piece to lock / unlock it ---
     if (tool === "lock") { const cur = grid[p.r][p.c]; if (!cur) { flash("Tap a piece to lock it 🔒"); painting = false; return; } const k = curScene() + "," + p.c + "," + p.r; if (locks[k]) { delete locks[k]; flash("🔓 Unlocked"); } else { locks[k] = true; flash("🔒 Locked — it won't move"); } drawAll(); painting = false; return; }
@@ -1958,6 +2264,7 @@
     }
     if (pt.hearts > 0) { for (let k = 0; k < 3; k++) { const hy = baseY - (1.1 - pt.hearts) * 26 - k * 7; heart(px + S / 2 + (k - 1) * 9, hy, 5, "rgba(255,90,120," + Math.min(1, pt.hearts) + ")"); } }
     if (pt.trick > 0) { const ph = 1 - pt.trick / 0.8; for (let k = 0; k < 4; k++) { const a = ph * 6 + k * 1.57; spark(px + S / 2 + Math.cos(a) * 20, baseY + S * 0.3 + Math.sin(a) * 16, 3, "rgba(255,220,90," + (1 - ph) + ")"); } }
+    if (!pt.trick && (pt.hunger == null || pt.hunger > 0.7) && ((frameCount + Math.floor(pt.phase * 40)) % 620) < 150) { ctx.save(); ctx.fillStyle = "rgba(120,140,200,.8)"; ctx.font = "italic bold 11px Trebuchet MS, sans-serif"; ctx.textAlign = "center"; const zt = (frameCount % 30) / 30; ctx.fillText("z", px + S * 0.72, baseY + S * 0.05 - zt * 6); ctx.font = "italic bold 8px Trebuchet MS, sans-serif"; ctx.fillText("z", px + S * 0.66, baseY + S * 0.12 - zt * 4); ctx.restore(); }
   }
   function roomNeighbor(dir) { const i = ROOM_KEYS.indexOf(roomKey); const j = (i + dir + ROOM_KEYS.length) % ROOM_KEYS.length; return ROOM_KEYS[j]; }
   function drawRoomDoors() {
@@ -2083,6 +2390,8 @@
     }
     gifts.forEach(function (gf) { if (gf.scene !== sc) return; drawGift(gf.x, gf.baseY + Math.sin(frameCount * 0.06 + gf.bob) * 3); });
     mess.forEach(function (m) { if (m.scene !== sc) return; drawMess(m); });
+    if (view === "in") { for (let fr = 0; fr < FLOOR_ROW; fr++) for (let fc = 0; fc < COLS; fc++) { if (baseId(grid[fr][fc]) === "fan") drawFanBlades(fc * S, fr * S, frameCount * 0.16); } }
+    if (frameCount % 600 === 0) { let rv = 0; for (const rk in rentedRooms) { if (rentedRooms[rk]) rv += roomValue(rk); } const inc = Math.floor(rv * 0.05); if (inc > 0) { coins += inc; saveCoins(); flash("💵 Rent collected: +" + inc + " coins!"); } }
     // weather that changes on its own
     weatherTimer--;
     if (weatherTimer <= 0) { weather = weather === "clear" ? "rain" : "clear"; weatherTimer = 1500 + Math.floor(Math.random() * 1500); flash(weather === "rain" ? "🌧️ It started raining!" : "☀️ The sun came out!"); }
@@ -2277,7 +2586,7 @@
   // ================= UI =================
   const pal = document.getElementById("palette");
   function buildPalette() {
-    const set = (view === "out") ? TOOLS_OUT : TOOLS_IN;
+    const set = (view === "in") ? TOOLS_IN : TOOLS_OUT;
     if (!set.some(function (t) { return t.id === tool; })) tool = set[0].id;
     pal.innerHTML = "";
     set.forEach(function (t) {
@@ -2365,7 +2674,7 @@
     colDiv.appendChild(wrap);
   }
   const WALL_PATS = [["plain", "Plain"], ["stripes", "Stripes"], ["dots", "Dots"], ["floral", "Floral"], ["brick", "Brick"], ["wainscot", "Panel"], ["checker", "Check"]];
-  const FLOOR_PATS = [["plain", "Plain"], ["planks", "Wood"], ["tile", "Tile"], ["herring", "Chevron"], ["checker", "Check"], ["diag", "Diagonal"]];
+  const FLOOR_PATS = [["plain", "Plain"], ["planks", "Wood"], ["tile", "Tile"], ["carpet", "Carpet"], ["vinyl", "Vinyl"], ["herring", "Chevron"], ["checker", "Check"], ["diag", "Diagonal"]];
   const DECOR_STYLES = {
     Modern: { wall: "#e6e9ec", floor: "#8a8f96", wallPat: "plain", floorPat: "planks", items: [["sofa", 8, 12], ["tv", 11, 12], ["coffeetable", 9, 13], ["tallplant", 14, 12], ["chandelier", 12, 3]] },
     Cozy:   { wall: "#f2e6cf", floor: "#b9905a", wallPat: "stripes", floorPat: "planks", items: [["sofa", 8, 12], ["fireplace", 12, 11], ["armchair", 6, 12], ["bookshelf", 15, 11], ["rug", 10, 13], ["lamp2", 5, 12]] },
@@ -2376,6 +2685,27 @@
     const wrap = document.createElement("div"); wrap.className = "cgroup";
     const lab = document.createElement("span"); lab.className = "clabel"; lab.textContent = label + ":"; wrap.appendChild(lab);
     arr.forEach(function (p) { const s = document.createElement("button"); s.className = "yrbtn" + (p[0] === current ? " sel" : ""); s.textContent = p[1]; s.addEventListener("click", function () { onPick(p[0]); }); wrap.appendChild(s); });
+    colDiv.appendChild(wrap);
+  }
+  function addSizeGroup() {
+    const wrap = document.createElement("div"); wrap.className = "cgroup";
+    const lab = document.createElement("span"); lab.className = "clabel"; lab.textContent = "📐 Room size:"; wrap.appendChild(lab);
+    [["small", "Small"], ["medium", "Medium"], ["large", "Large"]].forEach(function (s) {
+      const b = document.createElement("button"); b.className = "yrbtn" + ((roomSizes[roomKey] || "medium") === s[0] ? " sel" : ""); b.textContent = s[1];
+      b.addEventListener("click", function () { roomSizes[roomKey] = s[0]; try { localStorage.setItem("moHouseSizes", JSON.stringify(roomSizes)); } catch (e) {} drawAll(); buildColors(); });
+      wrap.appendChild(b);
+    });
+    colDiv.appendChild(wrap);
+  }
+  function addColorWheel() {
+    const wrap = document.createElement("div"); wrap.className = "cgroup";
+    const lab = document.createElement("span"); lab.className = "clabel"; lab.textContent = "🎨 Any colour:"; wrap.appendChild(lab);
+    [["wall", "Wall"], ["floor", "Floor"]].forEach(function (w) {
+      const inp = document.createElement("input"); inp.type = "color"; inp.value = roomColors[roomKey][w[0]]; inp.title = w[1];
+      inp.style.cssText = "width:34px;height:26px;border:2px solid #cdb89a;border-radius:7px;padding:0;cursor:pointer;background:none;vertical-align:middle;";
+      inp.addEventListener("input", function () { roomColors[roomKey][w[0]] = inp.value; drawAll(); });
+      wrap.appendChild(inp);
+    });
     colDiv.appendChild(wrap);
   }
   function addStyleGroup() {
@@ -2403,6 +2733,8 @@
       addPatGroup("Wall style", WALL_PATS, roomColors[roomKey].wallPat || "plain", function (p) { roomColors[roomKey].wallPat = p; drawAll(); buildColors(); });
       addPatGroup("Floor style", FLOOR_PATS, roomColors[roomKey].floorPat || "plain", function (p) { roomColors[roomKey].floorPat = p; drawAll(); buildColors(); });
       addStyleGroup();
+      addColorWheel();
+      addSizeGroup();
     } else {
       const grp = GROUP[tool];
       if (grp) addColorGroup(grp === "wall" ? "Wall color" : grp === "roof" ? "Roof color" : "Door color", SWATCHES[grp], curColor[grp], function (c) { curColor[grp] = c; buildColors(); });
@@ -2423,18 +2755,21 @@
     });
   }
 
-  const outBtn = document.getElementById("outBtn"), inBtn = document.getElementById("inBtn");
+  const outBtn = document.getElementById("outBtn"), inBtn = document.getElementById("inBtn"), backBtn = document.getElementById("backBtn");
   const fillBtn = document.getElementById("fillBtn"), sellBtn = document.getElementById("sellBtn"), newBtn = document.getElementById("newBtn");
   function updateView() {
-    grid = (view === "out") ? gridOut : rooms[roomKey];
+    grid = (view === "out") ? gridOut : (view === "back") ? gridBack : rooms[roomKey];
     outBtn.classList.toggle("sel", view === "out");
     inBtn.classList.toggle("sel", view === "in");
-    fillBtn.style.display = (view === "out") ? "" : "none";
+    backBtn.classList.toggle("sel", view === "back");
+    fillBtn.style.display = (view === "in") ? "none" : "";
     sellBtn.style.display = (view === "out") ? "" : "none";
-    newBtn.textContent = (view === "out") ? "New Lot" : "Empty Room";
-    hint.textContent = (view === "out")
-      ? "Pick a block, then tap or drag to build your house and yard."
-      : "Buy furniture with coins and place it — switch rooms with the tabs above!";
+    newBtn.textContent = (view === "in") ? "Empty Room" : (view === "back") ? "Clear Yard" : "New Lot";
+    hint.textContent = (view === "in")
+      ? "Buy furniture with coins and place it — switch rooms with the tabs above!"
+      : (view === "back")
+      ? "Your backyard! Add a pool, swings, slide, garden, patio and more."
+      : "Pick a block, then tap or drag to build your house and yard.";
     buildRoomTabs(); buildPalette(); buildColors(); drawAll(); updateValue();
   }
   const tourBtn = document.getElementById("tourBtn");
@@ -2455,6 +2790,7 @@
   });
   outBtn.addEventListener("click", function () { stopTour(); view = "out"; updateView(); });
   inBtn.addEventListener("click", function () { stopTour(); view = "in"; updateView(); });
+  backBtn.addEventListener("click", function () { stopTour(); view = "back"; updateView(); });
   const dayBtn = document.getElementById("dayBtn");
   dayBtn.textContent = night ? "☀️ Day" : "🌙 Night";
   dayBtn.addEventListener("click", function () { night = !night; nightTried = true; dayBtn.textContent = night ? "☀️ Day" : "🌙 Night"; drawAll(); flash(night ? "Nighty-night! 🌙" : "Good morning! ☀️"); });
@@ -2477,7 +2813,7 @@
   const shop = document.getElementById("shop"), shopGrid = document.getElementById("shopGrid");
   function openShop() {
     shopGrid.innerHTML = "";
-    const set = (view === "out") ? TOOLS_OUT : TOOLS_IN;
+    const set = (view === "in") ? TOOLS_IN : TOOLS_OUT;
     set.forEach(function (t) {
       if (t.id === "erase" || t.id === "move" || t.id === "play" || t.id === "feed" || t.id === "person") return;
       const card = document.createElement("button"); card.className = "scard" + (t.id === tool ? " sel" : "");
@@ -2495,6 +2831,12 @@
   shop.addEventListener("click", function (e) { if (e.target === shop) shop.classList.add("hidden"); });
 
   document.getElementById("fixBtn").addEventListener("click", startFixFlip);
+  document.getElementById("rentBtn").addEventListener("click", function () {
+    if (view !== "in") { flash("🔑 Go inside a room to rent it out!"); return; }
+    if (rentedRooms[roomKey]) { delete rentedRooms[roomKey]; flash("🔑 Stopped renting the " + (ROOM_NAMES[roomKey] || "room")); }
+    else { rentedRooms[roomKey] = true; flash("🔑 Renting out the " + (ROOM_NAMES[roomKey] || "room") + " — earn coins over time!"); }
+    try { localStorage.setItem("moHouseRent", JSON.stringify(rentedRooms)); } catch (e) {}
+  });
   document.getElementById("photoBtn").addEventListener("click", function () {
     try { const a = document.createElement("a"); a.download = "mo-house.png"; a.href = canvas.toDataURL("image/png"); a.click(); photoTaken = true; flash("📸 Snapshot saved!"); }
     catch (e) { flash("Could not save photo"); }
@@ -2505,6 +2847,12 @@
   const workInfo = document.getElementById("workInfo"), workMsg = document.getElementById("workMsg"), workTitle = document.getElementById("workTitle");
   const jobPick = document.getElementById("jobPick"), jobGame = document.getElementById("jobGame"), workTap = document.getElementById("workTap");
   const JOBS = [
+    { id: "cleaner", name: "🧹 House Cleaner", pay: 8000, type: "mash", need: 30, time: 5, tap: "SCRUB!", desc: "Scrub fast — 30× in 5s to clean the house" },
+    { id: "handyman", name: "🔧 Handyman", pay: 11000, type: "timing", rounds: 6, speed: 8, grow: 1.8, green: 40, tap: "FIX!", desc: "Hammer on green 6× to fix the house" },
+    { id: "decorator", name: "🎨 Decorator", pay: 14000, type: "react", rounds: 6, tap: "PLACE!", desc: "Place the decor the instant it's ready, 6×" },
+    { id: "dogwalk", name: "🐕 Dog Walking", pay: 4000, type: "react", rounds: 5, tap: "GO!", desc: "Side job — keep up with the dog, tap on green 5×" },
+    { id: "lemonade", name: "🍋 Lemonade Stand", pay: 3500, type: "mash", need: 25, time: 5, tap: "POUR!", desc: "Side job — pour fast, 25 cups in 5s" },
+    { id: "babysit", name: "👶 Babysitting", pay: 5000, type: "timing", rounds: 5, speed: 6, grow: 1.6, green: 50, tap: "SOOTHE!", desc: "Side job — rock the baby, stop on green 5×" },
     { id: "office", name: "🧑‍💼 Office", pay: 7000, type: "timing", rounds: 5, speed: 7, grow: 1.7, green: 46, tap: "STOP!", desc: "Stop the arrow on green 5×" },
     { id: "chef", name: "👨‍🍳 Chef", pay: 12000, type: "mash", need: 35, time: 5, tap: "COOK!", desc: "Tap fast — 35 times in 5s" },
     { id: "racer", name: "🏎️ Racer", pay: 15000, type: "react", rounds: 5, tap: "GO!", desc: "Tap the instant it turns green, 5×" },
