@@ -294,6 +294,7 @@
   var navTarget=null, navSpeakT=0, nearHouseIdx=-1, autoDrive=false;
   document.getElementById('auto').onclick=function(){ if(!car.driving){ says.push({x:mo.x,y:mo.y-32,t:1.8,txt:'🚗 Get in the Chevy first!'}); beep(200,0.1,'sawtooth',0.04); return; } if(!navTarget){ document.getElementById('nav').onclick(); return; } autoDrive=!autoDrive; this.textContent=autoDrive?'🛑 STOP':'🤖 AUTO'; this.style.borderColor=autoDrive?'#7bff9e':'#7bd0ff'; beep(autoDrive?720:300,0.08,'square',0.05); if(autoDrive){ says.push({x:car.x,y:car.y-40,t:2,txt:'🤖 Self-driving to '+navTarget.name+'!'}); cleanSpeak('Self driving to '+navTarget.name.toLowerCase()); } };
   var HGAMES=[
+    {u:'../mo-arffmeow/mo-arffmeow.html',e:'🐕',n:'Family Home'},
     {u:'../mo-work/mo-work.html',e:'🧰',n:'MO Work'},
     {u:'../mo-pinball/mo-pinball.html',e:'🏀',n:'Pinball'},
     {u:'../mo-arff/mo-arff.html',e:'🐕',n:'Arff!'},

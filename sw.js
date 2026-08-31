@@ -1,10 +1,11 @@
 // Service worker: makes Mo Arcade fully playable with NO internet.
 // It pre-caches every game so once the site loads online once, all games work offline.
 // Bump CACHE whenever you change the site so phones pick up the new version.
-const CACHE = "mo-arcade-v261";
+const CACHE = "mo-arcade-v285";
 const FILES = [
   "./", "./index.html", "./games.html", "./mo-home.html", "./privacy.html", "./icon-180.png",
   "./icon-192.png", "./icon-512-maskable.png", "./icon-512.png", "./icon.svg", "./manifest.webmanifest", "./three.min.js",
+  "./mo-arffmeow/mo-arffmeow.html",
   "./hoop-shot-3d.html", "./hoop-shot.html", "./mo-1on1/mo-1on1.html", "./mo-2k/mo-2k.html", "./mo-2k26/mo-2k26.html", "./mo-3dcity/mo-3dcity.html",
   "./mo-3devent/mo-3devent.html", "./mo-3point/mo-3point.html", "./mo-8ball/mo-8ball.html", "./mo-airport/mo-airport.html", "./mo-alien/mo-alien.html", "./mo-allstar/mo-allstar.html",
   "./mo-ankle/mo-ankle.html", "./mo-apartmentbldg/mo-apartmentbldg.html", "./mo-aquarium/mo-aquarium.html", "./mo-aquarium2/mo-aquarium2.html", "./mo-aquariumfeed/mo-aquariumfeed.html", "./mo-arena-3d/mo-arena-3d.html",
@@ -120,23 +121,21 @@ self.addEventListener("activate", function (e) {
   );
 });
 
-// Cache first: instant load and works with no internet.
-// If not cached yet, fetch from network and store it for next time.
+// Network first: always show the newest version when online.
+// Falls back to the pre-cached copy when there is no internet, so every game
+// still works offline.
 self.addEventListener("fetch", function (e) {
   if (e.request.method !== "GET") return;
   e.respondWith(
-    caches.match(e.request).then(function (hit) {
-      if (hit) return hit;
-      return fetch(e.request).then(function (res) {
-        if (res && res.status === 200 && res.type === "basic") {
-          const copy = res.clone();
-          caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
-        }
-        return res;
-      }).catch(function () {
-        return caches.match(e.request).then(function (h2) {
-          return h2 || caches.match("./index.html");
-        });
+    fetch(e.request).then(function (res) {
+      if (res && res.status === 200 && res.type === "basic") {
+        const copy = res.clone();
+        caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
+      }
+      return res;
+    }).catch(function () {
+      return caches.match(e.request).then(function (hit) {
+        return hit || caches.match("./index.html");
       });
     })
   );
