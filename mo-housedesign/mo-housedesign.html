@@ -1,0 +1,1363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>🏠 FAMILY HOUSE DESIGNER</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:#241a12;color:#f6eee2;font-family:'Trebuchet MS',Verdana,sans-serif;overflow:hidden;}
+  #wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;padding:8px;}
+  .namebtn{display:block;margin:6px auto 2px;background:linear-gradient(#ffd23f,#f7a72b);color:#5a3a1a;font-weight:bold;border:none;border-radius:14px;padding:9px 22px;font-size:16px;font-family:inherit;box-shadow:0 4px 0 #0006;text-decoration:none;}
+  h1{margin:2px 0;font-size:20px;color:#ffd23f;text-shadow:0 2px 0 #0007;}
+  #steps{font-size:13px;color:#e7cfa9;margin:2px 0 6px;font-weight:bold;}
+  canvas{background:#f3ead9;border-radius:16px;box-shadow:0 8px 24px #0009;touch-action:none;max-width:100%;height:auto;}
+  #nav{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center;}
+  .nb{background:#3a2a1a;border:2px solid #7a5a30;color:#f0dcc0;font-weight:bold;font-size:14px;padding:8px 14px;border-radius:12px;font-family:inherit;text-decoration:none;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <a class="namebtn" href="../index.html">🏠 MO ARCADE</a>
+  <h1>🏠 FAMILY HOUSE DESIGNER</h1>
+  <div id="steps">Design the family house, room by room!</div>
+  <canvas id="cv" width="440" height="620"></canvas>
+  <div id="nav">
+    <a class="nb" href="../index.html">← Back</a>
+    <a class="nb" href="../mo-home.html">🏠 MO Home</a>
+    <a class="nb" href="../games.html">🎮 All Games</a>
+  </div>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById("cv"), cx=cv.getContext("2d"), steps=document.getElementById("steps");
+  var W=cv.width, H=cv.height, t=0;
+  var scene="menu", g={}, ptr={x:W/2,y:0,down:false};
+  var coins=0; try{ coins=parseInt(localStorage.getItem("mohouse_coins")||"0",10)||0; }catch(e){}
+  function save(){ try{ localStorage.setItem("mohouse_coins",String(coins)); }catch(e){} }
+  var owned={}; try{ owned=JSON.parse(localStorage.getItem("mohouse_owned")||"{}")||{}; }catch(e){}
+  var equipHat=-1; try{ var _eh=localStorage.getItem("mohouse_hat"); equipHat=(_eh===null)?-1:parseInt(_eh,10); if(isNaN(equipHat))equipHat=-1; }catch(e){}
+  function saveShop(){ try{ localStorage.setItem("mohouse_owned",JSON.stringify(owned)); localStorage.setItem("mohouse_hat",String(equipHat)); }catch(e){} }
+  var HAT_EMOJI=["🎩","🧢","👑","🥳"];
+  var SHOP=[{k:"hat0",e:"🎩",n:"Top Hat",p:30,cat:"hat",hi:0},{k:"hat1",e:"🧢",n:"Cap",p:20,cat:"hat",hi:1},{k:"hat2",e:"👑",n:"Crown",p:60,cat:"hat",hi:2},{k:"hat3",e:"🥳",n:"Party Hat",p:25,cat:"hat",hi:3},{k:"pet0",e:"🐰",n:"Pet Bunny",p:40,cat:"pet"},{k:"pet1",e:"🐧",n:"Pet Penguin",p:45,cat:"pet"},{k:"spark",e:"✨",n:"Sparkle Trail",p:50,cat:"pow"}];
+
+  var AC=null; function beep(f,d,ty){ try{ if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)(); var o=AC.createOscillator(),ga=AC.createGain(); o.frequency.value=f;o.type=ty||"square";o.connect(ga);ga.connect(AC.destination);ga.gain.value=.06;o.start();ga.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+(d||.08));o.stop(AC.currentTime+(d||.08)); }catch(e){} }
+  function ding(){ beep(760,.08,"sine"); setTimeout(function(){beep(1020,.12,"sine");},80); }
+  function clink(){ beep(880,.05,"sine"); setTimeout(function(){beep(1180,.06,"sine");},50); }
+  function rr(x,y,w,h,r){ cx.beginPath();cx.moveTo(x+r,y);cx.arcTo(x+w,y,x+w,y+h,r);cx.arcTo(x+w,y+h,x,y+h,r);cx.arcTo(x,y+h,x,y,r);cx.arcTo(x,y,x+w,y,r);cx.closePath(); }
+  function text(s,x,y,sz,c,al){ cx.fillStyle=c||"#fff";cx.font="bold "+sz+"px Trebuchet MS,sans-serif";cx.textAlign=al||"center";cx.textBaseline="middle";cx.fillText(s,x,y); }
+  function emo(ch,x,y,s){ cx.font=s+"px serif";cx.textAlign="center";cx.textBaseline="middle";cx.fillText(ch,x,y); }
+  function btn(label,y,c){ cx.fillStyle=c||"#7bd07b"; rr(W/2-120,y,240,52,14); cx.fill(); text(label,W/2,y+26,18,"#06280f"); }
+  function coinHUD(){ cx.fillStyle="rgba(255,255,255,.88)"; rr(14,12,94,30,10); cx.fill(); cx.strokeStyle="#e0b64a"; cx.lineWidth=2; rr(14,12,94,30,10); cx.stroke(); emo("🪙",34,27,20); text("x "+coins,54,27,17,"#5a3a1a","left"); }
+  function label(s){ steps.textContent=s; }
+  function go(name){ FX.parts=[]; FX.conf=[]; FX.floats=[]; scene=name; if(S[name].init)S[name].init(); }
+
+  // FX
+  var FX={parts:[],conf:[],floats:[]};
+  function drop(x,y,col,n,up){ n=n||8; for(var i=0;i<n;i++){ var a=Math.random()*6.28,s=1+Math.random()*2.4; FX.parts.push({x:x,y:y,vx:Math.cos(a)*s,vy:(up?-1:0.4)-Math.random()*2,life:1,col:col,r:2+Math.random()*2.5,g:0.14}); } }
+  function star(x,y,n){ n=n||8; for(var i=0;i<n;i++){ var a=Math.random()*6.28,s=1.6+Math.random()*2.4; FX.parts.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1.4,life:1,col:"#fff2a8",r:2+Math.random()*2,g:0.08,tw:1}); } }
+  function floatUp(s,x,y,col){ FX.floats.push({s:s,x:x,y:y,life:1,col:col||"#fff"}); }
+  function confettiBurst(){ for(var i=0;i<26;i++){ FX.conf.push({x:Math.random()*W,y:-10-Math.random()*60,vy:1.6+Math.random()*2.4,vx:Math.random()*2-1,r:3+Math.random()*4,col:["#ff5a7a","#ffd23f","#5ad0a0","#5aa0ff","#c77aff"][i%5],rot:Math.random()*6,vr:Math.random()*0.3-0.15}); } }
+  function updateFX(){
+    for(var i=FX.parts.length-1;i>=0;i--){ var p=FX.parts[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=p.g; p.life-=0.03; if(p.life<=0)FX.parts.splice(i,1); }
+    for(var j=FX.floats.length-1;j>=0;j--){ var f=FX.floats[j]; f.y-=1.1; f.life-=0.02; if(f.life<=0)FX.floats.splice(j,1); }
+    for(var k=FX.conf.length-1;k>=0;k--){ var c=FX.conf[k]; c.y+=c.vy; c.x+=c.vx; c.rot+=c.vr; if(c.y>H+20)FX.conf.splice(k,1); }
+  }
+  function renderFX(){
+    FX.parts.forEach(function(p){ cx.globalAlpha=Math.max(0,p.life); cx.fillStyle=p.tw&&Math.floor(t/3)%2?"#fff":p.col; cx.beginPath(); cx.arc(p.x,p.y,Math.max(0.5,p.r*p.life),0,7); cx.fill(); });
+    cx.globalAlpha=1;
+    FX.floats.forEach(function(f){ cx.globalAlpha=Math.max(0,f.life); cx.fillStyle=f.col; cx.strokeStyle="#00000055"; cx.lineWidth=3; cx.font="bold 20px Trebuchet MS,sans-serif"; cx.textAlign="center"; cx.textBaseline="middle"; cx.strokeText(f.s,f.x,f.y); cx.fillText(f.s,f.x,f.y); });
+    cx.globalAlpha=1;
+    FX.conf.forEach(function(c){ cx.save(); cx.translate(c.x,c.y); cx.rotate(c.rot); cx.fillStyle=c.col; cx.fillRect(-c.r/2,-c.r/2,c.r,c.r*1.6); cx.restore(); });
+  }
+
+  var CY=300; // counter top surface y
+  function drawKitchen(){
+    // wall
+    cx.fillStyle="#f6e9d2"; cx.fillRect(0,0,W,CY);
+    // upper cabinets
+    cx.fillStyle="#c98f5a"; cx.fillRect(0,44,W,74); cx.strokeStyle="#a5713f"; cx.lineWidth=2;
+    for(var i=0;i<4;i++){ cx.strokeRect(6+i*108,50,100,62); cx.fillStyle="#8a5a2f"; cx.fillRect(6+i*108+84,78,8,8); cx.fillStyle="#c98f5a"; }
+    // counter band
+    cx.fillStyle="#8a95a5"; cx.fillRect(0,CY,W,20);
+    cx.fillStyle="#6a7585"; cx.fillRect(0,CY+18,W,4);
+    // base cabinets
+    cx.fillStyle="#b97f4a"; cx.fillRect(0,CY+22,W,H-CY-22); cx.strokeStyle="#8a5a2f"; cx.lineWidth=2;
+    for(var j=0;j<4;j++){ cx.strokeRect(8+j*108,CY+30,100,H-CY-40); cx.fillStyle="#7a4a2a"; cx.fillRect(8+j*108+46,CY+40,10,10); cx.fillStyle="#b97f4a"; }
+  }
+
+  var S={};
+  var JOBS=[["person","🚶","Walk House","#ffd27a"],["door","🚪","Front Door","#d7c6a0"],["drive","🛣️","Driveway","#cfcfcf"],["sink","🚰","Kitchen Sink","#bfe0ff"],["coffee","☕","Coffee Bar","#e8c9a0"],["dining","🍽️","Dining Room","#f0c6a0"],["kids","🌟","Kids Stars","#c9c0f0"],["bath","🛁","Bathroom","#bfe8ee"],["gym","🏋️","Home Gym","#ffc0c0"],["sunroom","🪟","Sunroom","#cfeee0"],["firepit","🔥","Fire Pit","#ffd0b0"],["theater","🎬","Home Theater","#d4c6f0"],["petwash","🐾","Pet Wash","#ffe0c0"],["cityview","🌆","City View","#c4d4f0"],["rooftop","🌿","Rooftop Garden","#c8e8c0"],["gameroom","🎱","Game Room","#bfe0d0"],["yoga","🧘","Yoga Studio","#e0d0f0"],["robot","🤖","Robot Helper","#c4d4e4"],["range","🍳","Pro Range","#ffd0d0"],["hiddentv","📺","Hidden TV","#d4d4d4"],["shop","🛒","Coin Shop","#ffe8a0"]];
+  var menuPage=0, PAGE=14;
+  function menuRects(){ var cols=2,tw=152,th=52,gx=12,gy=8,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,r=[]; for(var i=0;i<PAGE;i++){ var c=i%cols,rw=Math.floor(i/cols); r.push({x:x0+c*(tw+gx),y:y0+rw*(th+gy),w:tw,h:th}); } return r; }
+
+  // ---------------- MENU ----------------
+  S.menu={ init:function(){ label("Pick a job to do! 🪙 "+coins); },
+    render:function(){ drawKitchen(); coinHUD();
+      emo("🏠",W*0.5,84,26);
+      text("FAMILY HOUSE DESIGNER",W/2,116,17,"#7a4a1a"); text("Pick a job to do!",W/2,136,12,"#7a5a3a");
+      var R=menuRects(), start=menuPage*PAGE, pages=Math.ceil(JOBS.length/PAGE);
+      for(var i=0;i<PAGE;i++){ var idx=start+i; if(idx>=JOBS.length)break; var rc=R[i],J=JOBS[idx]; cx.fillStyle=J[3]; rr(rc.x,rc.y,rc.w,rc.h,12); cx.fill(); cx.strokeStyle="#ffffffcc"; cx.lineWidth=2; rr(rc.x,rc.y,rc.w,rc.h,12); cx.stroke(); emo(J[1],rc.x+26,rc.y+rc.h/2,22); text(J[2],rc.x+44,rc.y+rc.h/2,12,"#3a2a10","left"); }
+      if(pages>1){ text("Page "+(menuPage+1)+" / "+pages,W/2,H-24,13,"#7a4a1a");
+        if(menuPage>0){ cx.fillStyle="#e8c9a0"; rr(30,H-40,120,32,10); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; rr(30,H-40,120,32,10); cx.stroke(); text("◀ Back",90,H-24,14,"#3a2a10"); }
+        if(menuPage<pages-1){ cx.fillStyle="#ffd27a"; rr(W-150,H-40,120,32,10); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; rr(W-150,H-40,120,32,10); cx.stroke(); text("More ▶",W-90,H-24,14,"#3a2a10"); } } },
+    tap:function(){ var R=menuRects(), start=menuPage*PAGE, pages=Math.ceil(JOBS.length/PAGE);
+      if(pages>1){ if(menuPage>0 && ptr.y>H-40&&ptr.y<H-8&&ptr.x>30&&ptr.x<150){ menuPage--; beep(500,.06); return; }
+        if(menuPage<pages-1 && ptr.y>H-40&&ptr.y<H-8&&ptr.x>W-150&&ptr.x<W-30){ menuPage++; beep(600,.06); return; } }
+      for(var i=0;i<PAGE;i++){ var idx=start+i; if(idx>=JOBS.length)break; var rc=R[i]; if(ptr.x>rc.x&&ptr.x<rc.x+rc.w&&ptr.y>rc.y&&ptr.y<rc.y+rc.h){ beep(680,.08); go(JOBS[idx][0]); return; } } } };
+
+  // ================= INSTALL SINK =================
+  // basin cutout centered
+  var BX=145, BW=150, BTOP=CY-2, BH=104;
+  var SPOUTX=250, SPOUTY=258;                 // faucet spout output
+  var FBASE={x:200,y:CY};                       // faucet base on counter
+  function drawBasin(){ // metal sink basin recessed
+    cx.fillStyle="#7d8794"; rr(BX-6,BTOP-6,BW+12,BH+12,14); cx.fill();
+    var gr=cx.createLinearGradient(0,BTOP,0,BTOP+BH); gr.addColorStop(0,"#c6cdd6"); gr.addColorStop(1,"#9aa4b0"); cx.fillStyle=gr; rr(BX,BTOP,BW,BH,12); cx.fill();
+    cx.strokeStyle="#6a7480"; cx.lineWidth=2; rr(BX,BTOP,BW,BH,12); cx.stroke();
+    // drain
+    cx.fillStyle="#5a6470"; cx.beginPath(); cx.arc(BX+BW/2,BTOP+BH-16,7,0,7); cx.fill();
+  }
+  function drawFaucet(on,turn){ cx.save();
+    // base
+    cx.fillStyle="#b8bfc8"; rr(FBASE.x-10,FBASE.y-14,20,16,4); cx.fill();
+    // neck (arc up and over to spout)
+    cx.strokeStyle="#c6cdd6"; cx.lineWidth=10; cx.lineCap="round"; cx.beginPath(); cx.moveTo(FBASE.x, FBASE.y-10); cx.lineTo(FBASE.x, SPOUTY-6); cx.quadraticCurveTo(FBASE.x, SPOUTY-14, SPOUTX-6, SPOUTY-10); cx.lineTo(SPOUTX, SPOUTY); cx.stroke();
+    cx.strokeStyle="#9aa4b0"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(FBASE.x, FBASE.y-10); cx.lineTo(FBASE.x, SPOUTY-6); cx.stroke();
+    // handle (rotates with turn)
+    cx.save(); cx.translate(FBASE.x-16, FBASE.y-6); cx.rotate((turn||0)*-1.1); cx.fillStyle="#7fb0e0"; rr(-4,-16,8,20,4); cx.fill(); cx.beginPath(); cx.arc(0,-16,6,0,7); cx.fill(); cx.restore();
+    cx.restore();
+  }
+  function drawStream(){ // flowing water from spout into basin
+    for(var i=0;i<4;i++){ var wob=Math.sin((t*0.4)+(i))*2; cx.strokeStyle="rgba(120,190,255,0.8)"; cx.lineWidth=2; cx.beginPath(); cx.moveTo(SPOUTX-3+i*2+wob, SPOUTY); cx.lineTo(SPOUTX-3+i*2+wob*-1, BTOP+BH-24); cx.stroke(); }
+    // basin water pool
+    cx.fillStyle="rgba(120,190,255,0.5)"; rr(BX+8,BTOP+BH-42,BW-16,34,8); cx.fill();
+    if(t%4===0) drop(SPOUTX+(Math.random()*20-10), BTOP+BH-30, "#bfe4ff", 3);
+  }
+
+  S.sink={ init:function(){ g={phase:"sink", hold:null, hx:0, hy:0, turn:0, turning:false, tstartY:0,
+      dishes:[], cur:null, washed:0, need:6, spawnT:0, over:false}; label("Drag the SINK into the counter! 🚰"); },
+    update:function(){
+      if(g.phase==="wash" && !g.over){
+        // manage current dish
+        if(!g.cur){ g.spawnT--; if(g.spawnT<=0){ var TY=["🍽️","🍴","🥣","🍳","🥤","🍵"]; g.cur={x:372,y:CY+2,dirt:1,e:TY[Math.floor(Math.random()*TY.length)],held:false,done:false}; } }
+        else if(g.cur.held){ // if inside stream zone, wash
+          if(Math.abs(g.cur.x-SPOUTX)<40 && g.cur.y>SPOUTY-10 && g.cur.y<BTOP+BH){ g.cur.dirt=Math.max(0,g.cur.dirt-0.035); if(t%3===0)drop(g.cur.x,g.cur.y-6,"#bfe4ff",2,true);
+            if(g.cur.dirt<=0 && !g.cur.done){ g.cur.done=true; clink(); star(g.cur.x,g.cur.y,7); floatUp("✨ clean!",g.cur.x,g.cur.y-14,"#fff2a8"); coins++; save(); g.washed++;
+              g.cur=null; g.spawnT=18; if(g.washed>=g.need){ g.over=true; confettiBurst(); label("SINK DONE! 🪙 "+coins); } } }
+        }
+      }
+    },
+    render:function(){ drawKitchen();
+      // drying rack (left) with washed dishes
+      cx.fillStyle="#c9b28a"; rr(30,CY-4,84,8,3); cx.fill();
+      for(var d=0;d<g.washed;d++){ emo("🍽️", 40+ (d%4)*20, CY-14 - Math.floor(d/4)*4, 15); }
+      drawBasin();
+      // installed faucet after placed
+      if(g.phase!=="sink"){ drawFaucet(g.phase!=="faucet", g.turn); }
+      if((g.phase==="wash") && g.turn>0.6){ drawStream(); }
+      coinHUD();
+
+      // instructions + shelf part
+      if(g.phase==="sink"){ text("Drag the SINK into the counter!",W/2,44,17,"#4a2a10");
+        // ghost outline
+        cx.setLineDash([7,6]); cx.strokeStyle="#5a6470"; cx.lineWidth=3; rr(BX,BTOP,BW,BH,12); cx.stroke(); cx.setLineDash([]);
+        var sx=g.hold==="sink"?g.hx:W/2, sy=g.hold==="sink"?g.hy:540; drawShelfSink(sx,sy);
+      }
+      else if(g.phase==="faucet"){ text("Drag the FAUCET onto the sink!",W/2,44,17,"#4a2a10");
+        emo("⬇️", FBASE.x, FBASE.y-30+Math.sin(t*0.2)*3, 20);
+        var fx=g.hold==="faucet"?g.hx:W/2, fy=g.hold==="faucet"?g.hy:545; drawShelfFaucet(fx,fy);
+      }
+      else if(g.phase==="handle"){ text("Turn the HANDLE up to start water!",W/2,44,16,"#4a2a10");
+        // pulsing hint on handle
+        cx.strokeStyle="rgba(120,180,255,"+(0.4+Math.sin(t*0.2)*0.3)+")"; cx.lineWidth=3; cx.beginPath(); cx.arc(FBASE.x-16,FBASE.y-6,18,0,7); cx.stroke();
+        text("👆 drag it up",FBASE.x-16,FBASE.y+26,12,"#3a6a9a");
+      }
+      else if(g.phase==="wash"){ text("Drag dirty dishes under the water! 🧽",W/2,40,15,"#4a2a10");
+        // dish on the counter to wash
+        if(g.cur){ cx.save(); cx.translate(g.cur.x,g.cur.y); emo(g.cur.e,0,0,30);
+          if(g.cur.dirt>0){ cx.globalAlpha=g.cur.dirt*0.8; cx.fillStyle="#8a6a3a"; [[-8,-4],[6,-8],[2,6],[-5,7]].forEach(function(p){ cx.beginPath(); cx.arc(p[0],p[1],3.5,0,7); cx.fill(); }); cx.globalAlpha=1; }
+          cx.restore(); }
+        // progress
+        for(var k=0;k<g.need;k++){ emo(k<g.washed?"✨":"⚪", W/2-(g.need-1)*15+k*30, H-22, 16); }
+        if(g.over){ if(t%45===0)confettiBurst(); cx.fillStyle="rgba(0,0,0,.5)"; cx.fillRect(0,0,W,H); text("🚰 SINK INSTALLED!",W/2,H*0.4,24,"#ffd23f"); text("Kitchen sparkles! ✨",W/2,H*0.47,16,"#fff"); btn("▶ BACK TO KITCHEN",H*0.56); }
+      }
+    },
+    down:function(){
+      if(g.phase==="sink"){ var sx=W/2,sy=540; if(Math.abs(ptr.x-sx)<70&&Math.abs(ptr.y-sy)<44){ g.hold="sink"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="faucet"){ if(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-545)<40){ g.hold="faucet"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="handle"){ if(Math.abs(ptr.x-(FBASE.x-16))<26&&Math.abs(ptr.y-(FBASE.y-6))<30){ g.turning=true; g.tstartY=ptr.y; } }
+      else if(g.phase==="wash"){ if(g.cur && Math.abs(ptr.x-g.cur.x)<26&&Math.abs(ptr.y-g.cur.y)<26){ g.cur.held=true; } }
+    },
+    drag:function(){
+      if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; }
+      else if(g.turning){ g.turn=Math.max(0,Math.min(1,(g.tstartY-ptr.y)/60)); if(g.turn>=1 && g.phase==="handle"){ g.phase="wash"; g.turning=false; g.spawnT=6; ding(); label("💧 Water on! Wash the dishes!"); } }
+      else if(g.phase==="wash" && g.cur && g.cur.held){ g.cur.x=ptr.x; g.cur.y=ptr.y; }
+    },
+    up:function(){
+      if(g.hold==="sink"){ if(Math.abs(g.hx-(BX+BW/2))<70 && Math.abs(g.hy-(BTOP+BH/2))<70){ g.phase="faucet"; ding(); drop(BX+BW/2,BTOP+BH/2,"#c6cdd6",10); label("Now drag the FAUCET on! 🚰"); } beep(g.phase==="faucet"?700:300,.08); g.hold=null; }
+      else if(g.hold==="faucet"){ if(Math.abs(g.hx-FBASE.x)<70 && Math.abs(g.hy-FBASE.y)<80){ g.phase="handle"; ding(); drop(FBASE.x,FBASE.y-20,"#c6cdd6",8); label("Turn the handle to start the water!"); } else beep(300,.08); g.hold=null; }
+      else if(g.turning){ if(g.turn<1)g.turn=0; g.turning=false; }
+      else if(g.phase==="wash" && g.cur){ g.cur.held=false; if(!g.cur.done){ /* snap back toward counter if dropped low */ if(g.cur.y>H-60){ g.cur.x=372; g.cur.y=CY+2; } } }
+    },
+    tap:function(){ if(g.phase==="wash" && g.over){ go("menu"); } } };
+  function drawShelfSink(x,y){ cx.save(); cx.translate(x,y);
+    cx.fillStyle="#c6cdd6"; rr(-60,-30,120,58,12); cx.fill(); cx.strokeStyle="#8a95a5"; cx.lineWidth=3; rr(-60,-30,120,58,12); cx.stroke();
+    cx.fillStyle="#9aa4b0"; rr(-48,-20,96,40,8); cx.fill(); cx.fillStyle="#5a6470"; cx.beginPath(); cx.arc(0,6,6,0,7); cx.fill();
+    text("SINK",0,-40,13,"#4a2a10"); cx.restore(); }
+  function drawShelfFaucet(x,y){ cx.save(); cx.translate(x,y);
+    cx.strokeStyle="#c6cdd6"; cx.lineWidth=10; cx.lineCap="round"; cx.beginPath(); cx.moveTo(-14,20); cx.lineTo(-14,-14); cx.quadraticCurveTo(-14,-22,14,-18); cx.lineTo(20,-8); cx.stroke();
+    cx.fillStyle="#7fb0e0"; cx.beginPath(); cx.arc(-28,10,7,0,7); cx.fill();
+    text("FAUCET",0,-34,13,"#4a2a10"); cx.restore(); }
+
+  // ================= COFFEE STATION =================
+  var MX=W/2, MTOP=170, MW=96, MH=104;         // machine body
+  var CSPOUT={x:MX,y:MTOP+MH};                    // machine spout (coffee out)
+  var MUGSPOT={x:MX,y:CY+4};                       // where mug sits under spout
+  var FAM=[["👦","Mo"],["👩","Mom"],["👨","Dad"],["👧","Sis"]];
+  S.coffee={ init:function(){ g={phase:"machine", hold:null, hx:0,hy:0, mug:null, pod:false, brew:0, brewing:false,
+      served:0, need:4, order:null, orderIdx:0, over:false}; label("Drag the COFFEE MAKER onto the counter! ☕"); },
+    update:function(){
+      if(g.phase==="brew" && g.brewing){ g.brew=Math.min(1,g.brew+0.02); if(t%3===0)drop(CSPOUT.x,CSPOUT.y+6,"#6a3a1a",2); if(g.brew>=1 && g.mug){ g.mug.full=1; } }
+    },
+    render:function(){ drawKitchen(); coinHUD();
+      // machine (after placed)
+      if(g.phase!=="machine"){ drawMachine(); }
+      // pod indicator
+      if(g.pod){ emo("🟤",MX,MTOP+14,14); }
+      // brewing stream
+      if(g.phase==="brew" && g.brewing){ cx.strokeStyle="rgba(90,50,20,0.85)"; cx.lineWidth=4; cx.beginPath(); cx.moveTo(CSPOUT.x,CSPOUT.y); cx.lineTo(CSPOUT.x,MUGSPOT.y-14); cx.stroke(); }
+      // the mug
+      if(g.mug){ var mx=g.mug.held?g.hx:g.mug.x, my=g.mug.held?g.hy:g.mug.y; drawMug(mx,my,g.mug.full||0); }
+
+      if(g.phase==="machine"){ text("Drag the COFFEE MAKER onto the counter!",W/2,42,14,"#4a2a10");
+        cx.setLineDash([7,6]); cx.strokeStyle="#8a5a2f"; cx.lineWidth=3; rr(MX-MW/2,MTOP,MW,MH,10); cx.stroke(); cx.setLineDash([]);
+        var x=g.hold==="machine"?g.hx:W/2, y=g.hold==="machine"?g.hy:545; drawShelfMachine(x,y);
+      }
+      else if(g.phase==="mug"){ text("Drag a MUG under the spout!",W/2,42,16,"#4a2a10");
+        emo("⬇️",MUGSPOT.x,MUGSPOT.y-26+Math.sin(t*0.2)*3,18);
+        if(!g.mug){ var mgx=g.hold==="mug"?g.hx:W/2, mgy=g.hold==="mug"?g.hy:545; drawShelfMug(mgx,mgy); }
+      }
+      else if(g.phase==="pod"){ text("Drop a COFFEE POD in the top! ☕",W/2,42,16,"#4a2a10");
+        emo("⬇️",MX,MTOP-14+Math.sin(t*0.2)*3,18);
+        var px=g.hold==="pod"?g.hx:W*0.78, py=g.hold==="pod"?g.hy:545; if(!g.pod||g.hold==="pod") drawShelfPod(px,py);
+      }
+      else if(g.phase==="brew"){ text(g.brew>=1?"Coffee ready! Serve it! ☕":"Hold the BREW button!",W/2,42,16,"#4a2a10");
+        // brew button
+        var bcol = g.brew>=1?"#7bd07b":(g.brewing?"#ff8a5a":"#ffce3f"); cx.fillStyle=bcol; cx.beginPath(); cx.arc(MX,MTOP+MH-24,18,0,7); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; cx.beginPath(); cx.arc(MX,MTOP+MH-24,18,0,7); cx.stroke(); text(g.brew>=1?"✓":"▶",MX,MTOP+MH-24,16,"#3a2a10");
+        // fill gauge
+        cx.fillStyle="#00000022"; rr(W/2-60,CY+70,120,12,6); cx.fill(); cx.fillStyle="#6a3a1a"; rr(W/2-60,CY+70,120*g.brew,12,6); cx.fill();
+        if(g.brew>=1 && g.mug){ emo("♨️",g.mug.x,g.mug.y-30+Math.sin(t*0.2)*3,20); }
+      }
+      else if(g.phase==="serve"){ text("Drag the coffee to who ordered! ☕",W/2,42,15,"#4a2a10");
+        // customer
+        var f=FAM[g.orderIdx]; emo(f[0], W*0.82, CY-30, 46);
+        // order bubble
+        cx.fillStyle="#fff"; rr(W*0.82-46,CY-96,64,40,10); cx.fill(); cx.fillStyle="#fff"; cx.beginPath(); cx.moveTo(W*0.82-16,CY-58); cx.lineTo(W*0.82-6,CY-46); cx.lineTo(W*0.82-2,CY-58); cx.fill(); emo("☕",W*0.82-14,CY-76,24); text(f[1],W*0.82,CY-4,13,"#4a2a10");
+        for(var k=0;k<g.need;k++){ emo(k<g.served?"☕":"⚪", W/2-(g.need-1)*16+k*32, H-22, 16); }
+        if(g.over){ if(t%45===0)confettiBurst(); cx.fillStyle="rgba(0,0,0,.5)"; cx.fillRect(0,0,W,H); text("☕ COFFEE STATION SET!",W/2,H*0.4,22,"#ffd23f"); text("Family is happy & caffeinated!",W/2,H*0.47,14,"#fff"); btn("▶ BACK TO KITCHEN",H*0.56); }
+      }
+    },
+    down:function(){
+      if(g.phase==="machine"){ if(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-545)<44){ g.hold="machine"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="mug"){ if(!g.mug && Math.abs(ptr.x-W/2)<50&&Math.abs(ptr.y-545)<40){ g.hold="mug"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="pod"){ if(Math.abs(ptr.x-W*0.78)<44&&Math.abs(ptr.y-545)<40){ g.hold="pod"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="brew"){ if(g.brew<1 && Math.abs(ptr.x-MX)<24&&Math.abs(ptr.y-(MTOP+MH-24))<24){ g.brewing=true; beep(300,.1,"sawtooth"); }
+        else if(g.brew>=1){ g.phase="serve"; g.mug.x=MUGSPOT.x; g.mug.y=MUGSPOT.y; g.orderIdx=Math.floor(Math.random()*FAM.length); label("Serve the coffee! ☕"); } }
+      else if(g.phase==="serve"){ if(g.mug && Math.abs(ptr.x-g.mug.x)<30&&Math.abs(ptr.y-g.mug.y)<30){ g.mug.held=true; } }
+    },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } else if(g.phase==="serve"&&g.mug&&g.mug.held){ g.hx=ptr.x; g.hy=ptr.y; g.mug.x=ptr.x; g.mug.y=ptr.y; } },
+    up:function(){
+      if(g.hold==="machine"){ if(Math.abs(g.hx-MX)<70&&Math.abs(g.hy-(MTOP+MH/2))<90){ g.phase="mug"; ding(); drop(MX,MTOP+MH/2,"#8a5a2f",8); label("Now drag a MUG under the spout!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="mug"){ if(Math.abs(g.hx-MUGSPOT.x)<60&&Math.abs(g.hy-MUGSPOT.y)<60){ g.mug={x:MUGSPOT.x,y:MUGSPOT.y,full:0,held:false}; g.phase="pod"; ding(); label("Drop a coffee pod in the top!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="pod"){ if(Math.abs(g.hx-MX)<60&&g.hy<MTOP+50){ g.pod=true; g.phase="brew"; ding(); drop(MX,MTOP+10,"#6a3a1a",6); label("Hold the BREW button to make coffee!"); } else beep(300,.08); g.hold=null; }
+      else if(g.phase==="brew"){ g.brewing=false; }
+      else if(g.phase==="serve" && g.mug && g.mug.held){ g.mug.held=false;
+        if(Math.abs(g.mug.x-W*0.82)<60 && Math.abs(g.mug.y-(CY-30))<70){ // served!
+          g.served++; coins+=2; save(); ding(); star(W*0.82,CY-30,8); floatUp("+2 🪙",W*0.82,CY-50,"#ffe27a"); heartAt(W*0.82,CY-60);
+          if(g.served>=g.need){ g.over=true; confettiBurst(); label("COFFEE STATION done! 🪙 "+coins); }
+          else { // reset for next order
+            g.mug=null; g.pod=false; g.brew=0; g.phase="mug"; label("Next order! Drag a fresh mug ☕"); }
+        } else { g.mug.x=MUGSPOT.x; g.mug.y=MUGSPOT.y; } }
+    },
+    tap:function(){ if(g.phase==="serve" && g.over){ go("menu"); } } };
+  function heartAt(x,y){ FX.floats.push({s:"❤️",x:x,y:y,life:1,col:"#ff6a8a"}); }
+  function drawMachine(){ cx.save();
+    var gr=cx.createLinearGradient(0,MTOP,0,MTOP+MH); gr.addColorStop(0,"#3a3a44"); gr.addColorStop(1,"#22222a"); cx.fillStyle=gr; rr(MX-MW/2,MTOP,MW,MH,10); cx.fill();
+    cx.strokeStyle="#55555f"; cx.lineWidth=2; rr(MX-MW/2,MTOP,MW,MH,10); cx.stroke();
+    // top lid
+    cx.fillStyle="#4a4a54"; rr(MX-MW/2+8,MTOP-6,MW-16,12,5); cx.fill();
+    // spout
+    cx.fillStyle="#666"; rr(MX-8,MTOP+MH-14,16,10,3); cx.fill();
+    // screen
+    cx.fillStyle="#5ad0a0"; rr(MX-24,MTOP+16,48,16,4); cx.fill(); text("☕",MX,MTOP+24,12,"#0a2a1a");
+    cx.restore(); }
+  function drawMug(x,y,full){ cx.save(); cx.translate(x,y);
+    cx.fillStyle="#fff"; rr(-16,-14,32,28,6); cx.fill(); cx.strokeStyle="#c9b28a"; cx.lineWidth=2; rr(-16,-14,32,28,6); cx.stroke();
+    cx.strokeStyle="#e0e0e0"; cx.lineWidth=4; cx.beginPath(); cx.arc(18,0,9,-1.2,1.2); cx.stroke();
+    if(full>0){ cx.fillStyle="#6a3a1a"; rr(-13,-11+ (1-full)*20,26,3+full*20,4); cx.fill(); }
+    cx.restore(); }
+  function drawShelfMachine(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#3a3a44"; rr(-40,-40,80,72,10); cx.fill(); cx.strokeStyle="#55555f"; cx.lineWidth=2; rr(-40,-40,80,72,10); cx.stroke(); cx.fillStyle="#5ad0a0"; rr(-20,-24,40,14,4); cx.fill(); emo("☕",0,-17,12); text("MAKER",0,-52,13,"#4a2a10"); cx.restore(); }
+  function drawShelfMug(x,y){ drawMug(x,y,0); text("MUG",x,y-28,13,"#4a2a10"); }
+  function drawShelfPod(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#6a3a1a"; rr(-14,-12,28,24,6); cx.fill(); cx.fillStyle="#8a5a2f"; cx.beginPath(); cx.arc(0,-12,14,3.14,0); cx.fill(); text("POD",0,-30,13,"#4a2a10"); cx.restore(); }
+
+  // ================= FRONT DOOR (#1) =================
+  var DFX=150,DFY=88,DFW=140,DFH=214, IX=164,IY=100,IW=112,IH=190;
+  function drawFacade(){
+    var gr=cx.createLinearGradient(0,0,0,300); gr.addColorStop(0,"#eadfc6"); gr.addColorStop(1,"#ddd0b2"); cx.fillStyle=gr; cx.fillRect(0,0,W,304);
+    cx.strokeStyle="#00000010"; cx.lineWidth=1; for(var i=1;i<9;i++){ cx.beginPath(); cx.moveTo(0,i*34); cx.lineTo(W,i*34); cx.stroke(); }
+    // porch floor
+    cx.fillStyle="#b98a54"; cx.fillRect(0,304,W,H-304); cx.strokeStyle="#9a6f40"; cx.lineWidth=2; for(var j=0;j<7;j++){ cx.beginPath(); cx.moveTo(j*66,304); cx.lineTo(j*66,H); cx.stroke(); }
+    // house numbers + a window
+    cx.fillStyle="#bfe6ff"; cx.fillRect(56,120,66,70); cx.strokeStyle="#7a5a30"; cx.lineWidth=4; cx.strokeRect(56,120,66,70); cx.beginPath(); cx.moveTo(89,120); cx.lineTo(89,190); cx.moveTo(56,155); cx.lineTo(122,155); cx.stroke();
+    cx.fillStyle="#bfe6ff"; cx.fillRect(318,120,66,70); cx.strokeStyle="#7a5a30"; cx.strokeRect(318,120,66,70); cx.beginPath(); cx.moveTo(351,120); cx.lineTo(351,190); cx.moveTo(318,155); cx.lineTo(384,155); cx.stroke();
+  }
+  function drawDoorSlab(op,knob,wr){ cx.save(); cx.translate(IX,IY); cx.rotate(-op*1.15);
+    var gr=cx.createLinearGradient(0,0,IW,0); gr.addColorStop(0,"#9a5a2a"); gr.addColorStop(1,"#7a4420"); cx.fillStyle=gr; rr(0,0,IW,IH,5); cx.fill();
+    cx.strokeStyle="#5a3418"; cx.lineWidth=3; rr(0,0,IW,IH,5); cx.stroke();
+    cx.strokeStyle="#6a3f1e"; cx.lineWidth=3; rr(14,16,IW-28,66,4); cx.stroke(); rr(14,96,IW-28,78,4); cx.stroke();
+    if(wr){ cx.strokeStyle="#4a8a3a"; cx.lineWidth=7; cx.beginPath(); cx.arc(IW*0.5,IH*0.26,17,0,7); cx.stroke(); emo("🎀",IW*0.5,IH*0.26+16,15); }
+    if(knob){ cx.fillStyle="#ffd23f"; cx.beginPath(); cx.arc(IW-18,IH*0.52,6,0,7); cx.fill(); cx.strokeStyle="#c99a2a"; cx.lineWidth=1.5; cx.stroke(); }
+    cx.restore();
+  }
+  S.door={ init:function(){ g={phase:"slab",hold:null,hx:0,hy:0,knob:false,wreath:false,op:0,over:false}; label("Drag the DOOR into the frame! 🚪"); },
+    update:function(){ if(g.phase==="opening"){ g.op=Math.min(1,g.op+0.045); if(g.op>=1 && !g.over){ g.over=true; coins+=5; save(); confettiBurst(); label("Grand door done! 🪙 "+coins); } } },
+    render:function(){ drawFacade();
+      // dark opening + interior when open
+      cx.fillStyle="#3a2a1a"; rr(IX,IY,IW,IH,5); cx.fill();
+      if(g.phase==="opening"||g.over){ var gr=cx.createLinearGradient(0,IY,0,IY+IH); gr.addColorStop(0,"#ffe6b0"); gr.addColorStop(1,"#f0c070"); cx.fillStyle=gr; rr(IX+6,IY+6,IW-12,IH-12,4); cx.fill();
+        emo("👨",IX+34,IY+120,26); emo("👩",IX+70,IY+120,26); emo("🐕",IX+52,IY+150,20); }
+      // frame
+      cx.strokeStyle="#8a5a2f"; cx.lineWidth=12; rr(DFX,DFY,DFW,DFH,6); cx.stroke();
+      cx.strokeStyle="#6a4420"; cx.lineWidth=3; rr(DFX,DFY,DFW,DFH,6); cx.stroke();
+      // door slab (if placed)
+      if(g.phase!=="slab"){ drawDoorSlab(g.op, g.knob, g.wreath); }
+      coinHUD();
+      if(g.phase==="slab"){ text("Drag the DOOR into the frame!",W/2,44,16,"#4a2a10");
+        cx.setLineDash([7,6]); cx.strokeStyle="#eecb8a"; cx.lineWidth=3; rr(IX,IY,IW,IH,5); cx.stroke(); cx.setLineDash([]);
+        var x=g.hold==="slab"?g.hx:W/2, y=g.hold==="slab"?g.hy:545; drawShelfDoor(x,y); }
+      else if(g.phase==="knob"){ text("Drag the HANDLE onto the door!",W/2,44,16,"#4a2a10");
+        var kx=g.hold==="knob"?g.hx:W*0.72, ky=g.hold==="knob"?g.hy:545; drawShelfKnob(kx,ky); }
+      else if(g.phase==="wreath"){ text("Hang the WREATH on the door!",W/2,44,16,"#4a2a10");
+        var wx=g.hold==="wreath"?g.hx:W*0.72, wy=g.hold==="wreath"?g.hy:545; drawShelfWreath(wx,wy); }
+      else if(g.phase==="ready"){ text("👉 Tap the door to OPEN it!",W/2,44,17,"#4a2a10");
+        if(Math.floor(t/20)%2===0){ cx.strokeStyle="#ffd23f"; cx.lineWidth=3; rr(IX,IY,IW,IH,5); cx.stroke(); } }
+      if(g.over){ // welcome mat
+        cx.fillStyle="#c85a3a"; rr(W/2-52,320,104,26,6); cx.fill(); text("WELCOME",W/2,333,14,"#fff");
+        if(t%45===0)confettiBurst(); text("🎉 GRAND DOOR — WELCOME HOME!",W/2,H*0.52,17,"#7a4a1a"); btn("▶ BACK TO HOUSE",H*0.62); }
+    },
+    down:function(){
+      if(g.phase==="slab"){ if(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-545)<44){ g.hold="slab"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="knob"){ if(Math.abs(ptr.x-W*0.72)<44&&Math.abs(ptr.y-545)<40){ g.hold="knob"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="wreath"){ if(Math.abs(ptr.x-W*0.72)<44&&Math.abs(ptr.y-545)<40){ g.hold="wreath"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="ready"){ if(ptr.x>IX&&ptr.x<IX+IW&&ptr.y>IY&&ptr.y<IY+IH){ g.phase="opening"; ding(); } }
+    },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){
+      if(g.hold==="slab"){ if(Math.abs(g.hx-(IX+IW/2))<70&&Math.abs(g.hy-(IY+IH/2))<90){ g.phase="knob"; ding(); drop(IX+IW/2,IY+IH/2,"#9a5a2a",10); label("Add the door HANDLE!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="knob"){ if(Math.abs(g.hx-(IX+IW-18))<60&&Math.abs(g.hy-(IY+IH*0.52))<70){ g.knob=true; g.phase="wreath"; ding(); star(IX+IW-18,IY+IH*0.52,6); label("Now hang a WREATH!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="wreath"){ if(Math.abs(g.hx-(IX+IW*0.5))<66&&Math.abs(g.hy-(IY+IH*0.3))<80){ g.wreath=true; g.phase="ready"; ding(); star(IX+IW*0.5,IY+IH*0.26,7); label("Tap the door to open it!"); } else beep(300,.08); g.hold=null; }
+    },
+    tap:function(){ if(g.over){ go("menu"); } } };
+  function drawShelfDoor(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#9a5a2a"; rr(-26,-40,52,80,5); cx.fill(); cx.strokeStyle="#5a3418"; cx.lineWidth=2; rr(-26,-40,52,80,5); cx.stroke(); cx.fillStyle="#ffd23f"; cx.beginPath(); cx.arc(16,4,4,0,7); cx.fill(); text("DOOR",0,-50,13,"#4a2a10"); cx.restore(); }
+  function drawShelfKnob(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#ffd23f"; cx.beginPath(); cx.arc(0,0,14,0,7); cx.fill(); cx.strokeStyle="#c99a2a"; cx.lineWidth=3; cx.stroke(); text("HANDLE",0,-26,13,"#4a2a10"); cx.restore(); }
+  function drawShelfWreath(x,y){ cx.save(); cx.translate(x,y); cx.strokeStyle="#4a8a3a"; cx.lineWidth=9; cx.beginPath(); cx.arc(0,0,16,0,7); cx.stroke(); emo("🎀",0,16,16); text("WREATH",0,-30,13,"#4a2a10"); cx.restore(); }
+
+  // ================= DINING TABLE (#122) =================
+  var TCX=W/2, TCY=298;
+  var CHAIRS=[{x:TCX,y:242},{x:TCX,y:360},{x:TCX-124,y:300},{x:TCX+124,y:300}];
+  var PLATES=[{x:TCX-56,y:300},{x:TCX+56,y:300},{x:TCX,y:274},{x:TCX,y:326}];
+  function drawRoom(){ var gr=cx.createLinearGradient(0,0,0,H); gr.addColorStop(0,"#efe3cd"); gr.addColorStop(0.5,"#e6d8bd"); gr.addColorStop(0.5,"#c99a64"); gr.addColorStop(1,"#b98a54"); cx.fillStyle=gr; cx.fillRect(0,0,W,H);
+    cx.strokeStyle="#a5713f"; cx.lineWidth=2; for(var j=0;j<7;j++){ cx.beginPath(); cx.moveTo(j*70,H*0.5); cx.lineTo(j*70-30,H); cx.stroke(); }
+    cx.fillStyle="#bfe6ff"; cx.fillRect(160,90,120,80); cx.strokeStyle="#7a5a30"; cx.lineWidth=5; cx.strokeRect(160,90,120,80); cx.beginPath(); cx.moveTo(220,90); cx.lineTo(220,170); cx.moveTo(160,130); cx.lineTo(280,130); cx.stroke(); }
+  function drawTable(){ cx.save(); cx.fillStyle="#00000022"; cx.beginPath(); cx.ellipse(TCX,TCY+40,104,20,0,0,7); cx.fill();
+    var gr=cx.createLinearGradient(0,TCY-38,0,TCY+38); gr.addColorStop(0,"#b9793f"); gr.addColorStop(1,"#8a5a2a"); cx.fillStyle=gr; rr(TCX-100,TCY-34,200,68,26); cx.fill(); cx.strokeStyle="#6a4420"; cx.lineWidth=3; rr(TCX-100,TCY-34,200,68,26); cx.stroke(); cx.restore(); }
+  function drawChair(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#a5713f"; rr(-14,-4,28,10,3); cx.fill(); rr(-13,-26,26,12,3); cx.fill(); cx.strokeStyle="#7a4a2a"; cx.lineWidth=2; rr(-13,-26,26,12,3); cx.stroke(); cx.restore(); }
+  function drawPlate(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#fff"; cx.beginPath(); cx.arc(0,0,15,0,7); cx.fill(); cx.strokeStyle="#c9c0b0"; cx.lineWidth=2; cx.stroke(); cx.beginPath(); cx.arc(0,0,8,0,7); cx.stroke(); cx.restore(); }
+  S.dining={ init:function(){ g={phase:"table",hold:null,hx:0,hy:0, chairs:[false,false,false,false], plates:[false,false,false,false], center:false, over:false}; label("Drag the big TABLE into the room! 🍽️"); },
+    update:function(){},
+    render:function(){ drawRoom();
+      // placed table + chairs behind/around
+      if(g.phase!=="table"){ // chairs first (so table overlaps)
+        for(var c=0;c<4;c++){ if(g.chairs[c]) drawChair(CHAIRS[c].x,CHAIRS[c].y); }
+        drawTable();
+        for(var p=0;p<4;p++){ if(g.plates[p]) drawPlate(PLATES[p].x,PLATES[p].y); }
+        if(g.center) emo("💐",TCX,TCY-2,30);
+        if(g.over){ // family seated
+          var F=["👦","👩","👨","👧"]; for(var s=0;s<4;s++){ emo(F[s],CHAIRS[s].x,CHAIRS[s].y-18,26); } }
+      }
+      coinHUD();
+      if(g.phase==="table"){ text("Drag the big TABLE into the room!",W/2,44,15,"#4a2a10");
+        cx.setLineDash([7,6]); cx.strokeStyle="#8a5a2f"; cx.lineWidth=3; rr(TCX-100,TCY-34,200,68,26); cx.stroke(); cx.setLineDash([]);
+        var x=g.hold==="table"?g.hx:W/2, y=g.hold==="table"?g.hy:545; drawShelfTable(x,y); }
+      else if(g.phase==="chairs"){ text("Place 4 CHAIRS around the table!",W/2,44,15,"#4a2a10");
+        for(var i=0;i<4;i++){ if(!g.chairs[i]){ cx.setLineDash([5,5]); cx.strokeStyle="#8a5a2f"; cx.lineWidth=2; rr(CHAIRS[i].x-15,CHAIRS[i].y-26,30,32,4); cx.stroke(); cx.setLineDash([]); } }
+        var cxp=g.hold==="chair"?g.hx:W/2, cyp=g.hold==="chair"?g.hy:552; drawShelfChair(cxp,cyp);
+        text(cnt(g.chairs)+"/4 chairs",W/2,H-20,13,"#4a2a10"); }
+      else if(g.phase==="plates"){ text("Set the table — drag PLATES on!",W/2,44,15,"#4a2a10");
+        for(var q=0;q<4;q++){ if(!g.plates[q]){ cx.setLineDash([4,4]); cx.strokeStyle="#8a5a2f"; cx.lineWidth=2; cx.beginPath(); cx.arc(PLATES[q].x,PLATES[q].y,15,0,7); cx.stroke(); cx.setLineDash([]); } }
+        var pxp=g.hold==="plate"?g.hx:W/2, pyp=g.hold==="plate"?g.hy:552; drawShelfPlate(pxp,pyp);
+        text(cnt(g.plates)+"/4 plates",W/2,H-20,13,"#4a2a10"); }
+      else if(g.phase==="center"){ text("Add a CENTERPIECE! 💐",W/2,44,16,"#4a2a10");
+        emo("⬇️",TCX,TCY-40+Math.sin(t*0.2)*3,18);
+        var vx=g.hold==="center"?g.hx:W/2, vy=g.hold==="center"?g.hy:548; if(!g.center) drawShelfCenter(vx,vy); }
+      if(g.over){ if(t%45===0)confettiBurst(); cx.fillStyle="rgba(0,0,0,.45)"; cx.fillRect(0,0,W,H); text("🍽️ DINNER IS SERVED!",W/2,H*0.4,22,"#ffd23f"); text("The family sits down together!",W/2,H*0.47,14,"#fff"); btn("▶ BACK TO HOUSE",H*0.56); }
+    },
+    down:function(){
+      if(g.phase==="table"){ if(Math.abs(ptr.x-W/2)<70&&Math.abs(ptr.y-545)<44){ g.hold="table"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="chairs"){ if(Math.abs(ptr.x-W/2)<40&&Math.abs(ptr.y-552)<40){ g.hold="chair"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="plates"){ if(Math.abs(ptr.x-W/2)<40&&Math.abs(ptr.y-552)<40){ g.hold="plate"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="center"){ if(Math.abs(ptr.x-W/2)<40&&Math.abs(ptr.y-548)<40){ g.hold="center"; g.hx=ptr.x; g.hy=ptr.y; } }
+    },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){
+      if(g.hold==="table"){ if(Math.abs(g.hx-TCX)<80&&Math.abs(g.hy-TCY)<70){ g.phase="chairs"; ding(); drop(TCX,TCY,"#b9793f",10); label("Place 4 chairs around it!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="chair"){ var bi=-1,bd=44; for(var i=0;i<4;i++){ if(!g.chairs[i]){ var d=Math.hypot(g.hx-CHAIRS[i].x,g.hy-CHAIRS[i].y); if(d<bd){bd=d;bi=i;} } } if(bi>=0){ g.chairs[bi]=true; ding(); star(CHAIRS[bi].x,CHAIRS[bi].y,5); if(cnt(g.chairs)>=4){ g.phase="plates"; label("Now set the plates!"); } } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="plate"){ var pi=-1,pd=40; for(var j=0;j<4;j++){ if(!g.plates[j]){ var e=Math.hypot(g.hx-PLATES[j].x,g.hy-PLATES[j].y); if(e<pd){pd=e;pi=j;} } } if(pi>=0){ g.plates[pi]=true; clink(); star(PLATES[pi].x,PLATES[pi].y,5); if(cnt(g.plates)>=4){ g.phase="center"; label("Add a pretty centerpiece!"); } } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="center"){ if(Math.abs(g.hx-TCX)<60&&Math.abs(g.hy-TCY)<50){ g.center=true; g.over=true; coins+=5; save(); ding(); confettiBurst(); label("Dining table done! 🪙 "+coins); } else beep(300,.08); g.hold=null; }
+    },
+    tap:function(){ if(g.over){ go("menu"); } } };
+  function cnt(a){ var n=0; for(var i=0;i<a.length;i++)if(a[i])n++; return n; }
+  function drawShelfTable(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#b9793f"; rr(-56,-18,112,36,16); cx.fill(); cx.strokeStyle="#6a4420"; cx.lineWidth=2; rr(-56,-18,112,36,16); cx.stroke(); text("TABLE",0,-30,13,"#4a2a10"); cx.restore(); }
+  function drawShelfChair(x,y){ drawChair(x,y+6); text("CHAIR",x,y-30,13,"#4a2a10"); }
+  function drawShelfPlate(x,y){ drawPlate(x,y); text("PLATE",x,y-24,13,"#4a2a10"); }
+  function drawShelfCenter(x,y){ emo("💐",x,y,30); text("FLOWERS",x,y-26,13,"#4a2a10"); }
+
+  // ================= KIDS ROOM — GLOW STARS (#84) =================
+  var CEIL_TOP=48, CEIL_BOT=250;                 // ceiling zone to place stars
+  function drawStar5(x,y,r,col){ cx.save(); cx.translate(x,y); cx.fillStyle=col; cx.beginPath(); for(var i=0;i<5;i++){ var a=-1.57+i*1.2566, a2=a+0.628; cx.lineTo(Math.cos(a)*r,Math.sin(a)*r); cx.lineTo(Math.cos(a2)*r*0.45,Math.sin(a2)*r*0.45); } cx.closePath(); cx.fill(); cx.restore(); }
+  function drawKidsRoom(){
+    cx.fillStyle="#e7ddf0"; cx.fillRect(0,0,W,300);
+    cx.fillStyle="#c9a06a"; cx.fillRect(0,300,W,H-300);
+    // rug
+    cx.fillStyle="#7fb0e0"; cx.beginPath(); cx.ellipse(W/2,H-70,120,40,0,0,7); cx.fill(); cx.fillStyle="#9ac6f0"; cx.beginPath(); cx.ellipse(W/2,H-70,80,26,0,0,7); cx.fill();
+    // bed
+    cx.fillStyle="#8a5a2f"; rr(30,300,180,24,6); cx.fill();
+    cx.fillStyle="#ff9ac0"; rr(30,270,180,36,8); cx.fill();      // blanket
+    cx.fillStyle="#fff"; rr(40,262,54,26,8); cx.fill();           // pillow
+    cx.fillStyle="#6a4420"; rr(30,300,12,60,3); cx.fill(); rr(198,300,12,60,3); cx.fill();
+    // toy box
+    cx.fillStyle="#5ad0a0"; rr(300,264,90,44,8); cx.fill(); emo("🧸",324,276,20); emo("🚂",360,278,18);
+    // window
+    cx.fillStyle="#bfd8f0"; cx.fillRect(250,80,110,90); cx.strokeStyle="#8a6fd0"; cx.lineWidth=5; cx.strokeRect(250,80,110,90); cx.beginPath(); cx.moveTo(305,80); cx.lineTo(305,170); cx.moveTo(250,125); cx.lineTo(360,125); cx.stroke();
+  }
+  S.kids={ init:function(){ g={phase:"place", stars:[], need:12, dark:0, over:false}; label("Tap the ceiling to stick glow stars! 🌟"); },
+    update:function(){ if(g.phase==="off"){ g.dark=Math.min(1,g.dark+0.03); if(g.dark>=1 && !g.over){ g.over=true; coins+=5; save(); confettiBurst(); label("Glow stars done! 🪙 "+coins); } } },
+    render:function(){ drawKidsRoom();
+      // window daylight / moon
+      if(g.dark>0.3){ cx.fillStyle="#1a2a4a"; cx.fillRect(252,82,106,86); emo("🌙",332,104,22); }
+      // placed stars (lit = pale, dark = glowing)
+      g.stars.forEach(function(s){ if(g.dark>0.2){ var tw=0.7+Math.sin(t*0.1+s.p)*0.3; cx.globalAlpha=tw; drawStar5(s.x,s.y,s.r+2,"#fff2a0"); cx.globalAlpha=0.35; drawStar5(s.x,s.y,s.r+7,"#ffe27a"); cx.globalAlpha=1; } else { drawStar5(s.x,s.y,s.r,"#d7c94a"); } });
+      // darkness overlay
+      if(g.dark>0){ cx.fillStyle="rgba(10,10,40,"+(g.dark*0.72)+")"; cx.fillRect(0,0,W,H);
+        g.stars.forEach(function(s){ var tw=0.7+Math.sin(t*0.1+s.p)*0.3; cx.globalAlpha=tw; drawStar5(s.x,s.y,s.r+2,"#fff2a0"); cx.globalAlpha=0.4; drawStar5(s.x,s.y,s.r+8,"#ffe27a"); cx.globalAlpha=1; }); }
+      coinHUD();
+      if(g.phase==="place"){ text("Tap the ceiling to stick stars! 🌟",W/2,32,15,"#4a2a6a");
+        cx.setLineDash([6,6]); cx.strokeStyle="#b7a0e0"; cx.lineWidth=2; cx.strokeRect(14,CEIL_TOP,W-28,CEIL_BOT-CEIL_TOP); cx.setLineDash([]);
+        for(var k=0;k<g.need;k++){ emo(k<g.stars.length?"⭐":"·", W/2-(g.need-1)*15+k*30, H-22, k<g.stars.length?15:20, ); }
+        if(g.stars.length>=g.need){ btn("💡 TURN OFF THE LIGHTS",H-64,"#8a6fd0"); }
+      }
+      if(g.over){ if(t%50===0)confettiBurst(); text("🌟 GLOW STARS — GOODNIGHT!",W/2,H*0.5,20,"#fff2a0"); text("The room glows like a night sky!",W/2,H*0.56,14,"#cbb8ff"); btn("▶ BACK TO HOUSE",H*0.64); }
+    },
+    down:function(){
+      if(g.phase==="place"){
+        if(g.stars.length>=g.need && ptr.y>H-64 && ptr.y<H-12 && Math.abs(ptr.x-W/2)<120){ g.phase="off"; ding(); label("Lights off — watch them glow!"); return; }
+        if(g.stars.length<g.need && ptr.y>CEIL_TOP && ptr.y<CEIL_BOT && ptr.x>14 && ptr.x<W-14){ g.stars.push({x:ptr.x,y:ptr.y,r:8+Math.random()*5,p:Math.random()*6}); beep(600+g.stars.length*30,.06,"sine"); star(ptr.x,ptr.y,4);
+          if(g.stars.length>=g.need){ label("All stars up! Turn off the lights 💡"); } }
+      }
+    },
+    tap:function(){ if(g.over){ go("menu"); } } };
+
+  // ================= FAMILY BATHROOM (#101 + soaking tub w/ view #120) =================
+  var TUB={x:W/2,y:352,w:158,h:56}, TOIL={x:372,y:346}, VAN={x:66,y:346};
+  function drawBathroom(){
+    // tiled wall
+    cx.fillStyle="#d6eef2"; cx.fillRect(0,0,W,300);
+    cx.strokeStyle="#bcdfe4"; cx.lineWidth=2; for(var i=1;i<8;i++){ cx.beginPath(); cx.moveTo(0,i*38); cx.lineTo(W,i*38); cx.stroke(); } for(var k=0;k<9;k++){ cx.beginPath(); cx.moveTo(k*52,0); cx.lineTo(k*52,300); cx.stroke(); }
+    // floor tiles
+    cx.fillStyle="#e7e2da"; cx.fillRect(0,300,W,H-300); cx.strokeStyle="#cfc8bc"; cx.lineWidth=2; for(var f=0;f<9;f++){ cx.beginPath(); cx.moveTo(f*52,300); cx.lineTo(f*52,H); cx.stroke(); } cx.beginPath(); cx.moveTo(0,300); cx.lineTo(W,300); cx.stroke(); cx.beginPath(); cx.moveTo(0,H-60); cx.lineTo(W,H-60); cx.stroke();
+    // WINDOW WITH A VIEW (the soaking-tub view!)
+    var wx=150,wy=70,ww=140,wh=110;
+    var sky=cx.createLinearGradient(0,wy,0,wy+wh); sky.addColorStop(0,"#aee0ff"); sky.addColorStop(1,"#e8f6ff"); cx.fillStyle=sky; cx.fillRect(wx,wy,ww,wh);
+    cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(wx+ww-28,wy+28,14,0,7); cx.fill();
+    cx.fillStyle="#7ec46a"; cx.beginPath(); cx.moveTo(wx,wy+wh); cx.lineTo(wx+40,wy+62); cx.lineTo(wx+80,wy+wh); cx.closePath(); cx.fill();
+    cx.fillStyle="#8fce7c"; cx.beginPath(); cx.moveTo(wx+50,wy+wh); cx.lineTo(wx+95,wy+54); cx.lineTo(wx+ww,wy+wh); cx.closePath(); cx.fill();
+    cx.fillStyle="#fff"; [[wx+34,wy+30],[wx+70,wy+40]].forEach(function(c){ cx.beginPath(); cx.arc(c[0],c[1],10,0,7); cx.arc(c[0]+10,c[1]+3,8,0,7); cx.fill(); });
+    cx.strokeStyle="#8fb8c0"; cx.lineWidth=6; cx.strokeRect(wx,wy,ww,wh); cx.beginPath(); cx.moveTo(wx+ww/2,wy); cx.lineTo(wx+ww/2,wy+wh); cx.moveTo(wx,wy+wh/2); cx.lineTo(wx+ww,wy+wh/2); cx.stroke();
+  }
+  function drawTub(water){ cx.save();
+    cx.fillStyle="#00000018"; cx.beginPath(); cx.ellipse(TUB.x,TUB.y+TUB.h/2+6,TUB.w/2,12,0,0,7); cx.fill();
+    cx.fillStyle="#ffffff"; rr(TUB.x-TUB.w/2,TUB.y-TUB.h/2,TUB.w,TUB.h,26); cx.fill(); cx.strokeStyle="#cfd6dc"; cx.lineWidth=3; rr(TUB.x-TUB.w/2,TUB.y-TUB.h/2,TUB.w,TUB.h,26); cx.stroke();
+    // inner
+    cx.fillStyle="#eef3f6"; rr(TUB.x-TUB.w/2+10,TUB.y-TUB.h/2+8,TUB.w-20,TUB.h-16,20); cx.fill();
+    if(water>0){ cx.fillStyle="rgba(120,190,255,0.7)"; rr(TUB.x-TUB.w/2+12,TUB.y-TUB.h/2+10+(1-water)*(TUB.h-24),TUB.w-24,(TUB.h-24)*water,16); cx.fill();
+      // bubbles
+      for(var bqx=0;bqx<6;bqx++){ var px=TUB.x-50+bqx*20, py=TUB.y-6-((t*0.6+bqx*17)% (TUB.h)); cx.fillStyle="rgba(255,255,255,0.7)"; cx.beginPath(); cx.arc(px,TUB.y+((py-TUB.y)),3+ (bqx%3),0,7); cx.fill(); } }
+    // faucet
+    cx.fillStyle="#c6cdd6"; rr(TUB.x-6,TUB.y-TUB.h/2-14,12,10,3); cx.fill(); cx.strokeStyle="#c6cdd6"; cx.lineWidth=5; cx.lineCap="round"; cx.beginPath(); cx.moveTo(TUB.x,TUB.y-TUB.h/2-12); cx.lineTo(TUB.x,TUB.y-TUB.h/2-2); cx.stroke();
+    cx.restore(); }
+  function drawToilet(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#fff"; rr(-16,-30,32,20,6); cx.fill(); cx.beginPath(); cx.ellipse(0,2,16,12,0,0,7); cx.fill(); cx.strokeStyle="#cfd6dc"; cx.lineWidth=2; cx.beginPath(); cx.ellipse(0,2,16,12,0,0,7); cx.stroke(); cx.fillStyle="#eef3f6"; cx.beginPath(); cx.ellipse(0,2,9,6,0,0,7); cx.fill(); cx.restore(); }
+  function drawVanity(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#b98a54"; rr(-20,-6,40,26,4); cx.fill(); cx.fillStyle="#fff"; rr(-20,-14,40,12,5); cx.fill(); cx.fillStyle="#eef3f6"; cx.beginPath(); cx.ellipse(0,-8,10,4,0,0,7); cx.fill(); cx.strokeStyle="#c6cdd6"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(0,-14); cx.lineTo(0,-20); cx.stroke(); cx.restore(); }
+  S.bath={ init:function(){ g={phase:"tub",hold:null,hx:0,hy:0,water:0,over:false}; label("Drag the soaking TUB by the window! 🛁"); },
+    update:function(){ if(g.phase==="fill" && g._filling){ g.water=Math.min(1,g.water+0.02); if(t%4===0)drop(TUB.x+(Math.random()*90-45),TUB.y-8,"#bfe4ff",2,true); if(g.water>=1&&!g.over){ g.over=true; coins+=5; save(); confettiBurst(); label("Bathroom done! 🪙 "+coins); } } },
+    render:function(){ drawBathroom();
+      if(g.phase!=="tub"){ drawTub(g.water); }
+      if(g.phase==="sink"||g.phase==="fill"||g.over){ if(g._toilet)drawToilet(TOIL.x,TOIL.y); }
+      if(g.phase==="fill"||g.over){ if(g._van)drawVanity(VAN.x,VAN.y); }
+      // draw toilet/vanity once placed regardless
+      if(g._toilet)drawToilet(TOIL.x,TOIL.y); if(g._van)drawVanity(VAN.x,VAN.y);
+      coinHUD();
+      if(g.phase==="tub"){ text("Drag the soaking TUB by the window!",W/2,42,14,"#2a5a6a");
+        cx.setLineDash([7,6]); cx.strokeStyle="#8fb8c0"; cx.lineWidth=3; rr(TUB.x-TUB.w/2,TUB.y-TUB.h/2,TUB.w,TUB.h,26); cx.stroke(); cx.setLineDash([]);
+        var x=g.hold==="tub"?g.hx:W/2, y=g.hold==="tub"?g.hy:545; drawShelfTub(x,y); }
+      else if(g.phase==="toilet"){ text("Drag the TOILET into the corner!",W/2,42,15,"#2a5a6a");
+        cx.setLineDash([6,5]); cx.strokeStyle="#8fb8c0"; cx.lineWidth=2; cx.strokeRect(TOIL.x-18,TOIL.y-32,36,44); cx.setLineDash([]);
+        var tx=g.hold==="toilet"?g.hx:W/2, ty=g.hold==="toilet"?g.hy:545; drawShelfToilet(tx,ty); }
+      else if(g.phase==="sink"){ text("Drag the SINK vanity in!",W/2,42,15,"#2a5a6a");
+        cx.setLineDash([6,5]); cx.strokeStyle="#8fb8c0"; cx.lineWidth=2; cx.strokeRect(VAN.x-22,VAN.y-16,44,38); cx.setLineDash([]);
+        var vx=g.hold==="sink"?g.hx:W/2, vy=g.hold==="sink"?g.hy:545; drawShelfVan(vx,vy); }
+      else if(g.phase==="fill"){ text(g.water>=1?"Bubbly bath ready! 🛁":"Tap the tub faucet to fill it!",W/2,42,15,"#2a5a6a");
+        if(g.water<1 && Math.floor(t/18)%2===0){ cx.strokeStyle="#5aa0e0"; cx.lineWidth=3; cx.beginPath(); cx.arc(TUB.x,TUB.y-TUB.h/2-8,14,0,7); cx.stroke(); } }
+      if(g.over){ if(t%50===0)confettiBurst(); cx.fillStyle="rgba(0,0,0,.4)"; cx.fillRect(0,0,W,H); text("🛁 SPA BATHROOM DONE!",W/2,H*0.4,21,"#ffd23f"); text("A soaking tub with a view! 🏞️",W/2,H*0.47,14,"#fff"); btn("▶ BACK TO HOUSE",H*0.56); }
+    },
+    down:function(){
+      if(g.phase==="tub"){ if(Math.abs(ptr.x-W/2)<70&&Math.abs(ptr.y-545)<44){ g.hold="tub"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="toilet"){ if(Math.abs(ptr.x-W/2)<44&&Math.abs(ptr.y-545)<40){ g.hold="toilet"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="sink"){ if(Math.abs(ptr.x-W/2)<44&&Math.abs(ptr.y-545)<40){ g.hold="sink"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="fill"){ if(g.water<1 && Math.abs(ptr.x-TUB.x)<50 && Math.abs(ptr.y-TUB.y)<40){ /* start fill on hold */ g._filling=true; beep(400,.1,"sine"); } }
+    },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){
+      if(g.hold==="tub"){ if(Math.abs(g.hx-TUB.x)<80&&Math.abs(g.hy-TUB.y)<70){ g.phase="toilet"; ding(); drop(TUB.x,TUB.y,"#dfeef6",10); label("Now add the toilet!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="toilet"){ if(Math.abs(g.hx-TOIL.x)<70&&Math.abs(g.hy-TOIL.y)<70){ g._toilet=true; g.phase="sink"; ding(); star(TOIL.x,TOIL.y,5); label("Add the sink vanity!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="sink"){ if(Math.abs(g.hx-VAN.x)<70&&Math.abs(g.hy-VAN.y)<70){ g._van=true; g.phase="fill"; ding(); star(VAN.x,VAN.y,5); label("Tap the tub faucet to fill the bath!"); } else beep(300,.08); g.hold=null; }
+    },
+    tap:function(){ if(g.over){ go("menu"); } } };
+  function drawShelfTub(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#fff"; rr(-52,-16,104,32,16); cx.fill(); cx.strokeStyle="#cfd6dc"; cx.lineWidth=2; rr(-52,-16,104,32,16); cx.stroke(); cx.fillStyle="#eef3f6"; rr(-44,-10,88,20,12); cx.fill(); text("TUB",0,-28,13,"#2a5a6a"); cx.restore(); }
+  function drawShelfToilet(x,y){ drawToilet(x,y+8); text("TOILET",x,y-30,13,"#2a5a6a"); }
+  function drawShelfVan(x,y){ drawVanity(x,y+4); text("SINK",x,y-26,13,"#2a5a6a"); }
+
+  // ================= WALK THE HOUSE — make a person & do anything =================
+  var SHIRTS=["#4a9de0","#e05a7a","#5ad07a","#c77aff","#ffce3f","#ff8a3a"];
+  var HAIRS=["#3a2a1a","#7a4a2a","#ffd23f","#e0e0e0","#c05a2a"]; var SKIN="#f6c9a0";
+  var mePref={shirt:0,hair:0}; try{ var _mp=localStorage.getItem("mohouse_look"); if(_mp)mePref=JSON.parse(_mp); }catch(e){}
+  function saveLook(){ try{ localStorage.setItem("mohouse_look",JSON.stringify(mePref)); }catch(e){} }
+  function drawPerson(x,y,face,ph,moving,shirt,hair,sit){ cx.save(); cx.translate(x,y);
+    cx.fillStyle="rgba(0,0,0,.18)"; cx.beginPath(); cx.ellipse(0,22,13,5,0,0,7); cx.fill();
+    cx.scale(face,1); var sw=sit?0:(moving?Math.sin(ph)*5:0);
+    cx.strokeStyle="#3a2a1a"; cx.lineWidth=5; cx.lineCap="round";
+    if(sit){ cx.beginPath(); cx.moveTo(-4,8); cx.lineTo(-8,16); cx.moveTo(4,8); cx.lineTo(0,16); cx.stroke(); }
+    else { cx.beginPath(); cx.moveTo(-4,8); cx.lineTo(-4+sw,20); cx.moveTo(4,8); cx.lineTo(4-sw,20); cx.stroke(); }
+    cx.fillStyle=shirt; rr(-9,-10,18,20,5); cx.fill();
+    cx.strokeStyle=shirt; cx.lineWidth=5; cx.beginPath(); cx.moveTo(-8,-6); cx.lineTo(-11,4-sw*0.6); cx.moveTo(8,-6); cx.lineTo(11,4+sw*0.6); cx.stroke();
+    cx.fillStyle=SKIN; cx.beginPath(); cx.arc(-11,5-sw*0.6,2.4,0,7); cx.arc(11,5+sw*0.6,2.4,0,7); cx.fill();
+    cx.fillStyle=SKIN; cx.beginPath(); cx.arc(0,-18,8,0,7); cx.fill();
+    cx.fillStyle=hair; cx.beginPath(); cx.arc(0,-20,8,Math.PI,2*Math.PI); cx.fill(); cx.fillRect(-8,-20,16,3);
+    cx.fillStyle="#222"; cx.beginPath(); cx.arc(3,-17,1.3,0,7); cx.fill(); cx.restore(); }
+  function drawDogTop(x,y,face){ cx.save(); cx.translate(x,y); cx.scale(face,1);
+    cx.fillStyle="rgba(0,0,0,.15)"; cx.beginPath(); cx.ellipse(0,10,10,4,0,0,7); cx.fill();
+    cx.strokeStyle="#8a5a2f"; cx.lineWidth=3; cx.lineCap="round"; cx.beginPath(); cx.moveTo(-11,-2); cx.lineTo(-16,-6+Math.sin(t*0.3)*3); cx.stroke();
+    cx.fillStyle="#a56a34"; [-8,-2,6].forEach(function(lx){ cx.fillRect(lx,4,3,6); });
+    cx.fillStyle="#b5793f"; rr(-12,-6,20,12,6); cx.fill(); cx.beginPath(); cx.arc(10,-6,7,0,7); cx.fill();
+    cx.fillStyle="#8a5a2f"; cx.beginPath(); cx.ellipse(6,-11,3,5,-.3,0,7); cx.fill();
+    cx.fillStyle="#222"; cx.beginPath(); cx.arc(12,-6,1.4,0,7); cx.fill(); cx.restore(); }
+  function drawMiniRobot(x,y,face,helping){ cx.save(); cx.translate(x,y); cx.scale(face,1);
+    cx.fillStyle="rgba(0,0,0,.15)"; cx.beginPath(); cx.ellipse(0,16,11,4,0,0,7); cx.fill();
+    // hover bob
+    var hb=Math.sin(t*0.2)*2; cx.translate(0,hb);
+    // wheels/base
+    cx.fillStyle="#7a8490"; rr(-9,8,18,8,3); cx.fill();
+    // body
+    var gr=cx.createLinearGradient(-11,0,11,0); gr.addColorStop(0,"#aeb6c2"); gr.addColorStop(.5,"#dfe4ea"); gr.addColorStop(1,"#aeb6c2"); cx.fillStyle=gr; rr(-11,-6,22,16,5); cx.fill();
+    cx.fillStyle=helping?"#5ad06a":"#ffce3f"; cx.beginPath(); cx.arc(0,2,3,0,7); cx.fill();
+    // arms (up when helping)
+    cx.strokeStyle="#8a95a5"; cx.lineWidth=3; cx.lineCap="round"; var aw=helping?-8-Math.abs(Math.sin(t*0.4))*4:2; cx.beginPath(); cx.moveTo(-11,-2); cx.lineTo(-15,aw); cx.moveTo(11,-2); cx.lineTo(15,aw); cx.stroke();
+    // head
+    cx.fillStyle="#8a95a5"; cx.lineWidth=2; cx.strokeStyle="#8a95a5"; cx.beginPath(); cx.moveTo(0,-6); cx.lineTo(0,-11); cx.stroke(); cx.fillStyle=helping?"#ff5a5a":"#c6cdd6"; cx.beginPath(); cx.arc(0,-13,2,0,7); cx.fill();
+    cx.fillStyle="#dfe4ea"; rr(-9,-20,18,14,4); cx.fill(); cx.strokeStyle="#8a95a5"; cx.strokeRect(-9,-20,18,14);
+    cx.fillStyle="#5ad0ff"; cx.beginPath(); cx.arc(-4,-13,2.4,0,7); cx.arc(4,-13,2.4,0,7); cx.fill();
+    if(helping){ cx.fillStyle="#fff2a8"; for(var s=0;s<3;s++){ var sa=t*0.2+s*2.1; cx.beginPath(); cx.arc(Math.cos(sa)*16,-13+Math.sin(sa)*10,1.6,0,7); cx.fill(); } }
+    cx.restore(); }
+
+  S.person={ init:function(){ label("Make your person, then walk! 🚶"); },
+    render:function(){ var gr=cx.createLinearGradient(0,0,0,H); gr.addColorStop(0,"#bfe6ff"); gr.addColorStop(1,"#eafbf0"); cx.fillStyle=gr; cx.fillRect(0,0,W,H); cx.fillStyle="#8fd07b"; cx.fillRect(0,H*0.6,W,H);
+      text("MAKE YOUR PERSON",W/2,54,22,"#3a6a2a");
+      drawPerson(W/2,H*0.33,1,t*0.2,true,SHIRTS[mePref.shirt],HAIRS[mePref.hair]);
+      text("👕 Shirt",W/2,H*0.48,15,"#3a5a2a");
+      for(var i=0;i<SHIRTS.length;i++){ var sx=W/2-((SHIRTS.length-1)*40)/2+i*40, sy=H*0.53; cx.fillStyle=SHIRTS[i]; cx.beginPath(); cx.arc(sx,sy,15,0,7); cx.fill(); if(mePref.shirt===i){ cx.strokeStyle="#fff"; cx.lineWidth=3; cx.stroke(); } }
+      text("💇 Hair",W/2,H*0.61,15,"#fff");
+      for(var j=0;j<HAIRS.length;j++){ var hx=W/2-((HAIRS.length-1)*44)/2+j*44, hy=H*0.66; cx.fillStyle=HAIRS[j]; cx.beginPath(); cx.arc(hx,hy,15,0,7); cx.fill(); if(mePref.hair===j){ cx.strokeStyle="#fff"; cx.lineWidth=3; cx.stroke(); } }
+      btn("▶ WALK THE HOUSE!",H-84,"#ffce3f"); },
+    tap:function(){
+      for(var i=0;i<SHIRTS.length;i++){ var sx=W/2-((SHIRTS.length-1)*40)/2+i*40, sy=H*0.53; if(Math.hypot(ptr.x-sx,ptr.y-sy)<18){ mePref.shirt=i; beep(600,.05); star(sx,sy,4); saveLook(); return; } }
+      for(var j=0;j<HAIRS.length;j++){ var hx=W/2-((HAIRS.length-1)*44)/2+j*44, hy=H*0.66; if(Math.hypot(ptr.x-hx,ptr.y-hy)<18){ mePref.hair=j; beep(650,.05); star(hx,hy,4); saveLook(); return; } }
+      if(ptr.y>H-84 && ptr.y<H-32 && Math.abs(ptr.x-W/2)<120){ beep(720,.1); go("house"); } } };
+
+  // interior bounds + interactive items
+  var HB={x0:16,y0:60,x1:424,y1:548};
+  var ITEMS=[
+    {x:70,y:130,type:"tv",e:"📺",name:"TV",say:"📺 Watching TV!"},
+    {x:150,y:150,type:"sofa",e:"🛋️",name:"Sofa",say:"😌 Relaxing"},
+    {x:300,y:110,type:"stove",e:"🍳",name:"Stove",say:"🍳 Cooking!"},
+    {x:360,y:130,type:"fridge",e:"🧊",name:"Fridge",say:"🍎 Yum!"},
+    {x:390,y:200,type:"sink",e:"🚰",name:"Sink",say:"💧 Washing up"},
+    {x:110,y:440,type:"bed",e:"🛏️",name:"Bed",say:"😴 Zzz..."},
+    {x:250,y:200,type:"table",e:"🍽️",name:"Table",say:"🍽️ Snack time!"},
+    {x:340,y:460,type:"tub",e:"🛁",name:"Tub",say:"🫧 Bubble bath!"},
+    {x:300,y:520,type:"plant",e:"🪴",name:"Plant",say:"🌿 Watering it"},
+    {x:184,y:250,type:"games",e:"🎮",name:"Games",say:"🎮 Playing games!",play:1},
+    {x:180,y:500,type:"ball",e:"⚽",name:"Ball",say:"⚽ Playing ball!",play:1},
+    {x:64,y:500,type:"toys",e:"🧸",name:"Toys",say:"🧸 Playing toys!",play:1}
+  ];
+  var HFAM=[{x:316,y:250,shirt:1,hair:0,msg:"Hi sweetie! 👋"},{x:120,y:356,shirt:2,hair:4,msg:"Looks great! 👍"},{x:372,y:400,shirt:3,hair:2,msg:"So cozy! 😊"}];
+  function drawMeowCat(x,y){ cx.save(); cx.translate(x,y); var tail=Math.sin(t*0.15)*4;
+    cx.strokeStyle="#c99a2a"; cx.lineWidth=3; cx.lineCap="round"; cx.beginPath(); cx.moveTo(-10,2); cx.quadraticCurveTo(-20,0,-16,-12+tail); cx.stroke();
+    cx.fillStyle="#f2c94c"; rr(-12,-6,22,14,7); cx.fill(); cx.beginPath(); cx.arc(10,-8,8,0,7); cx.fill();
+    cx.fillStyle="#c99a2a"; cx.beginPath(); cx.moveTo(4,-14); cx.lineTo(7,-22); cx.lineTo(10,-14); cx.closePath(); cx.fill(); cx.beginPath(); cx.moveTo(12,-14); cx.lineTo(15,-22); cx.lineTo(17,-14); cx.closePath(); cx.fill();
+    cx.fillStyle="#2a2a30"; cx.beginPath(); cx.arc(8,-9,1.4,0,7); cx.arc(14,-9,1.4,0,7); cx.fill(); cx.fillStyle="#e88"; cx.beginPath(); cx.arc(11,-6,1.2,0,7); cx.fill(); cx.restore(); }
+  function drawCityWindow(night){ var x=W/2,y=92,w=124,h=52;
+    var sky=cx.createLinearGradient(0,y-h/2,0,y+h/2); if(night){ sky.addColorStop(0,"#1a2450"); sky.addColorStop(1,"#4a3a6a"); } else { sky.addColorStop(0,"#aee0ff"); sky.addColorStop(1,"#ffe8d0"); } cx.fillStyle=sky; cx.fillRect(x-w/2,y-h/2,w,h);
+    if(night){ cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(x+w/2-16,y-h/2+12,7,0,7); cx.fill(); cx.fillStyle="#fff"; for(var st=0;st<7;st++){ if((st+Math.floor(t/20))%2===0)cx.fillRect(x-w/2+8+st*16,y-h/2+6,2,2); } }
+    else { cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(x+w/2-16,y-h/2+12,8,0,7); cx.fill(); }
+    for(var b=0;b<6;b++){ var bx=x-w/2+5+b*19, bh=14+((b*13)%26); cx.fillStyle=night?"#2a2a44":"#8a8fa8"; cx.fillRect(bx,y+h/2-bh,15,bh); cx.fillStyle=night?"#ffe27a":"#c4c8d8"; for(var wy=0;wy<Math.floor(bh/8);wy++){ if(!night||(b+wy)%2===0)cx.fillRect(bx+4,y+h/2-bh+4+wy*8,3,3); } }
+    cx.strokeStyle="#7a5a3a"; cx.lineWidth=4; cx.strokeRect(x-w/2,y-h/2,w,h); cx.beginPath(); cx.moveTo(x,y-h/2); cx.lineTo(x,y+h/2); cx.stroke(); }
+  S.house={ init:function(){ g={px:120,py:250,face:1,ph:0,moving:false,dogx:90,dogy:280,dogface:1,
+      robx:150,roby:280,robface:1,helping:false, night:false, meowx:200,meowy:186, sparkle:!!owned["spark"], pets:[],
+      joy:{active:false,bx:70,by:H-70,kx:70,ky:H-70}, near:-1, doing:null, dt:0};
+      SHOP.forEach(function(it){ if(it.cat==="pet" && owned[it.k]){ g.pets.push({e:it.e,x:120,y:270,off:g.pets.length}); } });
+      label("Walk • PLAY • tap 🌙 for night • robot helps! 🤖"); },
+    update:function(){
+      var j=g.joy, dx=0,dy=0; if(j.active){ dx=j.kx-j.bx; dy=j.ky-j.by; var d=Math.hypot(dx,dy); if(d>4){dx/=d;dy/=d;}else{dx=0;dy=0;} }
+      if(!g.doing){ g.px+=dx*2.8; g.py+=dy*2.8; g.px=Math.max(HB.x0+14,Math.min(HB.x1-14,g.px)); g.py=Math.max(HB.y0+20,Math.min(HB.y1-8,g.py));
+        g.moving=(dx!==0||dy!==0); if(g.moving){ g.ph+=0.28; if(dx<-0.2)g.face=-1; else if(dx>0.2)g.face=1; } } else { g.moving=false; g.dt--; if(g.dt<=0)g.doing=null; }
+      var ddx=g.px-g.dogx-26, ddy=g.py-g.dogy, dd=Math.hypot(ddx,ddy); if(dd>30){ g.dogx+=ddx*0.06; g.dogy+=ddy*0.06; g.dogface=(ddx<0)?-1:1; }
+      // robot helper: rushes to help at the item you're using, otherwise follows on your other side
+      var rtx, rty; if(g.doing){ var it=ITEMS[g.doing.i]; rtx=it.x-26; rty=it.y+18; g.helping=true; } else { rtx=g.px+34; rty=g.py+8; g.helping=false; }
+      var rdx=rtx-g.robx, rdy=rty-g.roby; g.robx+=rdx*0.12; g.roby+=rdy*0.12; if(Math.abs(rdx)>1)g.robface=(rdx<0)?-1:1;
+      if(g.helping && t%16===0){ star(g.robx,g.roby-14,3); }
+      // shop pets follow + sparkle trail
+      g.pets.forEach(function(pt){ var tx=g.px-32-pt.off*20, ty=g.py+20; pt.x+=(tx-pt.x)*0.11; pt.y+=(ty-pt.y)*0.11; });
+      if(g.sparkle && g.moving && t%4===0){ star(g.px-g.face*10, g.py+6, 2); }
+      g.near=-1; for(var i=0;i<ITEMS.length;i++){ if(Math.hypot(ITEMS[i].x-g.px,ITEMS[i].y-g.py)<44){ g.near=i; break; } }
+    },
+    render:function(){
+      // clear full canvas (outside-the-house ground)
+      cx.fillStyle="#3a5a3a"; cx.fillRect(0,0,W,H);
+      cx.fillStyle="#4a7a4a"; for(var bg=0;bg<H;bg+=24){ cx.fillRect(0,bg,W,12); }
+      // floor zones
+      cx.fillStyle="#c9a06a"; cx.fillRect(HB.x0,HB.y0,HB.x1-HB.x0,HB.y1-HB.y0);
+      cx.fillStyle="#b98a54"; cx.fillRect(HB.x0,HB.y0,204,242);          // living wood
+      cx.fillStyle="#e7e2da"; cx.fillRect(220,HB.y0,204,242);            // kitchen tile
+      cx.fillStyle="#d9c6e0"; cx.fillRect(HB.x0,304,204,244);           // bedroom carpet
+      cx.fillStyle="#cfe6ea"; cx.fillRect(220,304,204,244);            // bath tile
+      // outer wall
+      cx.strokeStyle="#7a5a3a"; cx.lineWidth=6; cx.strokeRect(HB.x0,HB.y0,HB.x1-HB.x0,HB.y1-HB.y0);
+      // zone labels
+      cx.globalAlpha=0.5; text("LIVING",80,72,11,"#5a3a1a"); text("KITCHEN",320,72,11,"#5a4a3a"); text("BEDROOM",80,318,11,"#5a3a6a"); text("BATH",320,318,11,"#2a5a6a"); cx.globalAlpha=1;
+      // rug in living
+      cx.fillStyle="#e0b84a"; cx.beginPath(); cx.ellipse(120,180,54,30,0,0,7); cx.fill();
+      // items
+      ITEMS.forEach(function(it,idx){ var doingThis=g.doing&&g.doing.i===idx;
+        if(it.type==="tv"){ cx.fillStyle="#2a2a30"; rr(it.x-22,it.y-16,44,28,4); cx.fill(); cx.fillStyle=doingThis?["#5ad0ff","#ff8a5a","#8affa0"][Math.floor(t/8)%3]:"#4a5a66"; rr(it.x-18,it.y-12,36,20,2); cx.fill(); }
+        else { emo(it.e,it.x,it.y,it.type==="sofa"||it.type==="bed"?34:28); }
+        if(g.near===idx && !g.doing){ var bob=Math.sin(t*0.2)*2; cx.fillStyle="#fff"; rr(it.x-30,it.y-52+bob,60,22,7); cx.fill(); text("👆 "+it.name,it.x,it.y-41+bob,11,"#3a2a10"); }
+      });
+      // city-view window (top wall) — works day & night
+      drawCityWindow(g.night);
+      // Meow the cat + the family
+      drawMeowCat(g.meowx,g.meowy);
+      HFAM.forEach(function(f){ drawPerson(f.x,f.y,1,t*0.05,false,SHIRTS[f.shirt],HAIRS[f.hair]); if(Math.hypot(f.x-g.px,f.y-g.py)<58){ var bb=Math.sin(t*0.2)*2; cx.fillStyle="#fff"; rr(f.x-38,f.y-64+bb,76,24,8); cx.fill(); text(f.msg,f.x,f.y-52+bb,11,"#3a2a10"); } });
+      // dog + robot + pets + person
+      drawDogTop(g.dogx,g.dogy,g.dogface);
+      drawMiniRobot(g.robx,g.roby,g.robface,g.helping);
+      g.pets.forEach(function(pt){ emo(pt.e,pt.x,pt.y,22); });
+      var sitting=g.doing&&(g.doing.type==="sofa"||g.doing.type==="bed");
+      drawPerson(g.px,g.py,g.face,g.ph,g.moving,SHIRTS[mePref.shirt],HAIRS[mePref.hair],sitting);
+      if(equipHat>=0){ emo(HAT_EMOJI[equipHat], g.px, g.py-30-(sitting?0:0), 20); }
+      // doing bubble
+      if(g.doing){ cx.fillStyle="rgba(0,0,0,.5)"; rr(g.px-70,g.py-64,140,26,9); cx.fill(); text(g.doing.say,g.px,g.py-51,13,"#ffd23f");
+        cx.fillStyle="rgba(90,200,120,.85)"; rr(g.robx-30,g.roby-40,60,18,7); cx.fill(); text("🤖 helping!",g.robx,g.roby-31,10,"#fff"); }
+      // NIGHT overlay — dim the house with warm glow pools
+      if(g.night){ cx.save(); cx.fillStyle="rgba(12,14,44,0.55)"; cx.fillRect(HB.x0,HB.y0,HB.x1-HB.x0,HB.y1-HB.y0);
+        cx.globalCompositeOperation="lighter"; [[g.px,g.py,74],[g.meowx,g.meowy,44],[120,180,58],[W/2,92,60]].forEach(function(gp){ var rg=cx.createRadialGradient(gp[0],gp[1],0,gp[0],gp[1],gp[2]); rg.addColorStop(0,"rgba(255,208,120,0.4)"); rg.addColorStop(1,"rgba(255,208,120,0)"); cx.fillStyle=rg; cx.beginPath(); cx.arc(gp[0],gp[1],gp[2],0,7); cx.fill(); }); cx.restore(); }
+      renderFX();
+      // HUD
+      cx.fillStyle="rgba(255,255,255,.9)"; rr(12,12,104,30,10); cx.fill(); emo("🪙",32,27,20); text("x "+coins,52,27,17,"#5a3a1a","left");
+      // night/day toggle button
+      cx.fillStyle=g.night?"#2a2a50":"#ffe27a"; cx.beginPath(); cx.arc(W-30,27,17,0,7); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; cx.stroke(); emo(g.night?"☀️":"🌙",W-30,27,17);
+      // joystick
+      var j=g.joy; cx.fillStyle="rgba(0,0,0,.16)"; cx.beginPath(); cx.arc(j.bx,j.by,44,0,7); cx.fill();
+      cx.fillStyle="rgba(255,255,255,.6)"; cx.beginPath(); cx.arc(j.kx,j.ky,21,0,7); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; cx.stroke();
+      if(!j.active)text("🕹️ walk",j.bx,j.by-56,11,"#fff");
+    },
+    down:function(){
+      if(Math.hypot(ptr.x-(W-30),ptr.y-27)<20){ g.night=!g.night; beep(g.night?300:640,.1); label(g.night?"🌙 Nighttime — so cozy!":"☀️ Daytime!"); return; }
+      if(ptr.x<W*0.5 && ptr.y>H*0.58){ g.joy.active=true; g.joy.bx=ptr.x; g.joy.by=ptr.y; g.joy.kx=ptr.x; g.joy.ky=ptr.y; return; }
+      // tap to use nearby item
+      if(g.near>=0 && !g.doing){ var it=ITEMS[g.near]; g.doing={i:g.near,type:it.type,say:it.say}; g.dt=120; g.px=it.x; g.py=Math.min(it.y+24,HB.y1-10); ding(); coins++; save(); star(it.x,it.y,6); floatUp("+1 🪙",it.x,it.y-20,"#ffe27a"); }
+    },
+    drag:function(){ if(g.joy.active){ var dx=ptr.x-g.joy.bx, dy=ptr.y-g.joy.by, d=Math.hypot(dx,dy), m=Math.min(d,44); if(d>0){ g.joy.kx=g.joy.bx+dx/d*m; g.joy.ky=g.joy.by+dy/d*m; } } },
+    up:function(){ g.joy.active=false; g.joy.kx=g.joy.bx; g.joy.ky=g.joy.by; } };
+
+  // ================= PAVE DRIVEWAY + DRIVE A BIG CAR INTO THE GARAGE (Set2 #21) =================
+  var DVX=130, DVY=118, DCOLS=3, DROWS=6, DTS=60;
+  var CARS=[["#e0503a","#b83a26","Red Car"],["#4a7ad0","#2a5ab0","Blue Truck"],["#4a9a5a","#2a7a3a","Green SUV"],["#ffce3f","#e0a82a","Yellow Taxi"]];
+  var GAR={x:112,y:52,w:216,h:58};   // big garage opening (fits a big car)
+  function drawBigCar(x,y,ang,type,big){ var C=CARS[type], L=big?52:44, Wd=big?34:30; cx.save(); cx.translate(x,y); cx.rotate(ang);
+    cx.fillStyle="rgba(0,0,0,.2)"; rr(-Wd/2+3,-L/2+4,Wd,L,10); cx.fill();
+    // wheels
+    cx.fillStyle="#222"; rr(-Wd/2-3,-L/2+8,6,14,3); cx.fill(); rr(Wd/2-3,-L/2+8,6,14,3); cx.fill(); rr(-Wd/2-3,L/2-22,6,14,3); cx.fill(); rr(Wd/2-3,L/2-22,6,14,3); cx.fill();
+    // body
+    var gr=cx.createLinearGradient(-Wd/2,0,Wd/2,0); gr.addColorStop(0,C[1]); gr.addColorStop(0.5,C[0]); gr.addColorStop(1,C[1]); cx.fillStyle=gr; rr(-Wd/2,-L/2,Wd,L,11); cx.fill();
+    cx.strokeStyle="#00000033"; cx.lineWidth=2; rr(-Wd/2,-L/2,Wd,L,11); cx.stroke();
+    // windshield + roof + rear window
+    cx.fillStyle="#bfe6ff"; rr(-Wd/2+5,-L/2+8,Wd-10,12,4); cx.fill();
+    cx.fillStyle="#8fb0c8"; rr(-Wd/2+6,-L/2+22,Wd-12,L-40,4); cx.fill();
+    cx.fillStyle="#bfe6ff"; rr(-Wd/2+5,L/2-18,Wd-10,10,4); cx.fill();
+    // headlights (front = top)
+    cx.fillStyle="#fff7c0"; cx.beginPath(); cx.arc(-Wd/2+6,-L/2+3,3,0,7); cx.arc(Wd/2-6,-L/2+3,3,0,7); cx.fill();
+    cx.restore(); }
+  S.drive={ init:function(){ g={phase:"pave", tiles:[], paved:0, need:DCOLS*DROWS, cartype:0,
+      cx:DVX+DCOLS*DTS/2, cy:H-64, ang:0, joy:{active:false,bx:70,by:H-70,kx:70,ky:H-70}, over:false}; for(var i=0;i<DCOLS*DROWS;i++)g.tiles.push(false); label("Drag across the dirt to pave it! 🛣️"); },
+    update:function(){
+      if(g.phase==="drive" && !g.over){ var j=g.joy, dx=0,dy=0; if(j.active){ dx=j.kx-j.bx; dy=j.ky-j.by; var d=Math.hypot(dx,dy); if(d>5){dx/=d;dy/=d;}else{dx=0;dy=0;} }
+        if(dx!==0||dy!==0){ g.cx+=dx*2.7; g.cy+=dy*2.7; g.ang=Math.atan2(dy,dx)+Math.PI/2; }
+        g.cx=Math.max(DVX+18,Math.min(DVX+DCOLS*DTS-18,g.cx)); g.cy=Math.max(GAR.y+30,Math.min(H-30,g.cy));
+        // parked in garage?
+        if(g.cy<GAR.y+40 && g.cx>GAR.x+30 && g.cx<GAR.x+GAR.w-30){ g.over=true; coins+=6; save(); confettiBurst(); label("Parked in the garage! 🪙 "+coins); }
+      }
+    },
+    render:function(){
+      cx.fillStyle="#8fd07b"; cx.fillRect(0,0,W,H);
+      cx.fillStyle="#83c66f"; for(var gx=0;gx<W;gx+=40){ for(var gy=0;gy<H;gy+=40){ if((gx/40+gy/40)%2===0)cx.fillRect(gx,gy,40,40); } }
+      // street
+      cx.fillStyle="#5a5a62"; cx.fillRect(0,H-40,W,40); cx.strokeStyle="#ffd23f"; cx.lineWidth=3; cx.setLineDash([16,12]); cx.beginPath(); cx.moveTo(0,H-20); cx.lineTo(W,H-20); cx.stroke(); cx.setLineDash([]);
+      // house + big garage
+      cx.fillStyle="#d9b48a"; cx.fillRect(72,16,296,44); cx.fillStyle="#b5673a"; cx.beginPath(); cx.moveTo(60,20); cx.lineTo(220,-12); cx.lineTo(380,20); cx.closePath(); cx.fill();
+      // garage opening (dark = open) with door frame
+      cx.fillStyle=(g.phase==="drive"||g.over)?"#2a2420":"#9aa4b0"; cx.fillRect(GAR.x,GAR.y,GAR.w,GAR.h);
+      if(g.phase!=="drive"&&!g.over){ cx.strokeStyle="#6a7480"; cx.lineWidth=2; for(var dd=0;dd<3;dd++){ cx.beginPath(); cx.moveTo(GAR.x,GAR.y+14+dd*15); cx.lineTo(GAR.x+GAR.w,GAR.y+14+dd*15); cx.stroke(); } }
+      cx.strokeStyle="#7a5a3a"; cx.lineWidth=5; cx.strokeRect(GAR.x,GAR.y,GAR.w,GAR.h);
+      // driveway tiles
+      for(var i=0;i<g.tiles.length;i++){ var col=i%DCOLS, row=Math.floor(i/DCOLS); var tx=DVX+col*DTS, ty=DVY+row*DTS;
+        if(g.tiles[i]){ cx.fillStyle=(col+row)%2?"#9a9aa2":"#8e8e96"; cx.fillRect(tx,ty,DTS,DTS); cx.strokeStyle="#77777e"; cx.lineWidth=1.5; cx.strokeRect(tx,ty,DTS,DTS); }
+        else { cx.fillStyle=(col+row)%2?"#a9865a":"#9c7a4e"; cx.fillRect(tx,ty,DTS,DTS); cx.fillStyle="#8a6a42"; for(var k=0;k<6;k++){ cx.fillRect(tx+6+((k*11)%(DTS-12)),ty+8+((k*17)%(DTS-14)),3,3); } cx.strokeStyle="#7a5a34"; cx.lineWidth=1; cx.strokeRect(tx,ty,DTS,DTS); }
+      }
+      coinHUD();
+
+      if(g.phase==="pave"){ text("Drag to pave the driveway! 🛣️",W/2,H-58,15,"#2a4a2a");
+        cx.fillStyle="#00000022"; rr(W/2-100,H-30,200,12,6); cx.fill(); cx.fillStyle="#6a6a72"; rr(W/2-100,H-30,200*Math.min(1,g.paved/g.need),12,6); cx.fill(); text(g.paved+"/"+g.need,W/2,H-24,12,"#fff"); }
+      else if(g.phase==="pick"){ text("Pick a BIG car to drive!",W/2,H*0.5,20,"#2a4a2a");
+        for(var c=0;c<CARS.length;c++){ var px=W/2-((CARS.length-1)*84)/2+c*84, py=H*0.62; cx.fillStyle="#ffffffcc"; rr(px-38,py-46,76,92,12); cx.fill(); drawBigCar(px,py,0,c,true); text(CARS[c][2],px,py+58,11,"#2a2a2a"); } }
+      else { // drive
+        drawBigCar(g.cx,g.cy,g.ang,g.cartype,true);
+        text("🕹️ Drive the car into the garage!",W/2,H-52,14,"#2a4a2a");
+        var j=g.joy; cx.fillStyle="rgba(0,0,0,.16)"; cx.beginPath(); cx.arc(j.bx,j.by,42,0,7); cx.fill(); cx.fillStyle="rgba(255,255,255,.6)"; cx.beginPath(); cx.arc(j.kx,j.ky,20,0,7); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; cx.stroke(); if(!j.active)text("🕹️ drive",j.bx,j.by-54,11,"#fff"); }
+      renderFX();
+      if(g.over){ if(t%45===0)confettiBurst(); cx.fillStyle="rgba(0,0,0,.45)"; cx.fillRect(0,0,W,H); text("🚗 PARKED IN THE GARAGE!",W/2,H*0.4,20,"#ffd23f"); text("Driveway paved & car parked!",W/2,H*0.47,14,"#fff"); btn("▶ BACK TO HOUSE",H*0.56); }
+    },
+    down:function(){
+      if(g.over){ if(ptr.y>H*0.56-8&&ptr.y<H*0.56+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      if(g.phase==="pave"){ this.pave(); }
+      else if(g.phase==="pick"){ for(var c=0;c<CARS.length;c++){ var px=W/2-((CARS.length-1)*84)/2+c*84, py=H*0.62; if(Math.abs(ptr.x-px)<38&&Math.abs(ptr.y-py)<46){ g.cartype=c; g.phase="drive"; g.cx=DVX+DCOLS*DTS/2; g.cy=H-64; beep(500,.1); label("Drive it up into the garage! 🚗"); return; } } }
+      else if(g.phase==="drive"){ if(ptr.x<W*0.55 && ptr.y>H*0.6){ g.joy.active=true; g.joy.bx=ptr.x; g.joy.by=ptr.y; g.joy.kx=ptr.x; g.joy.ky=ptr.y; } }
+    },
+    drag:function(){ if(g.phase==="pave"&&!g.over){ this.pave(); } else if(g.phase==="drive"&&g.joy.active){ var dx=ptr.x-g.joy.bx, dy=ptr.y-g.joy.by, d=Math.hypot(dx,dy), m=Math.min(d,42); if(d>0){ g.joy.kx=g.joy.bx+dx/d*m; g.joy.ky=g.joy.by+dy/d*m; } } },
+    up:function(){ if(g.phase==="drive"){ g.joy.active=false; g.joy.kx=g.joy.bx; g.joy.ky=g.joy.by; } },
+    pave:function(){ var col=Math.floor((ptr.x-DVX)/DTS), row=Math.floor((ptr.y-DVY)/DTS); if(col<0||col>=DCOLS||row<0||row>=DROWS)return; var i=row*DCOLS+col; if(!g.tiles[i]){ g.tiles[i]=true; g.paved++; beep(300+g.paved*12,.05,"square"); drop(DVX+col*DTS+DTS/2,DVY+row*DTS+DTS/2,"#b0b0b8",5); if(g.paved>=g.need){ g.phase="pick"; ding(); label("Now pick a big car to drive!"); } } } };
+
+  // ================= HOME GYM — set up the workout TV (Set2 #133) =================
+  var GBR={x:W/2-56,y:92,w:112,h:70};  // TV wall bracket
+  var GMAT={x:W/2,y:410}, GWT={x:340,y:320};
+  function drawWorkoutTV(on){ cx.save();
+    cx.fillStyle="#2a2a30"; rr(GBR.x,GBR.y,GBR.w,GBR.h,6); cx.fill();
+    var sc={x:GBR.x+7,y:GBR.y+7,w:GBR.w-14,h:GBR.h-14};
+    if(on){ var gr=cx.createLinearGradient(0,sc.y,0,sc.y+sc.h); gr.addColorStop(0,"#bfe6ff"); gr.addColorStop(1,"#e8f6ff"); cx.fillStyle=gr; cx.fillRect(sc.x,sc.y,sc.w,sc.h);
+      // trainer doing jumping jacks
+      var up=Math.floor(t/16)%2===0, cxp=sc.x+sc.w/2, cyp=sc.y+sc.h/2+6;
+      cx.strokeStyle="#e0503a"; cx.lineWidth=3; cx.lineCap="round";
+      cx.beginPath(); if(up){ cx.moveTo(cxp-8,cyp-2); cx.lineTo(cxp-14,cyp-14); cx.moveTo(cxp+8,cyp-2); cx.lineTo(cxp+14,cyp-14);} else { cx.moveTo(cxp-8,cyp-2); cx.lineTo(cxp-14,cyp+6); cx.moveTo(cxp+8,cyp-2); cx.lineTo(cxp+14,cyp+6);} cx.stroke();
+      cx.beginPath(); if(up){ cx.moveTo(cxp-3,cyp+8); cx.lineTo(cxp-9,cyp+18); cx.moveTo(cxp+3,cyp+8); cx.lineTo(cxp+9,cyp+18);} else { cx.moveTo(cxp-3,cyp+8); cx.lineTo(cxp-3,cyp+18); cx.moveTo(cxp+3,cyp+8); cx.lineTo(cxp+3,cyp+18);} cx.stroke();
+      cx.fillStyle="#e0503a"; rr(cxp-4,cyp-4,8,12,3); cx.fill(); cx.fillStyle=SKIN; cx.beginPath(); cx.arc(cxp,cyp-10,4,0,7); cx.fill();
+      cx.fillStyle="#ff3a3a"; if(Math.floor(t/20)%2===0){ cx.beginPath(); cx.arc(sc.x+8,sc.y+7,3,0,7); cx.fill(); } text("LIVE",sc.x+24,sc.y+7,8,"#ff3a3a","left");
+    } else { cx.fillStyle="#3a4450"; cx.fillRect(sc.x,sc.y,sc.w,sc.h); }
+    cx.restore(); }
+  S.gym={ init:function(){ g={phase:"tv",hold:null,hx:0,hy:0, mat:false, wt:false, reps:0, need:15, jump:0, over:false}; label("Mount the workout TV on the wall! 🏋️"); },
+    update:function(){ if(g.jump>0)g.jump--; },
+    render:function(){
+      // gym room
+      cx.fillStyle="#ffe0e0"; cx.fillRect(0,0,W,H*0.5); cx.fillStyle="#6a6a72"; cx.fillRect(0,H*0.5,W,H);
+      cx.strokeStyle="#5a5a62"; cx.lineWidth=1; for(var fl=0;fl<W;fl+=44){ cx.beginPath(); cx.moveTo(fl,H*0.5); cx.lineTo(fl,H); cx.stroke(); }
+      // mirror wall
+      cx.fillStyle="rgba(200,230,240,.4)"; cx.fillRect(24,60,70,H*0.5-70); cx.strokeStyle="#bcdfe4"; cx.lineWidth=3; cx.strokeRect(24,60,70,H*0.5-70);
+      // TV or bracket
+      if(g.phase!=="tv"){ drawWorkoutTV(g.phase==="workout"||g.over); }
+      else { cx.setLineDash([7,6]); cx.strokeStyle="#c06a6a"; cx.lineWidth=3; rr(GBR.x,GBR.y,GBR.w,GBR.h,6); cx.stroke(); cx.setLineDash([]); }
+      // mat + weights
+      if(g.mat){ cx.fillStyle="#5ac0a0"; rr(GMAT.x-46,GMAT.y-14,92,28,8); cx.fill(); cx.strokeStyle="#3a9a7a"; cx.lineWidth=2; rr(GMAT.x-46,GMAT.y-14,92,28,8); cx.stroke(); }
+      if(g.wt){ emo("🏋️",GWT.x,GWT.y,30); }
+      coinHUD();
+      if(g.phase==="tv"){ text("Mount the workout TV on the wall!",W/2,42,14,"#7a2a2a");
+        var x=g.hold==="tv"?g.hx:W/2, y=g.hold==="tv"?g.hy:H-70; drawShelfTV(x,y); }
+      else if(g.phase==="mat"){ text("Roll out the yoga MAT!",W/2,42,15,"#7a2a2a");
+        cx.setLineDash([6,5]); cx.strokeStyle="#3a9a7a"; cx.lineWidth=2; rr(GMAT.x-46,GMAT.y-14,92,28,8); cx.stroke(); cx.setLineDash([]);
+        var mx=g.hold==="mat"?g.hx:W/2, my=g.hold==="mat"?g.hy:H-64; drawShelfMat(mx,my); }
+      else if(g.phase==="weights"){ text("Add the WEIGHTS!",W/2,42,15,"#7a2a2a");
+        var wx=g.hold==="weights"?g.hx:W/2, wy=g.hold==="weights"?g.hy:H-64; if(!g.wt)drawShelfWeights(wx,wy); }
+      else if(g.phase==="workout"){ text(g.reps>=g.need?"💪 Great workout!":"TAP to do your reps! 💪",W/2,42,15,"#7a2a2a");
+        // person exercising on the mat
+        var up=g.jump>0; drawPerson(GMAT.x, GMAT.y-24-(up?10:0), 1, t*0.3, up, SHIRTS[mePref.shirt], HAIRS[mePref.hair]);
+        // rep bar
+        cx.fillStyle="#00000022"; rr(W/2-100,H-34,200,14,7); cx.fill(); cx.fillStyle="#e0503a"; rr(W/2-100,H-34,200*Math.min(1,g.reps/g.need),14,7); cx.fill(); text(g.reps+"/"+g.need+" reps",W/2,H-27,12,"#fff");
+        if(g.reps<g.need){ var pu=1+Math.sin(t*0.2)*0.08; text("👆",W/2,GMAT.y-70,26*pu,"#7a2a2a"); } }
+      renderFX();
+      if(g.over){ if(t%45===0)confettiBurst(); cx.fillStyle="rgba(0,0,0,.45)"; cx.fillRect(0,0,W,H); text("🏋️ HOME GYM DONE!",W/2,H*0.4,22,"#ffd23f"); text("TV set up & workout complete! 💪",W/2,H*0.47,14,"#fff"); btn("▶ BACK TO HOUSE",H*0.56); }
+    },
+    down:function(){
+      if(g.over){ if(ptr.y>H*0.56-8&&ptr.y<H*0.56+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      if(g.phase==="tv"){ if(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-(H-70))<44){ g.hold="tv"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="mat"){ if(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-(H-64))<40){ g.hold="mat"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="weights"){ if(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-(H-64))<40){ g.hold="weights"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="workout"){ if(g.reps<g.need){ g.reps++; g.jump=10; beep(400+g.reps*20,.06,"square"); star(GMAT.x,GMAT.y-30,4); if(g.reps>=g.need){ g.over=true; coins+=6; save(); confettiBurst(); label("Workout done! 🪙 "+coins); } } }
+    },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){
+      if(g.hold==="tv"){ if(Math.abs(g.hx-W/2)<70&&Math.abs(g.hy-(GBR.y+GBR.h/2))<70){ g.phase="mat"; ding(); drop(W/2,GBR.y+GBR.h/2,"#4a5a66",8); label("Now roll out the yoga mat!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="mat"){ if(Math.abs(g.hx-GMAT.x)<70&&Math.abs(g.hy-GMAT.y)<60){ g.mat=true; g.phase="weights"; ding(); label("Add the weights!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="weights"){ if(Math.abs(g.hx-GWT.x)<80&&Math.abs(g.hy-GWT.y)<80){ g.wt=true; g.phase="workout"; ding(); label("TV's on — tap to work out!"); } else beep(300,.08); g.hold=null; }
+    } };
+  function drawShelfTV(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#2a2a30"; rr(-34,-24,68,44,5); cx.fill(); cx.fillStyle="#4a5a66"; rr(-28,-18,56,32,3); cx.fill(); text("📺 TV",0,-34,13,"#7a2a2a"); cx.restore(); }
+  function drawShelfMat(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#5ac0a0"; rr(-40,-12,80,24,7); cx.fill(); cx.strokeStyle="#3a9a7a"; cx.lineWidth=2; rr(-40,-12,80,24,7); cx.stroke(); text("MAT",0,-24,13,"#7a2a2a"); cx.restore(); }
+  function drawShelfWeights(x,y){ emo("🏋️",x,y,32); text("WEIGHTS",x,y-26,13,"#7a2a2a"); }
+
+  // ================= SUNROOM — add big glass windows (Set2 #221) =================
+  var WFR=[{x:78},{x:176},{x:274},{x:372}]; var WFY=150, WFW=76, WFH=200;
+  S.sunroom={ init:function(){ g={panes:[false,false,false,false], done:0, over:false, sun:0, hold:false, hx:0, hy:0}; label("Drag big glass windows into the frames! 🪟"); },
+    update:function(){ if(g.over){ g.sun=Math.min(1,g.sun+0.02); } },
+    render:function(){
+      // room
+      cx.fillStyle="#eef3ec"; cx.fillRect(0,0,W,H); cx.fillStyle="#c9a06a"; cx.fillRect(0,H*0.62,W,H);
+      // outdoor view behind the wall openings
+      WFR.forEach(function(f){ var sky=cx.createLinearGradient(0,WFY,0,WFY+WFH); sky.addColorStop(0,"#aee0ff"); sky.addColorStop(1,"#e8f6ff"); cx.fillStyle=sky; cx.fillRect(f.x-WFW/2,WFY,WFW,WFH);
+        cx.fillStyle="#7ec46a"; cx.fillRect(f.x-WFW/2,WFY+WFH-40,WFW,40); cx.fillStyle="#4a9a4a"; cx.beginPath(); cx.arc(f.x-14,WFY+WFH-42,16,0,7); cx.arc(f.x+16,WFY+WFH-46,13,0,7); cx.fill(); });
+      cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(W-46,WFY+30,16,0,7); cx.fill();
+      // panes + frames
+      for(var i=0;i<WFR.length;i++){ var f=WFR[i];
+        if(g.panes[i]){ cx.fillStyle="rgba(190,230,255,0.4)"; cx.fillRect(f.x-WFW/2,WFY,WFW,WFH); cx.strokeStyle="#eaffff"; cx.lineWidth=2; cx.beginPath(); cx.moveTo(f.x-WFW/2+10,WFY+16); cx.lineTo(f.x-6,WFY+WFH-30); cx.stroke(); }
+        cx.strokeStyle="#8a6f4a"; cx.lineWidth=6; cx.strokeRect(f.x-WFW/2,WFY,WFW,WFH); cx.beginPath(); cx.moveTo(f.x,WFY); cx.lineTo(f.x,WFY+WFH); cx.moveTo(f.x-WFW/2,WFY+WFH/2); cx.lineTo(f.x+WFW/2,WFY+WFH/2); cx.stroke();
+        if(!g.panes[i]&&g.phase!=="over"){ cx.setLineDash([5,5]); cx.strokeStyle="#5aa0e0"; cx.lineWidth=2; cx.strokeRect(f.x-WFW/2+4,WFY+4,WFW-8,WFH-8); cx.setLineDash([]); }
+      }
+      // sunbeams when done
+      if(g.over && g.sun>0){ cx.globalAlpha=g.sun*0.25; cx.fillStyle="#fff7c0"; WFR.forEach(function(f){ cx.beginPath(); cx.moveTo(f.x-WFW/2,WFY+WFH); cx.lineTo(f.x-WFW/2-30,H); cx.lineTo(f.x+WFW/2+30,H); cx.lineTo(f.x+WFW/2,WFY+WFH); cx.fill(); }); cx.globalAlpha=1; }
+      // cozy plant + chair
+      emo("🪴",44,H*0.62-6,30); emo("🪑",W-52,H*0.62-2,32);
+      coinHUD();
+      text("Add big glass windows! 🪟",W/2,42,15,"#3a5a4a");
+      if(g.hold){ cx.fillStyle="rgba(190,230,255,0.6)"; rr(g.hx-38,g.hy-52,76,104,4); cx.fill(); cx.strokeStyle="#8a6f4a"; cx.lineWidth=4; rr(g.hx-38,g.hy-52,76,104,4); cx.stroke(); }
+      else if(!g.over){ // shelf pane
+        cx.fillStyle="rgba(190,230,255,0.6)"; rr(W/2-38,H-70,76,52,4); cx.fill(); cx.strokeStyle="#8a6f4a"; cx.lineWidth=4; rr(W/2-38,H-70,76,52,4); cx.stroke(); text("🪟 window",W/2,H-80,12,"#3a5a4a"); }
+      cx.fillStyle="#00000018"; rr(W/2-70,H-14,140,10,5); cx.fill(); cx.fillStyle="#5aa0e0"; rr(W/2-70,H-14,140*(g.done/4),10,5); cx.fill();
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("🪟 SUNROOM DONE!",W/2,H*0.5,22,"#3a7a5a"); text("Big glass windows & sunshine! ☀️",W/2,H*0.56,14,"#3a5a4a"); btn("▶ BACK TO HOUSE",H*0.64); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.64-8&&ptr.y<H*0.64+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      if(Math.abs(ptr.x-W/2)<50&&Math.abs(ptr.y-(H-44))<40){ g.hold=true; g.hx=ptr.x; g.hy=ptr.y; } },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){ if(g.hold){ var bi=-1,bd=60; for(var i=0;i<WFR.length;i++){ if(!g.panes[i]){ var d=Math.hypot(g.hx-WFR[i].x,g.hy-(WFY+WFH/2)); if(d<bd){bd=d;bi=i;} } } if(bi>=0){ g.panes[bi]=true; g.done++; ding(); star(WFR[bi].x,WFY+WFH/2,6); if(g.done>=4){ g.over=true; coins+=5; save(); confettiBurst(); label("Sunroom done! 🪙 "+coins); } } else beep(300,.08); g.hold=false; } } };
+
+  // ================= FIRE PIT — set up a fire pit (Set2 #263) =================
+  var FPIT={x:W/2,y:360};
+  S.firepit={ init:function(){ g={phase:"pit",hold:null,hx:0,hy:0, logs:0, lit:false, over:false}; label("Drag the fire-pit ring onto the patio! 🔥"); },
+    update:function(){ },
+    render:function(){
+      // dusk sky + patio
+      var gr=cx.createLinearGradient(0,0,0,H); gr.addColorStop(0,"#3a2a5a"); gr.addColorStop(0.5,"#7a4a5a"); gr.addColorStop(0.5,"#8a8a92"); gr.addColorStop(1,"#6a6a72"); cx.fillStyle=gr; cx.fillRect(0,0,W,H);
+      // stars
+      cx.fillStyle="#fff"; for(var s=0;s<20;s++){ var sx=(s*97)%W, sy=(s*53)%180+10; if(Math.floor(t/20+s)%3===0)cx.fillRect(sx,sy,2,2); }
+      // patio stones
+      cx.strokeStyle="#5a5a62"; cx.lineWidth=2; for(var px=0;px<W;px+=60){ for(var py=Math.floor(H*0.5);py<H;py+=44){ cx.strokeRect(px,py,60,44); } }
+      // chairs around
+      emo("🪑",120,320,28); emo("🪑",320,320,28);
+      // pit
+      if(g.phase!=="pit"){ cx.fillStyle="#4a4a52"; cx.beginPath(); cx.ellipse(FPIT.x,FPIT.y,48,22,0,0,7); cx.fill(); cx.strokeStyle="#2a2a30"; cx.lineWidth=4; cx.stroke(); cx.fillStyle="#2a2a2e"; cx.beginPath(); cx.ellipse(FPIT.x,FPIT.y,36,15,0,0,7); cx.fill(); }
+      // logs
+      if(g.logs>0){ cx.strokeStyle="#7a4a2a"; cx.lineWidth=8; cx.lineCap="round"; for(var L=0;L<g.logs;L++){ var a=L*2.1; cx.beginPath(); cx.moveTo(FPIT.x-18*Math.cos(a),FPIT.y-8*Math.sin(a)); cx.lineTo(FPIT.x+18*Math.cos(a),FPIT.y+8*Math.sin(a)); cx.stroke(); } }
+      // fire
+      if(g.lit){ for(var fpart=0;fpart<7;fpart++){ var fh=26+Math.sin(t*0.3+fpart)*10, fx=FPIT.x-16+fpart*5+Math.sin(t*0.2+fpart)*2; var col=fpart%3===0?"#ffe27a":(fpart%2?"#ff8a3a":"#ff5a2a"); cx.fillStyle=col; cx.beginPath(); cx.moveTo(fx-5,FPIT.y-4); cx.quadraticCurveTo(fx,FPIT.y-fh,fx+5,FPIT.y-4); cx.fill(); }
+        cx.globalAlpha=0.2+Math.sin(t*0.2)*0.05; cx.fillStyle="#ff8a3a"; cx.beginPath(); cx.arc(FPIT.x,FPIT.y-10,70,0,7); cx.fill(); cx.globalAlpha=1;
+        if(t%3===0)FX.parts.push({x:FPIT.x+(Math.random()*30-15),y:FPIT.y-20,vx:Math.random()*0.6-0.3,vy:-1-Math.random(),life:1,col:"#ffb04a",r:2,g:-0.01}); }
+      coinHUD();
+      if(g.phase==="pit"){ text("Drag the fire-pit ring onto the patio! 🔥",W/2,44,13,"#ffd0b0");
+        cx.setLineDash([6,6]); cx.strokeStyle="#ffce8a"; cx.lineWidth=2; cx.beginPath(); cx.ellipse(FPIT.x,FPIT.y,48,22,0,0,7); cx.stroke(); cx.setLineDash([]);
+        var x=g.hold==="pit"?g.hx:W/2, y=g.hold==="pit"?g.hy:H-64; drawShelfPit(x,y); }
+      else if(g.phase==="logs"){ text("Add "+(3-g.logs)+" more logs! 🪵",W/2,44,15,"#ffd0b0");
+        var lx=g.hold==="log"?g.hx:W/2, ly=g.hold==="log"?g.hy:H-64; drawShelfLog(lx,ly); }
+      else if(g.phase==="light"){ text("Tap the pit to LIGHT the fire! 🔥",W/2,44,15,"#ffd0b0");
+        if(Math.floor(t/18)%2===0){ cx.strokeStyle="#ffce3f"; cx.lineWidth=3; cx.beginPath(); cx.ellipse(FPIT.x,FPIT.y,44,20,0,0,7); cx.stroke(); } }
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); cx.fillStyle="rgba(0,0,0,.35)"; cx.fillRect(0,0,W,H); text("🔥 FIRE PIT READY!",W/2,H*0.35,22,"#ffce3f"); text("Cozy nights on the patio! 🌙",W/2,H*0.42,14,"#fff"); btn("▶ BACK TO HOUSE",H*0.52); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.52-8&&ptr.y<H*0.52+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      if(g.phase==="pit"){ if(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-(H-64))<40){ g.hold="pit"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="logs"){ if(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-(H-64))<40){ g.hold="log"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="light"){ if(Math.hypot(ptr.x-FPIT.x,ptr.y-FPIT.y)<54){ g.lit=true; g.over=true; coins+=6; save(); ding(); confettiBurst(); label("Fire pit done! 🪙 "+coins); } } },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){
+      if(g.hold==="pit"){ if(Math.abs(g.hx-FPIT.x)<70&&Math.abs(g.hy-FPIT.y)<70){ g.phase="logs"; ding(); label("Now add 3 logs!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="log"){ if(Math.abs(g.hx-FPIT.x)<70&&Math.abs(g.hy-FPIT.y)<70){ g.logs++; beep(300,.06); drop(FPIT.x,FPIT.y,"#7a4a2a",5); if(g.logs>=3){ g.phase="light"; ding(); label("Tap the pit to light it!"); } } else beep(300,.08); g.hold=null; } } };
+  function drawShelfPit(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#4a4a52"; cx.beginPath(); cx.ellipse(0,0,40,18,0,0,7); cx.fill(); cx.fillStyle="#2a2a2e"; cx.beginPath(); cx.ellipse(0,0,30,12,0,0,7); cx.fill(); text("🔥 PIT",0,-26,13,"#ffd0b0"); cx.restore(); }
+  function drawShelfLog(x,y){ cx.save(); cx.translate(x,y); cx.strokeStyle="#7a4a2a"; cx.lineWidth=10; cx.lineCap="round"; cx.beginPath(); cx.moveTo(-24,0); cx.lineTo(24,0); cx.stroke(); cx.fillStyle="#a56a34"; cx.beginPath(); cx.arc(24,0,5,0,7); cx.fill(); text("🪵 LOG",0,-20,13,"#ffd0b0"); cx.restore(); }
+
+  // ================= HOME THEATER — mount a giant screen (Set2 #101) =================
+  var SCR={x:W/2-140,y:52,w:280,h:118};
+  var SEATS=[{x:110,y:430},{x:220,y:430},{x:330,y:430}];
+  var POP={x:220,y:360};
+  function drawRecliner(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#7a3a4a"; rr(-26,-6,52,24,6); cx.fill(); rr(-26,-30,52,18,6); cx.fill(); cx.fillStyle="#9a4a5a"; rr(-22,-26,44,12,4); cx.fill(); cx.strokeStyle="#5a2a3a"; cx.lineWidth=2; rr(-26,-30,52,48,6); cx.stroke(); cx.restore(); }
+  var SPKS=[{x:38,y:250},{x:402,y:250}], TFRIDGE={x:58,y:470};
+  function drawSpeaker(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#2a2a30"; rr(-13,-38,26,76,4); cx.fill(); cx.strokeStyle="#44444c"; cx.lineWidth=2; rr(-13,-38,26,76,4); cx.stroke(); cx.fillStyle="#4a4a52"; cx.beginPath(); cx.arc(0,-18,8,0,7); cx.fill(); cx.beginPath(); cx.arc(0,14,6,0,7); cx.fill(); cx.fillStyle="#666"; cx.beginPath(); cx.arc(0,-18,3,0,7); cx.fill(); cx.restore(); }
+  function drawMiniFridge(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#dfe6ea"; rr(-16,-28,32,56,5); cx.fill(); cx.strokeStyle="#b0b8be"; cx.lineWidth=2; rr(-16,-28,32,56,5); cx.stroke(); cx.beginPath(); cx.moveTo(-16,-2); cx.lineTo(16,-2); cx.stroke(); cx.fillStyle="#9aa4aa"; rr(9,-22,3,10,1); cx.fill(); rr(9,4,3,12,1); cx.fill(); cx.restore(); }
+  S.theater={ init:function(){ g={phase:"screen",hold:null,hx:0,hy:0, spk:[false,false], seats:[false,false,false], fridge:false, snacks:false, playing:false, over:false}; label("Mount the giant screen on the wall! 🎬"); },
+    update:function(){ },
+    render:function(){
+      cx.fillStyle="#2a2440"; cx.fillRect(0,0,W,H); cx.fillStyle="#221c36"; cx.fillRect(0,H*0.5,W,H);
+      if(g.phase!=="screen"){ cx.fillStyle="#111"; rr(SCR.x-6,SCR.y-6,SCR.w+12,SCR.h+12,6); cx.fill();
+        if(g.playing){ var frames=[["#5ab0e0","#e0e0a0"],["#e05a7a","#3a2a5a"],["#5ad0a0","#204a6a"]]; var f=frames[Math.floor(t/24)%3];
+          var gr=cx.createLinearGradient(0,SCR.y,0,SCR.y+SCR.h); gr.addColorStop(0,f[0]); gr.addColorStop(1,f[1]); cx.fillStyle=gr; cx.fillRect(SCR.x,SCR.y,SCR.w,SCR.h);
+          emo(["🎬","🦸","🚀","🐉","🏰"][Math.floor(t/40)%5], SCR.x+SCR.w/2, SCR.y+SCR.h/2, 40);
+        } else { cx.fillStyle="#0a0a12"; cx.fillRect(SCR.x,SCR.y,SCR.w,SCR.h); }
+      } else { cx.setLineDash([8,6]); cx.strokeStyle="#8a7ad0"; cx.lineWidth=3; rr(SCR.x,SCR.y,SCR.w,SCR.h,4); cx.stroke(); cx.setLineDash([]); }
+      // speakers, seats, fridge, popcorn
+      for(var q=0;q<2;q++){ if(g.spk[q])drawSpeaker(SPKS[q].x,SPKS[q].y); }
+      for(var s=0;s<3;s++){ if(g.seats[s])drawRecliner(SEATS[s].x,SEATS[s].y); }
+      if(g.fridge)drawMiniFridge(TFRIDGE.x,TFRIDGE.y);
+      if(g.snacks)emo("🍿",POP.x,POP.y,30);
+      cx.fillStyle="#ffce3f"; for(var L=0;L<7;L++){ if(Math.floor(t/10+L)%2===0){ cx.beginPath(); cx.arc(30+L*64,H-20,3,0,7); cx.fill(); } }
+      coinHUD();
+      if(g.phase==="screen"){ text("Mount the giant SCREEN on the wall! 🎬",W/2,H*0.5-8,13,"#d4c6f0");
+        var x=g.hold==="screen"?g.hx:W/2, y=g.hold==="screen"?g.hy:H-66; drawShelfScreen(x,y); }
+      else if(g.phase==="speakers"){ text("Set up "+(2-cnt(g.spk))+" surround SPEAKERS! 🔊",W/2,H*0.5-8,14,"#d4c6f0");
+        for(var k=0;k<2;k++){ if(!g.spk[k]){ cx.setLineDash([5,5]); cx.strokeStyle="#8a7ad0"; cx.lineWidth=2; rr(SPKS[k].x-14,SPKS[k].y-40,28,80,4); cx.stroke(); cx.setLineDash([]); } }
+        var kx=g.hold==="spk"?g.hx:W/2, ky=g.hold==="spk"?g.hy:H-58; drawShelfSpeaker(kx,ky); }
+      else if(g.phase==="seats"){ text("Add "+(3-cnt(g.seats))+" more recliner seats! 🪑",W/2,H*0.5-8,14,"#d4c6f0");
+        for(var i=0;i<3;i++){ if(!g.seats[i]){ cx.setLineDash([5,5]); cx.strokeStyle="#8a7ad0"; cx.lineWidth=2; rr(SEATS[i].x-26,SEATS[i].y-30,52,48,6); cx.stroke(); cx.setLineDash([]); } }
+        var sx=g.hold==="seat"?g.hx:W/2, sy=g.hold==="seat"?g.hy:H-58; drawShelfRecliner(sx,sy); }
+      else if(g.phase==="fridge"){ text("Add a MINI FRIDGE for drinks! 🧊",W/2,H*0.5-8,14,"#d4c6f0");
+        cx.setLineDash([5,5]); cx.strokeStyle="#8a7ad0"; cx.lineWidth=2; rr(TFRIDGE.x-16,TFRIDGE.y-28,32,56,5); cx.stroke(); cx.setLineDash([]);
+        var fx=g.hold==="fridge"?g.hx:W/2, fy=g.hold==="fridge"?g.hy:H-56; if(!g.fridge)drawShelfFridge(fx,fy); }
+      else if(g.phase==="snacks"){ text("Add the POPCORN! 🍿",W/2,H*0.5-8,15,"#d4c6f0");
+        var px=g.hold==="pop"?g.hx:W/2, py=g.hold==="pop"?g.hy:H-58; if(!g.snacks)drawShelfPop(px,py); }
+      else if(g.phase==="play"){ text("Tap the screen to start the movie! 🎬",W/2,SCR.y+SCR.h+26,14,"#d4c6f0");
+        if(Math.floor(t/18)%2===0){ cx.strokeStyle="#ffce3f"; cx.lineWidth=3; cx.strokeRect(SCR.x,SCR.y,SCR.w,SCR.h); } }
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("🎬 MOVIE NIGHT!",W/2,H*0.66,22,"#ffce3f"); text("Screen, speakers, seats & snacks! 🍿",W/2,H*0.72,13,"#d4c6f0"); btn("▶ BACK TO HOUSE",H*0.80); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.80-8&&ptr.y<H*0.80+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      var near=(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-(H-60))<44);
+      if(g.phase==="screen"&&near){ g.hold="screen"; }
+      else if(g.phase==="speakers"&&near){ g.hold="spk"; }
+      else if(g.phase==="seats"&&near){ g.hold="seat"; }
+      else if(g.phase==="fridge"&&near){ g.hold="fridge"; }
+      else if(g.phase==="snacks"&&near){ g.hold="pop"; }
+      else if(g.phase==="play"){ if(ptr.x>SCR.x&&ptr.x<SCR.x+SCR.w&&ptr.y>SCR.y&&ptr.y<SCR.y+SCR.h){ g.playing=true; g.over=true; coins+=6; save(); ding(); confettiBurst(); label("Movie night! 🪙 "+coins); } }
+      if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){
+      if(g.hold==="screen"){ if(Math.abs(g.hx-W/2)<90&&g.hy<SCR.y+SCR.h+40){ g.phase="speakers"; ding(); drop(W/2,SCR.y+SCR.h/2,"#8a7ad0",10); label("Set up 2 surround speakers!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="spk"){ var qi=-1,qd=60; for(var q=0;q<2;q++){ if(!g.spk[q]){ var dq=Math.hypot(g.hx-SPKS[q].x,g.hy-SPKS[q].y); if(dq<qd){qd=dq;qi=q;} } } if(qi>=0){ g.spk[qi]=true; ding(); star(SPKS[qi].x,SPKS[qi].y,5); if(cnt(g.spk)>=2){ g.phase="seats"; label("Add 3 recliner seats!"); } } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="seat"){ var bi=-1,bd=54; for(var i=0;i<3;i++){ if(!g.seats[i]){ var d=Math.hypot(g.hx-SEATS[i].x,g.hy-SEATS[i].y); if(d<bd){bd=d;bi=i;} } } if(bi>=0){ g.seats[bi]=true; ding(); star(SEATS[bi].x,SEATS[bi].y,5); if(cnt(g.seats)>=3){ g.phase="fridge"; label("Add a mini fridge!"); } } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="fridge"){ if(Math.abs(g.hx-TFRIDGE.x)<70&&Math.abs(g.hy-TFRIDGE.y)<70){ g.fridge=true; g.phase="snacks"; ding(); label("Add the popcorn!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="pop"){ if(Math.abs(g.hx-POP.x)<70&&Math.abs(g.hy-POP.y)<70){ g.snacks=true; g.phase="play"; ding(); label("Tap the screen to start the movie!"); } else beep(300,.08); g.hold=null; } } };
+  function drawShelfScreen(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#111"; rr(-46,-24,92,44,4); cx.fill(); cx.fillStyle="#3a4450"; rr(-42,-20,84,36,2); cx.fill(); text("🎬 SCREEN",0,-34,13,"#d4c6f0"); cx.restore(); }
+  function drawShelfSpeaker(x,y){ drawSpeaker(x,y+6); text("🔊 SPEAKER",x,y-34,13,"#d4c6f0"); }
+  function drawShelfFridge(x,y){ drawMiniFridge(x,y); text("🧊 FRIDGE",x,y-36,13,"#d4c6f0"); }
+  function drawShelfRecliner(x,y){ drawRecliner(x,y+6); text("SEAT",x,y-32,13,"#d4c6f0"); }
+  function drawShelfPop(x,y){ emo("🍿",x,y,32); text("POPCORN",x,y-26,13,"#d4c6f0"); }
+
+  // ================= PET WASH CORNER — build it & wash the pet (Set2 #190) =================
+  var PTUB={x:W/2,y:388}, PSPR={x:W/2+92,y:250}, PSOAP={x:W/2-96,y:300};
+  function drawWashDog(x,y,dirt,scrub){ cx.save(); cx.translate(x,y); var wag=Math.sin(t*0.3)*4;
+    cx.strokeStyle="#8a5a2f"; cx.lineWidth=4; cx.lineCap="round"; cx.beginPath(); cx.moveTo(-24,-4); cx.lineTo(-34,-10+wag); cx.stroke();
+    cx.fillStyle="#a56a34"; [-14,-6,8,16].forEach(function(lx){ cx.fillRect(lx,10,5,10); });
+    cx.fillStyle="#b5793f"; rr(-26,-14,44,26,12); cx.fill(); cx.beginPath(); cx.arc(20,-14,13,0,7); cx.fill();
+    cx.fillStyle="#8a5a2f"; cx.beginPath(); cx.ellipse(13,-24,5,9,-.3,0,7); cx.fill();
+    cx.fillStyle="#c98a52"; cx.beginPath(); cx.ellipse(28,-11,7,6,0,0,7); cx.fill();
+    cx.fillStyle="#222"; cx.beginPath(); cx.arc(22,-16,2,0,7); cx.fill(); cx.fillStyle="#2a1a10"; cx.beginPath(); cx.arc(33,-11,3,0,7); cx.fill();
+    if(dirt>0){ cx.globalAlpha=dirt*0.85; cx.fillStyle="#7a5a34"; [[-14,-6],[0,-10],[8,-2],[-6,4],[14,-8]].forEach(function(p){ cx.beginPath(); cx.arc(p[0],p[1],4,0,7); cx.fill(); }); cx.globalAlpha=1; }
+    if(scrub){ cx.fillStyle="rgba(255,255,255,0.9)"; for(var s=0;s<6;s++){ cx.beginPath(); cx.arc(-16+s*7,-16+Math.sin(t*0.4+s)*3,4,0,7); cx.fill(); } }
+    cx.restore(); }
+  S.petwash={ init:function(){ g={phase:"tub",hold:null,hx:0,hy:0, spr:false, soap:false, dirt:1, scrub:false, over:false}; label("Drag the wash TUB into the corner! 🐾"); },
+    update:function(){ if(g.scrub)g.scrub--; },
+    render:function(){
+      // wall + floor
+      cx.fillStyle="#d6eef2"; cx.fillRect(0,0,W,H*0.5); cx.strokeStyle="#bcdfe4"; cx.lineWidth=2; for(var i=1;i<7;i++){ cx.beginPath(); cx.moveTo(0,i*40); cx.lineTo(W,i*40); cx.stroke(); } for(var k=0;k<9;k++){ cx.beginPath(); cx.moveTo(k*52,0); cx.lineTo(k*52,H*0.5); cx.stroke(); }
+      cx.fillStyle="#c9a06a"; cx.fillRect(0,H*0.5,W,H);
+      // soap shelf
+      if(g.soap){ emo("🧴",PSOAP.x,PSOAP.y,26); }
+      // sprayer on wall
+      if(g.spr){ cx.strokeStyle="#9aa4b0"; cx.lineWidth=5; cx.lineCap="round"; cx.beginPath(); cx.moveTo(PSPR.x,120); cx.lineTo(PSPR.x,PSPR.y); cx.stroke(); emo("🚿",PSPR.x,PSPR.y+6,24); }
+      // tub
+      if(g.phase!=="tub"){ cx.fillStyle="#e8f0f4"; rr(PTUB.x-72,PTUB.y-30,144,60,20); cx.fill(); cx.strokeStyle="#b0c4cc"; cx.lineWidth=3; rr(PTUB.x-72,PTUB.y-30,144,60,20); cx.stroke(); cx.fillStyle="#cfe6ec"; rr(PTUB.x-62,PTUB.y-20,124,40,14); cx.fill();
+        if(g.phase==="wash"||g.over){ cx.fillStyle="rgba(150,210,255,0.5)"; rr(PTUB.x-60,PTUB.y-4,120,22,10); cx.fill(); } }
+      // the pet
+      if(g.phase==="wash"||g.over){ drawWashDog(PTUB.x, PTUB.y-6, g.over?0:g.dirt, g.scrub>0); }
+      coinHUD();
+      if(g.phase==="tub"){ text("Drag the wash TUB into the corner!",W/2,42,14,"#2a5a6a");
+        cx.setLineDash([7,6]); cx.strokeStyle="#8fb8c0"; cx.lineWidth=3; rr(PTUB.x-72,PTUB.y-30,144,60,20); cx.stroke(); cx.setLineDash([]);
+        var x=g.hold==="tub"?g.hx:W/2, y=g.hold==="tub"?g.hy:H-64; drawShelfPTub(x,y); }
+      else if(g.phase==="spr"){ text("Hang the SPRAYER on the wall! 🚿",W/2,42,15,"#2a5a6a");
+        cx.setLineDash([6,5]); cx.strokeStyle="#8fb8c0"; cx.lineWidth=2; cx.strokeRect(PSPR.x-16,PSPR.y-16,32,32); cx.setLineDash([]);
+        var rx=g.hold==="spr"?g.hx:W/2, ry=g.hold==="spr"?g.hy:H-58; drawShelfSpr(rx,ry); }
+      else if(g.phase==="soap"){ text("Add the pet SOAP! 🧴",W/2,42,15,"#2a5a6a");
+        var ox=g.hold==="soap"?g.hx:W/2, oy=g.hold==="soap"?g.hy:H-58; if(!g.soap)drawShelfSoap(ox,oy); }
+      else if(g.phase==="wash"){ text(g.dirt>0.05?"Scrub the doggy clean! 🧽":"So clean! ✨",W/2,42,15,"#2a5a6a");
+        // sponge follows finger while scrubbing
+        if(g.scrub>0){ emo("🧽",g.hx,g.hy,26); }
+        cx.fillStyle="#00000018"; rr(W/2-90,H-30,180,12,6); cx.fill(); cx.fillStyle="#5ac0a0"; rr(W/2-90,H-30,180*(1-g.dirt),12,6); cx.fill(); text("clean!",W/2,H-24,12,"#0a4a3a"); }
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); cx.fillStyle="rgba(0,0,0,.4)"; cx.fillRect(0,0,W,H); text("🐾 PET WASH DONE!",W/2,H*0.38,22,"#ffd23f"); text("Squeaky-clean & happy pup! ✨",W/2,H*0.45,14,"#fff"); btn("▶ BACK TO HOUSE",H*0.54); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.54-8&&ptr.y<H*0.54+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      var near=(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-(H-60))<44);
+      if(g.phase==="tub"&&near){ g.hold="tub"; g.hx=ptr.x; g.hy=ptr.y; }
+      else if(g.phase==="spr"&&near){ g.hold="spr"; g.hx=ptr.x; g.hy=ptr.y; }
+      else if(g.phase==="soap"&&near){ g.hold="soap"; g.hx=ptr.x; g.hy=ptr.y; }
+      else if(g.phase==="wash"){ this.scrubAt(); } },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } else if(g.phase==="wash"){ this.scrubAt(); } },
+    scrubAt:function(){ g.hx=ptr.x; g.hy=ptr.y; if(Math.abs(ptr.x-PTUB.x)<70 && Math.abs(ptr.y-(PTUB.y-6))<40 && g.dirt>0){ g.scrub=8; g.dirt=Math.max(0,g.dirt-0.03); if(t%3===0){ drop(ptr.x,ptr.y-4,"#ffffff",2,true); beep(500+(1-g.dirt)*300,.03,"sine"); }
+      if(g.dirt<=0 && !g.over){ g.over=true; coins+=6; save(); ding(); confettiBurst(); star(PTUB.x,PTUB.y,10); label("Pet washed! 🪙 "+coins); } } },
+    up:function(){
+      if(g.hold==="tub"){ if(Math.abs(g.hx-PTUB.x)<80&&Math.abs(g.hy-PTUB.y)<70){ g.phase="spr"; ding(); drop(PTUB.x,PTUB.y,"#cfe6ec",8); label("Hang the sprayer!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="spr"){ if(Math.abs(g.hx-PSPR.x)<70&&Math.abs(g.hy-PSPR.y)<80){ g.spr=true; g.phase="soap"; ding(); label("Add the pet soap!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="soap"){ if(Math.abs(g.hx-PSOAP.x)<70&&Math.abs(g.hy-PSOAP.y)<70){ g.soap=true; g.phase="wash"; ding(); label("Now scrub the doggy clean!"); } else beep(300,.08); g.hold=null; } } };
+  function drawShelfPTub(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#e8f0f4"; rr(-50,-16,100,32,14); cx.fill(); cx.strokeStyle="#b0c4cc"; cx.lineWidth=2; rr(-50,-16,100,32,14); cx.stroke(); cx.fillStyle="#cfe6ec"; rr(-42,-9,84,18,8); cx.fill(); text("TUB",0,-28,13,"#2a5a6a"); cx.restore(); }
+  function drawShelfSpr(x,y){ emo("🚿",x,y,30); text("SPRAYER",x,y-24,13,"#2a5a6a"); }
+  function drawShelfSoap(x,y){ emo("🧴",x,y,28); text("SOAP",x,y-24,13,"#2a5a6a"); }
+
+  // ================= CITY VIEW — floor-to-ceiling windows (Set3 #81) =================
+  var CVF=[{x:98},{x:220},{x:342}], CVY=70, CVW=104, CVH=380;
+  function drawSkyline(fx,night){ // skyline behind an opening
+    var sky=cx.createLinearGradient(0,CVY,0,CVY+CVH); if(night){ sky.addColorStop(0,"#1a2450"); sky.addColorStop(1,"#4a3a6a"); } else { sky.addColorStop(0,"#aee0ff"); sky.addColorStop(1,"#ffe0c0"); } cx.fillStyle=sky; cx.fillRect(fx-CVW/2,CVY,CVW,CVH);
+    if(night){ cx.fillStyle="#fff"; for(var s=0;s<8;s++){ if((s+Math.floor(t/20))%3===0)cx.fillRect(fx-CVW/2+8+s*12,CVY+12+((s*23)%40),2,2); } cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(fx+CVW/2-18,CVY+24,10,0,7); cx.fill(); }
+    else { cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(fx+CVW/2-18,CVY+24,12,0,7); cx.fill(); }
+    // buildings
+    var bh=[70,120,90,140,100]; for(var b=0;b<5;b++){ var bx=fx-CVW/2+6+b*20; cx.fillStyle=night?"#2a2a44":"#8a8fa8"; cx.fillRect(bx,CVY+CVH-bh[(b+ (fx|0))%5],17,bh[(b+(fx|0))%5]);
+      cx.fillStyle=night?"#ffe27a":"#c4c8d8"; for(var w=0;w<4;w++){ for(var h2=0;h2<Math.floor(bh[(b+(fx|0))%5]/22);h2++){ if(!night||((b+w+h2)%2===0))cx.fillRect(bx+3+w*4,CVY+CVH-bh[(b+(fx|0))%5]+6+h2*20,2.5,3); } } }
+  }
+  S.cityview={ init:function(){ g={panes:[false,false,false], done:0, over:false, hold:false, hx:0, hy:0, night:0}; label("Slide in the floor-to-ceiling windows! 🌆"); },
+    update:function(){ if(g.over)g.night=Math.min(1,g.night+0.02); },
+    render:function(){
+      cx.fillStyle="#e6e0ea"; cx.fillRect(0,0,W,H); cx.fillStyle="#b9a0c0"; cx.fillRect(0,H*0.76,W,H);
+      // openings with skyline
+      for(var i=0;i<CVF.length;i++){ var f=CVF[i]; drawSkyline(f.x, g.over);
+        if(g.panes[i]){ cx.fillStyle="rgba(190,225,255,0.35)"; cx.fillRect(f.x-CVW/2,CVY,CVW,CVH); cx.strokeStyle="#eaffff"; cx.lineWidth=2; cx.beginPath(); cx.moveTo(f.x-CVW/2+14,CVY+20); cx.lineTo(f.x-10,CVY+CVH-40); cx.stroke(); }
+        cx.strokeStyle="#5a5a66"; cx.lineWidth=5; cx.strokeRect(f.x-CVW/2,CVY,CVW,CVH); cx.beginPath(); cx.moveTo(f.x,CVY); cx.lineTo(f.x,CVY+CVH); cx.moveTo(f.x-CVW/2,CVY+CVH/2); cx.lineTo(f.x+CVW/2,CVY+CVH/2); cx.stroke();
+        if(!g.panes[i]&&!g.over){ cx.setLineDash([5,5]); cx.strokeStyle="#5aa0e0"; cx.lineWidth=2; cx.strokeRect(f.x-CVW/2+4,CVY+4,CVW-8,CVH-8); cx.setLineDash([]); } }
+      // furniture silhouette
+      emo("🛋️",70,H*0.76-4,30); emo("🪴",W-52,H*0.76-2,28);
+      coinHUD();
+      text("Add floor-to-ceiling windows! 🌆",W/2,44,14,"#4a3a6a");
+      if(g.hold){ cx.fillStyle="rgba(190,225,255,0.6)"; rr(g.hx-40,g.hy-58,80,116,4); cx.fill(); cx.strokeStyle="#5a5a66"; cx.lineWidth=4; rr(g.hx-40,g.hy-58,80,116,4); cx.stroke(); }
+      else if(!g.over){ cx.fillStyle="rgba(190,225,255,0.6)"; rr(W/2-40,H-72,80,54,4); cx.fill(); cx.strokeStyle="#5a5a66"; cx.lineWidth=4; rr(W/2-40,H-72,80,54,4); cx.stroke(); text("🪟 window",W/2,H-82,12,"#4a3a6a"); }
+      cx.fillStyle="#00000018"; rr(W/2-70,H-14,140,10,5); cx.fill(); cx.fillStyle="#7a5ad0"; rr(W/2-70,H-14,140*(g.done/3),10,5); cx.fill();
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("🌆 CITY VIEW DONE!",W/2,H*0.84,20,"#ffd23f"); text("Floor-to-ceiling skyline views! ✨",W/2,H*0.89,13,"#fff"); btn("▶ BACK TO HOUSE",H*0.94-26); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.94-34&&ptr.y<H*0.94+18&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      if(Math.abs(ptr.x-W/2)<50&&Math.abs(ptr.y-(H-46))<40){ g.hold=true; g.hx=ptr.x; g.hy=ptr.y; } },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){ if(g.hold){ var bi=-1,bd=64; for(var i=0;i<CVF.length;i++){ if(!g.panes[i]){ var d=Math.hypot(g.hx-CVF[i].x,g.hy-(CVY+CVH/2)); if(d<bd){bd=d;bi=i;} } } if(bi>=0){ g.panes[bi]=true; g.done++; ding(); star(CVF[bi].x,CVY+CVH/2,6); if(g.done>=3){ g.over=true; coins+=5; save(); confettiBurst(); label("City view done! 🪙 "+coins); } } else beep(300,.08); g.hold=false; } } };
+
+  // ================= ROOFTOP GARDEN (Set3 #85) =================
+  var RSPOTS=[{x:100,y:210},{x:220,y:210},{x:340,y:210},{x:100,y:330},{x:220,y:330},{x:340,y:330}];
+  var RPLANTS=["🪴","🌻","🌷","🌵","🌹","🌸"];
+  S.rooftop={ init:function(){ g={filled:[false,false,false,false,false,false], done:0, over:false, hold:false, hx:0, hy:0 }; label("Drag plants onto the rooftop! 🌿"); },
+    update:function(){},
+    render:function(){
+      // sky + rooftop deck
+      var sky=cx.createLinearGradient(0,0,0,H*0.42); sky.addColorStop(0,"#bfe6ff"); sky.addColorStop(1,"#ffe8d0"); cx.fillStyle=sky; cx.fillRect(0,0,W,H*0.42);
+      cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(W-54,60,18,0,7); cx.fill();
+      // distant skyline
+      cx.fillStyle="#a8b0c8"; for(var s=0;s<7;s++){ var bh=30+((s*37)%50); cx.fillRect(s*64,H*0.42-bh,50,bh); }
+      // deck
+      cx.fillStyle="#b98a54"; cx.fillRect(0,H*0.42,W,H); cx.strokeStyle="#9a6f40"; cx.lineWidth=2; for(var d=0;d<12;d++){ cx.beginPath(); cx.moveTo(0,H*0.42+d*20); cx.lineTo(W,H*0.42+d*20); cx.stroke(); }
+      // railing
+      cx.strokeStyle="#8a95a5"; cx.lineWidth=4; cx.strokeRect(14,H*0.42-4,W-28,8); for(var rr2=0;rr2<10;rr2++){ cx.beginPath(); cx.moveTo(20+rr2*42,H*0.42-16); cx.lineTo(20+rr2*42,H*0.42+4); cx.stroke(); }
+      // string lights when done
+      if(g.over){ cx.strokeStyle="#8a6f40"; cx.lineWidth=2; cx.beginPath(); cx.moveTo(20,120); cx.quadraticCurveTo(W/2,150,W-20,120); cx.stroke(); for(var L=0;L<9;L++){ var lx=20+L*50, ly=120+Math.sin(L)*8+18-Math.abs(L-4.5)*3; cx.fillStyle=["#ffd23f","#ff6a8a","#5ad0a0","#5aa0ff"][L%4]; if(Math.floor(t/12+L)%2===0){ cx.beginPath(); cx.arc(lx,ly+ (Math.sin(L*1.3)*6),4,0,7); cx.fill(); } } }
+      // placed plants
+      for(var i=0;i<6;i++){ if(g.filled[i]){ emo(RPLANTS[i],RSPOTS[i].x,RSPOTS[i].y,32); } else if(!g.over){ cx.setLineDash([5,5]); cx.strokeStyle="#7a5a34"; cx.lineWidth=2; cx.beginPath(); cx.arc(RSPOTS[i].x,RSPOTS[i].y,20,0,7); cx.stroke(); cx.setLineDash([]); } }
+      // bench + person chilling when done
+      if(g.over){ emo("🪑",70,H*0.42+40,28); }
+      coinHUD();
+      text("Set up the rooftop garden! 🌿",W/2,44,15,"#3a5a2a");
+      if(g.hold){ emo(RPLANTS[g.done%6],g.hx,g.hy,32); }
+      else if(!g.over){ emo(RPLANTS[g.done%6],W/2,H-52,32); text("drag a plant",W/2,H-74,12,"#3a5a2a"); }
+      cx.fillStyle="#00000018"; rr(W/2-70,H-16,140,10,5); cx.fill(); cx.fillStyle="#5aaa5a"; rr(W/2-70,H-16,140*(g.done/6),10,5); cx.fill();
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("🌿 ROOFTOP GARDEN DONE!",W/2,H*0.6,19,"#2a6a2a"); text("A green city oasis! 🌻",W/2,H*0.66,14,"#2a5a2a"); btn("▶ BACK TO HOUSE",H*0.72); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.72-8&&ptr.y<H*0.72+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      if(Math.abs(ptr.x-W/2)<44&&Math.abs(ptr.y-(H-52))<40){ g.hold=true; g.hx=ptr.x; g.hy=ptr.y; } },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){ if(g.hold){ var bi=-1,bd=40; for(var i=0;i<6;i++){ if(!g.filled[i]){ var d=Math.hypot(g.hx-RSPOTS[i].x,g.hy-RSPOTS[i].y); if(d<bd){bd=d;bi=i;} } } if(bi>=0){ g.filled[bi]=true; g.done++; ding(); star(RSPOTS[bi].x,RSPOTS[bi].y,5); if(g.done>=6){ g.over=true; coins+=5; save(); confettiBurst(); label("Rooftop garden done! 🪙 "+coins); } } else beep(300,.08); g.hold=false; } } };
+
+  // ================= GAME ROOM — pool table (#243) + trophy shelf (#256) =================
+  var TBL={x:W/2,y:350,w:290,h:158}; var TSH={x:W/2,y:110};
+  var POCK=[]; (function(){ var L=TBL.x-TBL.w/2, R2=TBL.x+TBL.w/2, T=TBL.y-TBL.h/2, B=TBL.y+TBL.h/2; POCK=[{x:L+8,y:T+8},{x:TBL.x,y:T+4},{x:R2-8,y:T+8},{x:L+8,y:B-8},{x:TBL.x,y:B-4},{x:R2-8,y:B-8}]; })();
+  function drawPoolTable(){ cx.fillStyle="#6a3f1e"; rr(TBL.x-TBL.w/2-12,TBL.y-TBL.h/2-12,TBL.w+24,TBL.h+24,14); cx.fill();
+    cx.fillStyle="#2a8a4a"; rr(TBL.x-TBL.w/2,TBL.y-TBL.h/2,TBL.w,TBL.h,8); cx.fill(); cx.fillStyle="#248040"; rr(TBL.x-TBL.w/2+6,TBL.y-TBL.h/2+6,TBL.w-12,TBL.h-12,6); cx.fill();
+    POCK.forEach(function(p){ cx.fillStyle="#111"; cx.beginPath(); cx.arc(p.x,p.y,11,0,7); cx.fill(); }); }
+  S.gameroom={ init:function(){ g={phase:"table",hold:null,hx:0,hy:0, trophy:false, ball:{x:W/2,y:360}, sunk:false, over:false}; label("Drag the POOL TABLE into the room! 🎱"); },
+    update:function(){},
+    render:function(){
+      cx.fillStyle="#3a3040"; cx.fillRect(0,0,W,H); cx.fillStyle="#4a4050"; cx.fillRect(0,H*0.5,W,H);
+      // trophy shelf on wall
+      if(g.trophy){ cx.fillStyle="#8a5a2f"; cx.fillRect(TSH.x-70,TSH.y+14,140,8); emo("🏆",TSH.x-44,TSH.y,26); emo("🥇",TSH.x,TSH.y,24); emo("🏆",TSH.x+44,TSH.y,26); }
+      // table
+      if(g.phase!=="table"){ drawPoolTable();
+        if(g.phase==="shot"||g.over){ // 8-ball
+          if(!g.over){ var bx=g.hold==="ball"?g.hx:g.ball.x, by=g.hold==="ball"?g.hy:g.ball.y; cx.fillStyle="#111"; cx.beginPath(); cx.arc(bx,by,11,0,7); cx.fill(); cx.fillStyle="#fff"; cx.beginPath(); cx.arc(bx,by,5,0,7); cx.fill(); text("8",bx,by,8,"#111"); } }
+      }
+      coinHUD();
+      if(g.phase==="table"){ text("Drag the POOL TABLE into the room! 🎱",W/2,42,13,"#bfe0d0");
+        cx.setLineDash([7,6]); cx.strokeStyle="#5aa06a"; cx.lineWidth=3; rr(TBL.x-TBL.w/2,TBL.y-TBL.h/2,TBL.w,TBL.h,8); cx.stroke(); cx.setLineDash([]);
+        var x=g.hold==="table"?g.hx:W/2,y=g.hold==="table"?g.hy:H-58; drawShelfPool(x,y); }
+      else if(g.phase==="trophy"){ text("Mount the TROPHY SHELF on the wall! 🏆",W/2,42,13,"#bfe0d0");
+        cx.setLineDash([6,5]); cx.strokeStyle="#8a7ad0"; cx.lineWidth=2; cx.strokeRect(TSH.x-70,TSH.y-14,140,40); cx.setLineDash([]);
+        var tx=g.hold==="trophy"?g.hx:W/2,ty=g.hold==="trophy"?g.hy:H-56; if(!g.trophy)drawShelfTrophy(tx,ty); }
+      else if(g.phase==="shot"){ text("Drag the 8-ball into a pocket! 🎱",W/2,42,14,"#bfe0d0");
+        POCK.forEach(function(p){ if(Math.floor(t/16)%2===0){ cx.strokeStyle="#ffce3f"; cx.lineWidth=2; cx.beginPath(); cx.arc(p.x,p.y,14,0,7); cx.stroke(); } }); }
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); cx.fillStyle="rgba(0,0,0,.45)"; cx.fillRect(0,0,W,H); text("🎱 GAME ROOM READY!",W/2,H*0.4,21,"#ffd23f"); text("Pool table & trophy shelf! 🏆",W/2,H*0.47,14,"#fff"); btn("▶ BACK TO HOUSE",H*0.56); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.56-8&&ptr.y<H*0.56+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      var near=(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-(H-58))<44);
+      if(g.phase==="table"&&near){ g.hold="table"; g.hx=ptr.x; g.hy=ptr.y; }
+      else if(g.phase==="trophy"&&near){ g.hold="trophy"; g.hx=ptr.x; g.hy=ptr.y; }
+      else if(g.phase==="shot"){ if(Math.hypot(ptr.x-g.ball.x,ptr.y-g.ball.y)<24){ g.hold="ball"; g.hx=ptr.x; g.hy=ptr.y; } } },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){
+      if(g.hold==="table"){ if(Math.abs(g.hx-TBL.x)<90&&Math.abs(g.hy-TBL.y)<90){ g.phase="trophy"; ding(); drop(TBL.x,TBL.y,"#2a8a4a",10); label("Mount the trophy shelf!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="trophy"){ if(Math.abs(g.hx-TSH.x)<80&&g.hy<TSH.y+70){ g.trophy=true; g.phase="shot"; ding(); label("Sink the 8-ball in a pocket!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="ball"){ var pk=null; POCK.forEach(function(p){ if(Math.hypot(g.hx-p.x,g.hy-p.y)<28)pk=p; }); if(pk){ g.over=true; coins+=6; save(); ding(); confettiBurst(); star(pk.x,pk.y,10); label("Nice shot! 🪙 "+coins); } else { g.ball.x=W/2; g.ball.y=360; beep(300,.08); } g.hold=null; } } };
+  function drawShelfPool(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#2a8a4a"; rr(-46,-18,92,36,6); cx.fill(); cx.strokeStyle="#6a3f1e"; cx.lineWidth=3; rr(-46,-18,92,36,6); cx.stroke(); text("🎱 TABLE",0,-28,13,"#bfe0d0"); cx.restore(); }
+  function drawShelfTrophy(x,y){ emo("🏆",x,y,30); text("SHELF",x,y-24,13,"#bfe0d0"); }
+
+  // ================= YOGA STUDIO — set up a yoga studio (Set3 #266) =================
+  var YMAT={x:W/2,y:420}, YMIR={x:W/2,y:130};
+  S.yoga={ init:function(){ g={phase:"mat",hold:null,hx:0,hy:0, mirror:false, calm:0, over:false}; label("Roll out the yoga MAT! 🧘"); },
+    update:function(){},
+    render:function(){
+      var gr=cx.createLinearGradient(0,0,0,H); gr.addColorStop(0,"#efe0f4"); gr.addColorStop(1,"#e0d0ea"); cx.fillStyle=gr; cx.fillRect(0,0,W,H); cx.fillStyle="#c9b48a"; cx.fillRect(0,H*0.62,W,H);
+      // mirror
+      if(g.mirror){ cx.fillStyle="rgba(200,230,240,.55)"; rr(YMIR.x-50,YMIR.y-60,100,120,8); cx.fill(); cx.strokeStyle="#b0a0c0"; cx.lineWidth=4; rr(YMIR.x-50,YMIR.y-60,100,120,8); cx.stroke(); cx.strokeStyle="#fff"; cx.lineWidth=2; cx.beginPath(); cx.moveTo(YMIR.x-36,YMIR.y-44); cx.lineTo(YMIR.x-10,YMIR.y+20); cx.stroke(); }
+      // mat
+      if(g.phase!=="mat"){ cx.fillStyle="#8a6fd0"; rr(YMAT.x-56,YMAT.y-16,112,32,10); cx.fill(); cx.strokeStyle="#6a4fb0"; cx.lineWidth=2; rr(YMAT.x-56,YMAT.y-16,112,32,10); cx.stroke(); }
+      // person doing pose in "pose"
+      if(g.phase==="pose"||g.over){ var breathe=1+Math.sin(t*0.08)*0.05; cx.save(); cx.translate(YMAT.x,YMAT.y-20); cx.scale(breathe,breathe);
+        cx.strokeStyle="#3a2a1a"; cx.lineWidth=5; cx.lineCap="round"; cx.beginPath(); cx.moveTo(-10,10); cx.lineTo(0,0); cx.lineTo(10,10); cx.stroke(); // legs crossed
+        cx.fillStyle=SHIRTS?SHIRTS[mePref.shirt]:"#8a6fd0"; rr(-9,-18,18,20,6); cx.fill();
+        cx.strokeStyle=SHIRTS?SHIRTS[mePref.shirt]:"#8a6fd0"; cx.lineWidth=5; cx.beginPath(); cx.moveTo(-8,-12); cx.lineTo(-16,-4); cx.moveTo(8,-12); cx.lineTo(16,-4); cx.stroke(); // arms out
+        cx.fillStyle=SKIN; cx.beginPath(); cx.arc(0,-26,8,0,7); cx.fill(); cx.fillStyle=HAIRS?HAIRS[mePref.hair]:"#3a2a1a"; cx.beginPath(); cx.arc(0,-28,8,Math.PI,2*Math.PI); cx.fill();
+        cx.restore(); emo("🧘",YMAT.x,YMAT.y-70,20); }
+      coinHUD();
+      if(g.phase==="mat"){ text("Roll out the yoga MAT! 🧘",W/2,42,15,"#5a3a6a");
+        cx.setLineDash([7,6]); cx.strokeStyle="#8a6fd0"; cx.lineWidth=3; rr(YMAT.x-56,YMAT.y-16,112,32,10); cx.stroke(); cx.setLineDash([]);
+        var x=g.hold==="mat"?g.hx:W/2,y=g.hold==="mat"?g.hy:H-58; drawShelfYMat(x,y); }
+      else if(g.phase==="mirror"){ text("Hang the MIRROR on the wall! 🪞",W/2,42,15,"#5a3a6a");
+        cx.setLineDash([6,5]); cx.strokeStyle="#b0a0c0"; cx.lineWidth=2; cx.strokeRect(YMIR.x-50,YMIR.y-60,100,120); cx.setLineDash([]);
+        var mx=g.hold==="mirror"?g.hx:W/2,my=g.hold==="mirror"?g.hy:H-58; if(!g.mirror)drawShelfMirror(mx,my); }
+      else if(g.phase==="pose"){ text(g.calm>=100?"Namaste! 🧘":"Tap to breathe & hold the pose! 🧘",W/2,42,14,"#5a3a6a");
+        cx.fillStyle="#00000018"; rr(W/2-90,H-30,180,14,7); cx.fill(); cx.fillStyle="#8a6fd0"; rr(W/2-90,H-30,180*Math.min(1,g.calm/100),14,7); cx.fill(); text("calm "+Math.floor(g.calm)+"%",W/2,H-23,12,"#fff"); }
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("🧘 YOGA STUDIO DONE!",W/2,H*0.5,20,"#5a3a6a"); text("Calm & peaceful! 🕉️",W/2,H*0.56,14,"#5a3a6a"); btn("▶ BACK TO HOUSE",H*0.64); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.64-8&&ptr.y<H*0.64+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      var near=(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-(H-58))<44);
+      if(g.phase==="mat"&&near){ g.hold="mat"; g.hx=ptr.x; g.hy=ptr.y; }
+      else if(g.phase==="mirror"&&near){ g.hold="mirror"; g.hx=ptr.x; g.hy=ptr.y; }
+      else if(g.phase==="pose"){ if(g.calm<100){ g.calm+=12; star(YMAT.x,YMAT.y-30,4); beep(400+g.calm*3,.06,"sine"); if(g.calm>=100){ g.over=true; coins+=6; save(); ding(); confettiBurst(); label("Yoga done! 🪙 "+coins); } } } },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){
+      if(g.hold==="mat"){ if(Math.abs(g.hx-YMAT.x)<80&&Math.abs(g.hy-YMAT.y)<70){ g.phase="mirror"; ding(); label("Hang the mirror!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="mirror"){ if(Math.abs(g.hx-YMIR.x)<80&&g.hy<YMIR.y+90){ g.mirror=true; g.phase="pose"; ding(); label("Tap to breathe & hold the pose!"); } else beep(300,.08); g.hold=null; } } };
+  function drawShelfYMat(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#8a6fd0"; rr(-44,-12,88,24,8); cx.fill(); text("MAT",0,-24,13,"#5a3a6a"); cx.restore(); }
+  function drawShelfMirror(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="rgba(200,230,240,.6)"; rr(-20,-26,40,52,5); cx.fill(); cx.strokeStyle="#b0a0c0"; cx.lineWidth=3; rr(-20,-26,40,52,5); cx.stroke(); text("🪞 MIRROR",0,-36,13,"#5a3a6a"); cx.restore(); }
+
+  // ================= ROBOT HELPER CORNER (Set3 #25) =================
+  var RBASE={x:W/2,y:402}, RBODY={x:W/2,y:344}, RHEAD={x:W/2,y:286};
+  function drawRobotBase(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#8a95a5"; cx.beginPath(); cx.moveTo(-30,16); cx.lineTo(-22,-16); cx.lineTo(22,-16); cx.lineTo(30,16); cx.closePath(); cx.fill(); cx.strokeStyle="#6a7480"; cx.lineWidth=2; cx.stroke(); cx.fillStyle="#333"; cx.beginPath(); cx.arc(-18,18,7,0,7); cx.arc(18,18,7,0,7); cx.fill(); cx.restore(); }
+  function drawRobotBody(x,y,on,wave){ cx.save(); cx.translate(x,y);
+    var gr=cx.createLinearGradient(-26,0,26,0); gr.addColorStop(0,"#aeb6c2"); gr.addColorStop(0.5,"#d6dce4"); gr.addColorStop(1,"#aeb6c2"); cx.fillStyle=gr; rr(-26,-28,52,56,10); cx.fill(); cx.strokeStyle="#8a95a5"; cx.lineWidth=2; rr(-26,-28,52,56,10); cx.stroke();
+    // panel lights
+    cx.fillStyle=on?"#5ad06a":"#4a5460"; cx.beginPath(); cx.arc(-10,-8,4,0,7); cx.fill(); cx.fillStyle=on?"#ffce3f":"#4a5460"; cx.beginPath(); cx.arc(2,-8,4,0,7); cx.fill(); cx.fillStyle=on?"#5aa0ff":"#4a5460"; cx.beginPath(); cx.arc(14,-8,4,0,7); cx.fill();
+    // power button
+    cx.fillStyle=on?"#5ad06a":"#e0503a"; cx.beginPath(); cx.arc(0,10,9,0,7); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; cx.beginPath(); cx.arc(0,10,9,0,7); cx.stroke(); text(on?"✓":"⏻",0,10,11,"#fff");
+    // arms
+    var aw=wave?Math.sin(t*0.4)*14:0; cx.strokeStyle="#8a95a5"; cx.lineWidth=6; cx.lineCap="round"; cx.beginPath(); cx.moveTo(-26,-14); cx.lineTo(-38,-14+ (wave?-aw:6)); cx.moveTo(26,-14); cx.lineTo(38,-14+aw); cx.stroke();
+    cx.fillStyle="#c6cdd6"; cx.beginPath(); cx.arc(-38,-14+(wave?-aw:6),4,0,7); cx.arc(38,-14+aw,4,0,7); cx.fill();
+    cx.restore(); }
+  function drawRobotHead(x,y,on){ cx.save(); cx.translate(x,y);
+    cx.strokeStyle="#8a95a5"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(0,14); cx.lineTo(0,-2); cx.stroke(); cx.fillStyle=on&&Math.floor(t/12)%2===0?"#ff5a5a":"#c6cdd6"; cx.beginPath(); cx.arc(0,-16,4,0,7); cx.fill();
+    var gr=cx.createLinearGradient(0,-14,0,20); gr.addColorStop(0,"#d6dce4"); gr.addColorStop(1,"#aeb6c2"); cx.fillStyle=gr; rr(-22,-14,44,34,9); cx.fill(); cx.strokeStyle="#8a95a5"; cx.lineWidth=2; rr(-22,-14,44,34,9); cx.stroke();
+    cx.fillStyle=on?"#5ad0ff":"#3a4450"; cx.beginPath(); cx.arc(-9,2,6,0,7); cx.arc(9,2,6,0,7); cx.fill(); if(on){ cx.fillStyle="#fff"; cx.beginPath(); cx.arc(-9,2,2,0,7); cx.arc(9,2,2,0,7); cx.fill(); }
+    cx.strokeStyle="#5a6470"; cx.lineWidth=2; cx.beginPath(); cx.moveTo(-8,13); cx.lineTo(8,13); cx.stroke();
+    cx.restore(); }
+  S.robot={ init:function(){ g={phase:"base",hold:null,hx:0,hy:0, on:false, over:false}; label("Build a robot helper! Drag the BASE in. 🤖"); },
+    update:function(){},
+    render:function(){
+      var gr=cx.createLinearGradient(0,0,0,H); gr.addColorStop(0,"#26304a"); gr.addColorStop(1,"#1a2036"); cx.fillStyle=gr; cx.fillRect(0,0,W,H);
+      // techy wall panels
+      cx.strokeStyle="#33405a"; cx.lineWidth=1; for(var gx=0;gx<W;gx+=30){ cx.beginPath(); cx.moveTo(gx,0); cx.lineTo(gx,H*0.6); cx.stroke(); } for(var gy=0;gy<H*0.6;gy+=30){ cx.beginPath(); cx.moveTo(0,gy); cx.lineTo(W,gy); cx.stroke(); }
+      cx.fillStyle="#2a3450"; cx.fillRect(0,H*0.6,W,H);
+      // charging pad
+      cx.fillStyle="#3a4a6a"; cx.beginPath(); cx.ellipse(W/2,420,54,16,0,0,7); cx.fill();
+      // assembled parts
+      var order=["base","body","head","power"], cur=order.indexOf(g.phase);
+      if(cur>0||g.over)drawRobotBase(RBASE.x,RBASE.y);
+      if(cur>1||g.over)drawRobotBody(RBODY.x,RBODY.y,g.on,g.on);
+      if(cur>2||g.over)drawRobotHead(RHEAD.x,RHEAD.y,g.on);
+      coinHUD();
+      if(g.phase==="base"){ text("Drag the robot BASE onto the pad! 🤖",W/2,44,13,"#c4d4e4");
+        cx.setLineDash([6,5]); cx.strokeStyle="#5a7ab0"; cx.lineWidth=2; cx.strokeRect(RBASE.x-30,RBASE.y-18,60,40); cx.setLineDash([]);
+        var x=g.hold==="base"?g.hx:W/2,y=g.hold==="base"?g.hy:H-56; drawShelfPart(x,y,"base"); }
+      else if(g.phase==="body"){ text("Add the robot BODY! 🤖",W/2,44,15,"#c4d4e4");
+        cx.setLineDash([6,5]); cx.strokeStyle="#5a7ab0"; cx.lineWidth=2; cx.strokeRect(RBODY.x-26,RBODY.y-28,52,56); cx.setLineDash([]);
+        var bx=g.hold==="body"?g.hx:W/2,by=g.hold==="body"?g.hy:H-56; drawShelfPart(bx,by,"body"); }
+      else if(g.phase==="head"){ text("Add the robot HEAD! 🤖",W/2,44,15,"#c4d4e4");
+        cx.setLineDash([6,5]); cx.strokeStyle="#5a7ab0"; cx.lineWidth=2; cx.strokeRect(RHEAD.x-22,RHEAD.y-14,44,34); cx.setLineDash([]);
+        var hx=g.hold==="head"?g.hx:W/2,hy=g.hold==="head"?g.hy:H-56; drawShelfPart(hx,hy,"head"); }
+      else if(g.phase==="power"){ text("Tap the ⏻ power button to turn it on!",W/2,44,14,"#c4d4e4");
+        if(Math.floor(t/16)%2===0){ cx.strokeStyle="#ffce3f"; cx.lineWidth=2; cx.beginPath(); cx.arc(RBODY.x,RBODY.y+10,14,0,7); cx.stroke(); } }
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("🤖 ROBOT HELPER READY!",W/2,H*0.66,19,"#5ad0ff"); text("Beep boop! I'm your helper! 🔋",W/2,H*0.72,14,"#c4d4e4"); btn("▶ BACK TO HOUSE",H*0.80); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.80-8&&ptr.y<H*0.80+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      var near=(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-(H-56))<44);
+      if(g.phase==="base"&&near){ g.hold="base"; g.hx=ptr.x; g.hy=ptr.y; }
+      else if(g.phase==="body"&&near){ g.hold="body"; g.hx=ptr.x; g.hy=ptr.y; }
+      else if(g.phase==="head"&&near){ g.hold="head"; g.hx=ptr.x; g.hy=ptr.y; }
+      else if(g.phase==="power"){ if(Math.hypot(ptr.x-RBODY.x,ptr.y-(RBODY.y+10))<18){ g.on=true; g.over=true; coins+=6; save(); ding(); confettiBurst(); star(RHEAD.x,RHEAD.y,10); label("Robot on! 🪙 "+coins); } } },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){
+      if(g.hold==="base"){ if(Math.abs(g.hx-RBASE.x)<70&&Math.abs(g.hy-RBASE.y)<70){ g.phase="body"; ding(); drop(RBASE.x,RBASE.y,"#aeb6c2",8); label("Add the body!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="body"){ if(Math.abs(g.hx-RBODY.x)<70&&Math.abs(g.hy-RBODY.y)<80){ g.phase="head"; ding(); drop(RBODY.x,RBODY.y,"#d6dce4",8); label("Add the head!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="head"){ if(Math.abs(g.hx-RHEAD.x)<70&&Math.abs(g.hy-RHEAD.y)<80){ g.phase="power"; ding(); drop(RHEAD.x,RHEAD.y,"#5ad0ff",8); label("Tap the power button!"); } else beep(300,.08); g.hold=null; } } };
+  function drawShelfPart(x,y,type){ cx.save(); cx.translate(x,y); if(type==="base"){ drawRobotBase(0,-4); text("BASE",0,-30,13,"#c4d4e4"); } else if(type==="body"){ drawRobotBody(0,0,false,false); text("BODY",0,-40,13,"#c4d4e4"); } else { drawRobotHead(0,0,false); text("HEAD",0,-30,13,"#c4d4e4"); } cx.restore(); }
+
+  // ================= PRO RANGE — add a professional range (Set3 #141) =================
+  var RNG={x:W/2,y:410}, HOOD={x:W/2,y:210};
+  S.range={ init:function(){ g={phase:"range",hold:null,hx:0,hy:0, hood:false, cooking:false, over:false}; label("Install the professional RANGE! 🍳"); },
+    update:function(){},
+    render:function(){
+      cx.fillStyle="#efe4d2"; cx.fillRect(0,0,W,H*0.55); cx.fillStyle="#b98a54"; cx.fillRect(0,H*0.55,W,H);
+      cx.fillStyle="#d9c9b0"; cx.fillRect(0,H*0.55-4,W,8);
+      // hood
+      if(g.hood){ cx.fillStyle="#9aa4b0"; cx.beginPath(); cx.moveTo(HOOD.x-70,HOOD.y+30); cx.lineTo(HOOD.x-50,HOOD.y-10); cx.lineTo(HOOD.x+50,HOOD.y-10); cx.lineTo(HOOD.x+70,HOOD.y+30); cx.closePath(); cx.fill(); cx.fillStyle="#7a8490"; cx.fillRect(HOOD.x-52,HOOD.y+30,104,10); }
+      // range
+      if(g.phase!=="range"){ cx.fillStyle="#c6cdd6"; rr(RNG.x-78,RNG.y-46,156,92,8); cx.fill(); cx.strokeStyle="#8a95a5"; cx.lineWidth=3; rr(RNG.x-78,RNG.y-46,156,92,8); cx.stroke();
+        // oven door
+        cx.fillStyle="#5a6470"; rr(RNG.x-64,RNG.y-4,128,42,6); cx.fill(); cx.fillStyle="#2a3038"; rr(RNG.x-52,RNG.y+4,104,22,4); cx.fill(); cx.fillStyle="#8a95a5"; rr(RNG.x-40,RNG.y+30,80,5,2); cx.fill();
+        // 4 burners
+        for(var bi=0;bi<4;bi++){ var bx=RNG.x-48+(bi%2)*96, by=RNG.y-34+Math.floor(bi/2)*22; cx.fillStyle="#3a4048"; cx.beginPath(); cx.arc(bx,by,14,0,7); cx.fill(); if(g.cooking){ for(var fl=0;fl<5;fl++){ cx.fillStyle=fl%2?"#ff8a3a":"#5aa0ff"; var fa=fl/5*6.28; cx.beginPath(); cx.arc(bx+Math.cos(fa)*7,by+Math.sin(fa)*7,3,0,7); cx.fill(); } } }
+        // pot when cooking
+        if(g.cooking){ cx.fillStyle="#8a95a5"; rr(RNG.x-16,RNG.y-48,44,20,5); cx.fill(); if(t%4===0)FX.parts.push({x:RNG.x+6+(Math.random()*20-10),y:RNG.y-48,vx:0,vy:-1,life:1,col:"#ffffff",r:3,g:-0.01}); } }
+      coinHUD();
+      if(g.phase==="range"){ text("Install the professional RANGE! 🍳",W/2,44,14,"#7a3a3a");
+        cx.setLineDash([7,6]); cx.strokeStyle="#c06a6a"; cx.lineWidth=3; rr(RNG.x-78,RNG.y-46,156,92,8); cx.stroke(); cx.setLineDash([]);
+        var x=g.hold==="range"?g.hx:W/2,y=g.hold==="range"?g.hy:H-56; drawShelfRange(x,y); }
+      else if(g.phase==="hood"){ text("Add the RANGE HOOD above it! 💨",W/2,44,14,"#7a3a3a");
+        cx.setLineDash([6,5]); cx.strokeStyle="#8a95a5"; cx.lineWidth=2; cx.beginPath(); cx.moveTo(HOOD.x-70,HOOD.y+30); cx.lineTo(HOOD.x-50,HOOD.y-10); cx.lineTo(HOOD.x+50,HOOD.y-10); cx.lineTo(HOOD.x+70,HOOD.y+30); cx.closePath(); cx.stroke(); cx.setLineDash([]);
+        var hx=g.hold==="hood"?g.hx:W/2,hy=g.hold==="hood"?g.hy:H-56; if(!g.hood)drawShelfHood(hx,hy); }
+      else if(g.phase==="cook"){ text("Tap the burners to cook! 🔥",W/2,44,15,"#7a3a3a");
+        if(Math.floor(t/16)%2===0){ cx.strokeStyle="#ffce3f"; cx.lineWidth=2; cx.strokeRect(RNG.x-78,RNG.y-46,156,40); } }
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); cx.fillStyle="rgba(0,0,0,.4)"; cx.fillRect(0,0,W,H); text("🍳 CHEF KITCHEN READY!",W/2,H*0.4,20,"#ffd23f"); text("Pro range cooking up a feast! 🔥",W/2,H*0.47,14,"#fff"); btn("▶ BACK TO HOUSE",H*0.56); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.56-8&&ptr.y<H*0.56+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      var near=(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-(H-56))<44);
+      if(g.phase==="range"&&near){ g.hold="range"; g.hx=ptr.x; g.hy=ptr.y; }
+      else if(g.phase==="hood"&&near){ g.hold="hood"; g.hx=ptr.x; g.hy=ptr.y; }
+      else if(g.phase==="cook"){ if(ptr.x>RNG.x-78&&ptr.x<RNG.x+78&&ptr.y>RNG.y-46&&ptr.y<RNG.y){ g.cooking=true; g.over=true; coins+=6; save(); ding(); confettiBurst(); label("Cooking! 🪙 "+coins); } } },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){
+      if(g.hold==="range"){ if(Math.abs(g.hx-RNG.x)<90&&Math.abs(g.hy-RNG.y)<80){ g.phase="hood"; ding(); drop(RNG.x,RNG.y,"#c6cdd6",10); label("Add the range hood!"); } else beep(300,.08); g.hold=null; }
+      else if(g.hold==="hood"){ if(Math.abs(g.hx-HOOD.x)<80&&g.hy<HOOD.y+80){ g.hood=true; g.phase="cook"; ding(); label("Tap the burners to cook!"); } else beep(300,.08); g.hold=null; } } };
+  function drawShelfRange(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#c6cdd6"; rr(-42,-22,84,44,6); cx.fill(); cx.strokeStyle="#8a95a5"; cx.lineWidth=2; rr(-42,-22,84,44,6); cx.stroke(); cx.fillStyle="#3a4048"; [-22,22].forEach(function(bx){ cx.beginPath(); cx.arc(bx,-8,8,0,7); cx.fill(); }); text("🍳 RANGE",0,-32,13,"#7a3a3a"); cx.restore(); }
+  function drawShelfHood(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#9aa4b0"; cx.beginPath(); cx.moveTo(-36,16); cx.lineTo(-26,-8); cx.lineTo(26,-8); cx.lineTo(36,16); cx.closePath(); cx.fill(); text("💨 HOOD",0,-20,13,"#7a3a3a"); cx.restore(); }
+
+  // ================= HIDDEN TV CABINET (Set3 #167) =================
+  var HTVC={x:W/2,y:430};
+  S.hiddentv={ init:function(){ g={phase:"cabinet",hold:null,hx:0,hy:0, tvUp:0, over:false}; label("Place the HIDDEN TV cabinet! 📺"); },
+    update:function(){ if(g.phase==="reveal"&&g.rising){ g.tvUp=Math.min(1,g.tvUp+0.03); if(g.tvUp>=1&&!g.over){ g.over=true; coins+=6; save(); confettiBurst(); label("Hidden TV done! 🪙 "+coins); } } },
+    render:function(){
+      var gr=cx.createLinearGradient(0,0,0,H); gr.addColorStop(0,"#efe6dc"); gr.addColorStop(1,"#e0d4c4"); cx.fillStyle=gr; cx.fillRect(0,0,W,H*0.62); cx.fillStyle="#b98a54"; cx.fillRect(0,H*0.62,W,H);
+      // wall art
+      emo("🖼️",90,150,30); emo("🪴",W-60,H*0.62-6,30);
+      // TV rising out of the cabinet
+      if(g.phase!=="cabinet"){
+        if(g.tvUp>0){ var tvY=HTVC.y-40-g.tvUp*150; cx.fillStyle="#111"; rr(HTVC.x-90,tvY,180,110,6); cx.fill(); var on=g.over; cx.fillStyle=on?"#4a90d0":"#2a3038"; rr(HTVC.x-84,tvY+6,168,98,3); cx.fill(); if(on)emo("🎬",HTVC.x,tvY+55,34); }
+        // cabinet
+        cx.fillStyle="#8a5a2f"; rr(HTVC.x-100,HTVC.y-30,200,72,8); cx.fill(); cx.strokeStyle="#6a4420"; cx.lineWidth=3; rr(HTVC.x-100,HTVC.y-30,200,72,8); cx.stroke();
+        cx.fillStyle="#7a4a2a"; rr(HTVC.x-92,HTVC.y-22,90,56,4); cx.fill(); rr(HTVC.x+2,HTVC.y-22,90,56,4); cx.fill(); cx.fillStyle="#ffd23f"; cx.beginPath(); cx.arc(HTVC.x-8,HTVC.y+6,3,0,7); cx.arc(HTVC.x+8,HTVC.y+6,3,0,7); cx.fill();
+      }
+      coinHUD();
+      if(g.phase==="cabinet"){ text("Place the HIDDEN TV cabinet! 📺",W/2,44,14,"#5a3a1a");
+        cx.setLineDash([7,6]); cx.strokeStyle="#8a5a2f"; cx.lineWidth=3; rr(HTVC.x-100,HTVC.y-30,200,72,8); cx.stroke(); cx.setLineDash([]);
+        var x=g.hold==="cab"?g.hx:W/2,y=g.hold==="cab"?g.hy:H-58; drawShelfCab(x,y); }
+      else if(g.phase==="reveal"&&!g.over){ text("Tap the cabinet — the TV rises up! 📺",W/2,44,13,"#5a3a1a");
+        if(Math.floor(t/16)%2===0){ cx.strokeStyle="#ffce3f"; cx.lineWidth=2; cx.strokeRect(HTVC.x-100,HTVC.y-30,200,72); } }
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("📺 HIDDEN TV CABINET!",W/2,H*0.5,20,"#5a3a1a"); text("TV hides away when you're done! ✨",W/2,H*0.56,13,"#5a3a1a"); btn("▶ BACK TO HOUSE",H*0.64); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.64-8&&ptr.y<H*0.64+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      if(g.phase==="cabinet"){ if(Math.abs(ptr.x-W/2)<60&&Math.abs(ptr.y-(H-58))<44){ g.hold="cab"; g.hx=ptr.x; g.hy=ptr.y; } }
+      else if(g.phase==="reveal"){ if(ptr.x>HTVC.x-100&&ptr.x<HTVC.x+100&&ptr.y>HTVC.y-30&&ptr.y<HTVC.y+42){ g.rising=true; ding(); } } },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){ if(g.hold==="cab"){ if(Math.abs(g.hx-HTVC.x)<90&&Math.abs(g.hy-HTVC.y)<80){ g.phase="reveal"; ding(); drop(HTVC.x,HTVC.y,"#8a5a2f",10); label("Tap the cabinet to reveal the TV!"); } else beep(300,.08); g.hold=null; } } };
+  function drawShelfCab(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#8a5a2f"; rr(-50,-18,100,36,6); cx.fill(); cx.strokeStyle="#6a4420"; cx.lineWidth=2; rr(-50,-18,100,36,6); cx.stroke(); cx.fillStyle="#7a4a2a"; rr(-45,-12,42,24,3); cx.fill(); rr(3,-12,42,24,3); cx.fill(); text("📺 CABINET",0,-28,13,"#5a3a1a"); cx.restore(); }
+
+  // ================= 🛒 COIN SHOP — spend job coins =================
+  function shopRects(){ var cols=2,tw=152,th=78,gx=12,gy=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=118,r=[]; for(var i=0;i<SHOP.length;i++){ var c=i%cols,rw=Math.floor(i/cols); r.push({x:x0+c*(tw+gx),y:y0+rw*(th+gy),w:tw,h:th}); } return r; }
+  S.shop={ init:function(){ g={flash:0}; label("Spend your coins! 🛒 "+coins); },
+    render:function(){
+      var gr=cx.createLinearGradient(0,0,0,H); gr.addColorStop(0,"#fff4d6"); gr.addColorStop(1,"#ffe6b0"); cx.fillStyle=gr; cx.fillRect(0,0,W,H);
+      emo("🛒",W/2-70,52,30); text("COIN SHOP",W/2+10,52,24,"#a5701a");
+      // coin balance badge
+      cx.fillStyle="#fff"; rr(W/2-56,72,112,30,15); cx.fill(); cx.strokeStyle="#e0b64a"; cx.lineWidth=3; rr(W/2-56,72,112,30,15); cx.stroke(); emo("🪙",W/2-32,87,20); text(coins,W/2+8,87,18,"#a5701a","left");
+      var R=shopRects();
+      for(var i=0;i<SHOP.length;i++){ var rc=R[i], it=SHOP[i], own=!!owned[it.k], canBuy=coins>=it.p;
+        cx.fillStyle=own?"#dff5df":(canBuy?"#fff":"#eee2c8"); rr(rc.x,rc.y,rc.w,rc.h,14); cx.fill();
+        cx.strokeStyle=own?"#5ab06a":"#e0c88a"; cx.lineWidth=own?3:2; rr(rc.x,rc.y,rc.w,rc.h,14); cx.stroke();
+        emo(it.e,rc.x+30,rc.y+rc.h/2,30); text(it.n,rc.x+52,rc.y+26,13,"#5a3a10","left");
+        if(own){ if(it.cat==="hat"){ var worn=(equipHat===it.hi); text(worn?"👕 WORN":"tap: wear",rc.x+52,rc.y+52,13,worn?"#2a7a2a":"#7a5a2a","left"); } else { text("OWNED ✓",rc.x+52,rc.y+52,13,"#2a7a2a","left"); } }
+        else { emo("🪙",rc.x+54,rc.y+52,15); text(it.p,rc.x+70,rc.y+52,14,canBuy?"#a5701a":"#b0a080","left"); }
+      }
+      cx.fillStyle="#e8c9a0"; rr(W/2-90,H-46,180,34,11); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; rr(W/2-90,H-46,180,34,11); cx.stroke(); text("◀ BACK TO JOBS",W/2,H-29,15,"#3a2a10");
+      renderFX();
+      if(g.flash>0){ g.flash--; }
+    },
+    tap:function(){
+      if(ptr.y>H-46&&ptr.y<H-12&&Math.abs(ptr.x-W/2)<90){ beep(500,.06); go("menu"); return; }
+      var R=shopRects();
+      for(var i=0;i<SHOP.length;i++){ var rc=R[i], it=SHOP[i]; if(ptr.x>rc.x&&ptr.x<rc.x+rc.w&&ptr.y>rc.y&&ptr.y<rc.y+rc.h){
+        if(owned[it.k]){ if(it.cat==="hat"){ equipHat=(equipHat===it.hi)?-1:it.hi; saveShop(); ding(); star(rc.x+30,rc.y+rc.h/2,5); } else { beep(400,.06); } }
+        else if(coins>=it.p){ coins-=it.p; owned[it.k]=true; if(it.cat==="hat")equipHat=it.hi; save(); saveShop(); ding(); confettiBurst(); star(rc.x+rc.w/2,rc.y+rc.h/2,10); floatUp("Bought! ✨",rc.x+rc.w/2,rc.y+10,"#5a3a10"); label("Got it! 🪙 "+coins); }
+        else { beep(200,.12,"sawtooth"); floatUp("Need more 🪙",rc.x+rc.w/2,rc.y+10,"#c05a3a"); }
+        return; } }
+    } };
+
+  // ---------------- input ----------------
+  function pos(e){ var r=cv.getBoundingClientRect(), sx=cv.width/r.width, sy=cv.height/r.height; var cxp,cyp; if(e.touches&&e.touches[0]){ cxp=e.touches[0].clientX; cyp=e.touches[0].clientY; } else { cxp=e.clientX; cyp=e.clientY; } return {x:(cxp-r.left)*sx, y:(cyp-r.top)*sy}; }
+  function down(e){ e.preventDefault(); var p=pos(e); ptr.x=p.x; ptr.y=p.y; ptr.down=true; var s=S[scene]; if(s.down)s.down(); if(s.tap)s.tap(); }
+  function move(e){ e.preventDefault(); var p=pos(e); ptr.x=p.x; ptr.y=p.y; var s=S[scene]; if(ptr.down&&s.drag)s.drag(); }
+  function up(e){ e.preventDefault(); ptr.down=false; var s=S[scene]; if(s.up)s.up(); }
+  cv.addEventListener("mousedown",down); cv.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
+  cv.addEventListener("touchstart",down,{passive:false}); cv.addEventListener("touchmove",move,{passive:false}); cv.addEventListener("touchend",up,{passive:false});
+
+  function loop(){ t++; var s=S[scene]; if(s.update)s.update(); updateFX(); s.render(); renderFX(); requestAnimationFrame(loop); }
+  go("menu"); loop();
+})();
+</script>
+</body>
+</html>

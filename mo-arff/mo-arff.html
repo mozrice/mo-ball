@@ -14,6 +14,17 @@
   canvas{background:#bdeecb;border-radius:16px;box-shadow:0 8px 24px #0009;touch-action:none;max-width:100%;height:auto;}
   #nav{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center;}
   .nb{background:#173a25;border:2px solid #35805a;color:#dcf5e6;font-weight:bold;font-size:14px;padding:8px 14px;border-radius:12px;font-family:inherit;text-decoration:none;}
+  #adbar{position:relative;width:100%;max-width:440px;margin:10px auto 0;height:56px;border-radius:14px;overflow:hidden;
+    box-shadow:0 4px 14px #0007;cursor:pointer;user-select:none;border:2px solid #ffffff33;}
+  #adbar .ad{position:absolute;inset:0;display:flex;align-items:center;gap:10px;padding:0 14px;
+    opacity:0;transform:translateY(12px);transition:opacity .4s,transform .4s;}
+  #adbar .ad.on{opacity:1;transform:translateY(0);}
+  #adbar .em{font-size:30px;flex:0 0 auto;}
+  #adbar .tx{display:flex;flex-direction:column;line-height:1.15;}
+  #adbar .tt{font-weight:bold;font-size:15px;color:#fff;text-shadow:0 1px 2px #0006;}
+  #adbar .sub{font-size:11px;color:#ffffffdd;}
+  #adbar .tag{position:absolute;top:3px;right:5px;background:#0006;color:#fff;font-size:8px;
+    font-weight:bold;padding:1px 5px;border-radius:6px;letter-spacing:.5px;}
 </style>
 </head>
 <body>
@@ -22,10 +33,12 @@
   <h1>🐕 ARFF!</h1>
   <div id="steps">Tap to play with Arff!</div>
   <canvas id="cv" width="440" height="620"></canvas>
+  <div id="adbar"></div>
   <div id="nav">
     <a class="nb" href="../index.html">← Back</a>
     <a class="nb" href="../mo-home.html">🏠 MO Home</a>
     <a class="nb" href="../games.html">🎮 All Games</a>
+    <button class="nb" id="adtoggle" type="button">📺 ADS: ON</button>
   </div>
 </div>
 <script>
@@ -157,7 +170,7 @@
   S.fetch={ init:function(){ g={ax:W/2, ay:H-70, phase:"wait", ball:null, done:0, need:5, msg:"Tap where to throw the ball!"}; label("FETCH — tap to throw! 🎾"); },
     update:function(){ var b=g.ball;
       if(g.phase==="fly"&&b){ b.x+=(b.tx-b.x)*0.14; b.y+=(b.ty-b.y)*0.14; if(Math.abs(b.x-b.tx)<3&&Math.abs(b.y-b.ty)<3){ g.phase="chase"; } }
-      else if(g.phase==="chase"&&b){ g.ax+=(b.x-g.ax)*0.12; g.ay+=(b.y-6-g.ay)*0.12; if(Math.abs(g.ax-b.x)<8){ g.phase="return"; g.msg="Good boy! Bringing it back..."; } }
+      else if(g.phase==="chase"&&b){ g.ax+=(b.x-g.ax)*0.12; g.ay+=(b.y-6-g.ay)*0.12; if(Math.abs(g.ax-b.x)<8){ g.phase="return"; g.msg="Good girl! Bringing it back..."; } }
       else if(g.phase==="return"){ g.ax+=(W/2-g.ax)*0.1; g.ay+=((H-70)-g.ay)*0.1; if(g.ball){ g.ball.x=g.ax+14; g.ball.y=g.ay-14; } if(Math.abs(g.ax-W/2)<8){ g.done++; bones++; saveBones(); bark(); reward(g.ax,g.ay-16,"#d3e84a"); g.ball=null; if(g.done>=g.need){ g.phase="win"; g.msg="You fetched "+g.need+" times! 🏆"; label("FETCH done! 🦴 "+bones); } else { g.phase="wait"; g.msg="Nice! Throw again ("+g.done+"/"+g.need+")"; } } } },
     render:function(){ sky("#bfe6ff","#eafbf0"); ground("#7cc46a", H*0.55);
       cx.fillStyle="#6bb85a"; for(var i=0;i<30;i++){ var gx=(i*53+ (t*0)) %W; cx.fillRect(gx, H*0.55+ (i*13)%(H*0.4), 2, 6); }
@@ -207,7 +220,7 @@
     update:function(){ if(g.over)return;
       g.ax+=(ptr.x-g.ax)*0.17; g.ay+=(ptr.y-g.ay)*0.17; g.ax=Math.max(30,Math.min(W-30,g.ax)); g.ay=Math.max(64,Math.min(H-36,g.ay));
       var pup=g.pup;
-      if(!pup.found){ if(Math.hypot(g.ax-pup.x,g.ay-pup.y)<36){ pup.found=true; bark(); heartPop(pup.x,pup.y-12,5); g.msg="Good boy! Lead it to the 🏠"; } }
+      if(!pup.found){ if(Math.hypot(g.ax-pup.x,g.ay-pup.y)<36){ pup.found=true; bark(); heartPop(pup.x,pup.y-12,5); g.msg="Good girl! Lead it to the 🏠"; } }
       else { pup.x+=(g.ax-pup.x)*0.08; pup.y+=(g.ay-pup.y)*0.08;
         if(Math.hypot(pup.x-g.home.x,pup.y-(g.home.y+8))<38){ g.done++; bones+=2; saveBones(); reward(pup.x,pup.y,"#ffd23f"); heartPop(g.home.x,g.home.y,6); confettiBurst();
           if(g.done>=g.need){ g.over=true; label("ALL PUPPIES HOME! 🦴 "+bones); } else { spawnPup(); g.msg="Another lost puppy! Go find it 🐶"; } } }
@@ -349,6 +362,48 @@
     s.render(); renderFX(); cx.restore();
     requestAnimationFrame(loop); }
   go("menu"); loop();
+})();
+</script>
+<script>
+(function(){
+  // Fun PRETEND ads for the Mo Arcade dog world — all make-believe!
+  var ADS=[
+    {em:"🦴",tt:"ARFF'S CRUNCHY BONES",sub:"Every good girl's favorite treat!",a:"#f7a72b",b:"#e8630e"},
+    {em:"🥏",tt:"SUPER-FLY FRISBEES",sub:"Catch 'em all at the park!",a:"#ff5a7a",b:"#c8306a"},
+    {em:"🎾",tt:"BOUNCY TENNIS BALLS",sub:"The #1 ball for fetch!",a:"#5ad0a0",b:"#1f9a6a"},
+    {em:"🐾",tt:"PAW-FECT DOG TREATS",sub:"Yummy in Arff's tummy!",a:"#c77aff",b:"#7a3ad0"},
+    {em:"🛁",tt:"SUDSY PUP WASH",sub:"Squeaky-clean happy dogs!",a:"#5aa0ff",b:"#2a5ad0"},
+    {em:"🏠",tt:"PLAY MO ARCADE!",sub:"So many games to play!",a:"#ffd23f",b:"#f7a72b"},
+    {em:"🐈",tt:"MEOW'S CAT TOWER",sub:"Climb all the way up!",a:"#f2c94c",b:"#c99a2a"},
+    {em:"⭐",tt:"GOOD GIRL CLUB",sub:"Join the best-dog team today!",a:"#ff8aa2",b:"#e0517a"}
+  ];
+  var bar=document.getElementById("adbar"); if(!bar)return;
+  var els=ADS.map(function(ad){
+    var d=document.createElement("div"); d.className="ad";
+    d.style.background="linear-gradient(120deg,"+ad.a+","+ad.b+")";
+    d.innerHTML='<span class="em">'+ad.em+'</span><span class="tx"><span class="tt">'+ad.tt+
+      '</span><span class="sub">'+ad.sub+'</span></span><span class="tag">FUN AD</span>';
+    bar.appendChild(d); return d;
+  });
+  var i=0; els[0].classList.add("on");
+  function bark(){ try{ var A=new (window.AudioContext||window.webkitAudioContext)(),o=A.createOscillator(),g=A.createGain();
+    o.frequency.value=520;o.connect(g);g.connect(A.destination);g.gain.value=.05;o.start();
+    g.gain.exponentialRampToValueAtTime(.0001,A.currentTime+.1);o.stop(A.currentTime+.1);}catch(e){} }
+  function rotate(){ els[i].classList.remove("on"); i=(i+1)%els.length; els[i].classList.add("on"); }
+  var timer=null;
+  function startAds(){ if(!timer) timer=setInterval(rotate,3200); }
+  function stopAds(){ if(timer){ clearInterval(timer); timer=null; } }
+  bar.addEventListener("click",function(){ bark(); rotate(); stopAds(); startAds(); });
+
+  // ADS ON / OFF toggle (remembers your choice)
+  var adsOn=true; try{ adsOn=(localStorage.getItem("arff_ads")!=="off"); }catch(e){}
+  var tog=document.getElementById("adtoggle");
+  function applyAds(){
+    if(adsOn){ bar.style.display="block"; startAds(); if(tog) tog.textContent="📺 ADS: ON"; }
+    else { stopAds(); bar.style.display="none"; if(tog) tog.textContent="🚫 ADS: OFF"; }
+  }
+  if(tog){ tog.addEventListener("click",function(){ adsOn=!adsOn; try{ localStorage.setItem("arff_ads",adsOn?"on":"off"); }catch(e){} applyAds(); }); }
+  applyAds();
 })();
 </script>
 </body>

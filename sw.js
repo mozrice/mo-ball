@@ -1,7 +1,7 @@
 // Service worker: makes Mo Arcade fully playable with NO internet.
 // It pre-caches every game so once the site loads online once, all games work offline.
 // Bump CACHE whenever you change the site so phones pick up the new version.
-const CACHE = "mo-arcade-v285";
+const CACHE = "mo-arcade-v306";
 const FILES = [
   "./", "./index.html", "./games.html", "./mo-home.html", "./privacy.html", "./icon-180.png",
   "./icon-192.png", "./icon-512-maskable.png", "./icon-512.png", "./icon.svg", "./manifest.webmanifest", "./three.min.js",
@@ -9,15 +9,15 @@ const FILES = [
   "./hoop-shot-3d.html", "./hoop-shot.html", "./mo-1on1/mo-1on1.html", "./mo-2k/mo-2k.html", "./mo-2k26/mo-2k26.html", "./mo-3dcity/mo-3dcity.html",
   "./mo-3devent/mo-3devent.html", "./mo-3point/mo-3point.html", "./mo-8ball/mo-8ball.html", "./mo-airport/mo-airport.html", "./mo-alien/mo-alien.html", "./mo-allstar/mo-allstar.html",
   "./mo-ankle/mo-ankle.html", "./mo-apartmentbldg/mo-apartmentbldg.html", "./mo-aquarium/mo-aquarium.html", "./mo-aquarium2/mo-aquarium2.html", "./mo-aquariumfeed/mo-aquariumfeed.html", "./mo-arena-3d/mo-arena-3d.html",
-  "./mo-arff/mo-arff.html", "./mo-arffart/mo-arffart.html", "./mo-arffastro/mo-arffastro.html", "./mo-arffbath/mo-arffbath.html", "./mo-arffbday/mo-arffbday.html", "./mo-arffbeach/mo-arffbeach.html",
+  "./mo-arff/mo-arff.html", "./mo-random/mo-random.html", "./mo-arff-ads/mo-arff-ads.html", "./mo-housedesign/mo-housedesign.html", "./mo-arffart/mo-arffart.html", "./mo-arffastro/mo-arffastro.html", "./mo-arffbath/mo-arffbath.html", "./mo-arffbday/mo-arffbday.html", "./mo-arffbeach/mo-arffbeach.html",
   "./mo-arffbirdrace/mo-arffbirdrace.html", "./mo-arffbullride/mo-arffbullride.html", "./mo-arffcamelrace/mo-arffcamelrace.html", "./mo-arffcamp/mo-arffcamp.html", "./mo-arffchase/mo-arffchase.html", "./mo-arffchef/mo-arffchef.html",
   "./mo-arffcitytour/mo-arffcitytour.html", "./mo-arffcliffdive/mo-arffcliffdive.html", "./mo-arffcliffwaterjump/mo-arffcliffwaterjump.html", "./mo-arffcontest/mo-arffcontest.html", "./mo-arffcrossbowchallenge/mo-arffcrossbowchallenge.html", "./mo-arffdash/mo-arffdash.html",
-  "./mo-arffdelivery/mo-arffdelivery.html", "./mo-arffdetective/mo-arffdetective.html", "./mo-arffdiving/mo-arffdiving.html", "./mo-arffdoc/mo-arffdoc.html", "./mo-arffdogsledrace/mo-arffdogsledrace.html", "./mo-arfffarm/mo-arfffarm.html",
+  "./mo-arffdelivery/mo-arffdelivery.html", "./mo-arffdetective/mo-arffdetective.html", "./mo-arffdiving/mo-arffdiving.html", "./mo-arffdoc/mo-arffdoc.html", "./mo-arfffarm/mo-arfffarm.html",
   "./mo-arfffire/mo-arfffire.html", "./mo-arfffirefighter/mo-arfffirefighter.html", "./mo-arfffish/mo-arfffish.html", "./mo-arffgarden/mo-arffgarden.html", "./mo-arffgroom/mo-arffgroom.html", "./mo-arffhorserace/mo-arffhorserace.html",
   "./mo-arffhotel/mo-arffhotel.html", "./mo-arffjetski/mo-arffjetski.html", "./mo-arffkarate/mo-arffkarate.html", "./mo-arffkayak/mo-arffkayak.html", "./mo-arffknifeThrow/mo-arffknifeThrow.html", "./mo-arffkungfu/mo-arffkungfu.html",
   "./mo-arfflasershooting/mo-arfflasershooting.html", "./mo-arffmail/mo-arffmail.html", "./mo-arffmarksman/mo-arffmarksman.html", "./mo-arffmotocross/mo-arffmotocross.html", "./mo-arffninjaStar/mo-arffninjaStar.html", "./mo-arffobstacle/mo-arffobstacle.html",
-  "./mo-arffpark/mo-arffpark.html", "./mo-arffparkourclimb/mo-arffparkourclimb.html", "./mo-arffpizza/mo-arffpizza.html", "./mo-arffpolarbear/mo-arffpolarbear.html", "./mo-arffpolice/mo-arffpolice.html", "./mo-arffracer/mo-arffracer.html",
-  "./mo-arffropeswing/mo-arffropeswing.html", "./mo-arffschool/mo-arffschool.html", "./mo-arffskateboardrail/mo-arffskateboardrail.html", "./mo-arffsky/mo-arffsky.html", "./mo-arffsnow/mo-arffsnow.html", "./mo-arffsnowboardpipe/mo-arffsnowboardpipe.html",
+  "./mo-arffpark/mo-arffpark.html", "./mo-arffparkourclimb/mo-arffparkourclimb.html", "./mo-arffpizza/mo-arffpizza.html", "./mo-arffpolice/mo-arffpolice.html", "./mo-arffracer/mo-arffracer.html",
+  "./mo-arffropeswing/mo-arffropeswing.html", "./mo-arffschool/mo-arffschool.html", "./mo-arffskateboardrail/mo-arffskateboardrail.html", "./mo-arffsky/mo-arffsky.html", 
   "./mo-arffspace/mo-arffspace.html", "./mo-arffsumo/mo-arffsumo.html", "./mo-arffsurfboard/mo-arffsurfboard.html", "./mo-arffswordfight/mo-arffswordfight.html", "./mo-arfftaekwondo/mo-arfftaekwondo.html", "./mo-arfftargetshooting/mo-arfftargetshooting.html",
   "./mo-arfftrapshooting/mo-arfftrapshooting.html", "./mo-arfftreats/mo-arfftreats.html", "./mo-arffwakeboard/mo-arffwakeboard.html", "./mo-aroundworld/mo-aroundworld.html", "./mo-artstudio/mo-artstudio.html", "./mo-balloon/mo-balloon.html",
   "./mo-balloonpop/mo-balloonpop.html", "./mo-bankteller/mo-bankteller.html", "./mo-barista/mo-barista.html", "./mo-baseball/mo-baseball.html", "./mo-beachbuild/mo-beachbuild.html", "./mo-beachclean/mo-beachclean.html",
@@ -37,7 +37,7 @@ const FILES = [
   "./mo-doctorvisit/mo-doctorvisit.html", "./mo-dodgeball/mo-dodgeball.html", "./mo-dogadopt/mo-dogadopt.html", "./mo-dogbeach/mo-dogbeach.html", "./mo-dogbirthday/mo-dogbirthday.html", "./mo-dogcamping/mo-dogcamping.html",
   "./mo-dogcastle/mo-dogcastle.html", "./mo-dogchef/mo-dogchef.html", "./mo-dogcircus/mo-dogcircus.html", "./mo-dogdaycare/mo-dogdaycare.html", "./mo-dogfarm/mo-dogfarm.html", "./mo-dogfashion/mo-dogfashion.html",
   "./mo-doggroom/mo-doggroom.html", "./mo-doghero/mo-doghero.html", "./mo-doghotel/mo-doghotel.html", "./mo-doghouse/mo-doghouse.html", "./mo-dogpark/mo-dogpark.html", "./mo-dogpool/mo-dogpool.html",
-  "./mo-dogrescue/mo-dogrescue.html", "./mo-dogschool/mo-dogschool.html", "./mo-dogshow/mo-dogshow.html", "./mo-dogsnow/mo-dogsnow.html", "./mo-dogspace/mo-dogspace.html", "./mo-dogtrain/mo-dogtrain.html",
+  "./mo-dogrescue/mo-dogrescue.html", "./mo-dogschool/mo-dogschool.html", "./mo-dogshow/mo-dogshow.html", "./mo-dogspace/mo-dogspace.html", "./mo-dogtrain/mo-dogtrain.html",
   "./mo-dogtreats/mo-dogtreats.html", "./mo-dogvet/mo-dogvet.html", "./mo-dogwash/mo-dogwash.html", "./mo-donut/mo-donut.html", "./mo-donutdec/mo-donutdec.html", "./mo-dragcontest/mo-dragcontest.html",
   "./mo-dragmaze/mo-dragmaze.html", "./mo-dragon/mo-dragon.html", "./mo-dragonfly/mo-dragonfly.html", "./mo-dragonquest/mo-dragonquest.html", "./mo-dragstop/mo-dragstop.html", "./mo-draw/mo-draw.html",
   "./mo-dreamhouse/mo-dreamhouse.html", "./mo-drive/mo-drive.html", "./mo-dunk/mo-dunk.html", "./mo-dunkcontest/mo-dunkcontest.html", "./mo-dunkstop/mo-dunkstop.html", "./mo-egg/mo-egg.html",
@@ -56,7 +56,7 @@ const FILES = [
   "./mo-grocerystore/mo-grocerystore.html", "./mo-gymnastics/mo-gymnastics.html", "./mo-hailtaxi/mo-hailtaxi.html", "./mo-haircut/mo-haircut.html", "./mo-halfcourt/mo-halfcourt.html", "./mo-halloween/mo-halloween.html",
   "./mo-harbor/mo-harbor.html", "./mo-hardware/mo-hardware.html", "./mo-helirescue/mo-helirescue.html", "./mo-hero/mo-hero.html", "./mo-hiddenlocs/mo-hiddenlocs.html", "./mo-home/mo-home.html",
   "./mo-homerun/mo-homerun.html", "./mo-hoop-builder/mo-hoop-builder.html", "./mo-horsecontest/mo-horsecontest.html", "./mo-horseranch/mo-horseranch.html", "./mo-horsestop/mo-horsestop.html", "./mo-hotdog/mo-hotdog.html",
-  "./mo-hotel/mo-hotel.html", "./mo-icecastle/mo-icecastle.html", "./mo-icecream/mo-icecream.html", "./mo-icecreamshop/mo-icecreamshop.html", "./mo-icecreamtruck/mo-icecreamtruck.html", "./mo-igloo/mo-igloo.html",
+  "./mo-hotel/mo-hotel.html", "./mo-icecream/mo-icecream.html", "./mo-icecreamshop/mo-icecreamshop.html", "./mo-icecreamtruck/mo-icecreamtruck.html", 
   "./mo-island/mo-island.html", "./mo-islandhop/mo-islandhop.html", "./mo-jetpack/mo-jetpack.html", "./mo-jetski/mo-jetski.html", "./mo-jetskicontest/mo-jetskicontest.html", "./mo-jetskistop/mo-jetskistop.html",
   "./mo-jigsaw/mo-jigsaw.html", "./mo-jungle/mo-jungle.html", "./mo-kart-3d/mo-kart-3d.html", "./mo-kart/mo-kart.html", "./mo-kittencafe/mo-kittencafe.html", "./mo-kittennursery/mo-kittennursery.html",
   "./mo-knockout/mo-knockout.html", "./mo-laneracer/mo-laneracer.html", "./mo-laundromat/mo-laundromat.html", "./mo-lava/mo-lava.html", "./mo-lavajump/mo-lavajump.html", "./mo-legobuild/mo-legobuild.html",
@@ -72,7 +72,7 @@ const FILES = [
   "./mo-mycareer/mo-mycareer.html", "./mo-myteam/mo-myteam.html", "./mo-nbamvp/mo-nbamvp.html", "./mo-ninja/mo-ninja.html", "./mo-ninjajump/mo-ninjajump.html", "./mo-ninjarun/mo-ninjarun.html",
   "./mo-northamerica/mo-northamerica.html", "./mo-ocean/mo-ocean.html", "./mo-oceanbuild/mo-oceanbuild.html", "./mo-pancake/mo-pancake.html", "./mo-paramedic/mo-paramedic.html", "./mo-park/mo-park.html",
   "./mo-parkbuild/mo-parkbuild.html", "./mo-parking/mo-parking.html", "./mo-parkmanager/mo-parkmanager.html", "./mo-parkour/mo-parkour.html", "./mo-party/mo-party.html", "./mo-pearldive/mo-pearldive.html",
-  "./mo-penalty/mo-penalty.html", "./mo-penguin/mo-penguin.html", "./mo-peppa/mo-peppa.html", "./mo-petdragon/mo-petdragon.html", "./mo-petrace/mo-petrace.html", "./mo-petshop/mo-petshop.html",
+  "./mo-penalty/mo-penalty.html", "./mo-peppa/mo-peppa.html", "./mo-petdragon/mo-petdragon.html", "./mo-petrace/mo-petrace.html", "./mo-petshop/mo-petshop.html",
   "./mo-photohunt/mo-photohunt.html", "./mo-pinball/mo-pinball.html", "./mo-piratecove/mo-piratecove.html", "./mo-pirateship/mo-pirateship.html", "./mo-pixel/mo-pixel.html", "./mo-pixelart/mo-pixelart.html",
   "./mo-pizza/mo-pizza.html", "./mo-pizzabuild/mo-pizzabuild.html", "./mo-pizzacity/mo-pizzacity.html", "./mo-pizzarush/mo-pizzarush.html", "./mo-pizzashop/mo-pizzashop.html", "./mo-plane-3d/mo-plane-3d.html",
   "./mo-platform/mo-platform.html", "./mo-playhousebuild/mo-playhousebuild.html", "./mo-policechase/mo-policechase.html", "./mo-popashot/mo-popashot.html", "./mo-popcorn/mo-popcorn.html", "./mo-postoffice/mo-postoffice.html",
@@ -80,9 +80,9 @@ const FILES = [
   "./mo-recyclecorner/mo-recyclecorner.html", "./mo-recyclesorter/mo-recyclesorter.html", "./mo-roadtrip/mo-roadtrip.html", "./mo-robotbuild/mo-robotbuild.html", "./mo-robotbuild2/mo-robotbuild2.html", "./mo-rockband/mo-rockband.html",
   "./mo-rocket/mo-rocket.html", "./mo-rocketbuild/mo-rocketbuild.html", "./mo-rocketcontest/mo-rocketcontest.html", "./mo-rocketland/mo-rocketland.html", "./mo-rocketlaunch/mo-rocketlaunch.html", "./mo-rooftopstunts/mo-rooftopstunts.html",
   "./mo-rowboat/mo-rowboat.html", "./mo-rowcontest/mo-rowcontest.html", "./mo-runcontest/mo-runcontest.html", "./mo-runner/mo-runner.html", "./mo-runstop/mo-runstop.html", "./mo-sandcastle/mo-sandcastle.html",
-  "./mo-shark/mo-shark.html", "./mo-sightseeing/mo-sightseeing.html", "./mo-skateboard/mo-skateboard.html", "./mo-skatepark/mo-skatepark.html", "./mo-skicontest/mo-skicontest.html", "./mo-skijump/mo-skijump.html",
-  "./mo-skistop/mo-skistop.html", "./mo-skyscraper/mo-skyscraper.html", "./mo-sledcontest/mo-sledcontest.html", "./mo-sledrace/mo-sledrace.html", "./mo-sledstop/mo-sledstop.html", "./mo-sling/mo-sling.html",
-  "./mo-smoothie/mo-smoothie.html", "./mo-snake/mo-snake.html", "./mo-snowball/mo-snowball.html", "./mo-snowfort/mo-snowfort.html", "./mo-snowman/mo-snowman.html", "./mo-snowplow/mo-snowplow.html",
+  "./mo-shark/mo-shark.html", "./mo-sightseeing/mo-sightseeing.html", "./mo-skateboard/mo-skateboard.html", "./mo-skatepark/mo-skatepark.html", 
+  "./mo-skyscraper/mo-skyscraper.html", "./mo-sling/mo-sling.html",
+  "./mo-smoothie/mo-smoothie.html", "./mo-snake/mo-snake.html", 
   "./mo-soccer/mo-soccer.html", "./mo-soccershoot/mo-soccershoot.html", "./mo-soundtrack/mo-soundtrack.html", "./mo-space/mo-space.html", "./mo-spacebuild/mo-spacebuild.html", "./mo-spacemission/mo-spacemission.html",
   "./mo-spacestation/mo-spacestation.html", "./mo-stack/mo-stack.html", "./mo-stadium/mo-stadium.html", "./mo-stadium2/mo-stadium2.html", "./mo-stadiumbuild/mo-stadiumbuild.html", "./mo-stars/mo-stars.html",
   "./mo-streetball/mo-streetball.html", "./mo-streetcleaner/mo-streetcleaner.html", "./mo-streetfair/mo-streetfair.html", "./mo-stunt-3d/mo-stunt-3d.html", "./mo-sub/mo-sub.html", "./mo-subway/mo-subway.html",
@@ -93,7 +93,7 @@ const FILES = [
   "./mo-trafficlights/mo-trafficlights.html", "./mo-train-city-3d/mo-train-city-3d.html", "./mo-train/mo-train.html", "./mo-trampoline/mo-trampoline.html", "./mo-trampoline2/mo-trampoline2.html", "./mo-trashcollector/mo-trashcollector.html",
   "./mo-treasurehunt/mo-treasurehunt.html", "./mo-treehousefort/mo-treehousefort.html", "./mo-tripmap/mo-tripmap.html", "./mo-truckcontest/mo-truckcontest.html", "./mo-truckstop/mo-truckstop.html", "./mo-tycoon/mo-tycoon.html",
   "./mo-underground/mo-underground.html", "./mo-volcano/mo-volcano.html", "./mo-walkthedog/mo-walkthedog.html", "./mo-waterballoon/mo-waterballoon.html", "./mo-waterpark/mo-waterpark.html", "./mo-waterslide/mo-waterslide.html",
-  "./mo-whack/mo-whack.html", "./mo-whackcritter/mo-whackcritter.html", "./mo-wheel/mo-wheel.html", "./mo-winterland/mo-winterland.html", "./mo-wizardlab/mo-wizardlab.html", "./mo-work/mo-work.html",
+  "./mo-whack/mo-whack.html", "./mo-whackcritter/mo-whackcritter.html", "./mo-wheel/mo-wheel.html", "./mo-wizardlab/mo-wizardlab.html", "./mo-work/mo-work.html",
   "./mo-world/mo-world.html", "./mo-zipline/mo-zipline.html", "./mo-zoobuild/mo-zoobuild.html", "./mo/mo.html", "./mohouse-build/mohouse-build.html"
 ];
 
