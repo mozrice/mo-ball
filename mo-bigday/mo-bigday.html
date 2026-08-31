@@ -82,17 +82,26 @@
       btn("▶ START",H*0.82); },
     tap:function(){ go("build"); } };
 
-  S.build={ init:function(){ g={parts:0,pop:0}; stepLabel(1,"Build the car! Tap to add parts."); },
-    update:function(){ if(g.pop>0)g.pop-=0.05; },
+  S.build={ init:function(){ g={parts:0,pop:0,pumped:0,puff:0}; stepLabel(1,"Build the car! Tap to add parts."); },
+    update:function(){ if(g.pop>0)g.pop-=0.05; if(g.puff>0)g.puff-=0.06; },
     render:function(){ sky("#dfe9f2","#f2f7fb"); cx.fillStyle="#9aa0a6"; cx.fillRect(0,H*0.62,W,H*0.38);
       text("🔧 BUILD YOUR CAR",W/2,50,20,"#3a4a5a");
-      var s=1.6+ (g.pop>0?g.pop*0.15:0);
+      var s=1.6+ (g.pop>0?g.pop*0.15:0) + (g.pumped>=3?0.1:0);
       drawCar(W/2,H*0.5,s,g.parts);
       var names=["Add the body!","Add a wheel!","Add a wheel!","Add the windows!"];
-      if(g.parts<4) text(names[g.parts],W/2,H*0.74,18,"#2a3a4a");
+      if(g.parts<4){ text(names[g.parts],W/2,H*0.74,18,"#2a3a4a"); }
+      else if(g.pumped<3){
+        // air pump next to the car
+        var pxp=W/2+70, py=H*0.5+20;
+        cx.strokeStyle="#3a3f45"; cx.lineWidth=4; cx.beginPath(); cx.moveTo(pxp,py); cx.lineTo(pxp,py-30-(g.puff>0?g.puff*8:0)); cx.stroke();
+        cx.fillStyle="#e0453a"; rr(pxp-10,py-40-(g.puff>0?g.puff*8:0),20,8,3); cx.fill();
+        cx.strokeStyle="#5a6068"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(pxp,py); cx.lineTo(W/2+38,H*0.5+24); cx.stroke();
+        if(g.puff>0){ cx.globalAlpha=g.puff; cx.fillStyle="#fff"; for(var k=0;k<3;k++){ cx.beginPath(); cx.arc(W/2+30+k*6,H*0.5+20-k*4,3+g.puff*3,0,7); cx.fill(); } cx.globalAlpha=1; }
+        text("💨 Pump the tires!  ("+g.pumped+"/3)",W/2,H*0.74,18,"#2a3a4a");
+      }
       else { text("Awesome car! 🚗",W/2,H*0.72,20,"#2a7d3a"); btn("▶ DRIVE TO THE CITY",H*0.8); }
       for(var i=0;i<4;i++){ cx.fillStyle=i<g.parts?"#7bd07b":"#cfd6dc"; cx.beginPath(); cx.arc(W/2-30+i*20,H*0.86,7,0,7); cx.fill(); } },
-    tap:function(){ if(g.parts<4){ g.parts++; g.pop=1; beep(500+g.parts*80,.08); } else go("drive"); } };
+    tap:function(){ if(g.parts<4){ g.parts++; g.pop=1; beep(500+g.parts*80,.08); } else if(g.pumped<3){ g.pumped++; g.puff=1; beep(300+g.pumped*90,.1); if(g.pumped>=3)beep(760,.14); } else go("drive"); } };
 
   S.drive={ init:function(){ g={dist:0,px:W/2,obs:[],road:0,shake:0,arrived:false}; stepLabel(2,"Drive to the city! Drag to steer."); },
     update:function(){ if(g.arrived)return;
@@ -108,6 +117,23 @@
       cx.fillStyle="#5b5b66"; cx.fillRect(40,0,W-80,H);
       cx.fillStyle="#9a9aa6"; cx.fillRect(30,0,10,H); cx.fillRect(W-40,0,10,H);
       cx.fillStyle="#f2d24a"; for(var y=-40+g.road;y<H;y+=40){ cx.fillRect(W/2-4,y,8,20); }
+      // #67 Bridge: water on the sides + railings
+      if(g.dist>22 && g.dist<38){
+        cx.fillStyle="#2f7fb8"; cx.fillRect(0,0,40,H); cx.fillRect(W-40,0,40,H);
+        cx.strokeStyle="rgba(255,255,255,.45)"; cx.lineWidth=2;
+        for(var wy=(g.road*2)%30;wy<H;wy+=30){ cx.beginPath(); cx.moveTo(6,wy); cx.quadraticCurveTo(20,wy-5,34,wy); cx.stroke(); cx.beginPath(); cx.moveTo(W-34,wy); cx.quadraticCurveTo(W-20,wy-5,W-6,wy); cx.stroke(); }
+        cx.fillStyle="#d8d8e0"; cx.fillRect(38,0,5,H); cx.fillRect(W-43,0,5,H);
+        cx.fillStyle="#b0b0bc"; for(var py=g.road%50;py<H;py+=50){ cx.fillRect(35,py,10,6); cx.fillRect(W-45,py,10,6); }
+        text("🌉 BRIDGE",W/2,60,16,"#fff");
+      }
+      // #67 Tunnel: arch overhead, dimmed inside
+      if(g.dist>44 && g.dist<56){
+        cx.fillStyle="#2a2a33"; cx.fillRect(0,0,40,H); cx.fillRect(W-40,0,40,H);
+        cx.fillStyle="#1c1c24"; cx.beginPath(); cx.moveTo(18,0); cx.lineTo(18,95); cx.quadraticCurveTo(W/2,8,W-18,95); cx.lineTo(W-18,0); cx.closePath(); cx.fill();
+        cx.fillStyle="rgba(0,0,0,.32)"; cx.fillRect(0,0,W,H);
+        cx.fillStyle="#ffe27a"; for(var lx=80;lx<W-40;lx+=90){ cx.beginPath(); cx.arc(lx,68,4,0,7); cx.fill(); }
+        text("🚇 TUNNEL",W/2,120,16,"#ffe27a");
+      }
       // city buildings appear as you get close
       if(g.dist>60){ var a=Math.min(1,(g.dist-60)/40); cx.globalAlpha=a; cx.fillStyle="#8a95a5"; for(var i=0;i<6;i++){ cx.fillRect(45+i*(W-90)/6, 20, (W-90)/6-6, 60+i%3*30); } cx.globalAlpha=1; text("🏙️ CITY AHEAD!",W/2,110,18,"#fff"); }
       g.obs.forEach(function(o){ if(o.type==="car"){ drawCar(o.x,o.y,0.9,4); } else { cx.fillStyle="#ff8c2a"; cx.beginPath(); cx.moveTo(o.x,o.y-12); cx.lineTo(o.x-9,o.y+10); cx.lineTo(o.x+9,o.y+10); cx.closePath(); cx.fill(); cx.fillStyle="#fff"; cx.fillRect(o.x-9,o.y+2,18,3); } });
@@ -119,25 +145,37 @@
     drag:function(x){ ptr.x=x; },
     tap:function(){ if(g.arrived) go("hotel"); } };
 
-  S.hotel={ init:function(){ g={ph:"arrive",tm:0}; stepLabel(3,"Hotel for the night. Tap the bed to sleep."); },
+  S.hotel={ init:function(){ g={ph:"tuckdog",tm:0}; stepLabel(3,"Hotel for the night. Tuck Arff in!"); },
     update:function(){ if(g.ph==="sleep"){ g.tm+=0.012; if(g.tm>=1){ g.ph="morning"; beep(700,.15);} } },
     render:function(){
-      var night = g.ph==="sleep"||g.ph==="arrive";
+      var night = g.ph!=="morning";
       sky(g.ph==="morning"?"#ffd9a0":"#12183a", g.ph==="morning"?"#ffe9c6":"#2a3a70");
       if(night){ cx.fillStyle="#fff"; [[60,60],[120,40],[300,70],[380,50],[200,90]].forEach(function(p){ cx.globalAlpha=.7+Math.sin(t*0.1+p[0])*0.3; cx.beginPath(); cx.arc(p[0],p[1],1.6,0,7); cx.fill(); }); cx.globalAlpha=1;
         cx.fillStyle="#f4f0d0"; cx.beginPath(); cx.arc(W-70,70,18,0,7); cx.fill(); }
       else { cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(70,70,22,0,7); cx.fill(); }
       cx.fillStyle="#3a4a2a"; cx.fillRect(0,H*0.7,W,H*0.3);
       // hotel building
-      cx.fillStyle="#c9b79b"; cx.fillRect(W/2-90,H*0.34,180,H*0.36);
+      cx.fillStyle="#c9b79b"; cx.fillRect(W/2-90,H*0.34,180,H*0.34);
       cx.fillStyle="#8a5a2f"; cx.fillRect(W/2-100,H*0.3,200,20);
       cx.fillStyle="#ffd23f"; text("🏨 HOTEL",W/2,H*0.32,15,"#5a3a1a");
-      for(var r=0;r<3;r++)for(var c=0;c<4;c++){ cx.fillStyle=(g.ph==="sleep"&&r+c>1)?"#3a3a2a":"#ffe27a"; cx.fillRect(W/2-72+c*36,H*0.4+r*36,22,22); }
-      // bed prompt
-      if(g.ph==="arrive"){ emo("🛏️",W/2,H*0.82,40); text("Tap the bed to sleep 😴",W/2,H*0.92,16,"#fff"); }
-      else if(g.ph==="sleep"){ emo("🛏️",W/2,H*0.82,40); text("Zzz... 💤",W/2,H*0.9,20,"#cfe"); }
-      else { text("☀️ Good morning!",W/2,H*0.82,22,"#5a3a1a"); btn("▶ PLAY BASKETBALL",H*0.88); } },
-    tap:function(){ if(g.ph==="arrive"){ g.ph="sleep"; g.tm=0; beep(300,.2,"sine"); stepLabel(3,"Sleeping..."); } else if(g.ph==="morning"){ go("bball"); } } };
+      for(var r=0;r<3;r++)for(var c=0;c<4;c++){ cx.fillStyle=(g.ph==="sleep"&&r+c>1)?"#3a3a2a":"#ffe27a"; cx.fillRect(W/2-72+c*36,H*0.38+r*30,22,18); }
+      // #157 hotel pool at night
+      if(night){ var pxp=W*0.74, pyp=H*0.79; cx.fillStyle="#e6eef2"; rr(pxp-42,pyp-16,84,34,10); cx.fill();
+        var pg=cx.createLinearGradient(pxp,pyp-14,pxp,pyp+14); pg.addColorStop(0,"#3aa0d8"); pg.addColorStop(1,"#1f6fb0"); cx.fillStyle=pg; rr(pxp-38,pyp-12,76,26,8); cx.fill();
+        cx.strokeStyle="rgba(255,255,255,.5)"; cx.lineWidth=2; for(var i=0;i<2;i++){ cx.beginPath(); cx.moveTo(pxp-30,pyp-3+i*9+Math.sin(t*0.1+i)*1.5); cx.quadraticCurveTo(pxp,pyp-7+i*9,pxp+30,pyp-3+i*9); cx.stroke(); }
+        cx.fillStyle="rgba(255,250,210,.45)"; cx.beginPath(); cx.ellipse(pxp+16,pyp,4,9,0,0,7); cx.fill(); }
+      // #150 Arff's dog bed
+      var dx=W*0.24, dy=H*0.82;
+      cx.fillStyle="#8a5a70"; cx.beginPath(); cx.ellipse(dx,dy,28,12,0,0,7); cx.fill();
+      cx.fillStyle="#a06a86"; cx.beginPath(); cx.ellipse(dx,dy-2,21,8,0,0,7); cx.fill();
+      if(g.ph==="tuckdog"){ drawArff(dx, dy-16, 0.8); }
+      else { cx.fillStyle="#b5793f"; cx.beginPath(); cx.arc(dx,dy-4,12,0,7); cx.fill(); cx.fillStyle="#8a5a2f"; cx.beginPath(); cx.arc(dx+8,dy-6,6,0,7); cx.fill(); cx.fillStyle="#222"; cx.beginPath(); cx.arc(dx+10,dy-7,1.2,0,7); cx.fill(); text("💤",dx+16,dy-16,13,"#cfe"); }
+      // prompts
+      if(g.ph==="tuckdog"){ text("Tap to tuck Arff into bed 🐕",W/2,H*0.94,16,"#fff"); }
+      else if(g.ph==="arrive"){ emo("🛏️",W/2,H*0.86,36); text("Tap the bed to sleep 😴",W/2,H*0.95,15,"#fff"); }
+      else if(g.ph==="sleep"){ emo("🛏️",W/2,H*0.86,36); text("Zzz... 💤",W/2,H*0.95,18,"#cfe"); }
+      else { text("☀️ Good morning!",W/2,H*0.86,22,"#5a3a1a"); btn("▶ PLAY BASKETBALL",H*0.9); } },
+    tap:function(){ if(g.ph==="tuckdog"){ g.ph="arrive"; beep(660,.1); stepLabel(3,"Now tap the bed to sleep."); } else if(g.ph==="arrive"){ g.ph="sleep"; g.tm=0; beep(300,.2,"sine"); stepLabel(3,"Sleeping..."); } else if(g.ph==="morning"){ go("bball"); } } };
 
   S.bball={ init:function(){ g={made:0,need:3,ball:{x:W/2,y:H-70,vx:0,vy:0,live:false},aim:null}; stepLabel(4,"Play basketball! Drag the ball to shoot."); },
     update:function(){ var b=g.ball; if(b.live){ b.x+=b.vx; b.y+=b.vy; b.vy+=0.35;

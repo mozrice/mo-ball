@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>🧰 MO WORK</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:#14110a;color:#fdf6e7;font-family:'Trebuchet MS',Verdana,sans-serif;overflow:hidden;}
+  #wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;padding:8px;}
+  .namebtn{display:block;margin:6px auto 2px;background:linear-gradient(#ffd24a,#f0a52b);color:#4a2f08;font-weight:bold;border:none;border-radius:14px;padding:9px 22px;font-size:16px;font-family:inherit;box-shadow:0 4px 0 #0006;text-decoration:none;}
+  h1{margin:2px 0;font-size:20px;color:#ffcf4a;text-shadow:0 2px 0 #0007;}
+  #steps{font-size:13px;color:#ffe4a8;margin:2px 0 6px;font-weight:bold;}
+  canvas{background:#e7dcc4;border-radius:16px;box-shadow:0 8px 24px #0009;touch-action:none;max-width:100%;height:auto;}
+  #nav{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center;}
+  .nb{background:#3a2c12;border:2px solid #7a5a24;color:#ffe9c4;font-weight:bold;font-size:14px;padding:8px 14px;border-radius:12px;font-family:inherit;text-decoration:none;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <a class="namebtn" href="../index.html">🏠 MO ARCADE</a>
+  <h1>🧰 MO WORK</h1>
+  <div id="steps">Do house jobs and earn coins!</div>
+  <canvas id="cv" width="440" height="620"></canvas>
+  <div id="nav">
+    <a class="nb" href="../index.html">← Back</a>
+    <a class="nb" href="../mo-home.html">🏠 MO Home</a>
+    <a class="nb" href="../games.html">🎮 All Games</a>
+  </div>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById("cv"), cx=cv.getContext("2d"), steps=document.getElementById("steps");
+  var W=cv.width, H=cv.height, t=0;
+  var coins=0, best=0; try{ coins=parseInt(localStorage.getItem("mowork_coins")||"0",10)||0; best=parseInt(localStorage.getItem("mowork_best")||"0",10)||0; }catch(e){}
+  function save(){ try{ localStorage.setItem("mowork_coins",String(coins)); localStorage.setItem("mowork_best",String(best)); }catch(e){} }
+
+  var AC=null; function beep(f,d,ty){ try{ if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)(); var o=AC.createOscillator(),ga=AC.createGain(); o.frequency.value=f;o.type=ty||"square";o.connect(ga);ga.connect(AC.destination);ga.gain.value=.05;o.start();ga.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+(d||.08));o.stop(AC.currentTime+(d||.08)); }catch(e){} }
+  function ding(){ beep(720,.08); setTimeout(function(){beep(960,.1);},80); }
+  function rr(x,y,w,h,r){ cx.beginPath();cx.moveTo(x+r,y);cx.arcTo(x+w,y,x+w,y+h,r);cx.arcTo(x+w,y+h,x,y+h,r);cx.arcTo(x,y+h,x,y,r);cx.arcTo(x,y,x+w,y,r);cx.closePath(); }
+  function text(s,x,y,sz,c,al){ cx.fillStyle=c||"#fff";cx.font="bold "+sz+"px Trebuchet MS,sans-serif";cx.textAlign=al||"center";cx.textBaseline="middle";cx.fillText(s,x,y); }
+  function emo(ch,x,y,s){ cx.font=s+"px serif";cx.textAlign="center";cx.textBaseline="middle";cx.fillText(ch,x,y); }
+  function btn(label,y,c){ cx.fillStyle=c||"#7bd07b"; rr(W/2-120,y,240,52,14); cx.fill(); text(label,W/2,y+26,18,"#06280f"); }
+
+  // FX
+  var parts=[],floats=[],conf=[],shake=0;
+  function burst(x,y,c,n){ n=n||9; for(var i=0;i<n;i++){ var a=Math.random()*6.28,s=2+Math.random()*3; parts.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:1,c:c,r:2+Math.random()*2}); } }
+  function floatUp(s,x,y,c){ floats.push({s:s,x:x,y:y,life:1,c:c||"#fff"}); }
+  function confetti(){ for(var i=0;i<26;i++){ conf.push({x:Math.random()*W,y:-10-Math.random()*50,vy:1.8+Math.random()*2.4,vx:Math.random()*2-1,r:3+Math.random()*4,c:["#ff5a7a","#ffd23f","#5ad0a0","#5aa0ff","#c77aff"][i%5],rot:Math.random()*6,vr:Math.random()*0.3-0.15}); } }
+  function updFX(){ for(var i=parts.length-1;i>=0;i--){ var p=parts[i]; p.x+=p.vx;p.y+=p.vy;p.vy+=0.12;p.life-=0.03; if(p.life<=0)parts.splice(i,1);} for(var j=floats.length-1;j>=0;j--){ var f=floats[j]; f.y-=1; f.life-=0.02; if(f.life<=0)floats.splice(j,1);} for(var k=conf.length-1;k>=0;k--){ var c=conf[k]; c.y+=c.vy;c.x+=c.vx;c.rot+=c.vr; if(c.y>H+20)conf.splice(k,1);} if(shake>0.3)shake*=0.85; }
+  function coinShower(){ for(var i=0;i<16;i++){ parts.push({x:Math.random()*W,y:-10-Math.random()*50,vx:Math.random()*2-1,vy:2+Math.random()*2.4,life:1.5,c:"#ffd24a",r:9,coin:true}); } }
+  function renFX(){ parts.forEach(function(p){ cx.globalAlpha=Math.max(0,Math.min(1,p.life)); if(p.coin){ emo("💰",p.x,p.y,p.r*2); } else { cx.fillStyle=p.c; cx.beginPath(); cx.arc(p.x,p.y,p.r,0,7); cx.fill(); } }); cx.globalAlpha=1; floats.forEach(function(f){ cx.globalAlpha=Math.max(0,f.life); cx.fillStyle=f.c; cx.strokeStyle="#00000055"; cx.lineWidth=3; cx.font="bold 18px Trebuchet MS,sans-serif"; cx.textAlign="center"; cx.textBaseline="middle"; cx.strokeText(f.s,f.x,f.y); cx.fillText(f.s,f.x,f.y); }); cx.globalAlpha=1; conf.forEach(function(c){ cx.save(); cx.translate(c.x,c.y); cx.rotate(c.rot); cx.fillStyle=c.c; cx.fillRect(-c.r/2,-c.r/2,c.r,c.r*1.6); cx.restore(); }); }
+
+  var RANKS=[[0,"Rookie 🧢"],[60,"Helper 🧹"],[160,"Handy 🔧"],[320,"Pro 🛠️"],[600,"Master 🏆"]];
+  function rank(){ var r=RANKS[0][1]; for(var i=0;i<RANKS.length;i++){ if(coins>=RANKS[i][0])r=RANKS[i][1]; } return r; }
+
+  var ROOMS=[["Kitchen","#f0e6cf","#d8b98a"],["Living Room","#e9dcc0","#b98c5a"],["Bedroom","#e7d6e6","#c8a06a"],["Bathroom","#cfe6ee","#bcd0d6"],["Kids' Room","#e6efd0","#c8a06a"],["Backyard","#cfeecf","#7cc46a"],["Garage","#dad6cc","#9a9a9a"],["Office","#dfe6ea","#b98c5a"],["Dining Room","#efdcc8","#b98c5a"],["Hallway","#e6ddc8","#c8a06a"]];
+  function label(s){ steps.textContent=s; }
+  function go(n){ parts=[];floats=[];conf=[];shake=0; scene=n; if(S[n].init)S[n].init(); }
+  var scene="title", g={}, ptr={x:W/2,y:0,down:false}, job=null, earned=0, jobsDone=0;
+
+  function newJob(){ var ty=["clean","fix","place","paint","bulb"][Math.floor(Math.random()*5)]; var rm=ROOMS[Math.floor(Math.random()*ROOMS.length)];
+    var titles={clean:"🧹 Clean the "+rm[0], fix:"🔧 Fix things in the "+rm[0], place:"🛋️ Furnish the "+rm[0], paint:"🎨 Paint the "+rm[0], bulb:"💡 Change the "+rm[0]+" light"};
+    job={type:ty,room:rm,title:titles[ty]}; go("board"); }
+  function room(){ var rm=job.room; cx.fillStyle=rm[1]; cx.fillRect(0,54,W,H); cx.fillStyle=rm[2]; cx.fillRect(0,H*0.66,W,H); cx.fillStyle="rgba(0,0,0,.06)"; for(var i=0;i<W;i+=44)cx.fillRect(i,H*0.66,2,H); }
+  function hud(){ cx.fillStyle="rgba(0,0,0,.5)"; cx.fillRect(0,0,W,50); emo("💰",26,26,22); text(String(coins),46,26,18,"#ffd24a","left"); text(job?job.title:"",W-14,18,14,"#fff","right"); }
+  function drawWorker(x,y){ cx.fillStyle="#f6c9a0"; cx.fillRect(x-10,y+2,3,9); cx.fillRect(x+7,y+2,3,9); // arms
+    cx.fillStyle="#2b5aa0"; rr(x-7,y-2,14,16,3); cx.fill(); // overalls
+    cx.fillStyle="#5a3a1e"; cx.fillRect(x-5,y+14,4,7); cx.fillRect(x+2,y+14,4,7); // legs
+    cx.fillStyle="#f6c9a0"; cx.beginPath(); cx.arc(x,y-9,7,0,7); cx.fill(); // head
+    cx.fillStyle="#ffd24a"; cx.beginPath(); cx.arc(x,y-11,7.5,Math.PI,2*Math.PI); cx.fill(); cx.fillRect(x-8,y-11,16,2); // hard hat
+    cx.fillStyle="#222"; cx.beginPath(); cx.arc(x+2,y-9,1.3,0,7); cx.fill(); }
+
+  var S={};
+
+  var TOOLEMO=["🔧","🔨","🪛","🎨","🧹","💡","🪜","🧰"];
+  S.title={ init:function(){ label("Welcome to MO WORK! Earn coins."); if(Math.random()<1)for(var i=0;i<3;i++)burst(Math.random()*W,H*0.3,"#ffd24a",4); },
+    render:function(){ cx.fillStyle="#e7dcc4"; cx.fillRect(0,0,W,H);
+      cx.fillStyle="#caa15a"; cx.fillRect(0,H*0.6,W,H);
+      // drifting tools in the background
+      cx.globalAlpha=0.5; for(var i=0;i<TOOLEMO.length;i++){ var tx=((i*90 + t*0.6)% (W+80))-40; var ty=H*0.12+((i*57)%140)+Math.sin(t*0.04+i)*8; emo(TOOLEMO[i],tx,ty,24); } cx.globalAlpha=1;
+      // bobbing toolbox with sparkle
+      var by=H*0.26+Math.sin(t*0.06)*6; emo("🧰",W/2,by,72);
+      if(t%20===0)burst(W/2+(Math.random()*80-40),by-20,"#fff2a8",3);
+      var ts=34+Math.sin(t*0.1)*2; text("MO WORK",W/2,H*0.44,ts,"#5a3a12");
+      text("Clean, fix, furnish & paint houses",W/2,H*0.51,15,"#6a4a1a");
+      text("Finish jobs to earn 💰 and rank up!",W/2,H*0.56,14,"#6a4a1a");
+      cx.fillStyle="#fff8e8"; rr(W/2-110,H*0.6,220,34,10); cx.fill(); cx.strokeStyle="#e0b64a"; cx.lineWidth=2; rr(W/2-110,H*0.6,220,34,10); cx.stroke();
+      emo("💰",W/2-72,H*0.617,18); text(coins+"  •  "+rank(),W/2+8,H*0.617,15,"#5a3a12");
+      var pulse=Math.sin(t*0.12)*4; cx.fillStyle="#7bd07b"; rr(W/2-120-pulse/2,H*0.72-pulse/2,240+pulse,52+pulse,14); cx.fill(); text("▶ START WORK",W/2,H*0.72+26,18,"#06280f"); },
+    tap:function(){ ding(); newJob(); } };
+
+  S.board={ init:function(){ label(job.title); },
+    render:function(){ cx.fillStyle="#e7dcc4"; cx.fillRect(0,0,W,H); hud();
+      cx.fillStyle="#fff8e8"; rr(W/2-150,H*0.2,300,H*0.42,18); cx.fill(); cx.strokeStyle="#e0b64a"; cx.lineWidth=4; rr(W/2-150,H*0.2,300,H*0.42,18); cx.stroke();
+      text("NEW JOB",W/2,H*0.26,16,"#b07a2a");
+      var ic={clean:"🧹",fix:"🔧",place:"🛋️",paint:"🎨",bulb:"💡"}[job.type]; emo(ic,W/2,H*0.35,48);
+      text(job.title,W/2,H*0.45,19,"#4a2f08");
+      var desc={clean:"Tap every mess to clean it up!",fix:"Pick the right tool to fix it!",place:"Put furniture on the outlines!",paint:"Roll paint over the whole wall!",bulb:"Climb the ladder, then pull the old bulb!"}[job.type];
+      text(desc,W/2,H*0.52,14,"#6a4a1a");
+      emo("💰",W/2-30,H*0.575,18); text("+ pay when done",W/2+10,H*0.575,13,"#8a6a2a");
+      btn("▶ START JOB",H*0.68); },
+    tap:function(){ ding(); go(job.type); } };
+
+  // ---------- CLEAN ----------
+  var MESS=[["💧",0],["✨",0],["🍪",0],["🧦",0],["🕸️",0],["🗑️",0]];
+  S.clean={ init:function(){ g={spots:[],time:600,total:0}; var n=5+Math.floor(Math.random()*3); for(var i=0;i<n;i++){ var m=MESS[Math.floor(Math.random()*MESS.length)]; g.spots.push({x:40+Math.random()*(W-80),y:90+Math.random()*(H-190),e:m[0],done:false}); } g.total=n; label("Tap the messes to clean! 🧹"); },
+    update:function(){ if(g.time>0)g.time--; },
+    render:function(){ room(); hud();
+      var left=0; g.spots.forEach(function(s){ if(!s.done){ left++; emo(s.e,s.x,s.y,30); } });
+      text(left+" mess left",W/2,H-30,17,"#4a2f08");
+      cx.fillStyle="#00000022"; rr(W/2-100,72,200,10,5); cx.fill(); cx.fillStyle="#5ab0e0"; rr(W/2-100,72,200*(g.time/600),10,5); cx.fill();
+      if(left===0){ finish(12+Math.ceil(g.time/40)); } },
+    tap:function(){ for(var i=0;i<g.spots.length;i++){ var s=g.spots[i]; if(!s.done && Math.hypot(ptr.x-s.x,ptr.y-s.y)<24){ s.done=true; beep(600,.06); burst(s.x,s.y,"#bfe8ff",8); floatUp("✨",s.x,s.y-8,"#fff"); return; } } } };
+
+  // ---------- FIX ----------
+  var BROKEN=[["Leaky Sink","🚰","wrench"],["Dead Bulb","💡","bulb"],["Wall Crack","🕳️","patch"],["Squeaky Door","🚪","oil"],["Loose Screw","🔩","screw"],["Dripping Tap","🚿","wrench"]];
+  var TOOLBTN=[["🔧","wrench"],["💡","bulb"],["🩹","patch"],["🛢️","oil"],["🪛","screw"]];
+  S.fix={ init:function(){ g={idx:0,need:3,cur:null,opts:[],flash:0}; nextFix(); label("Pick the right tool! 🔧"); },
+    update:function(){ if(g.flash>0)g.flash--; },
+    render:function(){ room(); hud();
+      text("Fix "+(g.idx+1)+" of "+g.need,W/2,74,15,"#4a2f08");
+      cx.fillStyle=g.flash>0?"#bfe8bf":"#fff8e8"; rr(W/2-70,H*0.24,140,120,14); cx.fill(); cx.strokeStyle="#c8a06a"; cx.lineWidth=3; rr(W/2-70,H*0.24,140,120,14); cx.stroke();
+      emo(g.cur[1],W/2,H*0.31,52); text(g.cur[0],W/2,H*0.44,16,"#4a2f08");
+      text(g.flash>0?"Fixed! ✅":"Which tool?",W/2,H*0.53,15,"#6a4a1a");
+      var bx=[W/2-150,W/2-50,W/2+50], by=H*0.62;
+      for(var i=0;i<3;i++){ cx.fillStyle="#ffd27a"; rr(bx[i],by,90,70,12); cx.fill(); cx.strokeStyle="#e0a84a"; cx.lineWidth=2; rr(bx[i],by,90,70,12); cx.stroke(); emo(g.opts[i][0],bx[i]+45,by+34,30); } },
+    tap:function(){ if(g.flash>0)return; var bx=[W/2-150,W/2-50,W/2+50], by=H*0.62;
+      for(var i=0;i<3;i++){ if(ptr.x>bx[i]&&ptr.x<bx[i]+90&&ptr.y>by&&ptr.y<by+70){
+        if(g.opts[i][1]===g.cur[2]){ ding(); burst(W/2,H*0.32,"#bfe8bf",10); floatUp("✓",W/2,H*0.3,"#7bd07b"); g.flash=16; g.idx++; if(g.idx>=g.need){ setTimeout(function(){finish(16);},250); } else { setTimeout(nextFix,300); } }
+        else { beep(160,.16,"sawtooth"); shake=8; } return; } } } };
+  function nextFix(){ g.cur=BROKEN[Math.floor(Math.random()*BROKEN.length)]; var set={}; set[g.cur[2]]=1; g.opts=[TOOLBTN.filter(function(x){return x[1]===g.cur[2];})[0]];
+    while(g.opts.length<3){ var r=TOOLBTN[Math.floor(Math.random()*TOOLBTN.length)]; if(!set[r[1]]){ set[r[1]]=1; g.opts.push(r); } }
+    for(var i=g.opts.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var tmp=g.opts[i];g.opts[i]=g.opts[j];g.opts[j]=tmp; } }
+
+  // ---------- PLACE ----------
+  var FURN=[["Sofa","🛋️"],["Bed","🛏️"],["Plant","🪴"],["Lamp","💡"],["Table","🪑"],["TV","📺"],["Fridge","🧊"],["Bath","🛁"]];
+  S.place={ init:function(){ g={idx:0,need:3,target:null,tray:[]}; nextPlace(); label("Tap the item that fits! 🛋️"); },
+    render:function(){ room(); hud();
+      text("Furnish "+(g.idx+1)+" of "+g.need,W/2,74,15,"#4a2f08");
+      // ghost outline
+      var tx=W/2, ty=H*0.34; cx.setLineDash([8,6]); cx.strokeStyle="#5a3a1a"; cx.lineWidth=3; rr(tx-52,ty-42,104,84,10); cx.stroke(); cx.setLineDash([]);
+      cx.globalAlpha=0.28; emo(g.target[1],tx,ty,50); cx.globalAlpha=1;
+      text("put a "+g.target[0]+" here",tx,ty+58,14,"#6a4a1a");
+      // tray
+      var bx=[W/2-150,W/2-50,W/2+50], by=H*0.7;
+      for(var i=0;i<3;i++){ cx.fillStyle="#fff8e8"; rr(bx[i],by,90,80,12); cx.fill(); cx.strokeStyle="#e0b64a"; cx.lineWidth=2; rr(bx[i],by,90,80,12); cx.stroke(); emo(g.tray[i][1],bx[i]+45,by+34,32); text(g.tray[i][0],bx[i]+45,by+66,12,"#4a2f08"); } },
+    tap:function(){ var bx=[W/2-150,W/2-50,W/2+50], by=H*0.7;
+      for(var i=0;i<3;i++){ if(ptr.x>bx[i]&&ptr.x<bx[i]+90&&ptr.y>by&&ptr.y<by+80){
+        if(g.tray[i][0]===g.target[0]){ ding(); burst(W/2,H*0.34,"#ffd23f",12); floatUp("✓",W/2,H*0.3,"#7bd07b"); g.idx++; if(g.idx>=g.need){ setTimeout(function(){finish(15);},220); } else { nextPlace(); } }
+        else { beep(160,.16,"sawtooth"); shake=8; } return; } } } };
+  function nextPlace(){ g.target=FURN[Math.floor(Math.random()*FURN.length)]; var set={}; set[g.target[0]]=1; g.tray=[g.target];
+    while(g.tray.length<3){ var r=FURN[Math.floor(Math.random()*FURN.length)]; if(!set[r[0]]){ set[r[0]]=1; g.tray.push(r); } }
+    for(var i=g.tray.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var tmp=g.tray[i];g.tray[i]=g.tray[j];g.tray[j]=tmp; } }
+
+  // ---------- PAINT ----------
+  var PCOLORS=["#e07a7a","#7ab0e0","#7bc07a","#e0c060","#c78ad0"];
+  S.paint={ init:function(){ g={cols:9,rows:6, x0:40,y0:110, cw:(W-80)/9, ch:280/6, cells:[], painted:0, col:PCOLORS[Math.floor(Math.random()*PCOLORS.length)]}; for(var i=0;i<54;i++)g.cells.push(0); g.total=54; label("Drag the roller to paint! 🎨"); },
+    render:function(){ room(); hud();
+      text("Paint the wall!",W/2,74,15,"#4a2f08");
+      // wall grid
+      for(var r=0;r<6;r++)for(var c=0;c<9;c++){ var idx=r*9+c; var X=g.x0+c*g.cw, Y=g.y0+r*g.ch; cx.fillStyle=g.cells[idx]?g.col:"#c9bfa8"; cx.fillRect(X,Y,g.cw-1,g.ch-1); }
+      cx.strokeStyle="#8a6a3a"; cx.lineWidth=3; cx.strokeRect(g.x0-2,g.y0-2,g.cw*9+4,g.ch*6+4);
+      // roller cursor
+      if(ptr.down){ cx.fillStyle=g.col; rr(ptr.x-14,ptr.y-8,28,16,4); cx.fill(); cx.fillStyle="#8a929a"; cx.fillRect(ptr.x-2,ptr.y+8,4,14); }
+      var pct=Math.round(g.painted/g.total*100);
+      cx.fillStyle="#00000022"; rr(W/2-100,H-40,200,12,6); cx.fill(); cx.fillStyle=g.col; rr(W/2-100,H-40,200*(g.painted/g.total),12,6); cx.fill();
+      text(pct+"% painted",W/2,H-34,13,"#4a2f08");
+      if(g.painted>=g.total*0.95){ finish(14); } },
+    down:function(){ this.paintAt(); }, drag:function(){ this.paintAt(); },
+    paintAt:function(){ var c=Math.floor((ptr.x-g.x0)/g.cw), r=Math.floor((ptr.y-g.y0)/g.ch); if(c>=0&&c<9&&r>=0&&r<6){ var idx=r*9+c; if(!g.cells[idx]){ g.cells[idx]=1; g.painted++; if(g.painted%3===0)beep(400+g.painted*6,.04); } } } };
+
+  // ---------- BULB (climb ladder, drag down to grab old bulb) ----------
+  S.bulb={ init:function(){ g={n:5, step:0, phase:"climb", pull:0, pullY:null, yTop:H*0.34, yBot:H*0.82}; label("Tap each ladder step to climb! 🪜"); },
+    rungY:function(i){ return g.yBot - i*(g.yBot-g.yTop)/(g.n-1); },
+    render:function(){ room(); hud();
+      var mx=W/2, bx=W/2, by=H*0.16;
+      // light glow when done
+      if(g.phase==="done"){ var gr=cx.createRadialGradient(bx,by,2,bx,by,80); gr.addColorStop(0,"rgba(255,240,150,.85)"); gr.addColorStop(1,"rgba(255,240,150,0)"); cx.fillStyle=gr; cx.beginPath(); cx.arc(bx,by,80,0,7); cx.fill(); }
+      // ceiling cord + socket
+      cx.strokeStyle="#555"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(bx,52); cx.lineTo(bx,by-13); cx.stroke();
+      cx.fillStyle="#999"; cx.fillRect(bx-6,by-13,12,8);
+      // bulb (dim grey until fixed, then bright)
+      var on=g.phase==="done";
+      cx.fillStyle=on?"#fff08a":"#8a8f96"; cx.beginPath(); cx.arc(bx,by,12,0,7); cx.fill();
+      cx.strokeStyle=on?"#e0c040":"#5a5f66"; cx.lineWidth=2; cx.beginPath(); cx.arc(bx,by,12,0,7); cx.stroke();
+      if(on){ cx.strokeStyle="#ffe27a"; cx.lineWidth=2; for(var a=0;a<6;a++){ var an=a*Math.PI/3; cx.beginPath(); cx.moveTo(bx+Math.cos(an)*17,by+Math.sin(an)*17); cx.lineTo(bx+Math.cos(an)*24,by+Math.sin(an)*24); cx.stroke(); } }
+      // ladder rails + rungs
+      cx.strokeStyle="#b3712f"; cx.lineWidth=6; cx.lineCap="round"; cx.beginPath(); cx.moveTo(mx-24,g.yTop-18); cx.lineTo(mx-24,g.yBot+12); cx.moveTo(mx+24,g.yTop-18); cx.lineTo(mx+24,g.yBot+12); cx.stroke();
+      for(var i=0;i<g.n;i++){ var ry=this.rungY(i); var nextStep=(g.phase==="climb"&&i===g.step);
+        cx.strokeStyle=nextStep?"#ffd23f":"#8a5a2f"; cx.lineWidth=nextStep?7:5; cx.beginPath(); cx.moveTo(mx-24,ry); cx.lineTo(mx+24,ry); cx.stroke();
+        if(nextStep){ emo("👆",mx+44,ry,20); } }
+      // worker
+      var wy = g.step===0 ? g.yBot+14 : this.rungY(g.step-1)-8;
+      drawWorker(mx, wy);
+      // prompts
+      if(g.phase==="climb"){ text("Tap the glowing step to climb up!",W/2,H*0.93,15,"#4a2f08"); }
+      else if(g.phase==="grab"){ text("Now DRAG DOWN to pull the old bulb!",W/2,H*0.93,15,"#4a2f08"); emo("👇",bx+24,by+18+Math.sin(t*0.2)*4,22);
+        cx.fillStyle="#00000022"; rr(W/2-80,H*0.87,160,10,5); cx.fill(); cx.fillStyle="#e07a3a"; rr(W/2-80,H*0.87,160*Math.min(1,g.pull/90),10,5); cx.fill(); }
+      else { text("💡 Let there be light!",W/2,H*0.93,16,"#b07a2a"); } },
+    down:function(){ if(g.phase==="grab"){ g.pullY=ptr.y; } },
+    drag:function(){ if(g.phase==="grab" && g.pullY!=null){ var dy=ptr.y-g.pullY; if(dy>0){ g.pull+=dy; if(g.pull%18<dy)beep(300+g.pull,.04); } g.pullY=ptr.y;
+        if(g.pull>=90){ g.phase="done"; ding(); burst(W/2,H*0.16,"#fff08a",16); confetti(); setTimeout(function(){finish(16);},500); } } },
+    tap:function(){ if(g.phase!=="climb")return; var ry=this.rungY(g.step); if(Math.abs(ptr.y-ry)<30 && Math.abs(ptr.x-W/2)<70){ g.step++; beep(460+g.step*50,.07); burst(W/2,ry,"#ffe27a",5); if(g.step>=g.n){ g.phase="grab"; label("Drag down to grab the old bulb! 👇"); } } } };
+
+  // ---------- PAYOUT ----------
+  var done=false;
+  var rankUp=false, dispCoins=0, flashA=0, streakBonus=0;
+  function finish(pay){ if(done)return; done=true; var before=rank(); jobsDone++; streakBonus=(jobsDone%5===0)?8:0; earned=pay+streakBonus; dispCoins=coins; coins+=earned; if(coins>best){best=coins;} rankUp=(rank()!==before); flashA=0.85; save(); ding(); go("payout"); }
+  S.payout={ init:function(){ done=false; confetti(); coinShower(); if(rankUp){ setTimeout(function(){ ding(); },200); } label("Job done! 💰 +"+earned); },
+    _r:function(){ if(dispCoins<coins){ dispCoins=Math.min(coins, dispCoins+Math.max(1,Math.ceil((coins-dispCoins)*0.25))); } },
+    render:function(){ this._r(); cx.fillStyle="#e7dcc4"; cx.fillRect(0,0,W,H); hud();
+      if(t%38===0){ confetti(); if(t%76===0)coinShower(); }
+      cx.fillStyle="#fff8e8"; rr(W/2-150,H*0.2,300,H*0.44,18); cx.fill(); cx.strokeStyle="#e0b64a"; cx.lineWidth=4; rr(W/2-150,H*0.2,300,H*0.44,18); cx.stroke();
+      var pop=1+Math.sin(t*0.12)*0.06; text("✅ JOB DONE!",W/2,H*0.28,24*pop,"#3a8a3a");
+      emo("💰",W/2-40,H*0.38,32); text("+"+earned+" coins",W/2+18,H*0.38,22,"#b07a2a");
+      if(streakBonus>0) text("🔥 +"+streakBonus+" streak bonus!",W/2,H*0.44,13,"#c0392b");
+      text("Total: "+dispCoins+" 💰",W/2,H*0.5,18,"#4a2f08");
+      if(rankUp){ var g2=Math.abs(Math.sin(t*0.14)); cx.fillStyle="rgba(255,210,74,"+(0.35+g2*0.4)+")"; rr(W/2-130,H*0.535,260,30,10); cx.fill(); text("⭐ RANK UP! "+rank(),W/2,H*0.55,16,"#5a3a12"); }
+      else { text("Rank: "+rank(),W/2,H*0.55,16,"#6a4a1a"); }
+      var pulse=Math.sin(t*0.12)*3; cx.fillStyle="#7bd07b"; rr(W/2-120-pulse/2,H*0.7-pulse/2,240+pulse,52+pulse,14); cx.fill(); text("▶ NEXT JOB",W/2,H*0.7+26,18,"#06280f"); },
+    tap:function(){ ding(); newJob(); } };
+
+  // input
+  function pos(e){ var r=cv.getBoundingClientRect(), sx=cv.width/r.width, sy=cv.height/r.height; var a=(e.touches&&e.touches[0])?e.touches[0]:e; return {x:(a.clientX-r.left)*sx, y:(a.clientY-r.top)*sy}; }
+  function down(e){ e.preventDefault(); var p=pos(e); ptr.x=p.x;ptr.y=p.y;ptr.down=true; var s=S[scene]; if(s.down)s.down(); if(s.tap)s.tap(); }
+  function move(e){ e.preventDefault(); var p=pos(e); ptr.x=p.x;ptr.y=p.y; var s=S[scene]; if(ptr.down&&s.drag)s.drag(); }
+  function up(e){ e.preventDefault(); ptr.down=false; }
+  cv.addEventListener("mousedown",down); cv.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
+  cv.addEventListener("touchstart",down,{passive:false}); cv.addEventListener("touchmove",move,{passive:false}); cv.addEventListener("touchend",up,{passive:false});
+
+  function loop(){ t++; var s=S[scene]; if(s.update)s.update(); updFX();
+    cx.save(); if(shake>0.4){ cx.translate((Math.random()*2-1)*shake,(Math.random()*2-1)*shake); }
+    s.render(); renFX(); cx.restore();
+    if(flashA>0.02){ cx.fillStyle="rgba(255,255,255,"+flashA.toFixed(3)+")"; cx.fillRect(0,0,W,H); flashA*=0.86; } else { flashA=0; }
+    requestAnimationFrame(loop); }
+  loop();
+})();
+</script>
+</body>
+</html>
