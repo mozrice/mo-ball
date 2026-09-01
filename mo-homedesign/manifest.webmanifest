@@ -1,0 +1,16 @@
+{
+  "name": "Mo Home Design",
+  "short_name": "Home Design",
+  "description": "Design and decorate rooms with furniture, colors, and your family!",
+  "start_url": "./mo-homedesign.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#241a33",
+  "theme_color": "#7a5ad0",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

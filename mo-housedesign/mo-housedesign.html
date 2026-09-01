@@ -31,7 +31,29 @@
 <script>
 (function(){
   var cv=document.getElementById("cv"), cx=cv.getContext("2d"), steps=document.getElementById("steps");
-  var W=cv.width, H=cv.height, t=0;
+  // ---- HD / 1080p crisp rendering: keep 440x620 game coords, render on a high-res backing store ----
+  var LOGW=440, LOGH=620;
+  var HD=Math.max(3, Math.ceil((window.devicePixelRatio||1)*2)); // ~1320px+ wide backing = sharp 1080p look
+  cv.width=LOGW*HD; cv.height=LOGH*HD;
+  cx.setTransform(HD,0,0,HD,0,0);
+  cx.imageSmoothingEnabled=true; if(cx.imageSmoothingQuality)cx.imageSmoothingQuality="high";
+  var W=LOGW, H=LOGH, t=0;
+  // ---- fit the whole game inside the screen so no rows get cut off ----
+  function fitScreen(){
+    var navEl=document.getElementById("nav");
+    var top=cv.getBoundingClientRect().top + window.scrollY; // space taken by header above canvas (stable)
+    var navH=(navEl?navEl.offsetHeight:0)+18;
+    var availH=window.innerHeight - top - navH - 8;
+    var wrap=document.getElementById("wrap");
+    var availW=(wrap?wrap.clientWidth:window.innerWidth)-16;
+    availW=Math.min(availW,520);
+    var scale=Math.min(availW/LOGW, availH/LOGH);
+    if(!isFinite(scale)||scale<=0)scale=1; scale=Math.max(0.35,Math.min(scale,1.3));
+    cv.style.width=(LOGW*scale)+"px"; cv.style.height=(LOGH*scale)+"px";
+  }
+  window.addEventListener("resize", fitScreen);
+  window.addEventListener("orientationchange", fitScreen);
+  setTimeout(fitScreen,0); fitScreen();
   var scene="menu", g={}, ptr={x:W/2,y:0,down:false};
   var coins=0; try{ coins=parseInt(localStorage.getItem("mohouse_coins")||"0",10)||0; }catch(e){}
   function save(){ try{ localStorage.setItem("mohouse_coins",String(coins)); }catch(e){} }
@@ -39,11 +61,21 @@
   var equipHat=-1; try{ var _eh=localStorage.getItem("mohouse_hat"); equipHat=(_eh===null)?-1:parseInt(_eh,10); if(isNaN(equipHat))equipHat=-1; }catch(e){}
   function saveShop(){ try{ localStorage.setItem("mohouse_owned",JSON.stringify(owned)); localStorage.setItem("mohouse_hat",String(equipHat)); }catch(e){} }
   var HAT_EMOJI=["🎩","🧢","👑","🥳"];
-  var SHOP=[{k:"hat0",e:"🎩",n:"Top Hat",p:30,cat:"hat",hi:0},{k:"hat1",e:"🧢",n:"Cap",p:20,cat:"hat",hi:1},{k:"hat2",e:"👑",n:"Crown",p:60,cat:"hat",hi:2},{k:"hat3",e:"🥳",n:"Party Hat",p:25,cat:"hat",hi:3},{k:"pet0",e:"🐰",n:"Pet Bunny",p:40,cat:"pet"},{k:"pet1",e:"🐧",n:"Pet Penguin",p:45,cat:"pet"},{k:"spark",e:"✨",n:"Sparkle Trail",p:50,cat:"pow"}];
+  var SHOP=[{k:"hat0",e:"🎩",n:"Top Hat",p:30,cat:"hat",hi:0},{k:"hat1",e:"🧢",n:"Cap",p:20,cat:"hat",hi:1},{k:"hat2",e:"👑",n:"Crown",p:60,cat:"hat",hi:2},{k:"hat3",e:"🥳",n:"Party Hat",p:25,cat:"hat",hi:3},{k:"pet0",e:"🐰",n:"Pet Bunny",p:40,cat:"pet"},{k:"pet1",e:"🐧",n:"Pet Penguin",p:45,cat:"pet"},{k:"spark",e:"✨",n:"Sparkle Trail",p:50,cat:"pow"},{k:"f_sofa",e:"🛋️",n:"Fancy Sofa",p:20,cat:"furn"},{k:"f_bed",e:"🛏️",n:"Big Bed",p:25,cat:"furn"},{k:"f_tv",e:"📺",n:"Big TV",p:30,cat:"furn"},{k:"f_lamp",e:"💡",n:"Floor Lamp",p:12,cat:"furn"},{k:"f_plant",e:"🪴",n:"Plants",p:10,cat:"furn"},{k:"f_art",e:"🖼️",n:"Wall Art",p:15,cat:"furn"},{k:"f_rug",e:"🟫",n:"Cozy Rug",p:12,cat:"furn"},{k:"f_clock",e:"🕰️",n:"Wall Clock",p:14,cat:"furn"},{k:"f_shelf",e:"📚",n:"Bookshelf",p:18,cat:"furn"},{k:"f_fire",e:"🔥",n:"Fireplace",p:35,cat:"furn"},{k:"f_piano",e:"🎹",n:"Grand Piano",p:50,cat:"furn"},{k:"f_tub",e:"🛁",n:"Spa Tub",p:28,cat:"furn"},{k:"f_furrug",e:"⬜",n:"White Fur Rug",p:22,cat:"furn"},{k:"f_furrug2",e:"🟫",n:"Brown Fur Rug",p:22,cat:"furn"}];
 
   var AC=null; function beep(f,d,ty){ try{ if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)(); var o=AC.createOscillator(),ga=AC.createGain(); o.frequency.value=f;o.type=ty||"square";o.connect(ga);ga.connect(AC.destination);ga.gain.value=.06;o.start();ga.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+(d||.08));o.stop(AC.currentTime+(d||.08)); }catch(e){} }
   function ding(){ beep(760,.08,"sine"); setTimeout(function(){beep(1020,.12,"sine");},80); }
   function clink(){ beep(880,.05,"sine"); setTimeout(function(){beep(1180,.06,"sine");},50); }
+  // ---- background music: 0 off, 1 Loud Bagpipes, 2 Sleepy ----
+  var MUS={mode:0,drone:[],timer:null,step:0,started:false};
+  try{ MUS.mode=parseInt(localStorage.getItem("mohouse_music")||"0",10)||0; }catch(e){}
+  function acOn(){ if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.resume)AC.resume(); }
+  function stopMusic(){ if(MUS.timer){clearTimeout(MUS.timer);MUS.timer=null;} MUS.drone.forEach(function(o){try{o.stop();}catch(e){}}); MUS.drone=[]; }
+  function startMusic(){ stopMusic(); if(MUS.mode===0)return; acOn(); MUS.started=true; MUS.step=0;
+    if(MUS.mode===1){ [110,164.8,220].forEach(function(f){ try{ var o=AC.createOscillator(),g2=AC.createGain(); o.type="sawtooth"; o.frequency.value=f; g2.gain.value=0.05; o.connect(g2); g2.connect(AC.destination); o.start(); MUS.drone.push(o);}catch(e){} });
+      var mel=[[392,200],[440,140],[494,160],[440,140],[392,320],[440,160],[494,160],[523,340],[494,160],[440,160],[392,200],[349,140],[392,320],[440,170],[494,170],[440,400]]; (function tick(){ if(MUS.mode!==1)return; try{ var pr=mel[MUS.step%mel.length], n=pr[0], dur=pr[1]/1000; var o=AC.createOscillator(),g2=AC.createGain(); o.type="sawtooth"; o.frequency.value=n; o.connect(g2); g2.connect(AC.destination); g2.gain.setValueAtTime(0.13,AC.currentTime); g2.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+Math.max(0.12,dur-0.03)); o.start(); o.stop(AC.currentTime+dur);}catch(e){} MUS.step++; MUS.timer=setTimeout(tick,pr?mel[(MUS.step-1)%mel.length][1]:280); })();
+    } else { var mel2=[523,494,440,392,440,494,392,349,392,330,349,392]; (function tick2(){ if(MUS.mode!==2)return; try{ var n=mel2[MUS.step%mel2.length]; var o=AC.createOscillator(),g2=AC.createGain(); o.type="sine"; o.frequency.value=n; o.connect(g2); g2.connect(AC.destination); g2.gain.setValueAtTime(0.0001,AC.currentTime); g2.gain.linearRampToValueAtTime(0.05,AC.currentTime+0.35); g2.gain.exponentialRampToValueAtTime(0.0001,AC.currentTime+1.2); o.start(); o.stop(AC.currentTime+1.3);}catch(e){} MUS.step++; MUS.timer=setTimeout(tick2,950); })(); } }
+  function cycleMusic(){ MUS.mode=(MUS.mode+1)%3; try{localStorage.setItem("mohouse_music",String(MUS.mode));}catch(e){} startMusic(); }
   function rr(x,y,w,h,r){ cx.beginPath();cx.moveTo(x+r,y);cx.arcTo(x+w,y,x+w,y+h,r);cx.arcTo(x+w,y+h,x,y+h,r);cx.arcTo(x,y+h,x,y,r);cx.arcTo(x,y,x+w,y,r);cx.closePath(); }
   function text(s,x,y,sz,c,al){ cx.fillStyle=c||"#fff";cx.font="bold "+sz+"px Trebuchet MS,sans-serif";cx.textAlign=al||"center";cx.textBaseline="middle";cx.fillText(s,x,y); }
   function emo(ch,x,y,s){ cx.font=s+"px serif";cx.textAlign="center";cx.textBaseline="middle";cx.fillText(ch,x,y); }
@@ -87,23 +119,46 @@
   }
 
   var S={};
-  var JOBS=[["person","🚶","Walk House","#ffd27a"],["door","🚪","Front Door","#d7c6a0"],["drive","🛣️","Driveway","#cfcfcf"],["sink","🚰","Kitchen Sink","#bfe0ff"],["coffee","☕","Coffee Bar","#e8c9a0"],["dining","🍽️","Dining Room","#f0c6a0"],["kids","🌟","Kids Stars","#c9c0f0"],["bath","🛁","Bathroom","#bfe8ee"],["gym","🏋️","Home Gym","#ffc0c0"],["sunroom","🪟","Sunroom","#cfeee0"],["firepit","🔥","Fire Pit","#ffd0b0"],["theater","🎬","Home Theater","#d4c6f0"],["petwash","🐾","Pet Wash","#ffe0c0"],["cityview","🌆","City View","#c4d4f0"],["rooftop","🌿","Rooftop Garden","#c8e8c0"],["gameroom","🎱","Game Room","#bfe0d0"],["yoga","🧘","Yoga Studio","#e0d0f0"],["robot","🤖","Robot Helper","#c4d4e4"],["range","🍳","Pro Range","#ffd0d0"],["hiddentv","📺","Hidden TV","#d4d4d4"],["shop","🛒","Coin Shop","#ffe8a0"]];
+  var JOBS=[["person","🚶","Walk House","#ffd27a"],["door","🚪","Front Door","#d7c6a0"],["drive","🛣️","Driveway","#cfcfcf"],["sink","🚰","Kitchen Sink","#bfe0ff"],["coffee","☕","Coffee Bar","#e8c9a0"],["dining","🍽️","Dining Room","#f0c6a0"],["kids","🌟","Kids Stars","#c9c0f0"],["bath","🛁","Bathroom","#bfe8ee"],["gym","🏋️","Home Gym","#ffc0c0"],["sunroom","🪟","Sunroom","#cfeee0"],["firepit","🔥","Fire Pit","#ffd0b0"],["theater","🎬","Home Theater","#d4c6f0"],["petwash","🐾","Pet Wash","#ffe0c0"],["cityview","🌆","City View","#c4d4f0"],["rooftop","🌿","Rooftop Garden","#c8e8c0"],["gameroom","🎱","Game Room","#bfe0d0"],["yoga","🧘","Yoga Studio","#e0d0f0"],["robot","🤖","Robot Helper","#c4d4e4"],["range","🍳","Pro Range","#ffd0d0"],["hiddentv","📺","Hidden TV","#d4d4d4"],["furnish","🛋️","Furnish Room","#ffd8b0"],["pool","🏊","Swimming Pool","#bfe6ff"],["garden","🥕","Veggie Garden","#d6f0b0"],["playground","🛝","Playground","#ffd9a0"],["pantry","🍷","Snack Pantry","#f0d8b0"],["office","💻","Home Office","#cfe0f0"],["guest","🛏️","Guest Room","#e6d8f0"],["petroom","🐾","Pet Room","#fde0c0"],["stringlights","✨","String Lights","#ffe8a0"],["arffdig","🐕","Arff Digs!","#e8d0a0"],["spa","🧖","Spa Bath","#cfe8ee"],["brushmeow","🐈","Brush Meow","#f2d98a"],["winter","⛄","Winter Snow","#dfeeff"],["closet","👕","Walk-in Closet","#f0e0f0"],["movie","🎬","Movie Night","#d0c0e8"],["birthday","🎂","Birthday Party","#ffd8e0"],["fort","🏕️","Blanket Fort","#e8dcc0"],["pancakes","🥞","Pancakes","#ffe0b0"],["makebed","🛏️","Make the Bed","#eaf2fb"],["bunkbed","🛏️","Bunk Beds","#d0e8ff"],["sunnymorning","☀️","Sunny Morning","#ffe9a0"],["musicroom","🎵","Music Room","#e8d8f5"],["laundry","🧺","Laundry Room","#d8ecf0"],["breakfast","🌅","Breakfast Nook","#fff0c8"],["playhouse","🏠","Play House","#dff0c0"],["patio","🪨","Stone Patio","#d8d0c0"],["streets","🏘️","Buy Houses","#cfe0f2"],["apartments","🏢","Visit Apartments","#e0d8f2"],["bowling","🎳","Bowling Room","#d6c8f0"],["gokart","🏎️","Go-Kart Hall","#cfe0f5"],["sunflowers","🌻","Sunflowers","#fff0b0"],["eggs","🍳","Fry Eggs","#ffe4b0"],["mailbox","📫","Mailbox","#ffd8c0"],["porchswing","🪑","Porch Swing","#e8d8f0"],["toast","🍞","Make Toast","#ffe0b0"],["cake","🎂","Bake a Cake","#ffd8e8"],["cloudbed","☁️","Cloud Bedroom","#dbeeff"],["trampoline","🤸","Trampoline Room","#dbe8ff"],["secretdoor","📚","Secret Bookcase","#e6d8c2"],["slide","🛝","Indoor Slide","#ffe0cc"],["windowplants","🪴","Plant Window","#dcecdc"],["bubblebath","🛁","Bubble Bath","#d6ecf4"],["fiddleleaf","🪴","Tall Plant","#e2e6d0"],["crayoncaddy","🖍️","Crayon Caddy","#ffe6c6"],["arfftrick","🐕","Arff Trick","#dcecd0"],["arffhaircut","✂️","Arff Haircut","#e0ecf2"],["arfftreat","🦴","Arff Treat","#e8ddc6"],["cattree","🐈","Meow Cat Tree","#ece0f0"],["armchair","🪑","Comfy Armchair","#f2e4cc"],["shaggyrug","🧶","Shaggy Rug","#eadfc8"],["blanketbasket","🧺","Blanket Basket","#e8dcc2"],["recordplayer","🎶","Record Player","#e2d6ea"],["stringwall","✨","String Lights Wall","#3a3458"],["petbed","🛏️","Pet Bed","#e8dcc2"],["checkers","🎲","Checkers Table","#e6dcc4"],["swim","🏊","Swim in Pool","#bfe6ff"],["waterfight","💦","Water Fight","#c8ecff"],["trash","🗑️","Take Out Trash","#d0d6da"],["polish","✨","Polish Floors","#e6e0f0"],["paintdoor","🚪","Paint Door","#ffd0c0"],["paintceiling","🎨","Paint Ceiling","#d8ecff"],["paintplayhouse","🏠","Paint Playhouse","#ffe0ec"],["paintcabinets","🎨","Paint Cabinets","#e8ecd8"],["shop","🛒","Coin Shop","#ffe8a0"]];
   var menuPage=0, PAGE=14;
-  function menuRects(){ var cols=2,tw=152,th=52,gx=12,gy=8,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,r=[]; for(var i=0;i<PAGE;i++){ var c=i%cols,rw=Math.floor(i/cols); r.push({x:x0+c*(tw+gx),y:y0+rw*(th+gy),w:tw,h:th}); } return r; }
+  function menuRects(){ var cols=2,tw=190,th=52,gx=14,gy=9,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,r=[]; for(var i=0;i<PAGE;i++){ var c=i%cols,rw=Math.floor(i/cols); r.push({x:x0+c*(tw+gx),y:y0+rw*(th+gy),w:tw,h:th}); } return r; }
+  function menuBG(){ var gd=cx.createLinearGradient(0,0,0,H); gd.addColorStop(0,"#fff4e6"); gd.addColorStop(0.5,"#ffeede"); gd.addColorStop(1,"#ffe6ef"); cx.fillStyle=gd; cx.fillRect(0,0,W,H);
+    // soft floating house/cloud watermarks
+    cx.globalAlpha=0.06; cx.fillStyle="#c98f5a";
+    [[60,470,60],[380,520,74],[70,590,50],[370,600,54]].forEach(function(c){ cx.beginPath(); cx.arc(c[0],c[1],c[2]*0.5,0,7); cx.fill(); });
+    cx.globalAlpha=1;
+    // gentle top ribbon
+    cx.fillStyle="#ffd98a"; cx.fillRect(0,0,W,6); }
 
   // ---------------- MENU ----------------
   S.menu={ init:function(){ label("Pick a job to do! 🪙 "+coins); },
-    render:function(){ drawKitchen(); coinHUD();
-      emo("🏠",W*0.5,84,26);
-      text("FAMILY HOUSE DESIGNER",W/2,116,17,"#7a4a1a"); text("Pick a job to do!",W/2,136,12,"#7a5a3a");
+    render:function(){ menuBG();
+      // ---- header banner ----
+      cx.fillStyle="#ffffff"; rr(W/2-176,52,352,64,18); cx.fill(); cx.strokeStyle="#ffce7a"; cx.lineWidth=3; rr(W/2-176,52,352,64,18); cx.stroke();
+      emo("🏠",W/2-128,84,30);
+      text("FAMILY HOUSE DESIGNER",W/2+14,78,17,"#c06a1a"); text("Pick a job & walk to it! 🕹️",W/2+14,100,12,"#8a6a3a");
+      // coin badge (top-left) + music button (top-right)
+      coinHUD();
+      cx.fillStyle=MUS.mode?"#bfe8b0":"#ffffff"; rr(W-120,12,106,30,11); cx.fill(); cx.strokeStyle="#e0b64a"; cx.lineWidth=2; rr(W-120,12,106,30,11); cx.stroke(); text(["🔇 Music Off","🎵 Bagpipes!","😴 Sleepy"][MUS.mode],W-67,27,12,"#5a3a1a");
+      // ---- job cards ----
       var R=menuRects(), start=menuPage*PAGE, pages=Math.ceil(JOBS.length/PAGE);
-      for(var i=0;i<PAGE;i++){ var idx=start+i; if(idx>=JOBS.length)break; var rc=R[i],J=JOBS[idx]; cx.fillStyle=J[3]; rr(rc.x,rc.y,rc.w,rc.h,12); cx.fill(); cx.strokeStyle="#ffffffcc"; cx.lineWidth=2; rr(rc.x,rc.y,rc.w,rc.h,12); cx.stroke(); emo(J[1],rc.x+26,rc.y+rc.h/2,22); text(J[2],rc.x+44,rc.y+rc.h/2,12,"#3a2a10","left"); }
-      if(pages>1){ text("Page "+(menuPage+1)+" / "+pages,W/2,H-24,13,"#7a4a1a");
-        if(menuPage>0){ cx.fillStyle="#e8c9a0"; rr(30,H-40,120,32,10); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; rr(30,H-40,120,32,10); cx.stroke(); text("◀ Back",90,H-24,14,"#3a2a10"); }
-        if(menuPage<pages-1){ cx.fillStyle="#ffd27a"; rr(W-150,H-40,120,32,10); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; rr(W-150,H-40,120,32,10); cx.stroke(); text("More ▶",W-90,H-24,14,"#3a2a10"); } } },
+      for(var i=0;i<PAGE;i++){ var idx=start+i; if(idx>=JOBS.length)break; var rc=R[i],J=JOBS[idx];
+        cx.fillStyle="rgba(120,80,40,.13)"; rr(rc.x+1,rc.y+3,rc.w,rc.h,15); cx.fill(); // soft shadow
+        cx.fillStyle=J[3]; rr(rc.x,rc.y,rc.w,rc.h,15); cx.fill();
+        cx.fillStyle="rgba(255,255,255,.30)"; rr(rc.x,rc.y,rc.w,rc.h*0.5,15); cx.fill(); // top gloss
+        cx.strokeStyle="#ffffff"; cx.lineWidth=2.5; rr(rc.x,rc.y,rc.w,rc.h,15); cx.stroke();
+        cx.fillStyle="#ffffff"; cx.beginPath(); cx.arc(rc.x+30,rc.y+rc.h/2,18,0,7); cx.fill(); // emoji disc
+        emo(J[1],rc.x+30,rc.y+rc.h/2+1,22);
+        text(J[2],rc.x+56,rc.y+rc.h/2,12.5,"#4a3016","left"); }
+      // ---- page nav ----
+      if(pages>1){
+        cx.fillStyle="#ffffff"; rr(W/2-52,H-38,104,28,12); cx.fill(); cx.strokeStyle="#ffce7a"; cx.lineWidth=2; rr(W/2-52,H-38,104,28,12); cx.stroke(); text("Page "+(menuPage+1)+" / "+pages,W/2,H-24,12,"#c06a1a");
+        if(menuPage>0){ cx.fillStyle="#ffe0b0"; rr(20,H-40,96,32,12); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; rr(20,H-40,96,32,12); cx.stroke(); text("◀ Back",68,H-24,14,"#8a4a10"); }
+        if(menuPage<pages-1){ cx.fillStyle="#ffd27a"; rr(W-116,H-40,96,32,12); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; rr(W-116,H-40,96,32,12); cx.stroke(); text("More ▶",W-68,H-24,14,"#8a4a10"); } } },
     tap:function(){ var R=menuRects(), start=menuPage*PAGE, pages=Math.ceil(JOBS.length/PAGE);
-      if(pages>1){ if(menuPage>0 && ptr.y>H-40&&ptr.y<H-8&&ptr.x>30&&ptr.x<150){ menuPage--; beep(500,.06); return; }
-        if(menuPage<pages-1 && ptr.y>H-40&&ptr.y<H-8&&ptr.x>W-150&&ptr.x<W-30){ menuPage++; beep(600,.06); return; } }
+      if(ptr.x>W-120&&ptr.x<W-14&&ptr.y>12&&ptr.y<42){ cycleMusic(); beep(700,.05); return; }
+      if(pages>1){ if(menuPage>0 && ptr.y>H-40&&ptr.y<H-8&&ptr.x>20&&ptr.x<116){ menuPage--; beep(500,.06); return; }
+        if(menuPage<pages-1 && ptr.y>H-40&&ptr.y<H-8&&ptr.x>W-116&&ptr.x<W-20){ menuPage++; beep(600,.06); return; } }
       for(var i=0;i<PAGE;i++){ var idx=start+i; if(idx>=JOBS.length)break; var rc=R[i]; if(ptr.x>rc.x&&ptr.x<rc.x+rc.w&&ptr.y>rc.y&&ptr.y<rc.y+rc.h){ beep(680,.08); go(JOBS[idx][0]); return; } } } };
 
   // ================= INSTALL SINK =================
@@ -326,7 +381,7 @@
       // dark opening + interior when open
       cx.fillStyle="#3a2a1a"; rr(IX,IY,IW,IH,5); cx.fill();
       if(g.phase==="opening"||g.over){ var gr=cx.createLinearGradient(0,IY,0,IY+IH); gr.addColorStop(0,"#ffe6b0"); gr.addColorStop(1,"#f0c070"); cx.fillStyle=gr; rr(IX+6,IY+6,IW-12,IH-12,4); cx.fill();
-        emo("👨",IX+34,IY+120,26); emo("👩",IX+70,IY+120,26); emo("🐕",IX+52,IY+150,20); }
+        emo("👨",IX+34,IY+120,26); emo("👩",IX+70,IY+120,26); drawMaltipoo(IX+52,IY+150,1,0.6); }
       // frame
       cx.strokeStyle="#8a5a2f"; cx.lineWidth=12; rr(DFX,DFY,DFW,DFH,6); cx.stroke();
       cx.strokeStyle="#6a4420"; cx.lineWidth=3; rr(DFX,DFY,DFW,DFH,6); cx.stroke();
@@ -556,11 +611,31 @@
     cx.fillStyle="#222"; cx.beginPath(); cx.arc(3,-17,1.3,0,7); cx.fill(); cx.restore(); }
   function drawDogTop(x,y,face){ cx.save(); cx.translate(x,y); cx.scale(face,1);
     cx.fillStyle="rgba(0,0,0,.15)"; cx.beginPath(); cx.ellipse(0,10,10,4,0,0,7); cx.fill();
-    cx.strokeStyle="#8a5a2f"; cx.lineWidth=3; cx.lineCap="round"; cx.beginPath(); cx.moveTo(-11,-2); cx.lineTo(-16,-6+Math.sin(t*0.3)*3); cx.stroke();
-    cx.fillStyle="#a56a34"; [-8,-2,6].forEach(function(lx){ cx.fillRect(lx,4,3,6); });
-    cx.fillStyle="#b5793f"; rr(-12,-6,20,12,6); cx.fill(); cx.beginPath(); cx.arc(10,-6,7,0,7); cx.fill();
-    cx.fillStyle="#8a5a2f"; cx.beginPath(); cx.ellipse(6,-11,3,5,-.3,0,7); cx.fill();
+    cx.fillStyle="#e6ddcd"; cx.beginPath(); cx.arc(-14,-4+Math.sin(t*0.3)*3,6,0,7); cx.fill();
+    cx.fillStyle="#e8e0d2"; [-8,-2,6].forEach(function(lx){ cx.fillRect(lx,4,3,6); });
+    cx.fillStyle="#f9f6f0"; rr(-12,-6,20,12,6); cx.fill(); cx.beginPath(); cx.arc(10,-6,7,0,7); cx.fill(); cx.beginPath(); cx.arc(4,-9,5,0,7); cx.fill();
+    cx.fillStyle="#e6ddcd"; cx.beginPath(); cx.ellipse(6,-11,3,5,-.3,0,7); cx.fill();
     cx.fillStyle="#222"; cx.beginPath(); cx.arc(12,-6,1.4,0,7); cx.fill(); cx.restore(); }
+  function drawMaltipoo(x,y,face,s){ s=s||1; cx.save(); cx.translate(x,y); cx.scale((face||1)*s,s); var wag=Math.sin(t*0.25)*4;
+    cx.fillStyle="rgba(0,0,0,.12)"; cx.beginPath(); cx.ellipse(0,20,22,6,0,0,7); cx.fill();
+    cx.fillStyle="#eae1d0"; cx.beginPath(); cx.arc(-20,-4+wag*0.3,7,0,7); cx.fill();
+    cx.fillStyle="#e8e0d2"; [-12,-4,8,15].forEach(function(lx){ cx.fillRect(lx,8,6,12); });
+    cx.fillStyle="#f9f6f0"; [[-14,-4,13],[-2,-6,14],[10,-4,12]].forEach(function(c){ cx.beginPath(); cx.arc(c[0],c[1],c[2],0,7); cx.fill(); });
+    cx.beginPath(); cx.arc(18,-12,12,0,7); cx.fill(); cx.beginPath(); cx.arc(13,-19,7,0,7); cx.fill(); cx.beginPath(); cx.arc(24,-18,7,0,7); cx.fill();
+    cx.fillStyle="#ece4d6"; cx.beginPath(); cx.ellipse(10,-9,6,10,0.3,0,7); cx.fill(); cx.beginPath(); cx.ellipse(27,-9,5,9,-0.3,0,7); cx.fill();
+    cx.fillStyle="#fffdf8"; cx.beginPath(); cx.arc(27,-9,6,0,7); cx.fill();
+    cx.fillStyle="#2a2320"; cx.beginPath(); cx.arc(31,-10,2.4,0,7); cx.fill(); cx.beginPath(); cx.arc(20,-14,1.9,0,7); cx.fill();
+    cx.restore(); }
+  function drawMeowBig(x,y){ cx.save(); cx.translate(x,y); var tail=Math.sin(t*0.15)*6;
+    cx.strokeStyle="#e0b84a"; cx.lineWidth=10; cx.lineCap="round"; cx.beginPath(); cx.moveTo(24,12); cx.quadraticCurveTo(54,2,46,-28+tail); cx.stroke();
+    cx.fillStyle="#f2c94c"; cx.beginPath(); cx.moveTo(-26,32); cx.quadraticCurveTo(-32,-18,0,-22); cx.quadraticCurveTo(32,-18,26,32); cx.closePath(); cx.fill();
+    cx.beginPath(); cx.arc(0,-34,24,0,7); cx.fill();
+    cx.beginPath(); cx.moveTo(-20,-52); cx.lineTo(-12,-70); cx.lineTo(-3,-53); cx.closePath(); cx.fill(); cx.beginPath(); cx.moveTo(20,-52); cx.lineTo(12,-70); cx.lineTo(3,-53); cx.closePath(); cx.fill();
+    cx.strokeStyle="#e0b030"; cx.lineWidth=3; for(var i=0;i<3;i++){ cx.beginPath(); cx.arc(0,-6+i*10,19-i*3,0.25,Math.PI-0.25); cx.stroke(); }
+    cx.fillStyle="#2a2a30"; cx.beginPath(); cx.arc(-9,-36,3,0,7); cx.arc(9,-36,3,0,7); cx.fill();
+    cx.fillStyle="#e08a8a"; cx.beginPath(); cx.arc(0,-28,2.6,0,7); cx.fill();
+    cx.strokeStyle="#b89030"; cx.lineWidth=1.4; cx.beginPath(); cx.moveTo(-22,-30);cx.lineTo(-40,-33); cx.moveTo(-22,-26);cx.lineTo(-40,-23); cx.moveTo(22,-30);cx.lineTo(40,-33); cx.moveTo(22,-26);cx.lineTo(40,-23); cx.stroke();
+    cx.restore(); }
   function drawMiniRobot(x,y,face,helping){ cx.save(); cx.translate(x,y); cx.scale(face,1);
     cx.fillStyle="rgba(0,0,0,.15)"; cx.beginPath(); cx.ellipse(0,16,11,4,0,0,7); cx.fill();
     // hover bob
@@ -976,11 +1051,11 @@
   // ================= PET WASH CORNER — build it & wash the pet (Set2 #190) =================
   var PTUB={x:W/2,y:388}, PSPR={x:W/2+92,y:250}, PSOAP={x:W/2-96,y:300};
   function drawWashDog(x,y,dirt,scrub){ cx.save(); cx.translate(x,y); var wag=Math.sin(t*0.3)*4;
-    cx.strokeStyle="#8a5a2f"; cx.lineWidth=4; cx.lineCap="round"; cx.beginPath(); cx.moveTo(-24,-4); cx.lineTo(-34,-10+wag); cx.stroke();
-    cx.fillStyle="#a56a34"; [-14,-6,8,16].forEach(function(lx){ cx.fillRect(lx,10,5,10); });
-    cx.fillStyle="#b5793f"; rr(-26,-14,44,26,12); cx.fill(); cx.beginPath(); cx.arc(20,-14,13,0,7); cx.fill();
-    cx.fillStyle="#8a5a2f"; cx.beginPath(); cx.ellipse(13,-24,5,9,-.3,0,7); cx.fill();
-    cx.fillStyle="#c98a52"; cx.beginPath(); cx.ellipse(28,-11,7,6,0,0,7); cx.fill();
+    cx.fillStyle="#e6ddcd"; cx.beginPath(); cx.arc(-28,-8+wag,8,0,7); cx.fill();
+    cx.fillStyle="#e8e0d2"; [-14,-6,8,16].forEach(function(lx){ cx.fillRect(lx,10,5,10); });
+    cx.fillStyle="#f9f6f0"; rr(-26,-14,44,26,12); cx.fill(); cx.beginPath(); cx.arc(20,-14,13,0,7); cx.fill(); cx.beginPath(); cx.arc(6,-20,8,0,7); cx.fill(); cx.beginPath(); cx.arc(-8,-18,7,0,7); cx.fill();
+    cx.fillStyle="#e6ddcd"; cx.beginPath(); cx.ellipse(13,-24,5,9,-.3,0,7); cx.fill();
+    cx.fillStyle="#fffdf8"; cx.beginPath(); cx.ellipse(28,-11,7,6,0,0,7); cx.fill();
     cx.fillStyle="#222"; cx.beginPath(); cx.arc(22,-16,2,0,7); cx.fill(); cx.fillStyle="#2a1a10"; cx.beginPath(); cx.arc(33,-11,3,0,7); cx.fill();
     if(dirt>0){ cx.globalAlpha=dirt*0.85; cx.fillStyle="#7a5a34"; [[-14,-6],[0,-10],[8,-2],[-6,4],[14,-8]].forEach(function(p){ cx.beginPath(); cx.arc(p[0],p[1],4,0,7); cx.fill(); }); cx.globalAlpha=1; }
     if(scrub){ cx.fillStyle="rgba(255,255,255,0.9)"; for(var s=0;s<6;s++){ cx.beginPath(); cx.arc(-16+s*7,-16+Math.sin(t*0.4+s)*3,4,0,7); cx.fill(); } }
@@ -1318,38 +1393,1209 @@
   function drawShelfCab(x,y){ cx.save(); cx.translate(x,y); cx.fillStyle="#8a5a2f"; rr(-50,-18,100,36,6); cx.fill(); cx.strokeStyle="#6a4420"; cx.lineWidth=2; rr(-50,-18,100,36,6); cx.stroke(); cx.fillStyle="#7a4a2a"; rr(-45,-12,42,24,3); cx.fill(); rr(3,-12,42,24,3); cx.fill(); text("📺 CABINET",0,-28,13,"#5a3a1a"); cx.restore(); }
 
   // ================= 🛒 COIN SHOP — spend job coins =================
-  function shopRects(){ var cols=2,tw=152,th=78,gx=12,gy=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=118,r=[]; for(var i=0;i<SHOP.length;i++){ var c=i%cols,rw=Math.floor(i/cols); r.push({x:x0+c*(tw+gx),y:y0+rw*(th+gy),w:tw,h:th}); } return r; }
+  var shopPage=0, SHOP_PAGE=6;
+  function shopRects(){ var cols=2,tw=152,th=76,gx=12,gy=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=116,r=[]; for(var i=0;i<SHOP_PAGE;i++){ var c=i%cols,rw=Math.floor(i/cols); r.push({x:x0+c*(tw+gx),y:y0+rw*(th+gy),w:tw,h:th}); } return r; }
   S.shop={ init:function(){ g={flash:0}; label("Spend your coins! 🛒 "+coins); },
     render:function(){
       var gr=cx.createLinearGradient(0,0,0,H); gr.addColorStop(0,"#fff4d6"); gr.addColorStop(1,"#ffe6b0"); cx.fillStyle=gr; cx.fillRect(0,0,W,H);
       emo("🛒",W/2-70,52,30); text("COIN SHOP",W/2+10,52,24,"#a5701a");
-      // coin balance badge
       cx.fillStyle="#fff"; rr(W/2-56,72,112,30,15); cx.fill(); cx.strokeStyle="#e0b64a"; cx.lineWidth=3; rr(W/2-56,72,112,30,15); cx.stroke(); emo("🪙",W/2-32,87,20); text(coins,W/2+8,87,18,"#a5701a","left");
-      var R=shopRects();
-      for(var i=0;i<SHOP.length;i++){ var rc=R[i], it=SHOP[i], own=!!owned[it.k], canBuy=coins>=it.p;
+      var R=shopRects(), start=shopPage*SHOP_PAGE, pages=Math.ceil(SHOP.length/SHOP_PAGE);
+      for(var i=0;i<SHOP_PAGE;i++){ var idx=start+i; if(idx>=SHOP.length)break; var rc=R[i], it=SHOP[idx], own=!!owned[it.k], canBuy=coins>=it.p;
         cx.fillStyle=own?"#dff5df":(canBuy?"#fff":"#eee2c8"); rr(rc.x,rc.y,rc.w,rc.h,14); cx.fill();
         cx.strokeStyle=own?"#5ab06a":"#e0c88a"; cx.lineWidth=own?3:2; rr(rc.x,rc.y,rc.w,rc.h,14); cx.stroke();
-        emo(it.e,rc.x+30,rc.y+rc.h/2,30); text(it.n,rc.x+52,rc.y+26,13,"#5a3a10","left");
-        if(own){ if(it.cat==="hat"){ var worn=(equipHat===it.hi); text(worn?"👕 WORN":"tap: wear",rc.x+52,rc.y+52,13,worn?"#2a7a2a":"#7a5a2a","left"); } else { text("OWNED ✓",rc.x+52,rc.y+52,13,"#2a7a2a","left"); } }
-        else { emo("🪙",rc.x+54,rc.y+52,15); text(it.p,rc.x+70,rc.y+52,14,canBuy?"#a5701a":"#b0a080","left"); }
+        emo(it.e,rc.x+30,rc.y+rc.h/2,28); text(it.n,rc.x+50,rc.y+26,12,"#5a3a10","left");
+        if(own){ if(it.cat==="hat"){ var worn=(equipHat===it.hi); text(worn?"👕 WORN":"tap: wear",rc.x+50,rc.y+52,12,worn?"#2a7a2a":"#7a5a2a","left"); } else { text("OWNED ✓",rc.x+50,rc.y+52,12,"#2a7a2a","left"); } }
+        else { emo("🪙",rc.x+52,rc.y+52,15); text(it.p,rc.x+68,rc.y+52,14,canBuy?"#a5701a":"#b0a080","left"); }
       }
+      if(pages>1){ text("Page "+(shopPage+1)+" / "+pages,W/2,H-92,13,"#a5701a");
+        if(shopPage>0){ cx.fillStyle="#e8c9a0"; rr(30,H-84,110,30,10); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; rr(30,H-84,110,30,10); cx.stroke(); text("◀ Prev",85,H-69,14,"#3a2a10"); }
+        if(shopPage<pages-1){ cx.fillStyle="#ffd27a"; rr(W-140,H-84,110,30,10); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; rr(W-140,H-84,110,30,10); cx.stroke(); text("More ▶",W-85,H-69,14,"#3a2a10"); } }
       cx.fillStyle="#e8c9a0"; rr(W/2-90,H-46,180,34,11); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; rr(W/2-90,H-46,180,34,11); cx.stroke(); text("◀ BACK TO JOBS",W/2,H-29,15,"#3a2a10");
       renderFX();
       if(g.flash>0){ g.flash--; }
     },
     tap:function(){
+      var pages=Math.ceil(SHOP.length/SHOP_PAGE);
       if(ptr.y>H-46&&ptr.y<H-12&&Math.abs(ptr.x-W/2)<90){ beep(500,.06); go("menu"); return; }
-      var R=shopRects();
-      for(var i=0;i<SHOP.length;i++){ var rc=R[i], it=SHOP[i]; if(ptr.x>rc.x&&ptr.x<rc.x+rc.w&&ptr.y>rc.y&&ptr.y<rc.y+rc.h){
-        if(owned[it.k]){ if(it.cat==="hat"){ equipHat=(equipHat===it.hi)?-1:it.hi; saveShop(); ding(); star(rc.x+30,rc.y+rc.h/2,5); } else { beep(400,.06); } }
+      if(pages>1){ if(shopPage>0 && ptr.y>H-84&&ptr.y<H-54&&ptr.x>30&&ptr.x<140){ shopPage--; beep(500,.06); return; }
+        if(shopPage<pages-1 && ptr.y>H-84&&ptr.y<H-54&&ptr.x>W-140&&ptr.x<W-30){ shopPage++; beep(600,.06); return; } }
+      var R=shopRects(), start=shopPage*SHOP_PAGE;
+      for(var i=0;i<SHOP_PAGE;i++){ var idx=start+i; if(idx>=SHOP.length)break; var rc=R[i], it=SHOP[idx]; if(ptr.x>rc.x&&ptr.x<rc.x+rc.w&&ptr.y>rc.y&&ptr.y<rc.y+rc.h){
+        if(owned[it.k]){ if(it.cat==="hat"){ equipHat=(equipHat===it.hi)?-1:it.hi; saveShop(); ding(); star(rc.x+30,rc.y+rc.h/2,5); } else { beep(400,.06); floatUp("Owned ✓",rc.x+rc.w/2,rc.y+10,"#2a7a2a"); } }
         else if(coins>=it.p){ coins-=it.p; owned[it.k]=true; if(it.cat==="hat")equipHat=it.hi; save(); saveShop(); ding(); confettiBurst(); star(rc.x+rc.w/2,rc.y+rc.h/2,10); floatUp("Bought! ✨",rc.x+rc.w/2,rc.y+10,"#5a3a10"); label("Got it! 🪙 "+coins); }
         else { beep(200,.12,"sawtooth"); floatUp("Need more 🪙",rc.x+rc.w/2,rc.y+10,"#c05a3a"); }
         return; } }
     } };
 
+  // ================= FURNISH ROOM (Set4 ideas 41–60) =================
+  var FURN=[["🛋️","Couch"],["🍵","Coffee Table"],["📚","Bookshelf"],["💡","Floor Lamp"],["🪞","Mirror"],["🟫","Rug"],["🪟","Curtains"],["☁️","Pillows"],["📺","TV Stand"],["🔥","Fireplace"],["🍽️","Dining Set"],["🗄️","China Cabinet"],["🪑","Bar Stools"],["🗂️","Wall Shelves"],["🛏️","Bed Frame"],["🛎️","Nightstand"],["🧳","Dresser"],["🖥️","Desk & Chair"],["🛁","Bathtub"],["💄","Vanity Mirror"]];
+  var FURN_NEED=8;
+  S.furnish={ init:function(){ g={items:[], pick:-1, sel:-1, drag:false, over:false}; label("Tap furniture, then tap the room to place it! 🛋️"); },
+    render:function(){
+      var wall=cx.createLinearGradient(0,0,0,300); wall.addColorStop(0,"#f2e6d0"); wall.addColorStop(1,"#e8d8bc"); cx.fillStyle=wall; cx.fillRect(0,0,W,300);
+      cx.fillStyle="#c9a06a"; cx.fillRect(0,300,W,160);
+      cx.strokeStyle="rgba(0,0,0,.08)"; cx.lineWidth=1; for(var fx=0;fx<W;fx+=44){cx.beginPath();cx.moveTo(fx,300);cx.lineTo(fx,460);cx.stroke();}
+      cx.fillStyle="#b98a54"; cx.fillRect(0,296,W,6);
+      cx.fillStyle="#bfe6ff"; rr(W-120,44,84,60,6); cx.fill(); cx.strokeStyle="#8a7a58"; cx.lineWidth=4; rr(W-120,44,84,60,6); cx.stroke();
+      var order=g.items.map(function(_,i){return i;}).sort(function(a,b){return g.items[a].y-g.items[b].y;});
+      order.forEach(function(i){ var it=g.items[i]; emo(FURN[it.f][0],it.x,it.y,it.s||32); if(i===g.sel){ cx.strokeStyle="#ff8adf"; cx.lineWidth=3; cx.setLineDash([5,4]); cx.beginPath(); cx.arc(it.x,it.y-6,24,0,7); cx.stroke(); cx.setLineDash([]); } });
+      coinHUD();
+      text("🛋️ FURNISH THE ROOM",W/2,44,15,"#7a4a1a");
+      cx.fillStyle="#00000018"; rr(W/2-70,64,140,10,5); cx.fill(); cx.fillStyle="#e0a050"; rr(W/2-70,64,140*Math.min(1,g.items.length/FURN_NEED),10,5); cx.fill(); text(g.items.length+" / "+FURN_NEED+" placed",W/2,84,11,"#7a5a3a");
+      cx.fillStyle="#3a2a18"; cx.fillRect(0,462,W,H-462);
+      for(var k=0;k<FURN.length;k++){ var col=k%5,row=Math.floor(k/5); var bx=6+col*86, by=468+row*36; var selp=(g.pick===k);
+        cx.fillStyle=selp?"#ffe27a":"#f1e6d2"; rr(bx,by,82,32,7); cx.fill(); if(selp){cx.strokeStyle="#e0670e";cx.lineWidth=2;rr(bx,by,82,32,7);cx.stroke();}
+        emo(FURN[k][0],bx+15,by+16,17); cx.fillStyle="#5a3a1a"; cx.font="bold 8px Trebuchet MS,sans-serif"; cx.textAlign="left"; cx.textBaseline="middle"; cx.fillText(FURN[k][1],bx+27,by+16); }
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); cx.fillStyle="rgba(20,14,6,.5)"; cx.fillRect(0,0,W,460); text("🛋️ ROOM FURNISHED!",W/2,210,22,"#ffe27a"); text("Looks so cozy! 🪙 +5",W/2,244,15,"#fff"); btn("▶ BACK TO HOUSE",290); }
+    },
+    down:function(){
+      if(g.over){ if(ptr.y>290-8&&ptr.y<290+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      if(ptr.y>=462){ for(var k=0;k<FURN.length;k++){ var col=k%5,row=Math.floor(k/5); var bx=6+col*86, by=468+row*36; if(ptr.x>bx&&ptr.x<bx+82&&ptr.y>by&&ptr.y<by+32){ g.pick=(g.pick===k?-1:k); beep(600,.05); return; } } return; }
+      if(ptr.y>100&&ptr.y<460){ if(g.pick>=0){ g.items.push({f:g.pick,x:ptr.x,y:Math.max(120,ptr.y),s:32}); g.sel=g.items.length-1; ding(); star(ptr.x,ptr.y,4); if(g.items.length>=FURN_NEED&&!g.over){ g.over=true; coins+=5; save(); confettiBurst(); label("Room furnished! 🪙 "+coins); } return; }
+        var best=-1,bd=30; for(var i=0;i<g.items.length;i++){ var d=Math.hypot(g.items[i].x-ptr.x,g.items[i].y-ptr.y); if(d<bd){bd=d;best=i;} } g.sel=best; if(best>=0)g.drag=true; } },
+    drag:function(){ if(g.drag&&g.sel>=0&&g.pick<0){ g.items[g.sel].x=Math.max(16,Math.min(W-16,ptr.x)); g.items[g.sel].y=Math.max(120,Math.min(456,ptr.y)); } },
+    up:function(){ g.drag=false; } };
+
+  // ================= SWIMMING POOL (Set4 idea 82) =================
+  var POOLR={x:W/2,y:330,w:300,h:150};
+  S.pool={ init:function(){ g={phase:"dig", dig:0, water:0, ladder:false, floatie:false, hold:null, hx:0,hy:0, over:false}; label("Tap the yard to DIG the pool hole! ⛏️"); },
+    render:function(){
+      var sky=cx.createLinearGradient(0,0,0,180); sky.addColorStop(0,"#bfe6ff"); sky.addColorStop(1,"#e8f7ff"); cx.fillStyle=sky; cx.fillRect(0,0,W,180);
+      cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(W-54,54,20,0,7); cx.fill();
+      cx.fillStyle="#8fd07b"; cx.fillRect(0,180,W,H-180);
+      var px=POOLR.x-POOLR.w/2, py=POOLR.y-POOLR.h/2;
+      if(g.dig>0){ cx.fillStyle="#6a4a2a"; rr(px,py,POOLR.w,POOLR.h,16); cx.fill(); cx.fillStyle="#4a3420"; rr(px+10,py+10,POOLR.w-20,POOLR.h-20,12); cx.fill(); }
+      else { cx.setLineDash([8,6]); cx.strokeStyle="#7a5a34"; cx.lineWidth=3; rr(px,py,POOLR.w,POOLR.h,16); cx.stroke(); cx.setLineDash([]); }
+      if(g.phase!=="dig"){ cx.strokeStyle="#e0e0e8"; cx.lineWidth=6; rr(px-4,py-4,POOLR.w+8,POOLR.h+8,18); cx.stroke(); }
+      if(g.water>0){ var wl=(POOLR.h-16)*(g.water/8); cx.fillStyle="rgba(70,170,240,.85)"; rr(px+8,py+POOLR.h-8-wl,POOLR.w-16,wl,10); cx.fill();
+        cx.strokeStyle="rgba(255,255,255,.5)"; cx.lineWidth=2; for(var wv=0;wv<3;wv++){ var wy=py+POOLR.h-8-wl+8+wv*12; cx.beginPath(); for(var xx=px+12;xx<px+POOLR.w-12;xx+=12){ cx.lineTo(xx, wy+Math.sin((xx+t*2)/16)*2);} cx.stroke(); } }
+      if(g.ladder) emo("🪜",px+POOLR.w-22,py-4,30);
+      if(g.floatie) emo("🛟",POOLR.x,POOLR.y+6,40);
+      coinHUD();
+      text("🏊 BUILD THE SWIMMING POOL",W/2,44,15,"#2a5a8a");
+      if(g.phase==="dig"){ cx.fillStyle="#00000018"; rr(W/2-70,70,140,10,5); cx.fill(); cx.fillStyle="#8a5a2a"; rr(W/2-70,70,140*(g.dig/8),10,5); cx.fill(); text("⛏️ Tap the hole to dig! "+g.dig+"/8",W/2,92,12,"#5a3a1a"); }
+      else if(g.phase==="fill"){ cx.fillStyle="#00000018"; rr(W/2-70,70,140,10,5); cx.fill(); cx.fillStyle="#4aa0f0"; rr(W/2-70,70,140*(g.water/8),10,5); cx.fill(); text("💧 Tap to fill with water! "+g.water+"/8",W/2,92,12,"#2a5a8a"); emo("🚿",W/2,H-42,30); }
+      else if(g.phase==="deco"&&!g.over){ text("Drag the 🪜 ladder & 🛟 floatie into the pool!",W/2,92,12,"#2a5a8a");
+        if(!g.hold){ if(!g.ladder)emo("🪜",W*0.3,H-42,30); if(!g.floatie)emo("🛟",W*0.7,H-42,34); } }
+      if(g.hold){ emo(g.hold,g.hx,g.hy,g.hold==="🛟"?34:30); }
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("🏊 POOL DONE!",W/2,140,24,"#1a6ab0"); text("Time to swim! 🪙 +5",W/2,172,15,"#2a5a8a"); btn("▶ BACK TO HOUSE",230); }
+    },
+    down:function(){
+      if(g.over){ if(ptr.y>230-8&&ptr.y<230+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      var px=POOLR.x-POOLR.w/2, py=POOLR.y-POOLR.h/2, inPool=(ptr.x>px&&ptr.x<px+POOLR.w&&ptr.y>py&&ptr.y<py+POOLR.h);
+      if(g.phase==="dig"){ if(inPool){ g.dig++; drop(ptr.x,ptr.y,"#7a5a34",6,true); beep(300+g.dig*10,.05); if(g.dig>=8){ g.phase="fill"; label("Now fill it with water! 💧"); } } return; }
+      if(g.phase==="fill"){ g.water++; drop(POOLR.x+(Math.random()*80-40),py+20,"#bfe4ff",5); beep(500+g.water*20,.05,"sine"); if(g.water>=8){ g.phase="deco"; label("Add a ladder and a floatie! 🪜🛟"); } return; }
+      if(g.phase==="deco"){ if(!g.ladder && Math.abs(ptr.x-W*0.3)<44 && ptr.y>H-72){ g.hold="🪜"; g.hx=ptr.x; g.hy=ptr.y; return; } if(!g.floatie && Math.abs(ptr.x-W*0.7)<44 && ptr.y>H-72){ g.hold="🛟"; g.hx=ptr.x; g.hy=ptr.y; return; } } },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){ if(g.hold){ var px=POOLR.x-POOLR.w/2, py=POOLR.y-POOLR.h/2, inPool=(g.hx>px-24&&g.hx<px+POOLR.w+24&&g.hy>py-24&&g.hy<py+POOLR.h+24);
+      if(inPool){ if(g.hold==="🪜")g.ladder=true; else g.floatie=true; ding(); star(g.hx,g.hy,5); if(g.ladder&&g.floatie&&!g.over){ g.over=true; coins+=5; save(); confettiBurst(); label("Pool done! 🪙 "+coins); } } else beep(300,.08); g.hold=null; } } };
+
+  // ================= VEGGIE GARDEN (Set4 idea 83) =================
+  var GSPOTS=[{x:96,y:252},{x:220,y:252},{x:344,y:252},{x:96,y:360},{x:220,y:360},{x:344,y:360}];
+  var GVEG=["🥕","🍅","🌽","🥬","🥔","🍓"];
+  S.garden={ init:function(){ g={filled:[false,false,false,false,false,false], done:0, over:false}; label("Tap the soil to plant each veggie! 🥕"); },
+    render:function(){
+      var sky=cx.createLinearGradient(0,0,0,170); sky.addColorStop(0,"#bfe6ff"); sky.addColorStop(1,"#eafbf0"); cx.fillStyle=sky; cx.fillRect(0,0,W,170);
+      cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(54,56,18,0,7); cx.fill();
+      cx.fillStyle="#8fd07b"; cx.fillRect(0,170,W,H-170);
+      cx.fillStyle="#7a4a2a"; rr(40,208,W-80,224,14); cx.fill(); cx.fillStyle="#6a3f22"; for(var rw=0;rw<3;rw++){ cx.fillRect(50,224+rw*68,W-100,7); }
+      for(var i=0;i<6;i++){ if(g.filled[i]){ emo(GVEG[i],GSPOTS[i].x,GSPOTS[i].y,34); } else if(!g.over){ var nx=(i===g.done); cx.setLineDash([5,5]); cx.strokeStyle=nx?"#ffce3f":"#c9a06a"; cx.lineWidth=nx?3:2; cx.beginPath(); cx.arc(GSPOTS[i].x,GSPOTS[i].y,20,0,7); cx.stroke(); cx.setLineDash([]); if(nx){ cx.globalAlpha=0.4+Math.sin(t*0.2)*0.2; emo(GVEG[i],GSPOTS[i].x,GSPOTS[i].y,24); cx.globalAlpha=1; } } }
+      coinHUD(); text("🥕 PLANT THE VEGGIE GARDEN",W/2,44,15,"#3a6a2a");
+      if(!g.over)text("👆 Tap the glowing soil to plant!",W/2,H-40,13,"#3a5a2a");
+      cx.fillStyle="#00000018"; rr(W/2-70,H-16,140,10,5); cx.fill(); cx.fillStyle="#5aaa5a"; rr(W/2-70,H-16,140*(g.done/6),10,5); cx.fill();
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("🥕 GARDEN PLANTED!",W/2,H*0.5,20,"#2a6a2a"); text("Fresh veggies for the family! 🪙 +5",W/2,H*0.56,13,"#2a5a2a"); btn("▶ BACK TO HOUSE",H*0.64); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.64-8&&ptr.y<H*0.64+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      var i=g.done; if(i<6){ var sp=GSPOTS[i]; if(Math.hypot(ptr.x-sp.x,ptr.y-sp.y)<42){ g.filled[i]=true; g.done++; ding(); star(sp.x,sp.y,5); if(g.done>=6){ g.over=true; coins+=5; save(); confettiBurst(); label("Garden planted! 🪙 "+coins); } } else beep(300,.06); } },
+    tap:function(){} };
+
+  // ================= PLAYGROUND (Set4) =================
+  var PGSPOTS=[{x:96,y:250},{x:220,y:242},{x:346,y:250},{x:120,y:360},{x:250,y:360},{x:360,y:360}];
+  var PGIT=["🛝","🎠","🏖️","🪜","🌳","⚽"];
+  var PGNAME=["Slide","Merry-Go-Round","Sandbox","Climber","Shade Tree","Ball"];
+  S.playground={ init:function(){ g={filled:[false,false,false,false,false,false], done:0, over:false}; label("Tap the spots to build the playground! 🛝"); },
+    render:function(){
+      var sky=cx.createLinearGradient(0,0,0,180); sky.addColorStop(0,"#bfe6ff"); sky.addColorStop(1,"#eafbf0"); cx.fillStyle=sky; cx.fillRect(0,0,W,180);
+      cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(W-54,56,18,0,7); cx.fill();
+      cx.fillStyle="#8fd07b"; cx.fillRect(0,180,W,H-180);
+      cx.fillStyle="#f0dca8"; rr(40,208,W-80,228,20); cx.fill();
+      for(var i=0;i<6;i++){ if(g.filled[i]){ emo(PGIT[i],PGSPOTS[i].x,PGSPOTS[i].y,36); } else if(!g.over){ var nx=(i===g.done); cx.setLineDash([5,5]); cx.strokeStyle=nx?"#ffce3f":"#c9a86a"; cx.lineWidth=nx?3:2; cx.beginPath(); cx.arc(PGSPOTS[i].x,PGSPOTS[i].y,22,0,7); cx.stroke(); cx.setLineDash([]); if(nx){ cx.globalAlpha=0.4+Math.sin(t*0.2)*0.2; emo(PGIT[i],PGSPOTS[i].x,PGSPOTS[i].y,26); cx.globalAlpha=1; } text(PGNAME[i],PGSPOTS[i].x,PGSPOTS[i].y+32,9,"#8a6a3a"); } }
+      coinHUD(); text("🛝 BUILD THE PLAYGROUND",W/2,44,15,"#7a5a1a");
+      if(!g.over)text("👆 Tap the glowing spot to place it!",W/2,H-40,13,"#5a4a1a");
+      cx.fillStyle="#00000018"; rr(W/2-70,H-16,140,10,5); cx.fill(); cx.fillStyle="#e0a050"; rr(W/2-70,H-16,140*(g.done/6),10,5); cx.fill();
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("🛝 PLAYGROUND DONE!",W/2,H*0.5,20,"#7a5a1a"); text("Time to play! 🪙 +5",W/2,H*0.56,13,"#5a4a1a"); btn("▶ BACK TO HOUSE",H*0.64); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.64-8&&ptr.y<H*0.64+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      var i=g.done; if(i<6){ var sp=PGSPOTS[i]; if(Math.hypot(ptr.x-sp.x,ptr.y-sp.y)<44){ g.filled[i]=true; g.done++; ding(); star(sp.x,sp.y,5); if(g.done>=6){ g.over=true; coins+=5; save(); confettiBurst(); label("Playground done! 🪙 "+coins); } } else beep(300,.06); } },
+    tap:function(){} };
+
+  // ================= PLACE-JOB FACTORY (Set4: pantry #11, office #12, guest #14, pet room #15) =================
+  var SROOM=[{x:96,y:230},{x:220,y:230},{x:344,y:230},{x:96,y:350},{x:220,y:350},{x:344,y:350}];
+  function roomBG(a,b,fl){ var wg=cx.createLinearGradient(0,0,0,300); wg.addColorStop(0,a); wg.addColorStop(1,b); cx.fillStyle=wg; cx.fillRect(0,0,W,300); cx.fillStyle=fl; cx.fillRect(0,300,W,H-300); cx.fillStyle="#b98a54"; cx.fillRect(0,296,W,6); }
+  function drawAvatar(x,y,face,ph,moving){ cx.save(); cx.translate(x,y); cx.fillStyle="rgba(0,0,0,.15)"; cx.beginPath(); cx.ellipse(0,20,12,5,0,0,7); cx.fill(); cx.scale(face||1,1); var sw=moving?Math.sin(ph)*5:0;
+    cx.strokeStyle="#3a2a5a"; cx.lineWidth=5; cx.lineCap="round"; cx.beginPath(); cx.moveTo(-4,7);cx.lineTo(-4+sw,19); cx.moveTo(4,7);cx.lineTo(4-sw,19); cx.stroke();
+    cx.fillStyle="#e06a9a"; rr(-9,-11,18,20,5); cx.fill(); cx.strokeStyle="#e06a9a"; cx.lineWidth=4; cx.beginPath(); cx.moveTo(-8,-6);cx.lineTo(-12,3); cx.moveTo(8,-6);cx.lineTo(12,3); cx.stroke();
+    cx.fillStyle="#f6c9a0"; cx.beginPath(); cx.arc(0,-19,8,0,7); cx.fill();
+    cx.fillStyle="#5a3a2a"; cx.beginPath(); cx.arc(0,-22,8,Math.PI,2*Math.PI); cx.fill();
+    cx.fillStyle="#222"; cx.beginPath(); cx.arc(2,-18,1.3,0,7); cx.fill(); cx.restore(); }
+  function placeJob(o){ var N=o.spots.length;
+    var STEPS=[
+      {t:"Pick the WALLS 🎨", set:"wall", opts:[["Cream","#f4e4c8"],["Sky Blue","#cfe0f2"],["Pink","#ffd8ea"]]},
+      {t:"Pick the FLOOR 🪵", set:"floor", opts:[["Wood","#c99060"],["Grey","#9aa8b8"],["Warm","#e6b455"]]},
+      {t:"Pick a RUG 🟫", set:"rug", opts:[["Red","#e0596a"],["Blue","#5a9ae0"],["Green","#5ac06a"]]},
+      {t:"Pick the WINDOW 🪟", set:"window", opts:[["Red","#e0596a"],["Blue","#5a9ae0"],["Yellow","#ffce4a"]]},
+      {t:"Pick FURNITURE 🛋️", set:"furn", opts:[["Sofa","🛋️"],["Chairs","🪑"],["Cabinet","🗄️"]]}
+    ];
+    var PED=[{x:88,y:172},{x:220,y:172},{x:352,y:172}];
+    function drawRoom(){ cx.fillStyle=g.picks.wall; cx.fillRect(0,0,W,300); cx.fillStyle="rgba(0,0,0,.05)"; cx.fillRect(0,240,W,60); cx.fillStyle=g.picks.floor; cx.fillRect(0,300,W,H-300); cx.fillStyle="#b98a54"; cx.fillRect(0,296,W,6);
+      cx.fillStyle="#bfe6ff"; rr(W-116,58,82,52,6); cx.fill(); cx.strokeStyle="#8a7a58"; cx.lineWidth=4; rr(W-116,58,82,52,6); cx.stroke();
+      if(g.picks.window){ cx.fillStyle=g.picks.window; rr(W-120,52,16,64,3); cx.fill(); rr(W-46,52,16,64,3); cx.fill(); cx.fillStyle=g.picks.window; rr(W-120,50,84,10,3); cx.fill(); }
+      if(g.picks.furn){ emo(g.picks.furn,W/2,266,42); }
+      if(g.picks.rug){ cx.fillStyle=g.picks.rug; rr(W/2-92,332,184,66,12); cx.fill(); cx.strokeStyle="rgba(255,255,255,.4)"; cx.lineWidth=3; rr(W/2-92,332,184,66,12); cx.stroke(); }
+      for(var i=0;i<N;i++){ emo(o.items[i], o.spots[i].x, Math.max(250,o.spots[i].y), 32); } }
+    return {
+      init:function(){ g={px:W/2,py:330,face:1,ph:0,moving:false,step:0,picks:{wall:"#f4e4c8",floor:"#c99060",rug:null,window:null,furn:null},over:false,joy:{active:false,bx:70,by:H-70,kx:70,ky:H-70}}; label(o.hint||"Walk to a choice — then keep going! 🕹️"); },
+      update:function(){ if(g.over)return; var jj=g.joy,dx=0,dy=0; if(jj.active){ dx=jj.kx-jj.bx; dy=jj.ky-jj.by; var d=Math.hypot(dx,dy); if(d>5){dx/=d;dy/=d;}else{dx=0;dy=0;} }
+        g.px+=dx*3.1; g.py+=dy*3.1; g.px=Math.max(30,Math.min(W-30,g.px)); g.py=Math.max(120,Math.min(300,g.py)); g.moving=(dx!==0||dy!==0); if(g.moving){ g.ph+=0.3; if(dx<-.2)g.face=-1; else if(dx>.2)g.face=1; }
+        var st=STEPS[g.step]; for(var i=0;i<3;i++){ var pp=PED[i]; if(Math.abs(g.px-pp.x)<36&&Math.abs(g.py-pp.y)<48){ g.picks[st.set]=st.opts[i][1]; g.step++; ding(); star(pp.x,pp.y,6); g.px=W/2; g.py=330; if(g.step>=STEPS.length){ g.over=true; coins+=5; save(); confettiBurst(); label(o.doneMsg+" 🪙 "+coins); } } } },
+      render:function(){ drawRoom();
+        coinHUD(); text(o.title,W/2,44,15,o.tcol||"#3a2a10");
+        if(!g.over){ var st=STEPS[g.step];
+          for(var i=0;i<3;i++){ var pp=PED[i], op=st.opts[i]; var near=(Math.abs(g.px-pp.x)<40&&Math.abs(g.py-pp.y)<50);
+            cx.fillStyle="#00000018"; cx.beginPath(); cx.ellipse(pp.x,pp.y+38,30,8,0,0,7); cx.fill();
+            cx.fillStyle="#fff"; rr(pp.x-32,pp.y-30,64,54,10); cx.fill(); if(op[1].charAt(0)==="#"){ cx.fillStyle=op[1]; rr(pp.x-24,pp.y-22,48,30,6); cx.fill(); } else { emo(op[1],pp.x,pp.y-8,30); } cx.strokeStyle=near?"#e0670e":"#8a6a44"; cx.lineWidth=near?4:2; rr(pp.x-32,pp.y-30,64,54,10); cx.stroke();
+            text(op[0],pp.x,pp.y+34,11,near?"#e0670e":"#5a3a10"); if(near&&Math.floor(t/12)%2===0)text("▼ walk!",pp.x,pp.y-42,11,"#e0670e"); }
+          drawAvatar(g.px,g.py,g.face,g.ph,g.moving);
+          var j=g.joy; cx.fillStyle="rgba(0,0,0,.16)"; cx.beginPath(); cx.arc(j.bx,j.by,42,0,7); cx.fill(); cx.fillStyle="rgba(255,255,255,.65)"; cx.beginPath(); cx.arc(j.kx,j.ky,20,0,7); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; cx.stroke(); if(!j.active)text("🕹️ walk",j.bx,j.by-54,11,"#5a3a1a");
+          for(var d2=0;d2<STEPS.length;d2++){ cx.fillStyle=d2<g.step?"#5ab06a":(d2===g.step?"#ffce3f":"#c9b6a0"); cx.beginPath(); cx.arc(W/2-STEPS.length*8+d2*16,H-138,5,0,7); cx.fill(); }
+          text("Step "+(g.step+1)+" of "+STEPS.length+" — "+st.t,W/2,H-118,13,"#5a3a1a");
+        } else { drawAvatar(g.px,g.py,g.face,0,false); if(t%50===0)confettiBurst(); cx.fillStyle="rgba(20,14,6,.42)"; cx.fillRect(0,0,W,300); text(o.doneMsg,W/2,150,22,"#ffe27a"); text(o.doneSub||"All done!",W/2,182,13,"#fff"); btn("▶ BACK TO HOUSE",H*0.64); }
+        renderFX();
+      },
+      down:function(){ if(g.over){ if(ptr.y>H*0.64-8&&ptr.y<H*0.64+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+        var j=g.joy; if(ptr.y>H*0.6 || ptr.x<W*0.4){ j.active=true; j.bx=ptr.x; j.by=ptr.y; j.kx=ptr.x; j.ky=ptr.y; } },
+      drag:function(){ var j=g.joy; if(j.active){ var dx=ptr.x-j.bx, dy=ptr.y-j.by, d=Math.hypot(dx,dy), m=Math.min(d,42); if(d>0){ j.kx=j.bx+dx/d*m; j.ky=j.by+dy/d*m; } } },
+      up:function(){ g.joy.active=false; g.joy.kx=g.joy.bx; g.joy.ky=g.joy.by; },
+      tap:function(){} };
+  }
+  S.pantry=placeJob({ hint:"Drag snacks onto the pantry shelves! 🍷", title:"🍷 STOCK THE SNACK PANTRY", bg:function(){ roomBG("#f0e2c8","#e6d4b0","#c9a06a"); cx.fillStyle="#8a6a44"; cx.fillRect(56,258,W-112,9); cx.fillRect(56,378,W-112,9); }, spots:SROOM, items:["🍷","🧀","🍪","🥨","🍫","🍿"], doneMsg:"🍷 PANTRY STOCKED!", doneSub:"Snacks for everyone! 🪙 +5", tcol:"#8a5a1a", dcol:"#8a5a1a" });
+  S.office=placeJob({ hint:"Set up the home office! 💻", title:"💻 SET UP THE HOME OFFICE", bg:function(){ roomBG("#dfeaf5","#cfe0f0","#c9a06a"); }, spots:SROOM, items:["🖥️","💻","🪑","📚","🪴","💡"], names:["Monitor","Laptop","Chair","Books","Plant","Lamp"], doneMsg:"💻 OFFICE READY!", doneSub:"Time to work! 🪙 +5", tcol:"#2a5a8a", dcol:"#2a5a8a" });
+  S.guest=placeJob({ hint:"Make up the guest room! 🛏️", title:"🛏️ MAKE THE GUEST ROOM", bg:function(){ roomBG("#f0e6f5","#e6d8f0","#c9a06a"); }, spots:SROOM, items:["🛏️","🛋️","💡","🟫","🪴","🖼️"], names:["Bed","Sofa","Lamp","Rug","Plant","Art"], doneMsg:"🛏️ GUEST ROOM DONE!", doneSub:"Ready for visitors! 🪙 +5", tcol:"#6a3a8a", dcol:"#6a3a8a" });
+  S.petroom=placeJob({ hint:"Set up the pet room for Arff & Meow! 🐾", title:"🐾 SET UP THE PET ROOM", bg:function(){ roomBG("#fdeecf","#f5e0bc","#c9a06a"); }, spots:SROOM, items:["🛏️","🏰","🥣","🎾","🦴","🐾"], names:["Dog Bed","Cat Tower","Food Bowl","Toy","Bone","Mat"], doneMsg:"🐾 PET ROOM DONE!", doneSub:"Arff & Meow love it! 🪙 +5", tcol:"#a05a1a", dcol:"#a05a1a", overDraw:function(){ drawMaltipoo(120,456,1,1.7); emo("🐈",320,470,36); } });
+
+  // ================= STRING LIGHTS (Set4 idea 95) =================
+  S.stringlights={ init:function(){ g={bulbs:0, need:8, over:false}; label("Tap to hang glowing string lights! ✨"); },
+    render:function(){
+      var dusk=Math.min(1,g.bulbs/g.need);
+      var r=Math.round(191+(40-191)*dusk), gg=Math.round(230+(30-230)*dusk), bb=Math.round(255+(70-255)*dusk);
+      cx.fillStyle="rgb("+r+","+gg+","+bb+")"; cx.fillRect(0,0,W,H*0.6);
+      cx.fillStyle= dusk>0.5?"#2a5a2a":"#8fd07b"; cx.fillRect(0,H*0.6,W,H);
+      cx.fillStyle="#7a5a34"; cx.fillRect(30,120,10,H*0.6-120); cx.fillRect(W-40,120,10,H*0.6-120);
+      cx.strokeStyle="#3a2a1a"; cx.lineWidth=2; cx.beginPath(); cx.moveTo(35,132); cx.quadraticCurveTo(W/2,214,W-35,132); cx.stroke();
+      var cols=["#ffd23f","#ff6a8a","#5ad0a0","#5aa0ff","#c77aff"];
+      for(var i=0;i<g.bulbs;i++){ var pp=(i+1)/(g.need+1); var bx=35+pp*(W-70); var by=132+Math.sin(pp*Math.PI)*80; var on=(g.over||dusk>0.5);
+        if(on){ cx.globalAlpha=0.35; cx.fillStyle=cols[i%5]; cx.beginPath(); cx.arc(bx,by+6,14,0,7); cx.fill(); cx.globalAlpha=1; }
+        cx.fillStyle= on&&Math.floor(t/10+i)%2? "#fff8d0": cols[i%5]; cx.beginPath(); cx.arc(bx,by+6,6,0,7); cx.fill(); }
+      coinHUD(); text("✨ HANG THE STRING LIGHTS",W/2,44,15,dusk>0.5?"#fff":"#5a4a1a");
+      if(!g.over){ text("👆 Tap to hang a light! "+g.bulbs+"/"+g.need,W/2,H*0.6+30,13,"#eafbea");
+        cx.fillStyle="#00000028"; rr(W/2-70,H*0.6+44,140,10,5); cx.fill(); cx.fillStyle="#ffd23f"; rr(W/2-70,H*0.6+44,140*(g.bulbs/g.need),10,5); cx.fill(); }
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("✨ LIGHTS ON!",W/2,H*0.72,22,"#ffe27a"); text("So cozy at night! 🪙 +5",W/2,H*0.78,13,"#fff"); btn("▶ BACK TO HOUSE",H*0.84); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.84-8&&ptr.y<H*0.84+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      g.bulbs++; ding(); star(35+(g.bulbs/(g.need+1))*(W-70),190,4); if(g.bulbs>=g.need){ g.over=true; coins+=5; save(); confettiBurst(); label("Lights on! 🪙 "+coins); } },
+    tap:function(){} };
+
+  // ================= ARFF DIGS (Set4 idea 111) =================
+  S.arffdig={ init:function(){ g={holes:[], filled:0, need:6, spawnT:20, over:false, ax:W/2, atx:W/2}; label("Uh oh! Arff is digging! Tap the holes to fill them 🐕"); },
+    update:function(){ if(g.over)return; g.spawnT++; if(g.spawnT>=44 && g.holes.length<4){ g.spawnT=0; var hx=70+Math.random()*(W-140), hy=252+Math.random()*160; g.holes.push({x:hx,y:hy}); g.atx=hx; drop(hx,hy,"#7a5a34",5,true); }
+      g.ax+=(g.atx-g.ax)*0.08; if(t%7===0 && g.holes.length)drop(g.ax+18,362,"#7a5a34",2,true); },
+    render:function(){
+      var sky=cx.createLinearGradient(0,0,0,170); sky.addColorStop(0,"#bfe6ff"); sky.addColorStop(1,"#eafbf0"); cx.fillStyle=sky; cx.fillRect(0,0,W,170);
+      cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(W-54,54,18,0,7); cx.fill();
+      cx.fillStyle="#8fd07b"; cx.fillRect(0,170,W,H-170);
+      cx.fillStyle="#7a4a2a"; rr(40,222,W-80,206,14); cx.fill();
+      g.holes.forEach(function(h){ cx.fillStyle="#3a2416"; cx.beginPath(); cx.ellipse(h.x,h.y,20,12,0,0,7); cx.fill(); cx.fillStyle="#5a3a20"; cx.beginPath(); cx.ellipse(h.x+18,h.y+5,8,5,0,0,7); cx.fill(); });
+      drawMaltipoo(g.ax,352,1,1.5);
+      coinHUD(); text("🐕 ARFF IS DIGGING!",W/2,44,15,"#7a4a1a"); if(!g.over)text("Tap the holes to fill them!",W/2,H-40,13,"#5a4a1a");
+      cx.fillStyle="#00000018"; rr(W/2-70,H-16,140,10,5); cx.fill(); cx.fillStyle="#8a5a2a"; rr(W/2-70,H-16,140*(g.filled/g.need),10,5); cx.fill();
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("🐕 ALL FILLED IN!",W/2,H*0.5,20,"#2a6a2a"); text("Good girl, Arff! 🪙 +5",W/2,H*0.56,13,"#2a5a2a"); btn("▶ BACK TO HOUSE",H*0.64); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>H*0.64-8&&ptr.y<H*0.64+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      for(var i=g.holes.length-1;i>=0;i--){ var h=g.holes[i]; if(Math.hypot(ptr.x-h.x,ptr.y-h.y)<30){ g.holes.splice(i,1); g.filled++; ding(); drop(h.x,h.y,"#8a6a44",8,true); if(g.filled>=g.need){ g.over=true; coins+=5; save(); confettiBurst(); label("All filled! Good girl Arff 🪙 "+coins); } return; } } },
+    tap:function(){} };
+
+  // ================= SPA BATH (Set4 idea 19) =================
+  S.spa=placeJob({ hint:"Set up the relaxing spa bathroom! 🛁", title:"🛁 BUILD THE SPA BATHROOM", bg:function(){ roomBG("#dff0f2","#cfe8ee","#bfe0e6"); cx.strokeStyle="rgba(255,255,255,.5)"; cx.lineWidth=1; for(var i2=0;i2<W;i2+=44){cx.beginPath();cx.moveTo(i2,300);cx.lineTo(i2,H);cx.stroke();} for(var j2=300;j2<H;j2+=30){cx.beginPath();cx.moveTo(0,j2);cx.lineTo(W,j2);cx.stroke();} }, spots:SROOM, items:["🛁","🫧","🕯️","🪴","🧴","🦆"], names:["Big Tub","Bubbles","Candle","Plant","Soap","Duck"], doneMsg:"🛁 SPA READY!", doneSub:"Ahh, so relaxing! 🪙 +5", tcol:"#2a7a8a", dcol:"#2a7a8a" });
+
+  // ================= BRUSH MEOW (Set4 idea 107) =================
+  S.brushmeow={ init:function(){ g={fluff:0, need:16, brushing:false, bx:W/2, by:H-56, over:false}; label("Drag the brush over Meow to groom her! 🐈✨"); },
+    render:function(){
+      var wg=cx.createLinearGradient(0,0,0,300); wg.addColorStop(0,"#fdeecf"); wg.addColorStop(1,"#f5e0bc"); cx.fillStyle=wg; cx.fillRect(0,0,W,300); cx.fillStyle="#c9a06a"; cx.fillRect(0,300,W,H-300); cx.fillStyle="#b98a54"; cx.fillRect(0,296,W,6);
+      cx.fillStyle="#d98a9a"; rr(W/2-90,320,180,40,16); cx.fill();
+      drawMeowBig(W/2,296);
+      if(g.fluff>0){ for(var i=0;i<Math.min(6,Math.floor(g.fluff/3));i++){ emo("✨",W/2-70+i*28,220-Math.sin(t*0.1+i)*6,16); } }
+      coinHUD(); text("🐈 BRUSH & GROOM MEOW",W/2,44,15,"#a05a2a");
+      if(!g.over){ emo("🪮",g.brushing?g.bx:W/2,g.brushing?g.by:H-52,30); if(!g.brushing)text("drag the brush over Meow",W/2,H-78,12,"#7a5a3a"); }
+      cx.fillStyle="#00000018"; rr(W/2-70,H-16,140,10,5); cx.fill(); cx.fillStyle="#e0a050"; rr(W/2-70,H-16,140*(g.fluff/g.need),10,5); cx.fill();
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("🐈 SO FLUFFY!",W/2,150,22,"#a05a2a"); text("Meow feels great! 🪙 +5",W/2,182,13,"#7a5a2a"); btn("▶ BACK TO HOUSE",240); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>240-8&&ptr.y<240+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; } g.brushing=true; g.bx=ptr.x; g.by=ptr.y; },
+    drag:function(){ if(g.brushing){ g.bx=ptr.x; g.by=ptr.y; if(Math.hypot(ptr.x-W/2,ptr.y-256)<90 && t%3===0){ g.fluff++; star(ptr.x,ptr.y,3); drop(ptr.x,ptr.y,"#f2d98a",2,true); if(g.fluff>=g.need&&!g.over){ g.over=true; coins+=5; save(); confettiBurst(); label("Meow is fluffy! 🪙 "+coins); } } } },
+    up:function(){ g.brushing=false; } };
+
+  // ================= WINTER SNOW / SNOWMAN (Set4 idea 181) =================
+  S.winter={ init:function(){ g={balls:0, need:3, face:false, over:false, snow:[]}; for(var i=0;i<46;i++)g.snow.push({x:Math.random()*W,y:Math.random()*H,s:0.6+Math.random()*1.6,r:1.5+Math.random()*2.5}); label("Winter! Tap to stack a snowman ⛄"); },
+    update:function(){ g.snow.forEach(function(f){ f.y+=f.s; f.x+=Math.sin((f.y+f.x)/50)*0.4; if(f.y>H){f.y=-5;f.x=Math.random()*W;} }); },
+    render:function(){
+      var sky=cx.createLinearGradient(0,0,0,H); sky.addColorStop(0,"#9db4d0"); sky.addColorStop(1,"#c9d8e8"); cx.fillStyle=sky; cx.fillRect(0,0,W,H);
+      cx.fillStyle="#f2f6fb"; cx.fillRect(0,H-140,W,140);
+      // little house behind
+      cx.fillStyle="#e8dcc8"; cx.fillRect(60,H-260,120,120); cx.fillStyle="#b8584a"; cx.beginPath(); cx.moveTo(48,H-260); cx.lineTo(120,H-312); cx.lineTo(192,H-260); cx.closePath(); cx.fill(); cx.fillStyle="#fff"; cx.fillRect(48,H-266,144,8);
+      var gy=H-150, cxm=W/2+70;
+      var by0=gy-42, by1=by0-42-26, by2=by1-26-20;
+      if(g.balls>=1){ cx.fillStyle="#fff"; cx.strokeStyle="#dfe8f0"; cx.lineWidth=2; cx.beginPath(); cx.arc(cxm,by0,42,0,7); cx.fill(); cx.stroke(); }
+      if(g.balls>=2){ cx.beginPath(); cx.arc(cxm,by1,28,0,7); cx.fill(); cx.stroke(); if(g.face){ cx.fillStyle="#2a2a30"; cx.beginPath(); cx.arc(cxm,by1-4,3,0,7); cx.arc(cxm,by1+8,3,0,7); cx.fill(); } }
+      if(g.balls>=3){ cx.fillStyle="#fff"; cx.beginPath(); cx.arc(cxm,by2,21,0,7); cx.fill(); cx.stroke();
+        if(g.face){ cx.fillStyle="#2a2a30"; cx.beginPath(); cx.arc(cxm-7,by2-4,2.5,0,7); cx.arc(cxm+7,by2-4,2.5,0,7); cx.fill(); cx.fillStyle="#ff8a3a"; cx.beginPath(); cx.moveTo(cxm,by2+2); cx.lineTo(cxm+16,by2+5); cx.lineTo(cxm,by2+7); cx.closePath(); cx.fill(); cx.strokeStyle="#5a3a1a"; cx.lineWidth=4; cx.beginPath(); cx.moveTo(cxm-21,by1-6); cx.lineTo(cxm-44,by1-14); cx.moveTo(cxm+21,by1-6); cx.lineTo(cxm+44,by1-14); cx.stroke(); cx.fillStyle="#2a2a30"; cx.fillRect(cxm-16,by2-30,32,10); cx.fillRect(cxm-11,by2-44,22,16); } }
+      g.snow.forEach(function(f){ cx.fillStyle="rgba(255,255,255,.9)"; cx.beginPath(); cx.arc(f.x,f.y,f.r,0,7); cx.fill(); });
+      coinHUD(); text("⛄ BUILD A SNOWMAN",W/2,44,15,"#2a4a7a");
+      if(!g.over){ text(g.balls<3?("👆 Tap to add a snowball! "+g.balls+"/3"):"👆 Tap to add the face!",W/2,H-24,13,"#2a4a7a"); }
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("⛄ SNOWMAN DONE!",W/2,120,22,"#2a4a7a"); text("Happy winter! 🪙 +5",W/2,152,13,"#2a4a7a"); btn("▶ BACK TO HOUSE",200); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>200-8&&ptr.y<200+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      if(g.balls<3){ g.balls++; ding(); star(W/2+70,H-200,5); }
+      else if(!g.face){ g.face=true; ding(); confettiBurst(); g.over=true; coins+=5; save(); label("Snowman built! 🪙 "+coins); } },
+    tap:function(){} };
+
+  // ================= MORE ROOMS (Set4: closet #8, movie #122, birthday #126, fort #127) =================
+  S.closet=placeJob({ hint:"Organize the walk-in closet! 👕", title:"👕 ORGANIZE THE CLOSET", bg:function(){ roomBG("#f2e6f2","#e8d8ea","#c9a06a"); cx.strokeStyle="#8a6a44"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(50,150); cx.lineTo(W-50,150); cx.stroke(); }, spots:SROOM, items:["👕","👗","👖","🧥","👟","🎩"], names:["Shirt","Dress","Pants","Coat","Shoes","Hat"], doneMsg:"👕 CLOSET DONE!", doneSub:"So tidy! 🪙 +5", tcol:"#7a3a8a", dcol:"#7a3a8a" });
+  S.movie=placeJob({ hint:"Set up movie night on the couch! 🎬", title:"🎬 SET UP MOVIE NIGHT", bg:function(){ roomBG("#3a3050","#2a2440","#4a3a30"); }, spots:SROOM, items:["📺","🛋️","🍿","🥤","🎬","🧸"], names:["TV","Couch","Popcorn","Drink","Film","Teddy"], doneMsg:"🎬 MOVIE NIGHT!",doneSub:"Grab the popcorn! 🪙 +5", tcol:"#c9b6f0", dcol:"#c9b6f0" });
+  S.birthday=placeJob({ hint:"Throw a birthday party at home! 🎂", title:"🎂 THROW A BIRTHDAY PARTY", bg:function(){ roomBG("#fff0f4","#ffe0ea","#c9a06a"); }, spots:SROOM, items:["🎂","🎈","🎁","🎉","🕯️","🍰"], names:["Cake","Balloons","Gift","Confetti","Candle","Cupcake"], doneMsg:"🎂 HAPPY BIRTHDAY!", doneSub:"Party time! 🪙 +5", tcol:"#d0407a", dcol:"#d0407a" });
+  S.fort=placeJob({ hint:"Build a cozy blanket fort! 🏕️", title:"🏕️ BUILD A BLANKET FORT", bg:function(){ roomBG("#efe6d2","#e2d4b6","#c9a06a"); }, spots:SROOM, items:["⛺","🛋️","🪑","🛏️","🔦","🧸"], names:["Blanket","Cushion","Chair","Pillow","Flashlight","Teddy"], doneMsg:"🏕️ FORT BUILT!", doneSub:"So cozy inside! 🪙 +5", tcol:"#8a6a2a", dcol:"#8a6a2a" });
+
+  // ================= PANCAKE BREAKFAST (Set4 idea 128) =================
+  function lerpCol(a,b,f){ var A=[(a>>16)&255,(a>>8)&255,a&255],B=[(b>>16)&255,(b>>8)&255,b&255]; return "rgb("+Math.round(A[0]+(B[0]-A[0])*f)+","+Math.round(A[1]+(B[1]-A[1])*f)+","+Math.round(A[2]+(B[2]-A[2])*f)+")"; }
+  S.pancakes={ init:function(){ g={stack:0, need:5, cook:0, over:false, msg:0, perfect:0}; label("Flip the pancakes when they turn golden! 🥞"); },
+    update:function(){ if(g.over)return; if(g.msg>0)g.msg--; g.cook+=0.9; if(g.cook>110)g.cook=110; },
+    render:function(){
+      var wg=cx.createLinearGradient(0,0,0,300); wg.addColorStop(0,"#ffe9c9"); wg.addColorStop(1,"#f5d9a8"); cx.fillStyle=wg; cx.fillRect(0,0,W,300); cx.fillStyle="#c9a06a"; cx.fillRect(0,300,W,H-300); cx.fillStyle="#b98a54"; cx.fillRect(0,296,W,6);
+      // griddle
+      cx.fillStyle="#3a3a40"; cx.beginPath(); cx.ellipse(W/2-30,330,120,44,0,0,7); cx.fill(); cx.fillStyle="#2a2a30"; cx.beginPath(); cx.ellipse(W/2-30,330,108,36,0,0,7); cx.fill();
+      cx.fillStyle="#5a5a60"; cx.fillRect(W/2+80,322,70,12);
+      // cooking pancake
+      var f=Math.min(1,g.cook/100); var col= f<0.6? lerpCol(0xf2dca0,0xd89a40,f/0.6) : lerpCol(0xd89a40,0x9a5a1a,(f-0.6)/0.4);
+      cx.fillStyle=col; cx.beginPath(); cx.ellipse(W/2-30,326,52,20,0,0,7); cx.fill();
+      cx.fillStyle="rgba(0,0,0,.08)"; cx.beginPath(); cx.ellipse(W/2-30,332,52,20,0,0,7); cx.fill();
+      if(f>0.55&&f<0.98){ emo("🧈",W/2-30,318,20); }
+      // stack on plate
+      cx.fillStyle="#eef2f5"; cx.beginPath(); cx.ellipse(W-84,270,54,16,0,0,7); cx.fill();
+      for(var i=0;i<g.stack;i++){ cx.fillStyle="#d89a40"; cx.beginPath(); cx.ellipse(W-84,262-i*11,40,13,0,0,7); cx.fill(); cx.strokeStyle="#b87a20"; cx.lineWidth=1; cx.beginPath(); cx.ellipse(W-84,262-i*11,40,13,0,0,7); cx.stroke(); }
+      if(g.stack>0)emo("🍯",W-84,262-g.stack*11+2,18);
+      coinHUD(); text("🥞 FLIP THE PANCAKES!",W/2,44,15,"#8a5a1a");
+      // cook meter
+      cx.fillStyle="#00000018"; rr(W/2-90,H-70,180,14,7); cx.fill(); cx.fillStyle="#5ad06a"; rr(W/2-90+180*0.55,H-70,180*0.40,14,0); cx.fill(); cx.fillStyle="#e0670e"; rr(W/2-90,H-70,180*Math.min(1,g.cook/100),8,4); cx.fill();
+      text(g.stack+" / "+g.need+" flipped",W/2,H-90,12,"#8a5a1a");
+      if(g.msg>0)text(g.perfect? "PERFECT! ✨":"Flipped!",W/2-30,290,14, g.perfect?"#2a8a3a":"#8a5a1a");
+      if(!g.over)text("👆 TAP to flip when GOLDEN!",W/2,H-42,13,"#8a5a1a");
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("🥞 BREAKFAST READY!",W/2,150,22,"#8a5a1a"); text("Yummy pancakes! 🪙 +5",W/2,182,13,"#7a5a1a"); btn("▶ BACK TO HOUSE",230); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>230-8&&ptr.y<230+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      var good=(g.cook>=55&&g.cook<=100); g.perfect=good?1:0; g.stack++; g.msg=24; ding(); star(W/2-30,320,good?7:3); g.cook=0;
+      if(g.stack>=g.need){ g.over=true; coins+=5; save(); confettiBurst(); label("Pancakes done! 🪙 "+coins); } },
+    tap:function(){} };
+
+  // ================= MAKE THE BED (Set4 idea 281) =================
+  function bedItem(x,y,step){ if(step===0){ cx.fillStyle="#eaf2fb"; cx.strokeStyle="#bcd0e8"; cx.lineWidth=2; rr(x-26,y-16,52,32,6); cx.fill(); cx.stroke(); text("sheet",x,y,10,"#5a7aa0"); }
+    else if(step===1){ cx.fillStyle="#7aa0e0"; rr(x-26,y-16,52,32,6); cx.fill(); text("blanket",x,y,9,"#fff"); }
+    else if(step===2||step===3){ cx.fillStyle="#fff"; cx.strokeStyle="#e0d8c8"; cx.lineWidth=2; rr(x-24,y-14,48,28,12); cx.fill(); cx.stroke(); }
+    else { emo("🧸",x,y,30); } }
+  S.makebed={ init:function(){ g={step:0, need:5, hold:false, hx:0,hy:0, over:false}; label("Make the bed! Drag the fresh sheet on first 🛏️"); },
+    render:function(){
+      var wg=cx.createLinearGradient(0,0,0,300); wg.addColorStop(0,"#f0e6f5"); wg.addColorStop(1,"#e6d8f0"); cx.fillStyle=wg; cx.fillRect(0,0,W,300); cx.fillStyle="#c9a06a"; cx.fillRect(0,300,W,H-300); cx.fillStyle="#b98a54"; cx.fillRect(0,296,W,6);
+      var bx=W/2, mt=250, mw=270, mh=150;
+      cx.fillStyle="#7a4a2a"; rr(bx-mw/2-14,mt-46,mw+28,mh+72,14); cx.fill();
+      cx.fillStyle="#8a5a34"; rr(bx-mw/2-14,mt-52,mw+28,32,10); cx.fill();
+      cx.fillStyle="#efe4d0"; rr(bx-mw/2,mt,mw,mh,10); cx.fill();
+      if(g.step>=1){ cx.fillStyle="#eaf2fb"; rr(bx-mw/2+4,mt+4,mw-8,mh-8,8); cx.fill(); cx.strokeStyle="#cfe0f0"; cx.lineWidth=2; rr(bx-mw/2+4,mt+4,mw-8,mh-8,8); cx.stroke(); }
+      if(g.step>=2){ cx.fillStyle="#7aa0e0"; rr(bx-mw/2+4,mt+mh*0.42,mw-8,mh*0.58-4,8); cx.fill(); cx.fillStyle="#6a90d0"; cx.fillRect(bx-mw/2+4,mt+mh*0.42,mw-8,8); }
+      if(g.step>=3){ cx.fillStyle="#fff"; rr(bx-mw/2+18,mt+12,92,40,12); cx.fill(); cx.strokeStyle="#e0d8c8"; cx.lineWidth=2; rr(bx-mw/2+18,mt+12,92,40,12); cx.stroke(); }
+      if(g.step>=4){ cx.fillStyle="#fff"; rr(bx+mw/2-110,mt+12,92,40,12); cx.fill(); cx.strokeStyle="#e0d8c8"; rr(bx+mw/2-110,mt+12,92,40,12); cx.stroke(); }
+      if(g.step>=5){ emo("🧸",bx,mt+mh*0.44+16,34); }
+      coinHUD(); text("🛏️ MAKE THE BED",W/2,44,15,"#6a3a8a");
+      var LBL=["fresh sheet","cozy blanket","a pillow","another pillow","a teddy"];
+      if(!g.over){ if(g.hold){ bedItem(g.hx,g.hy,g.step); } else { bedItem(W/2,H-54,g.step); text("drag the "+LBL[g.step],W/2,H-84,12,"#6a4a8a"); } }
+      cx.fillStyle="#00000018"; rr(W/2-70,H-16,140,10,5); cx.fill(); cx.fillStyle="#a07ad0"; rr(W/2-70,H-16,140*(g.step/g.need),10,5); cx.fill();
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("🛏️ BED MADE!",W/2,140,22,"#6a3a8a"); text("Neat & cozy! 🪙 +5",W/2,172,13,"#5a3a7a"); btn("▶ BACK TO HOUSE",220); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>220-8&&ptr.y<220+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      if(Math.abs(ptr.x-W/2)<40&&Math.abs(ptr.y-(H-54))<36){ g.hold=true; g.hx=ptr.x; g.hy=ptr.y; } },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){ if(g.hold){ var bx=W/2, mt=250, mw=270, mh=150; if(g.hx>bx-mw/2-20&&g.hx<bx+mw/2+20&&g.hy>mt-40&&g.hy<mt+mh+20){ g.step++; ding(); star(g.hx,g.hy,5); if(g.step>=g.need){ g.over=true; coins+=5; save(); confettiBurst(); label("Bed made! 🪙 "+coins); } } else beep(300,.08); g.hold=false; } },
+    tap:function(){} };
+
+  // ================= BUNK BEDS (Set4 idea 291) =================
+  function bunkItem(x,y,step){ if(step<2){ cx.fillStyle= step===0?"#7aa0e0":"#7ad0a0"; rr(x-28,y-15,56,30,6); cx.fill(); text("mattress",x,y,9,"#fff"); }
+    else if(step===2){ cx.strokeStyle="#a5703a"; cx.lineWidth=4; cx.beginPath(); cx.moveTo(x-9,y-16);cx.lineTo(x-9,y+16);cx.moveTo(x+9,y-16);cx.lineTo(x+9,y+16); for(var r=-12;r<=12;r+=8){cx.moveTo(x-9,y+r);cx.lineTo(x+9,y+r);} cx.stroke(); }
+    else { cx.fillStyle="#fff"; cx.strokeStyle="#e0d8c8"; cx.lineWidth=2; rr(x-22,y-13,44,26,12); cx.fill(); cx.stroke(); } }
+  S.bunkbed={ init:function(){ g={step:0, need:5, hold:false, hx:0,hy:0, over:false}; label("Build the bunk beds! Drag the bottom mattress in 🛏️"); },
+    render:function(){
+      var wg=cx.createLinearGradient(0,0,0,300); wg.addColorStop(0,"#dfeeff"); wg.addColorStop(1,"#cfe4f5"); cx.fillStyle=wg; cx.fillRect(0,0,W,300); cx.fillStyle="#c9a06a"; cx.fillRect(0,300,W,H-300); cx.fillStyle="#b98a54"; cx.fillRect(0,296,W,6);
+      var bx=W/2, mw=250, L=bx-mw/2, R=bx+mw/2;
+      cx.fillStyle="#7a4a2a"; cx.fillRect(L-8,168,12,264); cx.fillRect(R-4,168,12,264);
+      cx.fillStyle="#8a5a34"; cx.fillRect(L-8,168,mw+20,8); cx.fillRect(L,300,mw,12); cx.fillRect(L,420,mw,12);
+      if(g.step>=1){ cx.fillStyle="#7aa0e0"; rr(L+6,392,mw-12,26,6); cx.fill(); }
+      if(g.step>=2){ cx.fillStyle="#7ad0a0"; rr(L+6,272,mw-12,26,6); cx.fill(); }
+      if(g.step>=3){ cx.strokeStyle="#a5703a"; cx.lineWidth=5; cx.beginPath(); cx.moveTo(R-38,256); cx.lineTo(R-38,430); cx.moveTo(R-18,256); cx.lineTo(R-18,430); for(var yy=272;yy<430;yy+=26){ cx.moveTo(R-38,yy); cx.lineTo(R-18,yy); } cx.stroke(); }
+      if(g.step>=4){ cx.fillStyle="#fff"; cx.strokeStyle="#e0d8c8"; cx.lineWidth=2; rr(L+16,394,80,22,10); cx.fill(); cx.stroke(); }
+      if(g.step>=5){ cx.fillStyle="#fff"; rr(L+16,274,80,22,10); cx.fill(); cx.stroke(); }
+      coinHUD(); text("🛏️ BUILD THE BUNK BEDS",W/2,44,15,"#2a5a8a");
+      var LBL=["bottom mattress","top mattress","the ladder","bottom pillow","top pillow"];
+      if(!g.over){ if(g.hold){ bunkItem(g.hx,g.hy,g.step); } else { bunkItem(W/2,H-54,g.step); text("drag "+LBL[g.step],W/2,H-84,12,"#2a5a8a"); } }
+      cx.fillStyle="#00000018"; rr(W/2-70,H-16,140,10,5); cx.fill(); cx.fillStyle="#4aa0f0"; rr(W/2-70,H-16,140*(g.step/g.need),10,5); cx.fill();
+      renderFX();
+      if(g.over){ if(t%50===0)confettiBurst(); text("🛏️ BUNK BEDS DONE!",W/2,130,20,"#2a5a8a"); text("Perfect for siblings! 🪙 +5",W/2,162,13,"#2a5a7a"); btn("▶ BACK TO HOUSE",210); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>210-8&&ptr.y<210+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      if(Math.abs(ptr.x-W/2)<42&&Math.abs(ptr.y-(H-54))<36){ g.hold=true; g.hx=ptr.x; g.hy=ptr.y; } },
+    drag:function(){ if(g.hold){ g.hx=ptr.x; g.hy=ptr.y; } },
+    up:function(){ if(g.hold){ var bx=W/2, mw=250; if(g.hx>bx-mw/2-20&&g.hx<bx+mw/2+20&&g.hy>160&&g.hy<440){ g.step++; ding(); star(g.hx,g.hy,5); if(g.step>=g.need){ g.over=true; coins+=5; save(); confettiBurst(); label("Bunk beds done! 🪙 "+coins); } } else beep(300,.08); g.hold=false; } },
+    tap:function(){} };
+
+  // ================= SUNNY MORNING (Set4 idea 141) =================
+  S.sunnymorning={ init:function(){ g={open:[false,false,false], done:0, over:false}; label("Tap the windows to open the curtains! ☀️"); },
+    render:function(){
+      var f=g.done/3;
+      cx.fillStyle=lerpCol(0x3a3550,0xf6ecc8,f); cx.fillRect(0,0,W,300);
+      cx.fillStyle=lerpCol(0x4a4030,0xc9a06a,f); cx.fillRect(0,300,W,H-300);
+      cx.fillStyle="#8a5a34"; cx.fillRect(0,296,W,6);
+      cx.fillStyle="#7a4a2a"; rr(30,360,182,92,10); cx.fill(); cx.fillStyle="#eaf2fb"; rr(38,368,166,50,8); cx.fill(); cx.fillStyle="#7aa0e0"; rr(38,398,166,20,6); cx.fill(); cx.fillStyle="#fff"; rr(48,372,54,22,10); cx.fill();
+      var wx=[110,225,340];
+      for(var i=0;i<3;i++){ var x=wx[i];
+        var sg=cx.createLinearGradient(0,110,0,214); sg.addColorStop(0,"#bfe6ff"); sg.addColorStop(1,"#ffe8c0"); cx.fillStyle=sg; rr(x-42,110,84,104,6); cx.fill();
+        if(i===1){ var sy=206-f*66; cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(x,sy,16,0,7); cx.fill(); cx.strokeStyle="rgba(255,220,90,.6)"; cx.lineWidth=2; for(var ry=0;ry<8;ry++){ var a=ry/8*6.28; cx.beginPath(); cx.moveTo(x+Math.cos(a)*20,sy+Math.sin(a)*20); cx.lineTo(x+Math.cos(a)*26,sy+Math.sin(a)*26); cx.stroke(); } }
+        cx.strokeStyle="#8a6a44"; cx.lineWidth=5; rr(x-42,110,84,104,6); cx.stroke(); cx.beginPath(); cx.moveTo(x,110); cx.lineTo(x,214); cx.moveTo(x-42,162); cx.lineTo(x+42,162); cx.stroke();
+        var slide=g.open[i]?34:4;
+        cx.fillStyle="#d05a7a"; rr(x-42,106,40-slide,112,4); cx.fill(); rr(x+2+slide,106,40-slide,112,4); cx.fill();
+        cx.fillStyle="#b84a68"; cx.fillRect(x-46,102,92,8);
+        if(!g.open[i]&&Math.floor(t/20)%2===0)text("tap!",x,88,11,"#e0a050"); }
+      coinHUD(); text("☀️ SUNNY MORNING",W/2,44,15,f>0.5?"#a05a1a":"#e0d0b0");
+      if(f<1){ cx.fillStyle="rgba(20,20,45,"+(0.35*(1-f))+")"; cx.fillRect(0,0,W,H); }
+      if(!g.over)text("Open all the curtains! "+g.done+"/3",W/2,H-30,13,"#8a6a3a");
+      renderFX();
+      if(g.over){ if(t%36===0){ FX.floats.push({s:"🐦",x:40+Math.random()*(W-80),y:130,life:1,col:"#333"}); } if(t%50===0)confettiBurst(); text("☀️ GOOD MORNING!",W/2,262,22,"#a05a1a"); text("Rise and shine! 🪙 +5",W/2,294,13,"#8a5a1a"); btn("▶ BACK TO HOUSE",332); }
+    },
+    down:function(){ if(g.over){ if(ptr.y>332-8&&ptr.y<332+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+      var wx=[110,225,340]; for(var i=0;i<3;i++){ if(!g.open[i] && Math.abs(ptr.x-wx[i])<46 && ptr.y>100 && ptr.y<220){ g.open[i]=true; g.done++; ding(); star(wx[i],160,5); if(g.done>=3){ g.over=true; coins+=5; save(); confettiBurst(); label("Good morning! 🪙 "+coins); } return; } } },
+    tap:function(){} };
+
+  // ================= MUSIC ROOM (Set4 idea 2) + LAUNDRY (Set4 idea 9) =================
+  S.musicroom=placeJob({ hint:"Set up the music room! 🎵", title:"🎵 SET UP THE MUSIC ROOM", bg:function(){ roomBG("#ece0f6","#e0d0f0","#c9a06a"); for(var n=0;n<8;n++){ emo("🎵",30+n*52,120+Math.sin(n)*10,16); } }, spots:SROOM, items:["🎹","🎸","🥁","🎺","🎻","🎷"], names:["Piano","Guitar","Drums","Trumpet","Violin","Sax"], doneMsg:"🎵 MUSIC ROOM DONE!", doneSub:"Let's play music! 🪙 +5", tcol:"#7a3a9a", dcol:"#7a3a9a" });
+  S.laundry=placeJob({ hint:"Set up the laundry room! 🧺", title:"🧺 SET UP THE LAUNDRY ROOM", bg:function(){ roomBG("#dfeef2","#cfe4ea","#bfc7cf");
+      cx.fillStyle="#eef3f6"; rr(56,168,86,104,10); cx.fill(); rr(150,168,86,104,10); cx.fill(); cx.strokeStyle="#b4bcc4"; cx.lineWidth=3; rr(56,168,86,104,10); cx.stroke(); rr(150,168,86,104,10); cx.stroke();
+      cx.fillStyle="#bcd4e2"; cx.beginPath(); cx.arc(99,224,24,0,7); cx.fill(); cx.arc(193,224,24,0,7); cx.fill(); cx.fillStyle="#88a4b6"; cx.beginPath(); cx.arc(99,224,16,0,7); cx.fill(); cx.arc(193,224,16,0,7); cx.fill();
+      text("WASH",99,258,9,"#5a6a7a"); text("DRY",193,258,9,"#5a6a7a"); },
+    spots:SROOM, items:["🧺","🧴","👕","🧦","🧷","🧽"], names:["Basket","Soap","Shirts","Socks","Clips","Sponge"], doneMsg:"🧺 LAUNDRY DONE!", doneSub:"All clean & folded! 🪙 +5", tcol:"#2a6a8a", dcol:"#2a6a8a" });
+
+  // ================= BREAKFAST NOOK (700-list idea 3) =================
+  S.breakfast=placeJob({ hint:"Set up the sunny breakfast nook! 🌅", title:"🌅 SET UP THE BREAKFAST NOOK",
+    bg:function(){ roomBG("#fff2d0","#ffe8b8","#c9a06a");
+      cx.fillStyle="#bfe6ff"; rr(W-118,58,86,72,6); cx.fill(); cx.strokeStyle="#8a7a58"; cx.lineWidth=4; rr(W-118,58,86,72,6); cx.stroke(); cx.beginPath(); cx.moveTo(W-75,58); cx.lineTo(W-75,130); cx.moveTo(W-118,94); cx.lineTo(W-32,94); cx.stroke();
+      cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(W-75,86,13,0,7); cx.fill();
+      cx.fillStyle="#b98a54"; cx.beginPath(); cx.ellipse(W/2,318,96,28,0,0,7); cx.fill(); cx.fillStyle="#a5703a"; cx.fillRect(W/2-7,318,14,90); },
+    spots:SROOM, items:["🪑","☕","🥐","🍳","🧇","🪴"], names:["Bench","Coffee","Croissant","Eggs","Waffles","Plant"], doneMsg:"🌅 NOOK READY!", doneSub:"Good morning, family! 🪙 +5", tcol:"#c08a1a", dcol:"#c08a1a" });
+
+  // ================= WALK-LOOK JOB FACTORY (joystick walk to pick 1 of 3 looks) =================
+  function walkLookJob(o){ var PED=[{x:88,y:172},{x:220,y:172},{x:352,y:172}];
+    return {
+      init:function(){ g={px:W/2,py:330,face:1,ph:0,moving:false,pick:-1,over:false,joy:{active:false,bx:70,by:H-70,kx:70,ky:H-70}}; label(o.hint||"Walk to the look you like! 🕹️"); },
+      update:function(){ if(g.over)return; var j=g.joy,dx=0,dy=0; if(j.active){ dx=j.kx-j.bx; dy=j.ky-j.by; var d=Math.hypot(dx,dy); if(d>5){dx/=d;dy/=d;}else{dx=0;dy=0;} }
+        g.px+=dx*3.1; g.py+=dy*3.1; g.px=Math.max(30,Math.min(W-30,g.px)); g.py=Math.max(120,Math.min(300,g.py)); g.moving=(dx!==0||dy!==0); if(g.moving){ g.ph+=0.3; if(dx<-.2)g.face=-1; else if(dx>.2)g.face=1; }
+        for(var i=0;i<3;i++){ var pp=PED[i]; if(Math.abs(g.px-pp.x)<38&&Math.abs(g.py-pp.y)<50){ g.pick=i; g.over=true; coins+=5; save(); ding(); confettiBurst(); star(pp.x,pp.y,8); label(o.doneMsg+" 🪙 "+coins); } } },
+      render:function(){ o.bg(g.pick);
+        if(g.pick>=0 && o.drawPick) o.drawPick(g.pick);
+        coinHUD();
+        // title banner pill
+        var tw=Math.min(W-24, o.title.length*11+40); cx.fillStyle="rgba(255,255,255,.92)"; rr(W/2-tw/2,26,tw,34,16); cx.fill(); cx.strokeStyle="#ffd98a"; cx.lineWidth=2.5; rr(W/2-tw/2,26,tw,34,16); cx.stroke(); text(o.title,W/2,44,15,o.tcol||"#3a5a2a");
+        if(!g.over){ var bob=Math.sin(t/9)*3; for(var i=0;i<3;i++){ var pp=PED[i], L=o.looks[i]; var near=(Math.abs(g.px-pp.x)<40&&Math.abs(g.py-pp.y)<52);
+            cx.fillStyle="#00000018"; cx.beginPath(); cx.ellipse(pp.x,pp.y+40,32,9,0,0,7); cx.fill();
+            cx.fillStyle="rgba(120,80,40,.16)"; rr(pp.x-34,pp.y-33,68,62,14); cx.fill(); // shadow
+            cx.fillStyle=near?"#fff6ea":"#ffffff"; rr(pp.x-34,pp.y-36,68,62,14); cx.fill();
+            cx.fillStyle="rgba(255,255,255,.5)"; rr(pp.x-34,pp.y-36,68,31,14); cx.fill(); // gloss
+            cx.strokeStyle=near?"#f0870e":"#d8c4a4"; cx.lineWidth=near?4:2.5; rr(pp.x-34,pp.y-36,68,62,14); cx.stroke();
+            emo(L.e,pp.x,pp.y-8,32); text(L.n,pp.x,pp.y+34,12,near?"#e0670e":"#6a4a1a");
+            if(near){ text("▼ WALK HERE!",pp.x,pp.y-52+bob,11,"#e0670e"); } }
+          drawAvatar(g.px,g.py,g.face,g.ph,g.moving);
+          var j=g.joy; cx.fillStyle="rgba(0,0,0,.12)"; cx.beginPath(); cx.arc(j.bx,j.by,44,0,7); cx.fill(); cx.strokeStyle="rgba(255,255,255,.85)"; cx.lineWidth=3; cx.beginPath(); cx.arc(j.bx,j.by,44,0,7); cx.stroke(); cx.fillStyle="rgba(255,255,255,.75)"; cx.beginPath(); cx.arc(j.kx,j.ky,20,0,7); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; cx.stroke(); if(!j.active)text("🕹️ walk",j.bx,j.by-58,11,"#5a4a2a");
+          cx.fillStyle="rgba(255,255,255,.78)"; rr(W/2-128,H-130,256,24,12); cx.fill(); text("Walk to a LOOK to choose it! 👀",W/2,H-118,12,"#5a4a2a");
+        } else { drawAvatar(g.px,g.py,g.face,0,false); if(t%50===0)confettiBurst();
+          cx.fillStyle="rgba(120,80,40,.16)"; rr(W/2-150,120,300,74,18); cx.fill();
+          cx.fillStyle="rgba(255,255,255,.95)"; rr(W/2-150,118,300,74,18); cx.fill(); cx.strokeStyle="#ffd23f"; cx.lineWidth=4; rr(W/2-150,118,300,74,18); cx.stroke();
+          emo("⭐",W/2-128,140,20); emo("⭐",W/2+128,140,20);
+          text(o.doneMsg,W/2,146,20,o.dcol||"#2a6a2a"); text(o.doneSub||"Nice! 🪙 +5",W/2,174,13,"#3a5a2a"); btn("▶ BACK TO HOUSE",H*0.7); }
+        renderFX();
+      },
+      down:function(){ if(g.over){ if(ptr.y>H*0.7-8&&ptr.y<H*0.7+52&&Math.abs(ptr.x-W/2)<120)go("menu"); return; }
+        var j=g.joy; if(ptr.y>H*0.6 || ptr.x<W*0.4){ j.active=true; j.bx=ptr.x; j.by=ptr.y; j.kx=ptr.x; j.ky=ptr.y; } },
+      drag:function(){ var j=g.joy; if(j.active){ var dx=ptr.x-j.bx, dy=ptr.y-j.by, d=Math.hypot(dx,dy), m=Math.min(d,42); if(d>0){ j.kx=j.bx+dx/d*m; j.ky=j.by+dy/d*m; } } },
+      up:function(){ g.joy.active=false; g.joy.kx=g.joy.bx; g.joy.ky=g.joy.by; },
+      tap:function(){} };
+  }
+  function yardBG(){ var sky=cx.createLinearGradient(0,0,0,180); sky.addColorStop(0,"#bfe6ff"); sky.addColorStop(1,"#eafbf0"); cx.fillStyle=sky; cx.fillRect(0,0,W,180); cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(W-54,54,18,0,7); cx.fill(); cx.fillStyle="#8fd07b"; cx.fillRect(0,180,W,H-180); }
+  S.playhouse=walkLookJob({ hint:"Walk to pick your playhouse! 🕹️🏠", title:"🏠 BUILD A PLAY HOUSE",
+    looks:[{n:"Cottage",e:"🏡"},{n:"Castle",e:"🏰"},{n:"Treehouse",e:"🛖"}],
+    bg:function(pk){ yardBG(); },
+    drawPick:function(pk){ var e=["🏡","🏰","🛖"][pk]; emo("🌳",64,238,42); emo("🌳",W-64,238,42); emo(e,W/2,246,92); emo("🌷",W/2-96,300,26); emo("🌻",W/2+96,300,26); emo("🚸",W/2,308,22); },
+    doneMsg:"🏠 PLAY HOUSE DONE!", doneSub:"Time to play! 🪙 +5", tcol:"#5a7a2a", dcol:"#3a6a2a" });
+
+  // ================= STONE PATIO (700-list idea 141) =================
+  S.patio=walkLookJob({ hint:"Walk to pick your patio style! 🕹️", title:"🪨 LAY A STONE PATIO",
+    looks:[{n:"Stone",e:"🪨"},{n:"Brick",e:"🧱"},{n:"Wood",e:"🪵"}],
+    bg:function(pk){ yardBG(); },
+    drawPick:function(pk){ var cols=["#b8b0a4","#c05a3a","#a5703a"][pk], col2=["#9a9286","#a04a30","#8a5a2a"][pk];
+      cx.fillStyle=cols; rr(70,232,W-140,92,10); cx.fill(); cx.strokeStyle=col2; cx.lineWidth=2;
+      for(var yy=244;yy<322;yy+=20){ for(var xx=80;xx<W-92;xx+=38){ cx.strokeRect(xx,yy,34,16); } }
+      emo("🪴",92,222,26); emo("🪑",W-100,224,26); emo("⛱️",W/2,206,32); },
+    doneMsg:"🪨 PATIO DONE!", doneSub:"Relax outside! 🪙 +5", tcol:"#5a5a4a", dcol:"#4a4a3a" });
+
+  // ================= STREETS — buy houses with coins! =================
+  function drawStreetHouse(hx,hy,w,col,owned,price){
+    cx.fillStyle=col; cx.fillRect(hx-w/2,hy,w,w*0.82);
+    cx.fillStyle="#8a3a2a"; cx.beginPath(); cx.moveTo(hx-w/2-6,hy); cx.lineTo(hx,hy-w*0.52); cx.lineTo(hx+w/2+6,hy); cx.closePath(); cx.fill();
+    cx.fillStyle="#5a3a1a"; cx.fillRect(hx-8,hy+w*0.82-22,16,22);
+    cx.fillStyle="#bfe6ff"; cx.fillRect(hx-w/2+8,hy+8,13,13); cx.fillRect(hx+w/2-21,hy+8,13,13);
+    if(owned){ cx.strokeStyle="#7a5a34"; cx.lineWidth=2; cx.beginPath(); cx.moveTo(hx,hy-w*0.52); cx.lineTo(hx,hy-w*0.52-18); cx.stroke(); cx.fillStyle="#2a8a3a"; cx.fillRect(hx,hy-w*0.52-18,16,11);
+      cx.fillStyle="#2a7a3a"; rr(hx-26,hy+w*0.82+3,52,16,4); cx.fill(); text("SOLD! 🏡",hx,hy+w*0.82+11,10,"#fff"); }
+    else { cx.fillStyle="#fff"; rr(hx-28,hy+w*0.82+3,56,16,4); cx.fill(); cx.strokeStyle="#e0b64a"; cx.lineWidth=1; rr(hx-28,hy+w*0.82+3,56,16,4); cx.stroke(); emo("🪙",hx-14,hy+w*0.82+11,12); text(price,hx+4,hy+w*0.82+11,11,"#a5701a","left"); }
+  }
+  S.streets={ init:function(){ g={px:W/2,py:360,face:1,ph:0,moving:false,joy:{active:false,bx:70,by:H-70,kx:70,ky:H-70},msg:"",msgT:0,
+      houses:[{x:66,price:40,c:"#e0704a"},{x:158,price:80,c:"#5aa0e0"},{x:250,price:130,c:"#7ac05a"},{x:342,price:200,c:"#c77ad0"},{x:420,price:300,c:"#ffce5a"}], owned:{}};
+      try{ g.owned=JSON.parse(localStorage.getItem("mohouse_streets")||"{}")||{}; }catch(e){}
+      label("Walk up to a house to BUY it with coins! 🏘️"); },
+    update:function(){ if(g.msgT>0)g.msgT--; var j=g.joy,dx=0,dy=0; if(j.active){ dx=j.kx-j.bx; dy=j.ky-j.by; var d=Math.hypot(dx,dy); if(d>5){dx/=d;dy/=d;}else{dx=0;dy=0;} }
+      g.px+=dx*3.4; g.py+=dy*3.4; g.px=Math.max(24,Math.min(W-24,g.px)); g.py=Math.max(238,Math.min(380,g.py)); g.moving=(dx!==0||dy!==0); if(g.moving){ g.ph+=0.3; if(dx<-.2)g.face=-1; else if(dx>.2)g.face=1; }
+      for(var i=0;i<g.houses.length;i++){ var h=g.houses[i]; if(Math.abs(g.px-h.x)<40 && g.py<268){ if(!g.owned[i]){ if(coins>=h.price){ coins-=h.price; g.owned[i]=true; save(); try{localStorage.setItem("mohouse_streets",JSON.stringify(g.owned));}catch(e){} confettiBurst(); clink(); g.msg="🏡 You bought a house!"; g.msgT=70; } else { g.msg="Need "+h.price+" 🪙 — do jobs to earn!"; g.msgT=30; } } } } },
+    render:function(){
+      var sky=cx.createLinearGradient(0,0,0,150); sky.addColorStop(0,"#bfe6ff"); sky.addColorStop(1,"#eafbf0"); cx.fillStyle=sky; cx.fillRect(0,0,W,150);
+      cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(40,44,16,0,7); cx.fill();
+      cx.fillStyle="#8fd07b"; cx.fillRect(0,150,W,H-150);
+      cx.fillStyle="#7a7a82"; cx.fillRect(0,300,W,H-300); cx.strokeStyle="#ffd23f"; cx.lineWidth=4; cx.setLineDash([24,18]); cx.beginPath(); cx.moveTo(0,342); cx.lineTo(W,342); cx.stroke(); cx.setLineDash([]);
+      for(var i=0;i<g.houses.length;i++){ var h=g.houses[i]; drawStreetHouse(h.x,150,58,h.c,g.owned[i],h.price); }
+      drawAvatar(g.px,g.py,g.face,g.ph,g.moving);
+      coinHUD(); text("🏘️ BUY HOUSES ON THE STREET",W/2,44,15,"#3a5a8a");
+      if(g.msgT>0){ cx.fillStyle="rgba(255,255,255,.92)"; rr(W/2-120,68,240,26,8); cx.fill(); cx.strokeStyle="#e0b64a"; cx.lineWidth=2; rr(W/2-120,68,240,26,8); cx.stroke(); text(g.msg,W/2,81,12,"#5a3a1a"); }
+      var j=g.joy; cx.fillStyle="rgba(0,0,0,.16)"; cx.beginPath(); cx.arc(j.bx,j.by,42,0,7); cx.fill(); cx.fillStyle="rgba(255,255,255,.65)"; cx.beginPath(); cx.arc(j.kx,j.ky,20,0,7); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; cx.stroke(); if(!j.active)text("🕹️ walk",j.bx,j.by-54,11,"#3a4a5a");
+      var oc=0; for(var k in g.owned)if(g.owned[k])oc++; text("Houses owned: "+oc+" / "+g.houses.length,W/2,H-118,12,"#3a5a8a");
+      cx.fillStyle="#c9f0c9"; rr(W-138,H-42,120,32,10); cx.fill(); cx.strokeStyle="#5aa06a"; cx.lineWidth=2; rr(W-138,H-42,120,32,10); cx.stroke(); text("◀ BACK",W-78,H-26,14,"#2a5a2a");
+      renderFX();
+    },
+    down:function(){ if(ptr.x>W-138&&ptr.x<W-18&&ptr.y>H-42&&ptr.y<H-8){ go("menu"); return; } var j=g.joy; if(ptr.y>H*0.62 || ptr.x<W*0.4){ j.active=true; j.bx=ptr.x; j.by=ptr.y; j.kx=ptr.x; j.ky=ptr.y; } },
+    drag:function(){ var j=g.joy; if(j.active){ var dx=ptr.x-j.bx, dy=ptr.y-j.by, d=Math.hypot(dx,dy), m=Math.min(d,42); if(d>0){ j.kx=j.bx+dx/d*m; j.ky=j.by+dy/d*m; } } },
+    up:function(){ g.joy.active=false; g.joy.kx=g.joy.bx; g.joy.ky=g.joy.by; },
+    tap:function(){} };
+
+  // ================= BOWLING ROOM (900-list idea 17) + GO-KART HALL (idea 18) =================
+  S.bowling=walkLookJob({ hint:"Walk to pick your bowling look! 🕹️🎳", title:"🎳 BOWLING ALLEY ROOM",
+    looks:[{n:"Classic",e:"🎳"},{n:"Neon",e:"🎳"},{n:"Cosmic",e:"🎳"}],
+    bg:function(pk){ var g1=cx.createLinearGradient(0,0,0,H); g1.addColorStop(0,"#2a2440"); g1.addColorStop(1,"#3a3458"); cx.fillStyle=g1; cx.fillRect(0,0,W,H); },
+    drawPick:function(pk){ var lane=["#d0a86a","#5a3a8a","#182a5a"][pk], neon=["#a5703a","#ff5aa0","#6affd0"][pk];
+      cx.fillStyle=lane; rr(W/2-64,150,128,172,10); cx.fill(); cx.strokeStyle=neon; cx.lineWidth=3; rr(W/2-64,150,128,172,10); cx.stroke();
+      cx.beginPath(); cx.moveTo(W/2-64,288); cx.lineTo(W/2+64,288); cx.stroke();
+      var pins=[[0,0],[-1,1],[1,1],[-2,2],[0,2],[2,2]]; for(var i=0;i<pins.length;i++){ var px=W/2+pins[i][0]*15, py=172+pins[i][1]*15; cx.fillStyle="#fff"; cx.beginPath(); cx.ellipse(px,py,5,9,0,0,7); cx.fill(); cx.strokeStyle="#e0303a"; cx.lineWidth=1; cx.beginPath(); cx.ellipse(px,py-2,5,3,0,0,7); cx.stroke(); }
+      cx.fillStyle=["#333","#c020a0","#2050d0"][pk]; cx.beginPath(); cx.arc(W/2,304,12,0,7); cx.fill(); cx.fillStyle="#fff"; cx.beginPath(); cx.arc(W/2-3,300,1.5,0,7); cx.arc(W/2+3,300,1.5,0,7); cx.arc(W/2,306,1.5,0,7); cx.fill(); },
+    doneMsg:"🎳 BOWLING ROOM DONE!", doneSub:"Strike! 🪙 +5", tcol:"#c9a6ff", dcol:"#6a3ac0" });
+  S.gokart=walkLookJob({ hint:"Walk to pick your track look! 🕹️🏎️", title:"🏎️ GO-KART HALLWAY",
+    looks:[{n:"Race",e:"🏎️"},{n:"Rainbow",e:"🌈"},{n:"Night",e:"🌙"}],
+    bg:function(pk){ var g1=cx.createLinearGradient(0,0,0,H); g1.addColorStop(0,"#dfeaf6"); g1.addColorStop(1,"#cfe0f0"); cx.fillStyle=g1; cx.fillRect(0,0,W,H); },
+    drawPick:function(pk){
+      if(pk===0){ cx.fillStyle="#5a5a62"; rr(56,178,W-112,150,10); cx.fill(); cx.strokeStyle="#ffd23f"; cx.lineWidth=4; cx.setLineDash([18,14]); cx.beginPath(); cx.moveTo(66,253); cx.lineTo(W-66,253); cx.stroke(); cx.setLineDash([]); emo("🏁",78,200,24); emo("🏁",W-78,200,24); emo("🏎️",W/2,253,46); }
+      else if(pk===1){ cx.lineCap="round"; cx.strokeStyle="#7a7a82"; cx.lineWidth=30; cx.beginPath(); cx.moveTo(70,310); cx.quadraticCurveTo(W/2,150,W-70,310); cx.stroke(); cx.strokeStyle="#fff"; cx.lineWidth=3; cx.setLineDash([14,12]); cx.beginPath(); cx.moveTo(70,310); cx.quadraticCurveTo(W/2,150,W-70,310); cx.stroke(); cx.setLineDash([]); cx.lineCap="butt"; emo("🌈",W/2,150,42); emo("🏎️",122,282,36); emo("🏁",W-70,300,22); }
+      else { cx.strokeStyle="#2e2e46"; cx.lineWidth=30; cx.beginPath(); cx.ellipse(W/2,252,140,66,0,0,7); cx.stroke(); cx.strokeStyle="#7affd0"; cx.lineWidth=3; cx.setLineDash([14,12]); cx.beginPath(); cx.ellipse(W/2,252,140,66,0,0,7); cx.stroke(); cx.setLineDash([]); emo("🌙",78,152,24); emo("⭐",W-90,150,16); emo("⭐",W/2+40,160,12); emo("🏎️",W/2+128,252,34); } },
+    doneMsg:"🏎️ GO-KART HALL DONE!", doneSub:"Vroom vroom! 🪙 +5", tcol:"#3a6a8a", dcol:"#2a5a8a" });
+
+  // ================= SUNFLOWERS (900-list idea 103) =================
+  S.sunflowers=walkLookJob({ hint:"Walk to pick your sunflowers! 🕹️🌻", title:"🌻 PLANT SUNFLOWERS",
+    looks:[{n:"Patch",e:"🌻"},{n:"Tall Row",e:"🌻"},{n:"Giant",e:"🌻"}],
+    bg:function(pk){ yardBG(); },
+    drawPick:function(pk){ cx.fillStyle="#7a4a2a"; rr(46,288,W-92,46,8); cx.fill();
+      if(pk===0){ var pos=[[100,252],[152,272],[204,256],[128,292],[190,292],[244,270],[300,262]]; for(var i=0;i<pos.length;i++){ var x=pos[i][0],y=pos[i][1]; cx.strokeStyle="#3a8a3a"; cx.lineWidth=4; cx.beginPath(); cx.moveTo(x,y+30); cx.lineTo(x,y+8); cx.stroke(); emo("🌻",x,y,26); } }
+      else if(pk===1){ for(var i=0;i<6;i++){ var x=60+i*58; cx.strokeStyle="#3a8a3a"; cx.lineWidth=5; cx.beginPath(); cx.moveTo(x,304); cx.lineTo(x,232); cx.stroke(); emo("🌻",x,224,30); } }
+      else { var g2=[[150,236],[300,248]]; for(var i=0;i<g2.length;i++){ var x=g2[i][0],y=g2[i][1]; cx.strokeStyle="#3a8a3a"; cx.lineWidth=9; cx.beginPath(); cx.moveTo(x,y+56); cx.lineTo(x,y+12); cx.stroke(); emo("🌻",x,y,62); } }
+      emo("☀️",W-56,90,30); emo("🐝",W/2+20,180,20); },
+    doneMsg:"🌻 SUNFLOWERS PLANTED!", doneSub:"So sunny! 🪙 +5", tcol:"#c08a1a", dcol:"#a06a1a" });
+
+  // ================= FRY EGGS (900-list idea 282) =================
+  S.eggs=walkLookJob({ hint:"Walk to pick how to cook the eggs! 🕹️🍳", title:"🍳 FRY SOME EGGS",
+    looks:[{n:"Sunny",e:"🍳"},{n:"Scramble",e:"🍳"},{n:"Omelette",e:"🥚"}],
+    bg:function(pk){ roomBG("#ffe9c9","#f5d9a8","#c9a06a"); },
+    drawPick:function(pk){
+      cx.fillStyle="#2a2a30"; cx.beginPath(); cx.ellipse(W/2,252,82,60,0,0,7); cx.fill(); cx.fillStyle="#3a3a42"; cx.beginPath(); cx.ellipse(W/2,250,72,52,0,0,7); cx.fill(); cx.fillStyle="#4a4a52"; rr(W/2+76,244,74,14,4); cx.fill();
+      if(pk===0){ cx.fillStyle="#fff"; cx.beginPath(); cx.ellipse(W/2-8,252,44,32,0,0,7); cx.fill(); cx.beginPath(); cx.ellipse(W/2+22,246,26,20,0,0,7); cx.fill(); cx.fillStyle="#ffce3f"; cx.beginPath(); cx.arc(W/2,250,15,0,7); cx.fill(); }
+      else if(pk===1){ cx.fillStyle="#ffd23f"; for(var i=0;i<9;i++){ var a=i/9*6.28; cx.beginPath(); cx.arc(W/2+Math.cos(a)*26,250+Math.sin(a)*20,12,0,7); cx.fill(); } cx.fillStyle="#ffe27a"; cx.beginPath(); cx.arc(W/2,250,16,0,7); cx.fill(); }
+      else { cx.fillStyle="#f5c542"; cx.beginPath(); cx.ellipse(W/2,254,48,26,0,Math.PI,0); cx.fill(); cx.fillStyle="#e0a828"; cx.beginPath(); cx.moveTo(W/2-48,254); cx.quadraticCurveTo(W/2,270,W/2+48,254); cx.stroke(); }
+      emo("🍞",92,272,26); emo("🧂",W-96,270,22); emo("♨️",W/2,180,24); },
+    doneMsg:"🍳 EGGS COOKED!", doneSub:"Yum, breakfast! 🪙 +5", tcol:"#a06a1a", dcol:"#8a5a1a" });
+
+  // ================= MAILBOX (900 idea 123) + PORCH SWING (idea 126) =================
+  S.mailbox=walkLookJob({ hint:"Walk to pick your mailbox! 🕹️📫", title:"📫 PUT UP A MAILBOX",
+    looks:[{n:"Red",e:"📫"},{n:"Blue",e:"📫"},{n:"Fancy",e:"📫"}],
+    bg:function(pk){ yardBG(); },
+    drawPick:function(pk){ var col=["#e0503a","#5a9ae0","#c77ad0"][pk];
+      cx.fillStyle="#8a5a34"; cx.fillRect(W/2-7,246,14,94);
+      cx.fillStyle=col; rr(W/2-44,206,88,46,12); cx.fill(); cx.strokeStyle="rgba(0,0,0,.15)"; cx.lineWidth=2; rr(W/2-44,206,88,46,12); cx.stroke();
+      cx.fillStyle="#fff"; rr(W/2-30,224,44,20,3); cx.fill(); text("✉",W/2-8,234,14,"#5a3a1a");
+      cx.fillStyle="#ffce3f"; cx.fillRect(W/2+42,210,4,24); cx.fillStyle="#e03a3a"; cx.fillRect(W/2+46,210,16,11);
+      emo("🌷",W/2-78,300,24); emo("🌻",W/2+80,300,24); emo("🏡",70,150,42); },
+    doneMsg:"📫 MAILBOX UP!", doneSub:"You've got mail! 🪙 +5", tcol:"#a05a3a", dcol:"#8a4a2a" });
+  S.porchswing=walkLookJob({ hint:"Walk to pick your porch swing! 🕹️🪑", title:"🪑 HANG A PORCH SWING",
+    looks:[{n:"Wood",e:"🪑"},{n:"White",e:"🪑"},{n:"Purple",e:"🪑"}],
+    bg:function(pk){ var sky=cx.createLinearGradient(0,0,0,180); sky.addColorStop(0,"#bfe6ff"); sky.addColorStop(1,"#ffe8d0"); cx.fillStyle=sky; cx.fillRect(0,0,W,180); cx.fillStyle="#c9a06a"; cx.fillRect(0,180,W,H-180); cx.fillStyle="#b98a54"; for(var i=0;i<12;i++){cx.fillRect(0,180+i*22,W,2);} },
+    drawPick:function(pk){ var col=["#a5703a","#f2f2f2","#b57ad0"][pk];
+      cx.fillStyle="#e8d8bc"; cx.beginPath(); cx.moveTo(50,158); cx.lineTo(W/2,120); cx.lineTo(W-50,158); cx.closePath(); cx.fill(); cx.fillStyle="#c9a06a"; cx.fillRect(56,158,W-112,10);
+      cx.strokeStyle="#7a5a34"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(W/2-64,168); cx.lineTo(W/2-64,262); cx.moveTo(W/2+64,168); cx.lineTo(W/2+64,262); cx.stroke();
+      cx.fillStyle=col; rr(W/2-74,262,148,20,7); cx.fill(); rr(W/2-74,228,148,16,7); cx.fill(); cx.strokeStyle="rgba(0,0,0,.15)"; cx.lineWidth=2; rr(W/2-74,262,148,20,7); cx.stroke();
+      emo("🧸",W/2-40,258,22); emo("🌸",W/2+50,258,20); },
+    doneMsg:"🪑 PORCH SWING UP!", doneSub:"Sit and relax! 🪙 +5", tcol:"#6a4a8a", dcol:"#5a3a7a" });
+
+  // ================= MAKE TOAST (900 idea 283) =================
+  S.toast=walkLookJob({ hint:"Walk to pick your toast topping! 🕹️🍞", title:"🍞 MAKE TOAST",
+    looks:[{n:"Butter",e:"🧈"},{n:"Jam",e:"🍓"},{n:"Avocado",e:"🥑"}],
+    bg:function(pk){ roomBG("#ffe9c9","#f5d9a8","#c9a06a"); },
+    drawPick:function(pk){ cx.fillStyle="#eef2f5"; cx.beginPath(); cx.ellipse(W/2,278,92,28,0,0,7); cx.fill();
+      cx.fillStyle="#d8a860"; rr(W/2-52,214,104,74,14); cx.fill(); cx.fillStyle="#c89850"; rr(W/2-44,222,88,58,10); cx.fill();
+      if(pk===0){ cx.fillStyle="#ffe27a"; rr(W/2-22,238,44,26,4); cx.fill(); cx.fillStyle="#ffd23f"; rr(W/2-22,238,44,6,3); cx.fill(); }
+      else if(pk===1){ cx.fillStyle="#c8203a"; rr(W/2-40,226,80,50,8); cx.fill(); cx.fillStyle="#e04a5a"; for(var i=0;i<5;i++){ cx.beginPath(); cx.arc(W/2-28+i*14,244+((i%2)*10),4,0,7); cx.fill(); } }
+      else { cx.fillStyle="#6aa03a"; rr(W/2-40,226,80,50,8); cx.fill(); cx.fillStyle="#8ac04a"; for(var i=0;i<6;i++){ cx.beginPath(); cx.ellipse(W/2-30+i*12,240+((i%2)*12),6,4,0,0,7); cx.fill(); } }
+      emo("☕",W-70,250,28); emo("🍽️",92,268,24); },
+    doneMsg:"🍞 TOAST READY!", doneSub:"Crunchy & yummy! 🪙 +5", tcol:"#a06a1a", dcol:"#8a5a1a" });
+
+  // ================= BAKE A CAKE (900 idea 321) =================
+  S.cake=walkLookJob({ hint:"Walk to pick your cake flavor! 🕹️🎂", title:"🎂 BAKE A CAKE",
+    looks:[{n:"Chocolate",e:"🍫"},{n:"Strawberry",e:"🍓"},{n:"Rainbow",e:"🌈"}],
+    bg:function(pk){ roomBG("#fff0f4","#ffe0ea","#c9a06a"); },
+    drawPick:function(pk){ var frost=["#6a4030","#ffb0c8","#c77ad0"][pk];
+      cx.fillStyle="#eef2f5"; cx.beginPath(); cx.ellipse(W/2,300,92,24,0,0,7); cx.fill();
+      cx.fillStyle="#f0e0c8"; rr(W/2-72,242,144,58,8); cx.fill(); cx.fillStyle=frost; rr(W/2-72,236,144,18,9); cx.fill();
+      cx.fillStyle="#f0e0c8"; rr(W/2-52,202,104,42,8); cx.fill(); cx.fillStyle=frost; rr(W/2-52,196,104,16,8); cx.fill();
+      if(pk===2){ ["#ff5a7a","#ffd23f","#5ad0a0","#5aa0ff"].forEach(function(c,i){ cx.fillStyle=c; cx.beginPath(); cx.arc(W/2-30+i*20,244,4,0,7); cx.fill(); }); }
+      for(var i=0;i<3;i++){ cx.fillStyle="#5a9ae0"; cx.fillRect(W/2-26+i*26,176,4,22); cx.fillStyle="#ffce3f"; cx.beginPath(); cx.arc(W/2-24+i*26,172,4,0,7); cx.fill(); }
+      emo("🍒",W/2,200,18); emo("🎉",84,160,26); emo("🎈",W-80,150,26); },
+    doneMsg:"🎂 CAKE BAKED!", doneSub:"Yummy! 🪙 +5", tcol:"#c0407a", dcol:"#a0306a" });
+
+
+  // ================= SWIM (900 idea 421) + WATER FIGHT (idea 427) =================
+  S.swim=walkLookJob({ hint:"Walk to pick how to swim! 🕹️🏊", title:"🏊 SWIM IN THE POOL",
+    looks:[{n:"Splash",e:"💦"},{n:"Float",e:"🛟"},{n:"Dive",e:"🤸"}],
+    bg:function(pk){ var sky=cx.createLinearGradient(0,0,0,150); sky.addColorStop(0,"#bfe6ff"); sky.addColorStop(1,"#eafbf0"); cx.fillStyle=sky; cx.fillRect(0,0,W,150); cx.fillStyle="#8fd07b"; cx.fillRect(0,150,W,H-150); cx.fillStyle="#3aa0e0"; rr(40,206,W-80,150,16); cx.fill(); cx.fillStyle="#5ab0ee"; for(var i=0;i<6;i++){cx.fillRect(48,220+i*22,W-96,3);} },
+    drawPick:function(pk){
+      if(pk===0){ emo("🌊",W/2-60,260,40); emo("💦",W/2,240,48); emo("🌊",W/2+60,260,40); emo("🙂",W/2,280,34); }
+      else if(pk===1){ cx.fillStyle="#ffce3f"; cx.beginPath(); cx.ellipse(W/2,272,54,30,0,0,7); cx.fill(); cx.fillStyle="#3aa0e0"; cx.beginPath(); cx.ellipse(W/2,272,30,16,0,0,7); cx.fill(); emo("😎",W/2,268,34); }
+      else { emo("🤸",W/2,240,54); emo("💦",W/2,296,30); }
+      emo("☀️",W-56,86,28); emo("🏖️",76,182,26); },
+    doneMsg:"🏊 SPLASH SPLASH!", doneSub:"So refreshing! 🪙 +5", tcol:"#2a7ac0", dcol:"#1a6ab0" });
+  S.waterfight=walkLookJob({ hint:"Walk to pick your water toy! 🕹️🔫", title:"💦 HAVE A WATER FIGHT",
+    looks:[{n:"Squirter",e:"🔫"},{n:"Balloons",e:"🎈"},{n:"Bucket",e:"🪣"}],
+    bg:function(pk){ var sky=cx.createLinearGradient(0,0,0,150); sky.addColorStop(0,"#bfe6ff"); sky.addColorStop(1,"#eafbf0"); cx.fillStyle=sky; cx.fillRect(0,0,W,150); cx.fillStyle="#8fd07b"; cx.fillRect(0,150,W,H-150); },
+    drawPick:function(pk){
+      if(pk===0){ emo("🔫",W/2,252,54); for(var i=0;i<6;i++){ cx.fillStyle="#5ab0ee"; cx.beginPath(); cx.arc(W/2+40+i*14,246-i*2,4,0,7); cx.fill(); } }
+      else if(pk===1){ ["#e05a6a","#5aa0e0","#6ac06a","#ffce3f"].forEach(function(c,i){ cx.fillStyle=c; cx.beginPath(); cx.ellipse(W/2-60+i*40,250,16,20,0,0,7); cx.fill(); cx.fillStyle="#5a8aac"; cx.fillRect(W/2-60+i*40-1,268,2,8); }); }
+      else { cx.fillStyle="#3a70c0"; rr(W/2-30,236,60,54,8); cx.fill(); cx.fillStyle="#5ab0ee"; cx.beginPath(); cx.ellipse(W/2,236,30,10,0,0,7); cx.fill(); emo("💦",W/2,214,30); }
+      emo("😆",96,250,32); emo("😅",W-96,252,32); },
+    doneMsg:"💦 SO MUCH FUN!", doneSub:"Everyone's soaked! 🪙 +5", tcol:"#2a7ac0", dcol:"#1a6ab0" });
+
+  // ================= TAKE OUT TRASH (900 idea 485) + POLISH FLOORS (idea 499) =================
+  S.trash=walkLookJob({ hint:"Walk to pick which bin! 🕹️🗑️", title:"🗑️ TAKE OUT THE TRASH",
+    looks:[{n:"Trash",e:"🗑️"},{n:"Recycle",e:"♻️"},{n:"Compost",e:"🥗"}],
+    bg:function(pk){ var sky=cx.createLinearGradient(0,0,0,150); sky.addColorStop(0,"#cfe0f0"); sky.addColorStop(1,"#eef4ec"); cx.fillStyle=sky; cx.fillRect(0,0,W,150); cx.fillStyle="#9aa0a6"; cx.fillRect(0,150,W,H-150); cx.fillStyle="#8a9096"; for(var i=0;i<8;i++){cx.fillRect(0,150+i*26,W,2);} },
+    drawPick:function(pk){ var col=["#4a8a4a","#3a8ad0","#8a5a2a"][pk];
+      cx.fillStyle=col; rr(W/2-40,224,80,96,10); cx.fill(); cx.fillStyle="rgba(255,255,255,.2)"; rr(W/2-40,224,80,20,10); cx.fill();
+      cx.fillStyle="#2a2a30"; rr(W/2-46,214,92,14,6); cx.fill(); cx.fillStyle="#3a3a40"; rr(W/2-8,200,16,16,3); cx.fill();
+      cx.fillStyle="#fff"; text(["🗑️","♻️","🥗"][pk],W/2,272,30);
+      emo("🧹",96,270,28); emo("✨",W/2+70,236,20); },
+    doneMsg:"🗑️ ALL CLEAN!", doneSub:"Trash is out! 🪙 +5", tcol:"#4a5a4a", dcol:"#3a5a3a" });
+  S.polish=walkLookJob({ hint:"Walk to pick your floor shine! 🕹️✨", title:"✨ POLISH THE FLOORS",
+    looks:[{n:"Wood",e:"🪵"},{n:"Marble",e:"🔳"},{n:"Sparkle",e:"✨"}],
+    bg:function(pk){ roomBG("#eaf0f6","#dfe8f0","#c9b48a"); },
+    drawPick:function(pk){ var col=["#c99a5a","#e8e8ee","#d0c0e8"][pk], col2=["#b58a4a","#d0d0da","#b8a0d8"][pk];
+      cx.fillStyle=col; rr(50,236,W-100,120,8); cx.fill();
+      cx.strokeStyle=col2; cx.lineWidth=2; if(pk===0){ for(var yy=250;yy<356;yy+=18){ cx.beginPath(); cx.moveTo(56,yy); cx.lineTo(W-56,yy); cx.stroke(); } }
+      else if(pk===1){ for(var i=0;i<5;i++){ cx.beginPath(); cx.moveTo(70+i*70,236); cx.lineTo(40+i*70,356); cx.stroke(); } }
+      else { for(var i=0;i<10;i++){ emo("✨",70+((i*37)%(W-140)),256+((i*53)%90),16); } }
+      cx.fillStyle="rgba(255,255,255,.5)"; cx.beginPath(); cx.moveTo(90,246); cx.lineTo(150,246); cx.lineTo(120,300); cx.lineTo(70,300); cx.closePath(); cx.fill();
+      emo("🧽",W-96,246,28); },
+    doneMsg:"✨ SO SHINY!", doneSub:"Floors sparkle! 🪙 +5", tcol:"#6a5a8a", dcol:"#5a4a7a" });
+
+  // ================= PAINTING: front door 522, ceiling 526, playhouse 531, cabinets 535 =================
+  function paintJob(o){ return walkLookJob({ hint:o.hint, title:o.title,
+    looks:[{n:o.cn[0],e:"🎨"},{n:o.cn[1],e:"🎨"},{n:o.cn[2],e:"🎨"}],
+    bg:o.bg, drawPick:function(pk){ o.draw(o.cols[pk]); emo("🖌️",96,300,30); emo("🪣",W-92,300,26); },
+    doneMsg:o.doneMsg, doneSub:"Fresh paint! 🪙 +5", tcol:"#7a5a3a", dcol:"#6a4a2a" }); }
+  S.paintdoor=paintJob({ hint:"Walk to pick the door color! 🕹️🚪", title:"🚪 PAINT THE FRONT DOOR",
+    cn:["Red","Blue","Green"], cols:["#c0402a","#3a6ac0","#3a8a4a"],
+    bg:function(pk){ var sky=cx.createLinearGradient(0,0,0,150); sky.addColorStop(0,"#bfe6ff"); sky.addColorStop(1,"#eafbf0"); cx.fillStyle=sky; cx.fillRect(0,0,W,150); cx.fillStyle="#e8ddc6"; cx.fillRect(0,150,W,H-150); },
+    draw:function(col){ cx.fillStyle="#d8cbb0"; rr(W/2-70,180,140,180,4); cx.fill(); cx.fillStyle=col; rr(W/2-46,200,92,158,4); cx.fill(); cx.strokeStyle="rgba(0,0,0,.15)"; cx.lineWidth=2; rr(W/2-36,214,72,60,3); cx.stroke(); rr(W/2-36,282,72,60,3); cx.stroke(); cx.fillStyle="#ffce3f"; cx.beginPath(); cx.arc(W/2+30,290,5,0,7); cx.fill(); },
+    doneMsg:"🚪 DOOR PAINTED!" });
+  S.paintceiling=paintJob({ hint:"Walk to pick the ceiling color! 🕹️", title:"🎨 PAINT THE CEILING",
+    cn:["Sky","Cream","Stars"], cols:["#a8d8f5","#fff0d8","#2a3a6a"],
+    bg:function(pk){ roomBG("#eef2f6","#e0e8f0","#c9b48a"); },
+    draw:function(col){ cx.fillStyle=col; rr(50,170,W-100,120,6); cx.fill(); cx.strokeStyle="rgba(0,0,0,.12)"; cx.lineWidth=3; rr(50,170,W-100,120,6); cx.stroke(); if(col==="#2a3a6a"){ for(var i=0;i<9;i++){ emo("⭐",80+((i*47)%(W-160)),190+((i*40)%80),16); } } cx.fillStyle="#f0e0b0"; cx.beginPath(); cx.arc(W/2,300,10,0,7); cx.fill(); cx.strokeStyle="#c9a040"; cx.lineWidth=2; cx.beginPath(); cx.moveTo(W/2,290); cx.lineTo(W/2,270); cx.stroke(); },
+    doneMsg:"🎨 CEILING DONE!" });
+  S.paintplayhouse=paintJob({ hint:"Walk to pick the playhouse color! 🕹️🏠", title:"🏠 PAINT THE PLAYHOUSE",
+    cn:["Pink","Yellow","Teal"], cols:["#f2a0c0","#ffd23f","#4ac0b0"],
+    bg:function(pk){ var sky=cx.createLinearGradient(0,0,0,150); sky.addColorStop(0,"#bfe6ff"); sky.addColorStop(1,"#eafbf0"); cx.fillStyle=sky; cx.fillRect(0,0,W,150); cx.fillStyle="#8fd07b"; cx.fillRect(0,150,W,H-150); },
+    draw:function(col){ cx.fillStyle=col; rr(W/2-64,224,128,110,6); cx.fill(); cx.fillStyle="#c0503a"; cx.beginPath(); cx.moveTo(W/2-74,224); cx.lineTo(W/2,168); cx.lineTo(W/2+74,224); cx.closePath(); cx.fill(); cx.fillStyle="#7a4a2a"; rr(W/2-18,286,36,48,3); cx.fill(); cx.fillStyle="#bfe6ff"; rr(W/2+22,246,30,28,3); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; cx.strokeRect(W/2+22,246,30,28); },
+    doneMsg:"🏠 PLAYHOUSE PAINTED!" });
+  S.paintcabinets=paintJob({ hint:"Walk to pick the cabinet color! 🕹️", title:"🎨 PAINT THE CABINETS",
+    cn:["White","Navy","Sage"], cols:["#f2f2ee","#33436a","#8aa07a"],
+    bg:function(pk){ roomBG("#f4ead6","#ecdcbe","#c9a06a"); },
+    draw:function(col){ cx.fillStyle=col; rr(50,236,W-100,100,4); cx.fill(); cx.strokeStyle="rgba(0,0,0,.18)"; cx.lineWidth=2; for(var i=0;i<4;i++){ cx.strokeRect(58+i*(W-116)/4,244,(W-116)/4-6,84); cx.fillStyle="#c9a040"; cx.beginPath(); cx.arc(58+i*(W-116)/4+(W-116)/4-14,286,3,0,7); cx.fill(); } cx.fillStyle="#d8c8a8"; rr(50,224,W-100,14,3); cx.fill(); },
+    doneMsg:"🎨 CABINETS PAINTED!" });
+
+
+  // ================= CLOUD BEDROOM (1500 idea 1) =================
+  S.cloudbed=walkLookJob({ hint:"Walk to pick your cloud bed! 🕹️☁️", title:"☁️ A CLOUD BEDROOM",
+    looks:[{n:"Fluffy",e:"☁️"},{n:"Sunset",e:"🌅"},{n:"Starry",e:"🌙"}],
+    bg:function(pk){ var i=pk<0?0:pk; var top=["#cfe8ff","#ffd9c0","#2a2a56"][i], bot=["#eaf5ff","#ffe8d6","#3a3a72"][i];
+      var gd=cx.createLinearGradient(0,0,0,H); gd.addColorStop(0,top); gd.addColorStop(1,bot); cx.fillStyle=gd; cx.fillRect(0,0,W,H); },
+    drawPick:function(pk){
+      // little clouds floating
+      cx.fillStyle="rgba(255,255,255,.7)";
+      [[86,120],[W-90,140],[W/2+40,96]].forEach(function(c){ cx.beginPath(); cx.arc(c[0],c[1],16,0,7); cx.arc(c[0]+18,c[1]+4,13,0,7); cx.arc(c[0]-16,c[1]+5,12,0,7); cx.fill(); });
+      if(pk===2){ for(var i=0;i<10;i++){ emo("⭐",60+((i*53)%(W-120)),90+((i*37)%70),14); } emo("🌙",W-70,96,30); }
+      if(pk===1){ emo("☀️",W-64,100,30); }
+      // cloud bed base
+      var bedcol=["#ffffff","#ffd0b0","#c8c0f0"][pk];
+      cx.fillStyle="rgba(0,0,0,.10)"; cx.beginPath(); cx.ellipse(W/2,332,120,20,0,0,7); cx.fill();
+      cx.fillStyle=bedcol;
+      cx.beginPath();
+      cx.arc(W/2-80,300,34,0,7); cx.arc(W/2-30,286,40,0,7); cx.arc(W/2+30,286,40,0,7); cx.arc(W/2+80,300,34,0,7);
+      cx.rect(W/2-112,296,224,40); cx.fill();
+      // headboard cloud
+      cx.beginPath(); cx.arc(W/2-52,258,22,0,7); cx.arc(W/2-16,250,26,0,7); cx.arc(W/2+20,252,24,0,7); cx.arc(W/2+52,262,20,0,7); cx.fill();
+      // pillows
+      var pcol=["#bfe0ff","#ff9ec0","#9aa0ff"][pk];
+      cx.fillStyle=pcol; rr(W/2-70,272,52,26,12); cx.fill(); rr(W/2+18,272,52,26,12); cx.fill();
+      cx.strokeStyle="rgba(0,0,0,.10)"; cx.lineWidth=2; rr(W/2-70,272,52,26,12); cx.stroke(); rr(W/2+18,272,52,26,12); cx.stroke();
+      // fluffy blanket edge
+      cx.fillStyle="rgba(255,255,255,.55)"; for(var i=0;i<9;i++){ cx.beginPath(); cx.arc(W/2-96+i*24,330,12,0,7); cx.fill(); }
+      emo("🧸",W/2-92,300,22); emo("⭐",W/2+92,286,18); },
+    doneMsg:"☁️ DREAMY BEDROOM!", doneSub:"Sweet dreams! 🪙 +5", tcol:"#5a6a9a", dcol:"#4a5a8a" });
+
+  // ================= TRAMPOLINE ROOM (1500 idea 12) + SECRET DOOR BOOKCASE (idea 14) =================
+  S.trampoline=walkLookJob({ hint:"Walk to pick your trampoline! 🕹️🤸", title:"🤸 A TRAMPOLINE ROOM",
+    looks:[{n:"Blue",e:"🔵"},{n:"Pink",e:"🌸"},{n:"Rainbow",e:"🌈"}],
+    bg:function(pk){ roomBG("#eaf2ff","#dbe8ff","#c9b48a"); },
+    drawPick:function(pk){
+      var pad=["#3a7ad0","#f06aa0","#8a5ad0"][pk], leg="#9aa0aa";
+      // shadow
+      cx.fillStyle="rgba(0,0,0,.10)"; cx.beginPath(); cx.ellipse(W/2,338,120,18,0,0,7); cx.fill();
+      // frame legs
+      cx.strokeStyle=leg; cx.lineWidth=7; cx.beginPath(); cx.moveTo(W/2-104,300); cx.lineTo(W/2-116,338); cx.moveTo(W/2+104,300); cx.lineTo(W/2+116,338); cx.stroke();
+      // safety net poles
+      cx.strokeStyle="#c8ccd2"; cx.lineWidth=5; cx.beginPath(); cx.moveTo(W/2-112,300); cx.lineTo(W/2-112,196); cx.moveTo(W/2+112,300); cx.lineTo(W/2+112,196); cx.stroke();
+      cx.strokeStyle="rgba(150,170,200,.5)"; cx.lineWidth=2; for(var x=W/2-108;x<=W/2+108;x+=14){ cx.beginPath(); cx.moveTo(x,200); cx.lineTo(x,296); cx.stroke(); }
+      // outer ring + jump pad
+      cx.fillStyle="#c8ccd2"; cx.beginPath(); cx.ellipse(W/2,300,110,26,0,0,7); cx.fill();
+      cx.fillStyle=pad; cx.beginPath(); cx.ellipse(W/2,300,92,20,0,0,7); cx.fill();
+      if(pk===2){ ["#ff5a7a","#ffce3f","#5ad0a0","#5aa0ff"].forEach(function(c,i){ cx.strokeStyle=c; cx.lineWidth=4; cx.beginPath(); cx.ellipse(W/2,300,92-i*18,20-i*4,0,0,7); cx.stroke(); }); }
+      // spring dots
+      cx.fillStyle="#ffd23f"; for(var a=0;a<12;a++){ var an=a/12*6.28; cx.beginPath(); cx.arc(W/2+Math.cos(an)*100,300+Math.sin(an)*23,2.5,0,7); cx.fill(); }
+      // bouncing star + happy
+      emo("🌟",W/2,224,26); emo("😃",W/2+70,214,24);
+      text("Boing! Boing!",W/2,182,13,"#4a6aaa"); },
+    doneMsg:"🤸 TRAMPOLINE ROOM!", doneSub:"Bounce high! 🪙 +5", tcol:"#3a6ac0", dcol:"#2a5ab0" });
+
+  S.secretdoor=walkLookJob({ hint:"Walk to pick your secret bookcase! 🕹️📚", title:"📚 A SECRET DOOR BOOKCASE",
+    looks:[{n:"Classic",e:"📕"},{n:"Wizard",e:"🪄"},{n:"Cozy",e:"🧸"}],
+    bg:function(pk){ roomBG("#efe6d6","#e4d8c2","#b58a54"); },
+    drawPick:function(pk){
+      var wood=["#8a5a34","#5a3a6a","#a5703a"][pk], wood2=["#6a4424","#452a52","#8a5a2a"][pk];
+      // bookcase (slightly open like a door)
+      cx.save(); cx.translate(W/2-84,180);
+      cx.fillStyle="#2a2018"; cx.fillRect(4,6,150,166); // dark gap behind
+      cx.rotate(-0.14);
+      cx.fillStyle=wood; rr(0,0,150,170,4); cx.fill(); cx.strokeStyle=wood2; cx.lineWidth=3; rr(0,0,150,170,4); cx.stroke();
+      // shelves with books
+      var bcols=["#e0503a","#3a8ad0","#4a9a4a","#e0a83a","#8a5ad0","#e06aa0"];
+      for(var sh=0;sh<4;sh++){ var sy=14+sh*40; cx.fillStyle=wood2; cx.fillRect(6,sy+30,138,5);
+        for(var bk=0;bk<7;bk++){ cx.fillStyle=bcols[(sh*7+bk)%bcols.length]; var bw=14+((bk*sh)%6); cx.fillRect(10+bk*19,sy+8-((bk%3)),bw,26+((bk%3))); } }
+      if(pk===1){ emo("🪄",120,150,20); }
+      if(pk===2){ emo("🧸",24,150,20); }
+      cx.restore();
+      // glowing secret passage
+      cx.fillStyle="rgba(255,230,150,.35)"; cx.beginPath(); cx.moveTo(W/2+64,190); cx.lineTo(W/2+92,196); cx.lineTo(W/2+92,344); cx.lineTo(W/2+64,350); cx.closePath(); cx.fill();
+      emo("🔒",W/2+42,300,22); text("Shhh... secret!",W/2,176,13,"#7a5a2a"); },
+    doneMsg:"📚 SECRET DOOR READY!", doneSub:"A hidden room! 🪙 +5", tcol:"#7a5a2a", dcol:"#6a4a1a" });
+
+  // ================= SLIDE BETWEEN TWO FLOORS (1500 idea 10) =================
+  S.slide=walkLookJob({ hint:"Walk to pick your indoor slide! 🕹️🛝", title:"🛝 A SLIDE BETWEEN FLOORS",
+    looks:[{n:"Curvy",e:"🌊"},{n:"Straight",e:"📐"},{n:"Spiral",e:"🌀"}],
+    bg:function(pk){ roomBG("#fff0dc","#f6e2c2","#c9a06a"); },
+    drawPick:function(pk){
+      var col=["#f06a5a","#3aa0d0","#8a5ad0"][pk], col2=["#d0503a","#2a80b0","#6a3ac0"][pk];
+      // two floors: upper deck and lower floor line
+      cx.fillStyle="#c99a6a"; cx.fillRect(40,206,W-80,12); // upper floor
+      cx.fillStyle="#b98a54"; cx.fillRect(40,336,W-80,10); // lower floor
+      // rails on upper deck
+      cx.strokeStyle="#a5703a"; cx.lineWidth=4; cx.beginPath(); cx.moveTo(60,206); cx.lineTo(60,176); cx.moveTo(120,206); cx.lineTo(120,176); cx.stroke(); cx.beginPath(); cx.moveTo(56,178); cx.lineTo(124,178); cx.stroke();
+      // the slide
+      cx.lineCap="round"; cx.strokeStyle=col; cx.lineWidth=26;
+      cx.beginPath();
+      if(pk===0){ cx.moveTo(110,214); cx.bezierCurveTo(210,236,110,300,300,332); }
+      else if(pk===1){ cx.moveTo(110,214); cx.lineTo(300,332); }
+      else { cx.moveTo(140,214); cx.bezierCurveTo(300,250,120,300,290,332); }
+      cx.stroke();
+      // highlight stripe
+      cx.strokeStyle=col2; cx.lineWidth=4;
+      cx.beginPath();
+      if(pk===0){ cx.moveTo(110,214); cx.bezierCurveTo(210,236,110,300,300,332); }
+      else if(pk===1){ cx.moveTo(110,214); cx.lineTo(300,332); }
+      else { cx.moveTo(140,214); cx.bezierCurveTo(300,250,120,300,290,332); }
+      cx.stroke(); cx.lineCap="butt";
+      // slide end lip + landing cushion
+      cx.fillStyle=col; cx.beginPath(); cx.arc(300,332,15,0,7); cx.fill();
+      cx.fillStyle="#7ac0e0"; cx.beginPath(); cx.ellipse(316,340,30,10,0,0,7); cx.fill();
+      // happy slider
+      emo("😃",140,206,22); emo("🌟",250,270,20); emo("🪜",70,320,26);
+      text("Wheee!",210,190,14,"#c0503a"); },
+    doneMsg:"🛝 SLIDE INSTALLED!", doneSub:"Wheee! 🪙 +5", tcol:"#c0503a", dcol:"#a0402a" });
+
+  // ================= WINDOW FULL OF PLANTS (1500 idea 25) =================
+  S.windowplants=walkLookJob({ hint:"Walk to pick your window plants! 🕹️🪴", title:"🪴 A WINDOW OF PLANTS",
+    looks:[{n:"Herbs",e:"🌿"},{n:"Flowers",e:"🌷"},{n:"Cactus",e:"🌵"}],
+    bg:function(pk){ roomBG("#eaf3ea","#dcebdc","#b58a54"); },
+    drawPick:function(pk){
+      // window frame with bright sky
+      var sky=cx.createLinearGradient(0,150,0,330); sky.addColorStop(0,"#bfe6ff"); sky.addColorStop(1,"#eafaff"); cx.fillStyle=sky; rr(72,150,W-144,196,6); cx.fill();
+      cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(W-118,190,16,0,7); cx.fill();
+      cx.fillStyle="rgba(255,255,255,.8)"; cx.beginPath(); cx.arc(120,196,12,0,7); cx.arc(138,200,10,0,7); cx.arc(104,200,9,0,7); cx.fill();
+      // white window frame
+      cx.strokeStyle="#ffffff"; cx.lineWidth=10; rr(72,150,W-144,196,6); cx.stroke();
+      cx.strokeStyle="#e6e6e6"; cx.lineWidth=5; cx.beginPath(); cx.moveTo(W/2,150); cx.lineTo(W/2,346); cx.stroke();
+      // two shelves across the window
+      var shelfY=[236,300];
+      for(var si=0;si<shelfY.length;si++){ var sy=shelfY[si];
+        cx.fillStyle="#a5703a"; cx.fillRect(78,sy,W-156,9);
+        for(var p=0;p<4;p++){ var px=104+p*(W-208)/3;
+          // pot
+          var potc=["#d0703a","#e0a0c0","#c8b48a"][(p+si)%3]; cx.fillStyle=potc; cx.beginPath(); cx.moveTo(px-13,sy); cx.lineTo(px+13,sy); cx.lineTo(px+10,sy-16); cx.lineTo(px-10,sy-16); cx.closePath(); cx.fill();
+          cx.fillStyle="rgba(0,0,0,.08)"; cx.fillRect(px-13,sy-18,26,4);
+          if(pk===0){ cx.strokeStyle="#3a8a3a"; cx.lineWidth=3; for(var b=-1;b<=1;b++){ cx.beginPath(); cx.moveTo(px,sy-16); cx.quadraticCurveTo(px+b*10,sy-30,px+b*14,sy-40); cx.stroke(); } emo("🌿",px,sy-36,18); }
+          else if(pk===1){ cx.strokeStyle="#3a8a3a"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(px,sy-16); cx.lineTo(px,sy-34); cx.stroke(); emo(["🌷","🌼","🌹","🌺"][p%4],px,sy-40,20); }
+          else { cx.fillStyle="#4a9a4a"; rr(px-7,sy-34,14,20,6); cx.fill(); cx.fillStyle="#5aaa5a"; rr(px-14,sy-26,8,12,4); cx.fill(); rr(px+6,sy-28,8,12,4); cx.fill(); if((p+si)%2===0){ cx.fillStyle="#ff5a7a"; cx.beginPath(); cx.arc(px,sy-36,4,0,7); cx.fill(); } }
+        }
+      }
+      emo("🪟",W/2+92,240,18); emo("🐝",120,260,16);
+      text("So fresh & green!",W/2,172,13,"#3a7a3a"); },
+    doneMsg:"🪴 PLANT WINDOW DONE!", doneSub:"So leafy! 🪙 +5", tcol:"#3a7a3a", dcol:"#2a6a2a" });
+
+  // ================= BUBBLE-BATH TUB (1500 idea 81) =================
+  S.bubblebath=walkLookJob({ hint:"Walk to pick your bubble bath! 🕹️🛁", title:"🛁 A BUBBLE-BATH TUB",
+    looks:[{n:"Bubbles",e:"🫧"},{n:"Duckies",e:"🦆"},{n:"Petals",e:"🌺"}],
+    bg:function(pk){ roomBG("#dff0f6","#cfe6f0","#b0c4cc");
+      // wall tiles
+      cx.strokeStyle="rgba(255,255,255,.5)"; cx.lineWidth=2; for(var y=60;y<150;y+=22){ cx.beginPath(); cx.moveTo(30,y); cx.lineTo(W-30,y); cx.stroke(); } for(var x=40;x<W-30;x+=44){ cx.beginPath(); cx.moveTo(x,60); cx.lineTo(x,148); cx.stroke(); } },
+    drawPick:function(pk){
+      // bath mat
+      cx.fillStyle="#9ad0e0"; rr(W/2-96,336,192,16,8); cx.fill();
+      // tub body
+      cx.fillStyle="#ffffff"; rr(W/2-108,232,216,104,26); cx.fill(); cx.strokeStyle="#cfe0e6"; cx.lineWidth=3; rr(W/2-108,232,216,104,26); cx.stroke();
+      // little feet
+      cx.fillStyle="#e0e8ec"; cx.beginPath(); cx.arc(W/2-88,338,9,0,7); cx.fill(); cx.beginPath(); cx.arc(W/2+88,338,9,0,7); cx.fill();
+      // water
+      cx.fillStyle="#8fd0ec"; rr(W/2-96,250,192,66,18); cx.fill();
+      // faucet
+      cx.strokeStyle="#cfd8dc"; cx.lineWidth=6; cx.beginPath(); cx.moveTo(W/2+104,232); cx.lineTo(W/2+104,208); cx.lineTo(W/2+84,208); cx.stroke();
+      cx.fillStyle="#bfe6ff"; for(var i=0;i<3;i++){ cx.beginPath(); cx.arc(W/2+82,220+i*8,2,0,7); cx.fill(); }
+      // foam / bubbles mound
+      cx.fillStyle="rgba(255,255,255,.96)"; for(var i=0;i<16;i++){ var bx=W/2-90+((i*29)%180), by=254-((i*13)%18); cx.beginPath(); cx.arc(bx,by,10+((i*7)%6),0,7); cx.fill(); }
+      if(pk===0){ cx.fillStyle="rgba(255,255,255,.7)"; for(var i=0;i<7;i++){ cx.beginPath(); cx.arc(W/2-70+i*22, 210-((i*17)%40), 6+((i*5)%6),0,7); cx.fill(); } text("Pop! Pop!",W/2,188,13,"#3a8ac0"); }
+      else if(pk===1){ for(var i=0;i<3;i++){ emo("🦆",W/2-52+i*52,246,26); } }
+      else { for(var i=0;i<8;i++){ emo("🌸",W/2-84+((i*47)%172),252-((i*11)%12),16); } }
+      // happy bather peeking
+      cx.fillStyle="#f6c9a0"; cx.beginPath(); cx.arc(W/2-30,244,13,0,7); cx.fill(); cx.fillStyle="#3a2a1a"; cx.beginPath(); cx.arc(W/2-30,238,13,3.14,0); cx.fill(); cx.fillStyle="#2a2a2a"; cx.beginPath(); cx.arc(W/2-34,245,1.6,0,7); cx.arc(W/2-26,245,1.6,0,7); cx.fill(); cx.strokeStyle="#c06a4a"; cx.lineWidth=1.5; cx.beginPath(); cx.arc(W/2-30,249,4,0,3.14); cx.stroke();
+      emo("🧴",W/2+70,300,22); emo("🧽",W/2-92,300,20); },
+    doneMsg:"🛁 BUBBLE BATH READY!", doneSub:"Splish splash! 🪙 +5", tcol:"#2a7ab0", dcol:"#1a6aa0" });
+
+  // ================= TALL FIDDLE-LEAF TREE (1500 idea 101) =================
+  S.fiddleleaf=walkLookJob({ hint:"Walk to pick your tall plant! 🕹️🪴", title:"🪴 A TALL PLANT",
+    looks:[{n:"Fiddle",e:"🌳"},{n:"Palm",e:"🌴"},{n:"Rubber",e:"🌱"}],
+    bg:function(pk){ roomBG("#f2efe6","#e6e0d0","#c9a06a");
+      // cozy corner: window + rug
+      cx.fillStyle="#bfe6ff"; rr(56,66,96,84,6); cx.fill(); cx.strokeStyle="#d8d0c0"; cx.lineWidth=5; rr(56,66,96,84,6); cx.stroke(); cx.beginPath(); cx.moveTo(104,66); cx.lineTo(104,150); cx.moveTo(56,108); cx.lineTo(152,108); cx.stroke();
+      cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(104,96,12,0,7); cx.fill();
+      cx.fillStyle="#d8c0a0"; cx.beginPath(); cx.ellipse(W/2,352,150,26,0,0,7); cx.fill(); },
+    drawPick:function(pk){
+      // pot
+      var potc=["#d8d2c6","#c9784a","#e8e2d6"][pk];
+      cx.fillStyle="rgba(0,0,0,.10)"; cx.beginPath(); cx.ellipse(W/2,352,58,14,0,0,7); cx.fill();
+      cx.fillStyle=potc; cx.beginPath(); cx.moveTo(W/2-42,300); cx.lineTo(W/2+42,300); cx.lineTo(W/2+32,352); cx.lineTo(W/2-32,352); cx.closePath(); cx.fill();
+      cx.fillStyle="rgba(0,0,0,.06)"; cx.fillRect(W/2-46,294,92,10);
+      cx.fillStyle="#6a4a2a"; cx.beginPath(); cx.ellipse(W/2,300,38,7,0,0,7); cx.fill();
+      // trunk
+      cx.strokeStyle="#7a5a34"; cx.lineWidth=8; cx.beginPath(); cx.moveTo(W/2,300); cx.lineTo(W/2-4,178); cx.stroke();
+      if(pk===0){ // fiddle-leaf: big rounded leaves up the stem
+        var pts=[[-24,270,-1],[26,244,1],[-30,214,-1],[28,192,1],[-8,166,0]];
+        pts.forEach(function(p){ cx.save(); cx.translate(W/2+p[0],p[1]); cx.rotate(p[2]*0.5); cx.fillStyle="#3a8a4a"; cx.beginPath(); cx.ellipse(0,0,20,30,0,0,7); cx.fill(); cx.strokeStyle="#2a6a3a"; cx.lineWidth=2; cx.beginPath(); cx.moveTo(0,26); cx.lineTo(0,-26); cx.stroke(); cx.restore(); }); }
+      else if(pk===1){ // palm fronds
+        cx.strokeStyle="#3a9a4a"; cx.lineWidth=5; for(var a=0;a<7;a++){ var an=-1.57+(a-3)*0.42; cx.beginPath(); cx.moveTo(W/2-4,178); var ex=W/2-4+Math.cos(an)*72, ey=178+Math.sin(an)*54; cx.quadraticCurveTo(W/2-4+Math.cos(an)*40,178+Math.sin(an)*20,ex,ey); cx.stroke(); }
+        cx.fillStyle="#8a5a2a"; cx.beginPath(); cx.arc(W/2-4,180,8,0,7); cx.fill(); }
+      else { // rubber plant: dark oval leaves
+        var rp=[[-22,262,-1],[24,236,1],[-24,206,-1],[22,184,1],[-2,162,0]];
+        rp.forEach(function(p){ cx.save(); cx.translate(W/2+p[0],p[1]); cx.rotate(p[2]*0.4); cx.fillStyle="#2a6a3a"; cx.beginPath(); cx.ellipse(0,0,15,26,0,0,7); cx.fill(); cx.fillStyle="#3a8a4a"; cx.beginPath(); cx.ellipse(-3,-3,6,14,0,0,7); cx.fill(); cx.restore(); }); }
+      emo("🌟",W/2+72,196,18); text("So leafy & tall!",W/2,172,13,"#3a7a3a"); },
+    doneMsg:"🪴 PLANT ADDED!", doneSub:"Cozy corner! 🪙 +5", tcol:"#3a7a3a", dcol:"#2a6a2a" });
+
+  // ================= CRAYON CADDY (1500 idea 122) =================
+  S.crayoncaddy=walkLookJob({ hint:"Walk to pick your art supplies! 🕹️🖍️", title:"🖍️ A CRAYON CADDY",
+    looks:[{n:"Crayons",e:"🖍️"},{n:"Markers",e:"🖊️"},{n:"Pencils",e:"✏️"}],
+    bg:function(pk){ roomBG("#fff4e0","#ffe9c6","#c9a06a");
+      // art on the wall
+      var wc=["#ff8aa0","#8ac0ff","#9adf9a"]; for(var i=0;i<3;i++){ cx.fillStyle="#fff"; rr(56+i*116,58,84,60,6); cx.fill(); cx.strokeStyle="#c9a06a"; cx.lineWidth=3; rr(56+i*116,58,84,60,6); cx.stroke(); cx.fillStyle=wc[i]; cx.beginPath(); cx.arc(56+i*116+42,88,15,0,7); cx.fill(); } },
+    drawPick:function(pk){
+      // table
+      cx.fillStyle="rgba(0,0,0,.10)"; cx.beginPath(); cx.ellipse(W/2,352,150,22,0,0,7); cx.fill();
+      cx.fillStyle="#c98f5a"; rr(W/2-150,318,300,20,8); cx.fill(); cx.fillStyle="#a5703a"; cx.fillRect(W/2-120,338,12,26); cx.fillRect(W/2+108,338,12,26);
+      // paper with a doodle
+      cx.fillStyle="#fff"; rr(W/2+30,286,96,34,4); cx.fill(); cx.strokeStyle="#e0d0b0"; cx.lineWidth=1.5; rr(W/2+30,286,96,34,4); cx.stroke(); cx.strokeStyle="#ff8aa0"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(W/2+42,308); cx.quadraticCurveTo(W/2+64,286,W/2+86,308); cx.quadraticCurveTo(W/2+104,320,W/2+116,300); cx.stroke();
+      // caddy cup
+      var cadc=["#ff8a3a","#7a5ad0","#3aa0d0"][pk];
+      cx.fillStyle=cadc; cx.beginPath(); cx.moveTo(W/2-96,300); cx.lineTo(W/2-24,300); cx.lineTo(W/2-30,254); cx.lineTo(W/2-90,254); cx.closePath(); cx.fill();
+      cx.fillStyle="rgba(255,255,255,.25)"; cx.beginPath(); cx.moveTo(W/2-96,300); cx.lineTo(W/2-62,300); cx.lineTo(W/2-64,254); cx.lineTo(W/2-90,254); cx.closePath(); cx.fill();
+      // supplies sticking out
+      var cols=["#e0403a","#3a8ad0","#4a9a4a","#e0a83a","#8a5ad0","#e06aa0","#40b0a0"];
+      for(var i=0;i<7;i++){ var x=W/2-86+i*9, top=254-16-((i*7)%18); cx.fillStyle=cols[i%cols.length]; cx.fillRect(x,top,7,254-top);
+        if(pk===0){ cx.beginPath(); cx.moveTo(x,top); cx.lineTo(x+3.5,top-6); cx.lineTo(x+7,top); cx.closePath(); cx.fill(); } // crayon tip
+        else if(pk===1){ cx.fillStyle="#555"; cx.fillRect(x,top,7,4); } // marker cap
+        else { cx.fillStyle="#f0d0a0"; cx.beginPath(); cx.moveTo(x,top); cx.lineTo(x+3.5,top-6); cx.lineTo(x+7,top); cx.closePath(); cx.fill(); cx.fillStyle="#333"; cx.beginPath(); cx.moveTo(x+1.5,top-3); cx.lineTo(x+3.5,top-6); cx.lineTo(x+5.5,top-3); cx.closePath(); cx.fill(); } }
+      emo("🌟",W/2+96,264,18); text("Let's color!",W/2,190,13,"#c06a1a"); },
+    doneMsg:"🖍️ ART CADDY READY!", doneSub:"Time to color! 🪙 +5", tcol:"#c06a1a", dcol:"#a0501a" });
+
+  // ================= ARFF LEARNS A TRICK (1500 idea 161) + FLUFFY HAIRCUT (idea 163) =================
+  S.arfftrick=walkLookJob({ hint:"Walk to pick a trick for Arff! 🕹️🐕", title:"🐕 ARFF LEARNS A TRICK",
+    looks:[{n:"Sit",e:"🪑"},{n:"Shake",e:"🤝"},{n:"Spin",e:"🔄"}],
+    bg:function(pk){ roomBG("#eaf3e6","#dcebd6","#c9a06a");
+      cx.fillStyle="#c8e0a0"; cx.beginPath(); cx.ellipse(W/2,344,150,26,0,0,7); cx.fill(); },
+    drawPick:function(pk){
+      // Arff, big and happy
+      drawMaltipoo(W/2-6,300,1,2.3);
+      // trick cue
+      if(pk===0){ text("Good sit! 🪑",W/2,214,14,"#3a7a3a"); emo("🍪",W/2+70,296,24); }
+      else if(pk===1){ text("Shake a paw! 🤝",W/2,214,14,"#3a7a3a"); emo("🖐️",W/2+66,286,26); }
+      else { text("Spin around! 🔄",W/2,214,14,"#3a7a3a"); emo("💫",W/2-58,270,22); emo("💫",W/2+62,262,20); }
+      // sparkles + a good-girl heart
+      emo("💖",W/2-64,232,20); emo("🌟",W/2+58,228,18);
+      text("Good girl, Arff!",W/2,192,12,"#c06a2a"); },
+    doneMsg:"🐕 GOOD GIRL, ARFF!", doneSub:"She did it! 🪙 +5", tcol:"#3a7a3a", dcol:"#2a6a2a" });
+
+  S.arffhaircut=walkLookJob({ hint:"Walk to pick Arff\'s haircut! 🕹️✂️", title:"✂️ ARFF\'S FLUFFY HAIRCUT",
+    looks:[{n:"Fluffy",e:"🧿"},{n:"Puppy",e:"🐾"},{n:"Curly",e:"🦱"}],
+    bg:function(pk){ roomBG("#eef4f8","#e0ecf2","#b0c4cc");
+      // grooming table
+      cx.fillStyle="#cfd8dc"; rr(W/2-130,318,260,16,8); cx.fill(); },
+    drawPick:function(pk){
+      // extra fluff behind Arff for "fluffy", tight for "puppy", curls for "curly"
+      if(pk===0){ cx.fillStyle="rgba(255,255,255,.9)"; for(var i=0;i<10;i++){ var a=i/10*6.28; cx.beginPath(); cx.arc(W/2-6+Math.cos(a)*34,290+Math.sin(a)*24,12,0,7); cx.fill(); } }
+      else if(pk===2){ cx.strokeStyle="#f2ede2"; cx.lineWidth=5; for(var i=0;i<8;i++){ var a=i/8*6.28; var cxx=W/2-6+Math.cos(a)*30, cyy=290+Math.sin(a)*22; cx.beginPath(); cx.arc(cxx,cyy,7,0,5); cx.stroke(); } }
+      drawMaltipoo(W/2-6,290,1,2.2);
+      // sparkles = fresh & clean
+      emo("✨",W/2-56,244,20); emo("✨",W/2+54,250,18); emo("💖",W/2+64,290,18);
+      // grooming tools
+      emo("✂️",W/2-82,300,26); emo("🪞",W/2+80,306,22);
+      text("So soft & fluffy!",W/2,196,13,"#3a7aaa"); },
+    doneMsg:"✂️ FRESH HAIRCUT!", doneSub:"So fluffy! 🪙 +5", tcol:"#2a7ab0", dcol:"#1a6aa0" });
+
+  // ================= APARTMENTS YOU CAN GO TO =================
+  var APTS=[
+    {name:"Cozy",  wall:"#ffe6d0", floor:"#c99a6a", sofa:"#e0704a", accent:"#ffd23f"},
+    {name:"Ocean", wall:"#d6ecf6", floor:"#9ab0bc", sofa:"#3aa0d0", accent:"#7ad0e0"},
+    {name:"Minty", wall:"#dff2e2", floor:"#a5c0a0", sofa:"#4ab07a", accent:"#bff0c0"},
+    {name:"Berry", wall:"#f6dcec", floor:"#c0a0b0", sofa:"#d05a9a", accent:"#ff9ec0"}
+  ];
+  function drawAptRoom(a){
+    // room walls + floor
+    cx.fillStyle=a.wall; cx.fillRect(30,120,W-60,180);
+    cx.fillStyle=a.floor; cx.fillRect(30,300,W-60,120);
+    cx.strokeStyle="rgba(0,0,0,.12)"; cx.lineWidth=3; cx.strokeRect(30,120,W-60,300);
+    // window with sky
+    cx.fillStyle="#bfe6ff"; rr(64,150,90,74,6); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=6; rr(64,150,90,74,6); cx.stroke(); cx.beginPath(); cx.moveTo(109,150); cx.lineTo(109,224); cx.moveTo(64,187); cx.lineTo(154,187); cx.stroke();
+    cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(109,178,12,0,7); cx.fill();
+    // wall picture
+    cx.fillStyle="#fff"; rr(W-150,150,64,48,4); cx.fill(); cx.strokeStyle=a.accent; cx.lineWidth=4; rr(W-150,150,64,48,4); cx.stroke(); emo("🏠",W-118,174,22);
+    // rug
+    cx.fillStyle=a.accent; cx.beginPath(); cx.ellipse(W/2,340,120,26,0,0,7); cx.fill();
+    // sofa
+    cx.fillStyle=a.sofa; rr(W/2-90,268,180,44,12); cx.fill(); rr(W/2-96,240,26,66,10); cx.fill(); rr(W/2+70,240,26,66,10); cx.fill();
+    cx.fillStyle="rgba(255,255,255,.25)"; rr(W/2-84,252,168,16,8); cx.fill();
+    // cushions
+    cx.fillStyle=a.accent; rr(W/2-70,258,34,26,7); cx.fill(); rr(W/2+36,258,34,26,7); cx.fill();
+    // plant + lamp
+    emo("🪴",W-70,286,30); emo("💡",78,272,26);
+    // tv on wall
+    cx.fillStyle="#2a2a30"; rr(W/2-40,150,80,46,5); cx.fill(); cx.fillStyle="#4a6a8a"; rr(W/2-34,156,68,34,3); cx.fill();
+  }
+  S.apartments={
+    init:function(){ g={mode:"out",px:W/2,py:392,face:1,ph:0,moving:false,cur:-1,msg:"",msgT:0,
+        joy:{active:false,bx:70,by:H-70,kx:70,ky:H-70},
+        doors:[{x:88},{x:176},{x:264},{x:352}], visited:{}};
+      try{ g.visited=JSON.parse(localStorage.getItem("mohouse_apts")||"{}")||{}; }catch(e){}
+      label("Walk up to a door to go inside! 🏢"); },
+    update:function(){ if(g.mode!=="out"){ return; } if(g.msgT>0)g.msgT--;
+      var j=g.joy,dx=0,dy=0; if(j.active){ dx=j.kx-j.bx; dy=j.ky-j.by; var d=Math.hypot(dx,dy); if(d>5){dx/=d;dy/=d;}else{dx=0;dy=0;} }
+      g.px+=dx*3.3; g.py+=dy*3.3; g.px=Math.max(24,Math.min(W-24,g.px)); g.py=Math.max(300,Math.min(410,g.py)); g.moving=(dx!==0||dy!==0); if(g.moving){ g.ph+=0.3; if(dx<-.2)g.face=-1; else if(dx>.2)g.face=1; }
+      for(var i=0;i<g.doors.length;i++){ if(Math.abs(g.px-g.doors[i].x)<32 && g.py<330){ g.cur=i; g.mode="in"; if(!g.visited[i]){ g.visited[i]=true; coins+=5; save(); try{localStorage.setItem("mohouse_apts",JSON.stringify(g.visited));}catch(e){} confettiBurst(); } ding(); label("Welcome to the "+APTS[i].name+" apartment! 🪙 "+coins); } } },
+    render:function(){
+      if(g.mode==="in"){ var a=APTS[g.cur];
+        var gd=cx.createLinearGradient(0,0,0,H); gd.addColorStop(0,"#fff4e6"); gd.addColorStop(1,"#ffe6ef"); cx.fillStyle=gd; cx.fillRect(0,0,W,H);
+        drawAptRoom(a); drawAvatar(W/2,332,1,0,false); coinHUD();
+        // title banner
+        cx.fillStyle="rgba(255,255,255,.95)"; rr(W/2-150,26,300,34,16); cx.fill(); cx.strokeStyle="#ffd98a"; cx.lineWidth=2.5; rr(W/2-150,26,300,34,16); cx.stroke(); text("🏢 "+a.name.toUpperCase()+" APARTMENT",W/2,44,15,"#c06a2a");
+        text("Cozy home! Tap a door number below 🚪",W/2,108,12,"#7a5a3a");
+        // back to building
+        cx.fillStyle="#c9f0c9"; rr(20,H-44,150,34,12); cx.fill(); cx.strokeStyle="#5aa06a"; cx.lineWidth=2; rr(20,H-44,150,34,12); cx.stroke(); text("◀ BUILDING",95,H-27,14,"#2a5a2a");
+        // door number quick-visit buttons
+        for(var i=0;i<4;i++){ var bx=W-40-(3-i)*0; }
+        for(var i=0;i<4;i++){ var bx=W-158+i*38; cx.fillStyle=(i===g.cur)?"#ffd27a":"#ffffff"; cx.beginPath(); cx.arc(bx,H-27,15,0,7); cx.fill(); cx.strokeStyle="#e0b64a"; cx.lineWidth=2; cx.stroke(); text(""+(i+1),bx,H-27,14,"#8a5a1a"); }
+        renderFX(); return;
+      }
+      // ----- OUTSIDE: apartment building -----
+      var sky=cx.createLinearGradient(0,0,0,180); sky.addColorStop(0,"#bfe0ff"); sky.addColorStop(1,"#eaf6ff"); cx.fillStyle=sky; cx.fillRect(0,0,W,300);
+      cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(46,52,16,0,7); cx.fill();
+      cx.fillStyle="rgba(255,255,255,.85)"; cx.beginPath(); cx.arc(330,60,14,0,7); cx.arc(352,64,11,0,7); cx.arc(312,64,10,0,7); cx.fill();
+      cx.fillStyle="#8fd07b"; cx.fillRect(0,300,W,H-300);
+      // building body
+      cx.fillStyle="#d8b48a"; rr(44,96,W-88,224,10); cx.fill(); cx.strokeStyle="#b8946a"; cx.lineWidth=3; rr(44,96,W-88,224,10); cx.stroke();
+      cx.fillStyle="#c99a6a"; rr(38,86,W-76,20,6); cx.fill(); // roof ledge
+      text("🏢 SUNNY APARTMENTS",W/2,120,15,"#7a4a1a");
+      // windows (lit)
+      for(var r=0;r<2;r++){ for(var c=0;c<4;c++){ var wx=80+c*80, wy=146+r*46; cx.fillStyle=((r+c)%2===0)?"#ffe9a0":"#bfe6ff"; rr(wx-20,wy,40,32,5); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=3; rr(wx-20,wy,40,32,5); cx.stroke(); } }
+      // doors
+      for(var i=0;i<g.doors.length;i++){ var dx=g.doors[i].x; var a=APTS[i];
+        cx.fillStyle=a.sofa; rr(dx-22,252,44,66,6); cx.fill(); cx.strokeStyle="rgba(0,0,0,.2)"; cx.lineWidth=2; rr(dx-22,252,44,66,6); cx.stroke();
+        cx.fillStyle="#ffd23f"; cx.beginPath(); cx.arc(dx+13,288,3,0,7); cx.fill();
+        // number plate
+        cx.fillStyle="#fff"; rr(dx-12,240,24,14,4); cx.fill(); text(""+(i+1),dx,247,11,"#5a3a1a");
+        // welcome mat
+        cx.fillStyle=g.visited[i]?"#8ac06a":"#c9a06a"; rr(dx-20,318,40,8,3); cx.fill();
+        if(g.visited[i]){ cx.fillStyle="#2a7a3a"; text("✓",dx,300,12,"#2a7a3a"); }
+        var near=(Math.abs(g.px-dx)<34 && g.py<334); if(near && Math.floor(t/12)%2===0)text("▼ go in!",dx,232,11,"#e0670e"); }
+      drawAvatar(g.px,g.py,g.face,g.ph,g.moving); coinHUD();
+      // joystick
+      var j=g.joy; cx.fillStyle="rgba(0,0,0,.12)"; cx.beginPath(); cx.arc(j.bx,j.by,44,0,7); cx.fill(); cx.strokeStyle="rgba(255,255,255,.85)"; cx.lineWidth=3; cx.beginPath(); cx.arc(j.bx,j.by,44,0,7); cx.stroke(); cx.fillStyle="rgba(255,255,255,.75)"; cx.beginPath(); cx.arc(j.kx,j.ky,20,0,7); cx.fill(); cx.strokeStyle="#fff"; cx.lineWidth=2; cx.stroke(); if(!j.active)text("🕹️ walk",j.bx,j.by-58,11,"#3a4a5a");
+      var vc=0; for(var k in g.visited)if(g.visited[k])vc++;
+      cx.fillStyle="rgba(255,255,255,.8)"; rr(W/2-120,H-130,240,24,12); cx.fill(); text("Apartments visited: "+vc+" / 4",W/2,H-118,12,"#3a5a8a");
+      // back to menu
+      cx.fillStyle="#c9f0c9"; rr(W-150,H-42,130,32,10); cx.fill(); cx.strokeStyle="#5aa06a"; cx.lineWidth=2; rr(W-150,H-42,130,32,10); cx.stroke(); text("◀ HOUSE",W-85,H-26,14,"#2a5a2a");
+      renderFX();
+    },
+    down:function(){
+      if(g.mode==="in"){ if(ptr.x>20&&ptr.x<170&&ptr.y>H-44&&ptr.y<H-10){ g.mode="out"; g.px=g.doors[g.cur].x; g.py=352; label("Walk up to a door to go inside! 🏢"); return; }
+        for(var i=0;i<4;i++){ var bx=W-158+i*38; if(Math.hypot(ptr.x-bx,ptr.y-(H-27))<18){ g.cur=i; if(!g.visited[i]){ g.visited[i]=true; coins+=5; save(); try{localStorage.setItem("mohouse_apts",JSON.stringify(g.visited));}catch(e){} confettiBurst(); ding(); } beep(680,.06); label("Welcome to the "+APTS[i].name+" apartment! 🪙 "+coins); return; } }
+        return; }
+      if(ptr.x>W-150&&ptr.x<W-20&&ptr.y>H-42&&ptr.y<H-8){ go("menu"); return; }
+      var j=g.joy; if(ptr.y>H*0.6 || ptr.x<W*0.4){ j.active=true; j.bx=ptr.x; j.by=ptr.y; j.kx=ptr.x; j.ky=ptr.y; } },
+    drag:function(){ var j=g.joy; if(j.active){ var dx=ptr.x-j.bx, dy=ptr.y-j.by, d=Math.hypot(dx,dy), m=Math.min(d,42); if(d>0){ j.kx=j.bx+dx/d*m; j.ky=j.by+dy/d*m; } } },
+    up:function(){ g.joy.active=false; g.joy.kx=g.joy.bx; g.joy.ky=g.joy.by; },
+    tap:function(){} };
+
+  // ================= ARFF WAGS FOR A TREAT (1500 idea 165) =================
+  S.arfftreat=walkLookJob({ hint:"Walk to pick Arff\'s treat! 🕹️🦴", title:"🦴 A TREAT FOR ARFF",
+    looks:[{n:"Bone",e:"🦴"},{n:"Biscuit",e:"🍪"},{n:"Chew",e:"🍖"}],
+    bg:function(pk){ roomBG("#f3ecdd","#e6dcc6","#c9a06a");
+      cx.fillStyle="#d8c0a0"; cx.beginPath(); cx.ellipse(W/2,344,150,26,0,0,7); cx.fill();
+      // food bowl
+      cx.fillStyle="#e07040"; cx.beginPath(); cx.ellipse(W/2+96,330,26,10,0,0,7); cx.fill(); },
+    drawPick:function(pk){
+      drawMaltipoo(W/2-10,300,1,2.3);
+      var e=["🦴","🍪","🍖"][pk]; emo(e,W/2+70,296,26);
+      emo("💖",W/2-60,232,20); emo("🌟",W/2+60,236,18);
+      text("Wag wag! Good girl!",W/2,196,13,"#c06a2a"); },
+    doneMsg:"🦴 YUMMY TREAT!", doneSub:"Arff loves it! 🪙 +5", tcol:"#a0601a", dcol:"#8a4a1a" });
+
+  // ================= MEOW CLIMBS A CAT TREE (1500 idea 182) =================
+  S.cattree=walkLookJob({ hint:"Walk to pick Meow\'s cat tree! 🕹️🐈", title:"🐈 A CAT TREE FOR MEOW",
+    looks:[{n:"Tall",e:"🪵"},{n:"Cozy",e:"🧶"},{n:"Deluxe",e:"🏰"}],
+    bg:function(pk){ roomBG("#f6eef8","#ece0f0","#b0a0c0");
+      cx.fillStyle="#d8c0a0"; cx.beginPath(); cx.ellipse(W/2,352,140,24,0,0,7); cx.fill(); },
+    drawPick:function(pk){
+      var post=["#c9a06a","#a5804a","#8a6a9a"][pk], plat=["#e0c8a0","#c8a878","#c0a8d0"][pk];
+      // base + posts + platforms
+      cx.fillStyle=plat; rr(W/2-46,336,92,14,6); cx.fill();
+      cx.fillStyle=post; cx.fillRect(W/2-8,214,16,124);
+      cx.fillStyle=plat; rr(W/2-40,300,80,14,6); cx.fill(); rr(W/2-30,252,64,14,6); cx.fill(); rr(W/2-24,206,52,16,7); cx.fill();
+      // sisal wrap lines
+      cx.strokeStyle="rgba(0,0,0,.10)"; cx.lineWidth=2; for(var y=222;y<300;y+=8){ cx.beginPath(); cx.moveTo(W/2-8,y); cx.lineTo(W/2+8,y); cx.stroke(); }
+      if(pk===1){ emo("🧶",W/2-2,246,22); }
+      if(pk===2){ emo("🪜",W/2+34,300,18); emo("🔔",W/2-32,252,16); }
+      // dangling toy
+      cx.strokeStyle="#8a6a4a"; cx.lineWidth=2; cx.beginPath(); cx.moveTo(W/2+24,206); cx.lineTo(W/2+30,232); cx.stroke(); emo("🏐",W/2+30,238,16);
+      // Meow up top
+      drawMeowBig(W/2,190);
+      emo("🌟",W/2-56,220,18); text("Meow climbs up high!",W/2,166,12,"#8a5aaa"); },
+    doneMsg:"🐈 CAT TREE DONE!", doneSub:"Meow loves it! 🪙 +5", tcol:"#8a5aaa", dcol:"#7a4a9a" });
+
+  // ================= A COMFY ARMCHAIR (1500 idea 581) =================
+  S.armchair=walkLookJob({ hint:"Walk to pick your armchair! 🕹️🪑", title:"🪑 A COMFY ARMCHAIR",
+    looks:[{n:"Classic",e:"🪑"},{n:"Velvet",e:"🟪"},{n:"Stripey",e:"🟥"}],
+    bg:function(pk){ roomBG("#fff2e2","#f2e4cc","#c9a06a");
+      cx.fillStyle="#c99a6a"; cx.fillRect(0,318,W,4);
+      // lamp + rug
+      emo("💡",W-72,250,30);
+      cx.fillStyle="#f0d8b0"; cx.beginPath(); cx.ellipse(W/2,348,132,24,0,0,7); cx.fill(); },
+    drawPick:function(pk){
+      var col=["#b8703a","#8a4ad0","#e05a5a"][pk], col2=["#9a5a2a","#6a2ab0","#c04040"][pk];
+      cx.fillStyle="rgba(0,0,0,.10)"; cx.beginPath(); cx.ellipse(W/2,344,88,16,0,0,7); cx.fill();
+      // seat + back + arms
+      cx.fillStyle=col; rr(W/2-72,214,144,64,18); cx.fill(); // back
+      rr(W/2-80,262,160,58,16); cx.fill(); // seat base
+      rr(W/2-92,250,30,70,12); cx.fill(); rr(W/2+62,250,30,70,12); cx.fill(); // arms
+      cx.fillStyle="rgba(255,255,255,.18)"; rr(W/2-64,224,128,22,10); cx.fill();
+      // cushion
+      cx.fillStyle=col2; rr(W/2-56,266,112,26,12); cx.fill();
+      if(pk===2){ cx.strokeStyle="rgba(255,255,255,.5)"; cx.lineWidth=6; for(var x=W/2-60;x<W/2+60;x+=22){ cx.beginPath(); cx.moveTo(x,222); cx.lineTo(x,272); cx.stroke(); } }
+      // throw pillow
+      cx.fillStyle="#ffd23f"; rr(W/2+18,244,34,30,8); cx.fill();
+      emo("🌟",W/2-74,206,18); text("So cozy & comfy!",W/2,190,13,"#a0601a"); },
+    doneMsg:"🪑 COMFY ARMCHAIR!", doneSub:"Sit and relax! 🪙 +5", tcol:"#a0601a", dcol:"#8a4a1a" });
+
+  // ================= SOFT SHAGGY RUG (1500 idea 27) =================
+  S.shaggyrug=walkLookJob({ hint:"Walk to pick your soft rug! 🕹️🧶", title:"🧶 A SOFT SHAGGY RUG",
+    looks:[{n:"Cream",e:"🤍"},{n:"Pink",e:"💗"},{n:"Blue",e:"💙"}],
+    bg:function(pk){ roomBG("#f6efe2","#eadfc8","#c9a06a");
+      cx.fillStyle="#c9a06a"; cx.fillRect(0,318,W,4); },
+    drawPick:function(pk){
+      var col=["#f2ead8","#f7bcd4","#b9d8ef"][pk], col2=["#e6dcc4","#f0a0c0","#9cc4e6"][pk];
+      // sofa behind
+      cx.fillStyle="#c98f6a"; rr(W/2-96,206,192,52,14); cx.fill(); rr(W/2-104,190,26,68,10); cx.fill(); rr(W/2+78,190,26,68,10); cx.fill();
+      cx.fillStyle="#e0b48a"; rr(W/2-72,214,60,26,8); cx.fill(); rr(W/2+12,214,60,26,8); cx.fill();
+      // shaggy rug: layered fuzzy ellipse with tufts
+      cx.fillStyle="rgba(0,0,0,.08)"; cx.beginPath(); cx.ellipse(W/2,320,132,34,0,0,7); cx.fill();
+      cx.fillStyle=col2; cx.beginPath(); cx.ellipse(W/2,318,128,32,0,0,7); cx.fill();
+      cx.fillStyle=col; cx.beginPath(); cx.ellipse(W/2,316,116,27,0,0,7); cx.fill();
+      // fuzzy edge tufts
+      for(var a=0;a<40;a++){ var an=a/40*6.28; var rx=Math.cos(an)*126, ry=Math.sin(an)*31; cx.strokeStyle=col; cx.lineWidth=4; cx.beginPath(); cx.moveTo(W/2+rx*0.9,316+ry*0.9); cx.lineTo(W/2+rx*1.12,316+ry*1.12); cx.stroke(); }
+      // soft swirl texture
+      cx.strokeStyle=col2; cx.lineWidth=2; for(var i=0;i<5;i++){ cx.beginPath(); cx.ellipse(W/2,316,30+i*20,7+i*4,0,0,7); cx.stroke(); }
+      // cozy extras: pillow + cat napping
+      emo("🌟",W/2-96,238,18);
+      drawMeowBig(W/2+40,306);
+      text("So soft & fluffy!",W/2,190,13,"#a0703a"); },
+    doneMsg:"🧶 COZY RUG DOWN!", doneSub:"So soft! 🪙 +5", tcol:"#a0703a", dcol:"#8a5a2a" });
+
+  // ================= BASKET OF COZY BLANKETS (1500 idea 29) =================
+  S.blanketbasket=walkLookJob({ hint:"Walk to pick your cozy blankets! 🕹️🧺", title:"🧺 A BASKET OF BLANKETS",
+    looks:[{n:"Warm",e:"🟥"},{n:"Cool",e:"🟦"},{n:"Sweet",e:"🟪"}],
+    bg:function(pk){ roomBG("#f4ecdc","#e8dcc2","#c9a06a"); cx.fillStyle="#c9a06a"; cx.fillRect(0,320,W,4); },
+    drawPick:function(pk){
+      var cols=[["#e0603a","#e88a4a","#d0a03a"],["#3a80c0","#4aa0d0","#5ac0b0"],["#a05ac0","#d05aa0","#e08ac0"]][pk];
+      // basket
+      cx.fillStyle="#b98a54"; cx.beginPath(); cx.moveTo(W/2-84,318); cx.lineTo(W/2+84,318); cx.lineTo(W/2+70,240); cx.lineTo(W/2-70,240); cx.closePath(); cx.fill();
+      cx.strokeStyle="#8a5a2a"; cx.lineWidth=2; for(var wv=248;wv<316;wv+=12){ cx.beginPath(); cx.moveTo(W/2-78,wv); cx.lineTo(W/2+78,wv); cx.stroke(); }
+      for(var vx=-60;vx<=60;vx+=20){ cx.beginPath(); cx.moveTo(W/2+vx,240); cx.lineTo(W/2+vx*1.2,318); cx.stroke(); }
+      // rolled blankets poking out
+      for(var i=0;i<3;i++){ cx.fillStyle=cols[i]; cx.beginPath(); cx.ellipse(W/2-44+i*44,232,22,16,0,0,7); cx.fill(); cx.fillStyle="rgba(255,255,255,.25)"; cx.beginPath(); cx.ellipse(W/2-44+i*44,228,14,8,0,0,7); cx.fill(); cx.strokeStyle="rgba(0,0,0,.12)"; cx.lineWidth=2; cx.beginPath(); cx.arc(W/2-44+i*44,232,7,0,7); cx.stroke(); }
+      // a draped blanket
+      cx.fillStyle=cols[0]; cx.beginPath(); cx.moveTo(W/2+50,256); cx.quadraticCurveTo(W/2+96,280,W/2+80,318); cx.lineTo(W/2+58,318); cx.quadraticCurveTo(W/2+62,286,W/2+40,262); cx.closePath(); cx.fill();
+      emo("🌟",W/2-88,238,18); text("So warm & cozy!",W/2,196,13,"#a0703a"); },
+    doneMsg:"🧺 COZY BLANKETS!", doneSub:"Snuggle time! 🪙 +5", tcol:"#a0703a", dcol:"#8a5a2a" });
+
+  // ================= RECORD PLAYER CORNER (1500 idea 31) =================
+  S.recordplayer=walkLookJob({ hint:"Walk to pick your record player! 🕹️🎶", title:"🎶 A RECORD PLAYER CORNER",
+    looks:[{n:"Retro",e:"📻"},{n:"Modern",e:"🎛️"},{n:"Wood",e:"🪜"}],
+    bg:function(pk){ roomBG("#efe6f2","#e2d6ea","#b0a0c0"); cx.fillStyle="#c9a06a"; cx.fillRect(0,322,W,4); },
+    drawPick:function(pk){
+      // shelf/table
+      var wood=["#c07a4a","#5a6a7a","#9a6a3a"][pk];
+      cx.fillStyle=wood; rr(W/2-96,300,192,22,6); cx.fill(); cx.fillStyle="rgba(0,0,0,.15)"; cx.fillRect(W/2-88,322,10,26); cx.fillRect(W/2+78,322,10,26);
+      // player box
+      var box=["#3a2a2a","#2a2e3a","#7a4a2a"][pk]; cx.fillStyle=box; rr(W/2-70,252,140,50,8); cx.fill();
+      // turntable + spinning record
+      cx.fillStyle="#111"; cx.beginPath(); cx.arc(W/2-24,278,22,0,7); cx.fill();
+      cx.save(); cx.translate(W/2-24,278); cx.rotate(t*0.12); cx.strokeStyle="#444"; cx.lineWidth=1; for(var rr2=6;rr2<20;rr2+=4){ cx.beginPath(); cx.arc(0,0,rr2,0,7); cx.stroke(); } cx.fillStyle=["#e0503a","#e0a83a","#3a9a6a"][pk]; cx.beginPath(); cx.arc(0,0,7,0,7); cx.fill(); cx.fillStyle="#111"; cx.beginPath(); cx.arc(0,0,2,0,7); cx.fill(); cx.restore();
+      // tonearm
+      cx.strokeStyle="#c8c8c8"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(W/2+40,258); cx.lineTo(W/2-14,272); cx.stroke();
+      // records leaning + music notes
+      cx.fillStyle="#222"; cx.beginPath(); cx.arc(W/2+52,290,16,0,7); cx.fill(); cx.fillStyle=["#e0503a","#3a80c0","#3a9a6a"][pk]; cx.beginPath(); cx.arc(W/2+52,290,5,0,7); cx.fill();
+      var by=Math.sin(t/8)*4; emo("🎵",W/2-72,224+by,22); emo("🎶",W/2+70,214-by,22); emo("🌟",W/2+92,262,16);
+      text("La la la! Music time!",W/2,196,13,"#7a5aaa"); },
+    doneMsg:"🎶 MUSIC CORNER DONE!", doneSub:"Spin a tune! 🪙 +5", tcol:"#7a5aaa", dcol:"#6a4a9a" });
+
+  // ================= WARM STRING-LIGHT WALL (1500 idea 34) =================
+  S.stringwall=walkLookJob({ hint:"Walk to pick your string lights! 🕹️✨", title:"✨ A STRING-LIGHT WALL",
+    looks:[{n:"Warm",e:"🟡"},{n:"Rainbow",e:"🌈"},{n:"Cool",e:"🔷"}],
+    bg:function(pk){ var g1=cx.createLinearGradient(0,0,0,H); g1.addColorStop(0,"#2a2440"); g1.addColorStop(1,"#3a3458"); cx.fillStyle=g1; cx.fillRect(0,0,W,H); },
+    drawPick:function(pk){
+      // draped strings of lights (3 swags)
+      for(var row=0;row<3;row++){ var yy=180+row*44;
+        cx.strokeStyle="#5a5a6a"; cx.lineWidth=2; cx.beginPath();
+        for(var x=40;x<=W-40;x+=6){ var yv=yy+Math.sin((x/40)+row)*10; if(x===40)cx.moveTo(x,yv); else cx.lineTo(x,yv); } cx.stroke();
+        for(var x=52;x<W-40;x+=26){ var yv=yy+Math.sin((x/40)+row)*10+8; var col;
+          if(pk===0)col="#ffdf8a"; else if(pk===1)col=["#ff6a8a","#ffce5a","#6ad08a","#6aa0ff","#c07adf"][(Math.floor(x/26))%5]; else col="#8ad0ff";
+          var tw=(Math.sin(t/6+x)*0.3+0.7);
+          cx.fillStyle=col; cx.globalAlpha=tw; cx.beginPath(); cx.arc(x,yv,6,0,7); cx.fill();
+          cx.globalAlpha=tw*0.4; cx.beginPath(); cx.arc(x,yv,11,0,7); cx.fill(); cx.globalAlpha=1; }
+      }
+      // cozy shelf below
+      cx.fillStyle="#5a4a6a"; rr(W/2-90,312,180,14,5); cx.fill(); emo("🪴",W/2-64,300,24); emo("🕯️",W/2+60,302,22);
+      text("Twinkle twinkle!",W/2,150,14,"#ffe89a"); },
+    doneMsg:"✨ LIGHTS ARE UP!", doneSub:"So twinkly! 🪙 +5", tcol:"#ffe89a", dcol:"#ffd23f" });
+
+  // ================= PET BED BY THE COUCH (1500 idea 35) =================
+  S.petbed=walkLookJob({ hint:"Walk to pick a pet bed! 🕹️🛏️", title:"🛏️ A PET BED BY THE COUCH",
+    looks:[{n:"For Arff",e:"🐕"},{n:"For Meow",e:"🐈"},{n:"Comfy",e:"🧸"}],
+    bg:function(pk){ roomBG("#f4ecdc","#e8dcc2","#c9a06a"); cx.fillStyle="#c9a06a"; cx.fillRect(0,320,W,4);
+      // couch corner
+      cx.fillStyle="#c98f6a"; rr(40,206,150,50,14); cx.fill(); rr(34,190,26,66,10); cx.fill(); },
+    drawPick:function(pk){
+      var col=["#8a5ad0","#e0803a","#e05a8a"][pk], col2=["#6a3ac0","#c06020","#c04070"][pk];
+      // round pet bed
+      cx.fillStyle="rgba(0,0,0,.10)"; cx.beginPath(); cx.ellipse(W/2+40,322,78,18,0,0,7); cx.fill();
+      cx.fillStyle=col; cx.beginPath(); cx.ellipse(W/2+40,318,74,26,0,0,7); cx.fill();
+      cx.fillStyle=col2; cx.beginPath(); cx.ellipse(W/2+40,314,56,16,0,0,7); cx.fill();
+      cx.fillStyle="#fff5e8"; cx.beginPath(); cx.ellipse(W/2+40,314,44,11,0,0,7); cx.fill();
+      // occupant
+      if(pk===0){ drawMaltipoo(W/2+40,300,1,1.4); }
+      else if(pk===1){ drawMeowBig(W/2+40,300); }
+      else { emo("🧸",W/2+40,304,34); emo("💤",W/2+78,286,20); }
+      emo("💖",W/2-10,250,18); text("Comfy spot for a nap!",W/2,196,13,"#a0603a"); },
+    doneMsg:"🛏️ PET BED READY!", doneSub:"Cozy naps! 🪙 +5", tcol:"#a0603a", dcol:"#8a4a2a" });
+
+  // ================= CHECKERS TABLE (1500 idea 38) =================
+  S.checkers=walkLookJob({ hint:"Walk to pick your checkers table! 🕹️🎲", title:"🎲 A CHECKERS TABLE",
+    looks:[{n:"Classic",e:"🔴"},{n:"Wood",e:"🟫"},{n:"Fancy",e:"👑"}],
+    bg:function(pk){ roomBG("#f2ecdc","#e6dcc4","#c9a06a");
+      cx.fillStyle="#c9a06a"; cx.fillRect(0,338,W,4);
+      // two stools
+      cx.fillStyle="#a5703a"; cx.beginPath(); cx.arc(W/2-116,308,16,0,7); cx.fill(); cx.beginPath(); cx.arc(W/2+116,308,16,0,7); cx.fill(); },
+    drawPick:function(pk){
+      var lightSq=["#f0e0c0","#e8d0a8","#f4e8d0"][pk], darkSq=["#c0402a","#8a5a2a","#3a3a5a"][pk];
+      var p1=["#e03030","#5a3a1a","#c0a030"][pk], p2=["#222","#e8dcc0","#e8e8f0"][pk];
+      // table top (board) tilted slightly
+      var bx=W/2-84, by=214, sz=168, cell=sz/8;
+      cx.fillStyle="rgba(0,0,0,.12)"; rr(bx+3,by+6,sz,sz,8); cx.fill();
+      cx.fillStyle="#5a3a1a"; rr(bx-6,by-6,sz+12,sz+12,10); cx.fill(); // frame
+      for(var r=0;r<8;r++){ for(var c=0;c<8;c++){ cx.fillStyle=((r+c)%2===0)?lightSq:darkSq; cx.fillRect(bx+c*cell,by+r*cell,cell,cell); } }
+      // pieces on dark squares
+      function piece(r,c,col){ var px=bx+c*cell+cell/2, py=by+r*cell+cell/2; cx.fillStyle="rgba(0,0,0,.2)"; cx.beginPath(); cx.ellipse(px,py+3,7,4,0,0,7); cx.fill(); cx.fillStyle=col; cx.beginPath(); cx.arc(px,py,7,0,7); cx.fill(); cx.strokeStyle="rgba(0,0,0,.25)"; cx.lineWidth=1; cx.stroke(); }
+      var dark=[[0,1],[0,3],[1,0],[1,2],[2,1],[2,5],[0,7]]; dark.forEach(function(d){ piece(d[0],d[1],p1); });
+      var lite=[[7,0],[7,2],[6,1],[6,3],[5,4],[7,6],[5,0]]; lite.forEach(function(d){ piece(d[0],d[1],p2); });
+      if(pk===2){ emo("👑",W/2,196,20); }
+      // table legs already hinted by stools; add a note
+      text("Your move! 🎲",W/2,410,13,"#8a5a2a"); },
+    doneMsg:"🎲 CHECKERS READY!", doneSub:"King me! 🪙 +5", tcol:"#a05a2a", dcol:"#8a4a1a" });
   // ---------------- input ----------------
-  function pos(e){ var r=cv.getBoundingClientRect(), sx=cv.width/r.width, sy=cv.height/r.height; var cxp,cyp; if(e.touches&&e.touches[0]){ cxp=e.touches[0].clientX; cyp=e.touches[0].clientY; } else { cxp=e.clientX; cyp=e.clientY; } return {x:(cxp-r.left)*sx, y:(cyp-r.top)*sy}; }
-  function down(e){ e.preventDefault(); var p=pos(e); ptr.x=p.x; ptr.y=p.y; ptr.down=true; var s=S[scene]; if(s.down)s.down(); if(s.tap)s.tap(); }
+  function pos(e){ var r=cv.getBoundingClientRect(), sx=LOGW/r.width, sy=LOGH/r.height; var cxp,cyp; if(e.touches&&e.touches[0]){ cxp=e.touches[0].clientX; cyp=e.touches[0].clientY; } else { cxp=e.clientX; cyp=e.clientY; } return {x:(cxp-r.left)*sx, y:(cyp-r.top)*sy}; }
+  function down(e){ e.preventDefault(); if(MUS.mode&&!MUS.started){ startMusic(); } var p=pos(e); ptr.x=p.x; ptr.y=p.y; ptr.down=true; var s=S[scene]; if(s.down)s.down(); if(s.tap)s.tap(); }
   function move(e){ e.preventDefault(); var p=pos(e); ptr.x=p.x; ptr.y=p.y; var s=S[scene]; if(ptr.down&&s.drag)s.drag(); }
   function up(e){ e.preventDefault(); ptr.down=false; var s=S[scene]; if(s.up)s.up(); }
   cv.addEventListener("mousedown",down); cv.addEventListener("mousemove",move); window.addEventListener("mouseup",up);

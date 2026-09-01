@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>🎲 MO IDEA MACHINE</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;min-height:100%;font-family:'Trebuchet MS',Verdana,sans-serif;
+    background:linear-gradient(160deg,#fff4e6,#ffe6ef 55%,#e6ecff);color:#5a3a1a;}
+  #wrap{max-width:520px;margin:0 auto;padding:14px 14px 40px;text-align:center;}
+  .top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .homebtn{background:linear-gradient(#ffd23f,#f7a72b);color:#5a3a1a;font-weight:bold;border:none;
+    border-radius:14px;padding:8px 16px;font-size:15px;box-shadow:0 4px 0 #0004;text-decoration:none;}
+  h1{font-size:26px;margin:12px 0 2px;color:#c0501a;text-shadow:0 2px 0 #fff;}
+  .count{font-size:15px;font-weight:bold;color:#7a5a9a;margin:2px 0 14px;}
+  .count b{color:#c0501a;font-size:18px;}
+  #idea{background:#fff;border:4px solid #ffce7a;border-radius:22px;min-height:120px;
+    display:flex;align-items:center;justify-content:center;padding:22px 18px;margin:6px 0 16px;
+    font-size:24px;font-weight:bold;color:#3a5a2a;line-height:1.35;box-shadow:0 8px 20px #0002;}
+  .big{display:block;width:100%;border:none;border-radius:20px;padding:20px;font-size:24px;font-weight:bold;
+    font-family:inherit;color:#fff;box-shadow:0 6px 0 #0003;cursor:pointer;margin:8px 0;}
+  .spin{background:linear-gradient(#7ad07a,#3aa03a);}
+  .ten{background:linear-gradient(#5aa0e0,#3a70c0);}
+  .save{background:linear-gradient(#f78ac0,#e0509a);font-size:18px;padding:14px;}
+  .big:active{transform:translateY(3px);box-shadow:0 3px 0 #0003;}
+  #list{margin-top:16px;text-align:left;}
+  .li{background:#fff;border:2px solid #ffdca0;border-radius:14px;padding:12px 14px;margin:8px 0;
+    font-size:16px;font-weight:bold;color:#4a3a1a;box-shadow:0 3px 8px #0001;}
+  .li .num{color:#e0850e;margin-right:8px;}
+  #favs{margin-top:20px;}
+  .favtitle{font-size:17px;color:#c0501a;font-weight:bold;margin:10px 0 6px;}
+  .fav{background:#fff6fb;border:2px solid #f7b8d8;border-radius:12px;padding:10px 12px;margin:6px 0;
+    font-size:15px;font-weight:bold;color:#a03a6a;}
+  .hint{font-size:13px;color:#8a6a4a;margin-top:22px;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="top">
+    <a class="homebtn" href="../index.html">🏠 MO ARCADE</a>
+    <span style="font-size:30px">🎲</span>
+  </div>
+  <h1>🎲 MO IDEA MACHINE</h1>
+  <div class="count">You can make <b id="total">?</b> different ideas!</div>
+
+  <div id="idea">Press the button for an idea! 👇</div>
+
+  <button class="big spin" onclick="spin()">🎲 GIVE ME AN IDEA!</button>
+  <button class="big ten" onclick="tenIdeas()">📋 MAKE ME 10 IDEAS</button>
+  <button class="big save" onclick="saveFav()">❤️ SAVE THIS IDEA</button>
+
+  <div id="list"></div>
+
+  <div id="favs"></div>
+
+  <div class="hint">Every idea is made by mixing fun words together — so there are millions of combos!</div>
+</div>
+
+<script>
+(function(){
+  var ACTIONS=["Build","Design","Decorate","Paint","Make","Set up","Plant","Grow","Fill up","Clean",
+    "Wash","Fix up","Bake","Cook","Arrange","Organize","Light up","Fluff up","Sort","Stack",
+    "Water","Feed","Brush","Wrap up","Hang up","Sparkle up","Cozy up","Sprinkle","Style","Craft",
+    "Draw","Paste","Sweep","Polish","Pile up","Line up","Dust off","Scrub","Toss together","Whip up"];
+  var SUBJECTS=["a bedroom","a kitchen","a garden","a treehouse","a swimming pool","a slide","a bookshelf",
+    "a cat tree","a doghouse","a pillow fort","a playground","a bathroom","a living room","a balcony",
+    "a bunk bed","a lemonade stand","a tent","a swing set","a fish tank","a flower box","a snack bar",
+    "a race track","a rocket ship","a castle","a fairy garden","a science lab","a music stage","a dance floor",
+    "a movie room","a trampoline","a sandbox","a bird feeder","a veggie patch","a cozy nook","a puppet theater",
+    "a treasure chest","a ball pit","a reading corner","an ice-cream shop","a robot helper","a greenhouse",
+    "a bakery corner","a game room","a art studio","a spa bath","a campfire circle","a mailbox","a porch swing",
+    "a window seat","a pet bed"];
+  var STYLES=["rainbow","cozy","sparkly","giant","tiny","fluffy","magical","sunny","spooky","snowy",
+    "fancy","silly","glowing","bouncy","pastel","neon","royal","jungle","ocean","candy",
+    "polka-dot","striped","starry","cloud","flower","dinosaur","space","pirate","unicorn","superhero",
+    "wooden","glittery","sunset","frosty","tropical","autumn","spring","cartoon","gold","velvet"];
+  var WHOS=["for Morgan","for Arff the pup","for Meow the cat","for the whole family","upstairs",
+    "in the backyard","on the roof","by the big window","in the attic","in the garden",
+    "for a party","for movie night","for a sleepover","for Sunday morning","for a rainy day",
+    "for summer","for winter","by the front door","in a secret room","for game night",
+    "for the pets","for a birthday","under the stairs","in a sunny corner","for a cozy night",
+    "for playtime","for the kids","for grandma's visit","in the playroom","for a picnic"];
+
+  var total=ACTIONS.length*SUBJECTS.length*STYLES.length*WHOS.length;
+  function commas(n){ return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,","); }
+  document.getElementById("total").textContent=commas(total);
+
+  function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+  function makeIdea(){ return pick(ACTIONS)+" a "+pick(STYLES)+" "+pick(SUBJECTS).replace(/^a |^an /,"")+" "+pick(WHOS)+"!"; }
+
+  window.spin=function(){ var el=document.getElementById("idea"); el.textContent="🎲 "+makeIdea();
+    document.getElementById("list").innerHTML=""; };
+  window.tenIdeas=function(){ var h=""; for(var i=1;i<=10;i++){ h+='<div class="li"><span class="num">'+i+'.</span>'+makeIdea()+'</div>'; }
+    document.getElementById("list").innerHTML=h; };
+
+  var favs=[];
+  window.saveFav=function(){ var cur=document.getElementById("idea").textContent.replace(/^🎲 /,"");
+    if(!cur||cur.indexOf("Press the button")>-1){ return; }
+    favs.push(cur); renderFavs(); };
+  function renderFavs(){ if(!favs.length){ document.getElementById("favs").innerHTML=""; return; }
+    var h='<div class="favtitle">❤️ My Favorite Ideas</div>';
+    favs.forEach(function(f){ h+='<div class="fav">⭐ '+f+'</div>'; });
+    document.getElementById("favs").innerHTML=h; }
+
+  spin();
+})();
+</script>
+</body>
+</html>
