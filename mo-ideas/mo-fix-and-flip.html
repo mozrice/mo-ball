@@ -1,0 +1,128 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>MO Fix & Flip</title>
+<style>
+html,body{margin:0;height:100%;background:#2a2338;overflow:hidden;font-family:'Segoe UI',Arial,sans-serif;
+ -webkit-user-select:none;user-select:none;touch-action:none;}
+#wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+canvas{display:block;box-shadow:0 10px 40px rgba(0,0,0,.6);border-radius:10px;}
+</style></head>
+<body><div id="wrap"><canvas id="cv"></canvas></div>
+<script>
+(function(){
+var cv=document.getElementById('cv'), cx=cv.getContext('2d');
+var LOGW=440, LOGH=680;
+var HD=Math.max(2,Math.min(4,Math.floor((window.devicePixelRatio||1)*2)));
+cv.width=LOGW*HD; cv.height=LOGH*HD; cx.setTransform(HD,0,0,HD,0,0);
+function fit(){ var s=Math.min(window.innerWidth/LOGW,window.innerHeight/LOGH); cv.style.width=(LOGW*s)+'px'; cv.style.height=(LOGH*s)+'px'; }
+window.addEventListener('resize',fit); fit();
+function P(e){ var r=cv.getBoundingClientRect(); var t=e.touches?e.touches[0]:e; return {x:(t.clientX-r.left)*(LOGW/r.width), y:(t.clientY-r.top)*(LOGH/r.height)}; }
+
+var AC=null; function ac(){ if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}} return AC; }
+function tone(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||'sine'; o.frequency.value=f; g.gain.value=v||0.12; o.connect(g);g.connect(a.destination); var n=a.currentTime; o.start(n); g.gain.exponentialRampToValueAtTime(0.001,n+d); o.stop(n+d); }
+function fixS(){ tone(300,0.06,'square',0.1); setTimeout(function(){tone(520,0.08,'square',0.1);},50); }
+function coinS(){ tone(900,0.07,'sine',0.13); setTimeout(function(){tone(1250,0.1,'sine',0.12);},60); }
+function cash(){ tone(660,0.1,'sine',0.13); setTimeout(function(){tone(880,0.1,'sine',0.13);},90); setTimeout(function(){tone(1200,0.18,'sine',0.13);},180); }
+
+function rr(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
+function hitB(b,p){ return b&&p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h; }
+
+var coins=0; try{ coins=JSON.parse(localStorage.getItem('mofixflip')||'0')||0; }catch(e){}
+function save(){ try{ localStorage.setItem('mofixflip', JSON.stringify(coins)); }catch(e){} }
+
+var phase='fix'; // fix -> flip
+// problems in the room: type + position + fixed
+var PROB=['trash','crack','stain','cobweb','hole','oldlamp'];
+var problems=[];
+var wallCols=['#e0c090','#cfe6f0','#e6d0ea','#d0ead0','#f0d0d8'];
+var wallC=0, showSold=0;
+
+function newHouse(){ phase='fix'; wallC=0;
+ problems=[
+  {t:'trash', x:90, y:300, fixed:false},
+  {t:'crack', x:330, y:150, fixed:false},
+  {t:'stain', x:230, y:320, fixed:false},
+  {t:'cobweb',x:60,  y:130, fixed:false},
+  {t:'hole',  x:170, y:200, fixed:false},
+  {t:'oldlamp',x:360,y:300, fixed:false}
+ ];
+}
+newHouse();
+
+var RX=20, RY=70, RW=LOGW-40, RH=320, WALLH=RH*0.6;
+
+function drawProblem(pr){ var x=pr.x,y=pr.y,f=pr.fixed;
+ if(pr.t==='trash'){ if(f){ return; } cx.fillStyle='#8a6a3a'; cx.beginPath(); cx.arc(x,y,10,0,7); cx.fill(); cx.fillStyle='#6a4a2a'; cx.beginPath(); cx.arc(x-4,y-2,4,0,7); cx.fill(); cx.beginPath(); cx.arc(x+5,y+3,3,0,7); cx.fill(); }
+ else if(pr.t==='crack'){ if(f){ cx.fillStyle='#bfe4ff'; rr(x-20,y-16,40,34,3); cx.fill(); cx.strokeStyle='#fff'; cx.lineWidth=3; cx.strokeRect(x-20,y-16,40,34); cx.beginPath(); cx.moveTo(x,y-16); cx.lineTo(x,y+18); cx.moveTo(x-20,y+1); cx.lineTo(x+20,y+1); cx.stroke(); }
+  else { cx.fillStyle='#7a90a0'; rr(x-20,y-16,40,34,3); cx.fill(); cx.strokeStyle='#333'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(x-10,y-14); cx.lineTo(x-2,y-2); cx.lineTo(x-8,y+6); cx.lineTo(x+4,y+16); cx.stroke(); } }
+ else if(pr.t==='stain'){ if(f)return; cx.fillStyle='rgba(90,60,30,.55)'; cx.beginPath(); cx.ellipse(x,y,20,10,0,0,7); cx.fill(); cx.beginPath(); cx.ellipse(x+14,y+4,8,5,0,0,7); cx.fill(); }
+ else if(pr.t==='cobweb'){ if(f)return; cx.strokeStyle='rgba(240,240,255,.7)'; cx.lineWidth=1.4; for(var a=0;a<4;a++){ var an=(a/4)*(Math.PI/2); cx.beginPath(); cx.moveTo(x,y); cx.lineTo(x+Math.cos(an)*30,y+Math.sin(an)*30); cx.stroke(); } for(var r=8;r<=28;r+=8){ cx.beginPath(); cx.moveTo(x+r,y); cx.lineTo(x+r*0.7,y+r*0.7); cx.lineTo(x,y+r); cx.stroke(); } }
+ else if(pr.t==='hole'){ if(f){ cx.fillStyle=wallCols[wallC]; cx.beginPath(); cx.arc(x,y,14,0,7); cx.fill(); }
+  else { cx.fillStyle='#3a2a1a'; cx.beginPath(); cx.arc(x,y,14,0,7); cx.fill(); cx.strokeStyle='#5a4a3a'; cx.lineWidth=3; cx.beginPath(); cx.arc(x,y,14,0,7); cx.stroke(); } }
+ else if(pr.t==='oldlamp'){ cx.strokeStyle='#777'; cx.lineWidth=4; cx.beginPath(); cx.moveTo(x,y+14); cx.lineTo(x,y-24); cx.stroke(); if(f){ cx.fillStyle='#ffd23f'; } else { cx.fillStyle='#8a8a6a'; } cx.beginPath(); cx.moveTo(x-14,y-24); cx.lineTo(x+14,y-24); cx.lineTo(x+9,y-40); cx.lineTo(x-9,y-40); cx.fill(); if(!f){ cx.fillStyle='#555'; cx.fillText('?',x-3,y-28); } }
+ // tap marker if not fixed
+ if(!f){ cx.fillStyle='#e05050'; cx.beginPath(); cx.arc(x+16,y-16,10,0,7); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 14px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('!',x+16,y-15); }
+ else { cx.fillStyle='#2a8a3a'; cx.font='bold 16px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('✓',x+16,y-16); }
+}
+function niceFurniture(){ // shown after fixed / flipped
+ cx.fillStyle='#8a5a3a'; rr(90-30,RY+WALLH+40-30,60,30,6); cx.fill(); cx.fillStyle='#e0e0f0'; rr(90-30,RY+WALLH+24-30,60,18,6); cx.fill();
+ cx.fillStyle='#5a8ad0'; rr(240-40,RY+WALLH+40-30,80,30,10); cx.fill(); cx.fillStyle='#4a7ac0'; rr(240-40,RY+WALLH+30-30,80,14,10); cx.fill();
+ cx.fillStyle='#3a8a3a'; cx.beginPath(); cx.arc(360,RY+WALLH+20,12,0,7); cx.fill(); cx.fillStyle='#b5763a'; cx.fillRect(354,RY+WALLH+28,12,10);
+}
+
+var btns={};
+function draw(){
+ cx.setTransform(HD,0,0,HD,0,0); cx.clearRect(0,0,LOGW,LOGH); btns={};
+ // header
+ cx.fillStyle='#3a2a5a'; rr(10,10,LOGW-20,44,12); cx.fill();
+ cx.fillStyle='#fff'; cx.font='900 21px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('🔨 MO FIX & FLIP',LOGW/2,26);
+ cx.fillStyle='#ffd23f'; cx.font='bold 14px Segoe UI'; cx.fillText('💰 '+coins+' coins',LOGW/2,46);
+
+ var allfixed = problems.every(function(p){return p.fixed;});
+
+ // room
+ cx.fillStyle=wallCols[wallC]; cx.fillRect(RX,RY,RW,WALLH);
+ cx.fillStyle=(phase==='flip'||allfixed)?'#c98a4a':'#9a7a5a'; cx.fillRect(RX,RY+WALLH,RW,RH-WALLH);
+ cx.strokeStyle='rgba(0,0,0,.15)'; cx.lineWidth=2; cx.strokeRect(RX,RY,RW,RH);
+ cx.save(); cx.beginPath(); cx.rect(RX,RY,RW,RH); cx.clip();
+ if(phase==='flip'||allfixed){ niceFurniture(); }
+ for(var i=0;i<problems.length;i++){ drawProblem(problems[i]); }
+ cx.restore();
+
+ if(phase==='fix'){
+  cx.fillStyle='#e0d0f0'; cx.font='bold 16px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle';
+  var left=problems.filter(function(p){return !p.fixed;}).length;
+  cx.fillText(allfixed?'All fixed! Now paint & FLIP it! 🎉':'Tap each ! to fix it  ('+(problems.length-left)+'/'+problems.length+')',LOGW/2,RY+RH+22);
+  // paint options (enabled after fixed)
+  var py=RY+RH+50; cx.fillStyle='#c8bce0'; cx.font='bold 12px Segoe UI'; cx.textAlign='left'; cx.fillText('Paint the walls:',20,py);
+  for(var i=0;i<wallCols.length;i++){ var bx=120+i*44; btns['wc'+i]={x:bx,y:py-14,w:34,h:28}; cx.fillStyle=wallCols[i]; rr(bx,py-14,34,28,6); cx.fill(); if(i===wallC){cx.strokeStyle='#fff';cx.lineWidth=3;rr(bx,py-14,34,28,6);cx.stroke();} }
+  // FLIP button
+  btns.flip={x:LOGW/2-110,y:LOGH-72,w:220,h:52};
+  cx.fillStyle=allfixed?'#5ac85a':'#7a7a8a'; rr(LOGW/2-110,LOGH-72,220,52,14); cx.fill();
+  cx.fillStyle='#fff'; cx.font='bold 22px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(allfixed?'💰 FLIP IT!':'Fix everything first',LOGW/2,LOGH-46);
+ } else {
+  // flip / sold screen
+  cx.fillStyle='#ffcf33'; cx.font='900 30px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('🏡 SOLD!',LOGW/2,RY+RH+40);
+  cx.fillStyle='#5ac85a'; cx.font='bold 20px Segoe UI'; cx.fillText('+100 💰 coins!',LOGW/2,RY+RH+74);
+  btns.again={x:LOGW/2-120,y:LOGH-72,w:240,h:52}; cx.fillStyle='#ff8c1a'; rr(LOGW/2-120,LOGH-72,240,52,14); cx.fill();
+  cx.fillStyle='#fff'; cx.font='bold 20px Segoe UI'; cx.fillText('🔨 Fix Another House',LOGW/2,LOGH-46);
+ }
+ if(showSold>0){ showSold--; }
+ requestAnimationFrame(draw);
+}
+draw();
+
+cv.addEventListener('pointerdown',function(e){ e.preventDefault(); ac(); var p=P(e);
+ if(phase==='fix'){
+  // tap a problem
+  for(var i=0;i<problems.length;i++){ var pr=problems[i]; if(pr.fixed)continue; if(Math.abs(p.x-pr.x)<32 && Math.abs(p.y-pr.y)<32){ pr.fixed=true; fixS(); coins+=5; save(); return; } }
+  for(var i=0;i<wallCols.length;i++){ if(hitB(btns['wc'+i],p)){ wallC=i; coinS(); return; } }
+  if(hitB(btns.flip,p) && problems.every(function(x){return x.fixed;})){ phase='flip'; coins+=100; save(); cash(); showSold=60; return; }
+ } else {
+  if(hitB(btns.again,p)){ newHouse(); return; }
+ }
+},{passive:false});
+})();
+</script>
+</body></html>

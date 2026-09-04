@@ -1,0 +1,237 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>MO Fort Class</title>
+<style>
+html,body{margin:0;height:100%;background:#20293d;overflow:hidden;
+  font-family:'Segoe UI',Arial,sans-serif;-webkit-user-select:none;user-select:none;touch-action:manipulation;}
+#wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+canvas{display:block;box-shadow:0 10px 40px rgba(0,0,0,.6);border-radius:10px;}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<script>
+(function(){
+var cv=document.getElementById('cv'), cx=cv.getContext('2d');
+var LOGW=440, LOGH=640;
+var HD=Math.max(2,Math.min(4,Math.floor((window.devicePixelRatio||1)*2)));
+cv.width=LOGW*HD; cv.height=LOGH*HD; cx.setTransform(HD,0,0,HD,0,0);
+function fitScreen(){ var s=Math.min(window.innerWidth/LOGW, window.innerHeight/LOGH);
+  cv.style.width=(LOGW*s)+'px'; cv.style.height=(LOGH*s)+'px'; }
+window.addEventListener('resize',fitScreen); fitScreen();
+function pos(e){ var r=cv.getBoundingClientRect(); var t=e.touches?e.touches[0]:e;
+  return { x:(t.clientX-r.left)*(LOGW/r.width), y:(t.clientY-r.top)*(LOGH/r.height) }; }
+
+// sound
+var AC=null; function ac(){ if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}} return AC; }
+function tone(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||'sine'; o.frequency.value=f; g.gain.value=v||0.14; o.connect(g);g.connect(a.destination); var n=a.currentTime; o.start(n); g.gain.exponentialRampToValueAtTime(0.001,n+d); o.stop(n+d); }
+function thud(){ tone(150,0.14,'sine',0.16); }
+function poof(){ tone(300,0.12,'sine',0.12); setTimeout(function(){tone(440,0.12,'sine',0.1);},60); }
+function twinkle(){ tone(1200,0.08,'sine',0.12); setTimeout(function(){tone(1600,0.1,'sine',0.1);},60); }
+function yay(){ tone(700,0.1,'sine',0.14); setTimeout(function(){tone(950,0.1,'sine',0.14);},90); setTimeout(function(){tone(1250,0.18,'sine',0.14);},180); }
+
+function rr(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
+function btn(x,y,w,h,label,col,tcol,fs){ cx.fillStyle=col||'#e0641a'; rr(x,y,w,h,14); cx.fill();
+  cx.fillStyle='rgba(255,255,255,.15)'; rr(x,y,w,h*0.5,14); cx.fill();
+  cx.fillStyle=tcol||'#fff'; cx.font='bold '+(fs||22)+'px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(label,x+w/2,y+h/2);
+  return {x:x,y:y,w:w,h:h}; }
+function hit(b,p){ return b&&p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h; }
+function shadow(x,y,w){ cx.fillStyle='rgba(0,0,0,.15)'; cx.beginPath(); cx.ellipse(x,y,w,w*0.28,0,0,7); cx.fill(); }
+
+// 2nd grade kids (no names)
+var KIDS=[
+ {c:'#e6ac82', s:'#3a2a1a', style:'pig', shirt:'#e05a8a'},
+ {c:'#f2cca0', s:'#d0a030', style:'short', shirt:'#3fa9f5'},
+ {c:'#dda072', s:'#402820', style:'pig', shirt:'#9b59b6'},
+ {c:'#c98a5a', s:'#201510', style:'short', shirt:'#3fbfa8'}
+];
+function kid(x,y,r,who){
+  cx.fillStyle=who.shirt; rr(x-r*0.8,y+r*0.4,r*1.6,r*1.1,r*0.4); cx.fill();
+  cx.fillStyle=who.c; cx.beginPath(); cx.arc(x,y,r,0,7); cx.fill();
+  cx.fillStyle='#20334f'; cx.beginPath(); cx.arc(x-r*0.32,y-r*0.05,r*0.13,0,7); cx.fill(); cx.beginPath(); cx.arc(x+r*0.32,y-r*0.05,r*0.13,0,7); cx.fill();
+  cx.fillStyle='rgba(230,120,120,.4)'; cx.beginPath(); cx.arc(x-r*0.5,y+r*0.22,r*0.14,0,7); cx.fill(); cx.beginPath(); cx.arc(x+r*0.5,y+r*0.22,r*0.14,0,7); cx.fill();
+  cx.strokeStyle='#20334f'; cx.lineWidth=r*0.1; cx.lineCap='round'; cx.beginPath(); cx.arc(x,y+r*0.16,r*0.32,0.15*Math.PI,0.85*Math.PI); cx.stroke();
+  cx.fillStyle=who.s; cx.beginPath(); cx.arc(x,y-r*0.1,r*0.98,Math.PI*1.05,Math.PI*1.95); cx.fill();
+  cx.beginPath(); cx.moveTo(x-r*0.95,yc(y,r)); cx.quadraticCurveTo(x,y-r*1.5,x+r*0.95,yc(y,r)); cx.quadraticCurveTo(x,y-r*0.6,x-r*0.95,yc(y,r)); cx.fill();
+  if(who.style==='pig'){ cx.beginPath(); cx.arc(x-r*0.95,y,r*0.3,0,7); cx.fill(); cx.beginPath(); cx.arc(x+r*0.95,y,r*0.3,0,7); cx.fill(); }
+}
+function yc(y,r){ return y-r*0.12; }
+
+// Coach Mo (grown-up, ball cap) — the real-life fort coach
+function drawCoach(x,y,hold){
+  shadow(x,y+48,26);
+  // legs
+  cx.fillStyle='#3a4a66'; cx.fillRect(x-11,y+20,9,28); cx.fillRect(x+2,y+20,9,28);
+  cx.fillStyle='#2a2a2a'; cx.fillRect(x-13,y+46,13,6); cx.fillRect(x,y+46,13,6);
+  // body (orange coach shirt)
+  cx.fillStyle='#ff8c1a'; rr(x-19,y-14,38,38,9); cx.fill();
+  cx.fillStyle='#fff'; cx.font='bold 9px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('COACH',x,y+4);
+  // arms
+  cx.strokeStyle='#f0c79a'; cx.lineWidth=8; cx.lineCap='round';
+  if(hold){ cx.beginPath(); cx.moveTo(x+15,y-6); cx.lineTo(x+30,y-30); cx.stroke(); } // arm up holding blanket
+  else { cx.beginPath(); cx.moveTo(x+15,y-2); cx.lineTo(x+26,y+14); cx.stroke(); }
+  cx.beginPath(); cx.moveTo(x-15,y-2); cx.lineTo(x-26,y+14); cx.stroke();
+  // head
+  cx.fillStyle='#f0c79a'; cx.beginPath(); cx.arc(x,y-30,16,0,7); cx.fill();
+  // ball cap
+  cx.fillStyle='#e23b3b'; cx.beginPath(); cx.arc(x,y-34,16,Math.PI,0); cx.fill();
+  cx.fillRect(x-16,y-35,32,4); cx.fillStyle='#c02a2a'; cx.fillRect(x+8,y-35,22,7); // brim
+  // face
+  cx.fillStyle='#20334f'; cx.beginPath(); cx.arc(x-5,y-28,1.8,0,7); cx.fill(); cx.beginPath(); cx.arc(x+5,y-28,1.8,0,7); cx.fill();
+  cx.strokeStyle='#20334f'; cx.lineWidth=1.6; cx.beginPath(); cx.arc(x,y-24,5,0.15*Math.PI,0.85*Math.PI); cx.stroke();
+}
+
+// state
+var step=0, TOTAL=8, glow=0;
+var STEPS=[
+ 'the couch base','the two chair posts','the big blanket roof','the floor rug',
+ 'the fluffy pillows','the string lights','the glowing lantern','the books & stuffie'
+];
+var scene='build';
+
+function livingRoom(dim){
+  // wall
+  var g=cx.createLinearGradient(0,0,0,LOGH); g.addColorStop(0,'#e8dcc8'); g.addColorStop(1,'#dcc9a8');
+  cx.fillStyle=g; cx.fillRect(0,0,LOGW,LOGH);
+  // window with night sky (cozy)
+  cx.fillStyle='#3a4a6a'; rr(40,70,120,90,8); cx.fill();
+  cx.fillStyle='#2a3a58'; rr(46,76,108,78,6); cx.fill();
+  cx.fillStyle='#f0e0a0'; cx.beginPath(); cx.arc(130,100,12,0,7); cx.fill(); // moon
+  cx.fillStyle='#fff'; for(var i=0;i<8;i++){ cx.globalAlpha=0.7; cx.fillRect(56+i*13,84+(i%3)*16,2,2); } cx.globalAlpha=1;
+  cx.strokeStyle='#a8895a'; cx.lineWidth=4; cx.strokeRect(40,70,120,90); cx.beginPath(); cx.moveTo(100,70); cx.lineTo(100,160); cx.moveTo(40,115); cx.lineTo(160,115); cx.stroke();
+  // framed picture
+  cx.fillStyle='#a8895a'; rr(300,80,70,54,4); cx.fill(); cx.fillStyle='#c8e0f0'; rr(306,86,58,42,2); cx.fill();
+  cx.fillStyle='#8ac88a'; cx.fillRect(306,110,58,18); cx.fillStyle='#f0c040'; cx.beginPath(); cx.arc(348,96,7,0,7); cx.fill();
+  // floor
+  cx.fillStyle='#b98a54'; cx.fillRect(0,LOGH-150,LOGW,150);
+  for(var b=0;b<7;b++){ cx.strokeStyle='#a87a44'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(b*70,LOGH-150); cx.lineTo(b*70,LOGH); cx.stroke(); }
+  cx.fillStyle='#a87a44'; cx.fillRect(0,LOGH-150,LOGW,5);
+  if(dim){ cx.fillStyle='rgba(20,20,40,'+dim+')'; cx.fillRect(0,0,LOGW,LOGH); }
+}
+
+var MX=225, BASE=LOGH-170;
+
+function drawFort(upto){
+  // shadow under fort
+  if(upto>=1) shadow(MX,BASE+70,140);
+  // 1 couch base
+  if(upto>=1){
+    cx.fillStyle='#8a6bb0'; rr(MX-120,BASE+6,240,64,14); cx.fill();
+    cx.fillStyle='#7a5aa0'; rr(MX-120,BASE+52,240,18,14); cx.fill();
+    // cushions
+    cx.fillStyle='#9878c0'; rr(MX-114,BASE+10,110,40,10); cx.fill(); rr(MX+4,BASE+10,110,40,10); cx.fill();
+    cx.strokeStyle='#7a5aa0'; cx.lineWidth=2; rr(MX-114,BASE+10,110,40,10); cx.stroke(); rr(MX+4,BASE+10,110,40,10); cx.stroke();
+  }
+  // 2 chair posts
+  if(upto>=2){
+    cx.fillStyle='#a86a3a'; cx.fillRect(MX-118,BASE-92,14,100); cx.fillRect(MX+104,BASE-92,14,100);
+    cx.fillStyle='#946034'; cx.fillRect(MX-126,BASE-96,30,12); cx.fillRect(MX+96,BASE-96,30,12);
+  }
+  // 3 big blanket roof with folds + shading
+  if(upto>=3){
+    var rg=cx.createLinearGradient(0,BASE-120,0,BASE-40); rg.addColorStop(0,'#e05a7a'); rg.addColorStop(1,'#c04060');
+    cx.fillStyle=rg;
+    cx.beginPath(); cx.moveTo(MX-130,BASE-40);
+    cx.quadraticCurveTo(MX-118,BASE-96,MX-70,BASE-86);
+    cx.quadraticCurveTo(MX-30,BASE-118,MX,BASE-100);
+    cx.quadraticCurveTo(MX+34,BASE-120,MX+72,BASE-86);
+    cx.quadraticCurveTo(MX+120,BASE-96,MX+130,BASE-40);
+    cx.quadraticCurveTo(MX,BASE-64,MX-130,BASE-40); cx.closePath(); cx.fill();
+    // fold shading
+    cx.strokeStyle='rgba(150,40,70,.5)'; cx.lineWidth=3; cx.lineCap='round';
+    cx.beginPath(); cx.moveTo(MX-70,BASE-84); cx.quadraticCurveTo(MX-64,BASE-58,MX-58,BASE-46); cx.stroke();
+    cx.beginPath(); cx.moveTo(MX,BASE-98); cx.quadraticCurveTo(MX+2,BASE-70,MX+2,BASE-52); cx.stroke();
+    cx.beginPath(); cx.moveTo(MX+70,BASE-84); cx.quadraticCurveTo(MX+64,BASE-58,MX+58,BASE-46); cx.stroke();
+    // polka dots
+    cx.fillStyle='rgba(255,255,255,.5)'; var dots=[[-92,-52],[-40,-72],[16,-70],[64,-58],[96,-50],[-64,-40]];
+    for(var i=0;i<dots.length;i++){ cx.beginPath(); cx.arc(MX+dots[i][0],BASE+dots[i][1],5,0,7); cx.fill(); }
+    // dark opening (inside the fort)
+    cx.fillStyle='#3a2440'; cx.beginPath(); cx.moveTo(MX-96,BASE+6); cx.quadraticCurveTo(MX,BASE-58,MX+96,BASE+6); cx.lineTo(MX+96,BASE+8); cx.lineTo(MX-96,BASE+8); cx.closePath(); cx.fill();
+  }
+  // 4 floor rug
+  if(upto>=4){
+    cx.fillStyle='#4a8ac0'; cx.beginPath(); cx.ellipse(MX,BASE+66,116,20,0,0,7); cx.fill();
+    cx.strokeStyle='#6aa8e0'; cx.lineWidth=3; cx.beginPath(); cx.ellipse(MX,BASE+66,96,15,0,0,7); cx.stroke();
+    cx.beginPath(); cx.ellipse(MX,BASE+66,64,10,0,0,7); cx.stroke();
+  }
+  // 5 pillows
+  if(upto>=5){
+    cx.fillStyle='#f0b040'; rr(MX-84,BASE+34,52,26,12); cx.fill();
+    cx.fillStyle='#5ac88a'; rr(MX-14,BASE+40,54,24,12); cx.fill();
+    cx.fillStyle='#f07090'; rr(MX+40,BASE+36,46,24,12); cx.fill();
+    cx.strokeStyle='rgba(0,0,0,.12)'; cx.lineWidth=2; rr(MX-84,BASE+34,52,26,12); cx.stroke();
+  }
+  // 6 string lights across the top
+  if(upto>=6){
+    cx.strokeStyle='#6a5a3a'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(MX-124,BASE-70); cx.quadraticCurveTo(MX,BASE-52,MX+124,BASE-70); cx.stroke();
+    var lc=['#ff6060','#ffd23f','#5ac85a','#5aa0e0','#f090d0','#ffa040'];
+    for(var l=0;l<9;l++){ var t=l/8; var lx=MX-124+t*248; var ly=BASE-70 + Math.sin(t*Math.PI)*18 + 4;
+      var tw = 0.6+0.4*Math.sin(Date.now()/300 + l);
+      cx.fillStyle=lc[l%6]; cx.globalAlpha=tw; cx.beginPath(); cx.arc(lx,ly,4.5,0,7); cx.fill(); cx.globalAlpha=1; }
+  }
+  // 7 lantern glow inside
+  if(upto>=7){
+    var lgx=MX-40, lgy=BASE+20;
+    // glow pool
+    var gg=cx.createRadialGradient(lgx,lgy,2,lgx,lgy,60); gg.addColorStop(0,'rgba(255,220,120,.8)'); gg.addColorStop(1,'rgba(255,220,120,0)');
+    cx.fillStyle=gg; cx.beginPath(); cx.arc(lgx,lgy,60,0,7); cx.fill();
+    cx.fillStyle='#c8a030'; cx.fillRect(lgx-8,lgy-18,16,26); cx.fillStyle='#fff2b0'; rr(lgx-6,lgy-15,12,20,3); cx.fill();
+    cx.strokeStyle='#c8a030'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(lgx,lgy-18); cx.lineTo(lgx,lgy-24); cx.stroke();
+  }
+  // 8 books + stuffie
+  if(upto>=8){
+    var bc=['#e05050','#3fa9f5','#5ac85a','#f0a800'];
+    for(var bk=0;bk<4;bk++){ cx.fillStyle=bc[bk]; rr(MX+44,BASE+58-bk*11,40,10,2); cx.fill(); cx.strokeStyle='rgba(0,0,0,.15)'; cx.lineWidth=1; rr(MX+44,BASE+58-bk*11,40,10,2); cx.stroke(); }
+    // teddy stuffie
+    var tx=MX+96, ty=BASE+44; cx.fillStyle='#b98a5a'; cx.beginPath(); cx.arc(tx,ty,12,0,7); cx.fill();
+    cx.beginPath(); cx.arc(tx-9,ty-9,5,0,7); cx.fill(); cx.beginPath(); cx.arc(tx+9,ty-9,5,0,7); cx.fill();
+    cx.fillStyle='#20140a'; cx.beginPath(); cx.arc(tx-4,ty-2,1.6,0,7); cx.fill(); cx.beginPath(); cx.arc(tx+4,ty-2,1.6,0,7); cx.fill();
+  }
+}
+
+function drawScene(){
+  var dim = scene==='done' ? Math.min(0.45, glow*0.008) : 0;
+  livingRoom(dim);
+  // re-light the fort area when dim (cozy pool)
+  if(scene==='done'){
+    var gg=cx.createRadialGradient(MX,BASE,10,MX,BASE,180); gg.addColorStop(0,'rgba(255,210,120,'+Math.min(0.5,glow*0.008)+')'); gg.addColorStop(1,'rgba(255,210,120,0)');
+    cx.fillStyle=gg; cx.beginPath(); cx.arc(MX,BASE,180,0,7); cx.fill();
+  }
+  drawFort(step);
+  // Coach Mo — building on the left, or resting by the fort when done
+  if(scene==='build'){ drawCoach(56,BASE+30, step>=2&&step<=4); }
+  // kids peek in when done
+  if(scene==='done'){
+    kid(MX-52,BASE+2,15,KIDS[0]); kid(MX+52,BASE+4,15,KIDS[1]);
+    kid(MX-16,BASE-6,15,KIDS[2]); kid(MX+22,BASE-4,15,KIDS[3]);
+    drawCoach(58,BASE+30,false);
+  }
+  // title bar
+  cx.fillStyle='rgba(40,25,20,.82)'; rr(16,16,LOGW-32,54,12); cx.fill();
+  cx.fillStyle='#fff'; cx.font='900 21px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle';
+  if(scene==='build'){ cx.fillText('🏕️ COACH MO — FORT CLASS',LOGW/2,34);
+    cx.fillStyle='#ffcf8a'; cx.font='bold 13px Segoe UI'; cx.fillText('Part '+step+' of '+TOTAL,LOGW/2,56); }
+  else { cx.fillText('🏕️ COACH MO\'S COZY FORT!',LOGW/2,34);
+    cx.fillStyle='#ffcf8a'; cx.font='bold 13px Segoe UI'; cx.fillText('The whole class is inside 💛',LOGW/2,56); }
+  // button
+  if(scene==='build'){ g_btn=btn(LOGW/2-135,LOGH-70,270,50,'🔨 Add '+STEPS[step],'#e0641a','#fff',18); }
+  else { glow++; g_btn=btn(LOGW/2-110,LOGH-70,220,48,'↺ Build Again','#5aa0e0','#fff',20); }
+}
+var g_btn=null;
+
+function loop(){ cx.setTransform(HD,0,0,HD,0,0); cx.clearRect(0,0,LOGW,LOGH); drawScene(); requestAnimationFrame(loop); }
+loop();
+
+cv.addEventListener('pointerdown',function(e){ e.preventDefault(); ac(); var p=pos(e);
+  if(hit(g_btn,p)){
+    if(scene==='build'){ step++; if(step===6)twinkle(); else if(step>=TOTAL){ scene='done'; glow=0; yay(); } else if(step>=3)poof(); else thud(); }
+    else { step=0; scene='build'; }
+  }
+},{passive:false});
+})();
+</script>
+</body>
+</html>

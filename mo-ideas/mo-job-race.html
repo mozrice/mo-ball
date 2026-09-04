@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>MO Job Race</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;min-height:100%;font-family:'Trebuchet MS',Verdana,sans-serif;color:#2a2233;
+ background:linear-gradient(160deg,#fff3d6,#ffe0ec 55%,#dff0ff);}
+#wrap{max-width:640px;margin:0 auto;padding:12px 12px 40px;}
+h1{font-size:26px;margin:8px 0 2px;text-align:center;color:#c0501a;text-shadow:0 2px 0 #fff;}
+.sub{text-align:center;font-size:13px;color:#8a6a4a;margin-bottom:8px;}
+.panel{background:#fff;border-radius:16px;padding:12px;margin:10px 0;box-shadow:0 3px 10px #0001;}
+canvas{width:100%;border-radius:12px;display:block;}
+#track{background:#8fd07b;}
+#mini{background:#eef4fb;}
+.stat{text-align:center;font-weight:bold;color:#c0501a;font-size:15px;margin:6px 0;}
+.pickttl{text-align:center;font-weight:bold;color:#2a6ab0;font-size:17px;margin:2px 0 8px;}
+.jobbtn{display:block;width:100%;border:none;border-radius:14px;padding:16px;margin:8px 0;font-size:17px;font-weight:bold;
+ font-family:inherit;color:#fff;box-shadow:0 5px 0 #0002;cursor:pointer;background:linear-gradient(#ff9a5a,#e0642a);text-align:left;}
+.jobbtn:active{transform:translateY(3px);box-shadow:0 2px 0 #0002;}
+.jobbtn .em{font-size:20px;margin-right:8px;}
+.jobbtn.b2{background:linear-gradient(#6ab0f0,#2a80d8);}
+.jobbtn.b3{background:linear-gradient(#7ad07a,#39a84a);}
+.win{text-align:center;font-size:22px;font-weight:bold;color:#2a8a3a;margin:8px 0;}
+.row{display:flex;gap:8px;justify-content:center;margin-top:8px;}
+.btn{background:#ffd23f;color:#4a2f0a;border:none;border-radius:12px;padding:12px 18px;font-weight:bold;font-family:inherit;font-size:15px;cursor:pointer;box-shadow:0 3px 0 #0003;}
+.prog{height:14px;background:#eee;border-radius:8px;overflow:hidden;margin-top:8px;}
+.pfill{height:100%;width:0;background:linear-gradient(#6ad07a,#39a84a);transition:width .2s;}
+.minittl{text-align:center;font-weight:bold;color:#2a6ab0;font-size:17px;margin:2px 0 6px;}
+</style></head>
+<body><div id="wrap">
+<h1>🏁 MO JOB RACE</h1>
+<div class="sub">Pick a job, do its own mini-game — do ALL the jobs!</div>
+<div class="panel">
+ <canvas id="track" width="440" height="230"></canvas>
+ <div class="stat" id="raceinfo">Do the jobs to fill the bar! 🏁</div>
+ <div class="win" id="win" style="display:none"></div>
+</div>
+<div class="panel" id="pickpanel">
+ <div class="pickttl">👇 Pick a job to do!</div>
+ <div id="jobs"></div>
+</div>
+<div class="panel" id="minipanel" style="display:none">
+ <div class="minittl" id="minittl"></div>
+ <canvas id="mini" width="440" height="300"></canvas>
+</div>
+<div class="panel">
+ <div class="stat" style="margin:0 0 6px">🏆 Job games done: <span id="alltime">0</span> / <span id="tot"></span></div>
+ <div class="prog"><div class="pfill" id="allbar"></div></div>
+ <div class="sub" id="alldone" style="margin-top:8px"></div>
+ <div class="row"><button class="btn" onclick="saveGame()" style="background:#7ad07a;">💾 Save</button><button class="btn" onclick="resetRace()">🔁 New Race</button></div>
+ <div class="sub" id="savedmsg" style="color:#2a8a3a;font-weight:bold;margin-top:6px;"></div>
+</div>
+<script>
+var JOBS=["Pick Up Toys Race", "Pick Up Toys Toss", "Pick Up Toys Match", "Pick Up Toys Hunt", "Pick Up Toys Dash", "Pick Up Toys Relay", "Pick Up Toys Sort", "Pick Up Toys Spin", "Pick Up Toys Blitz", "Pick Up Toys Tag", "Make the Bed Race", "Make the Bed Toss", "Make the Bed Match", "Make the Bed Hunt", "Make the Bed Dash", "Make the Bed Relay", "Make the Bed Sort", "Make the Bed Spin", "Make the Bed Blitz", "Make the Bed Tag", "Sort the Laundry Race", "Sort the Laundry Toss", "Sort the Laundry Match", "Sort the Laundry Hunt", "Sort the Laundry Dash", "Sort the Laundry Relay", "Sort the Laundry Sort", "Sort the Laundry Spin", "Sort the Laundry Blitz", "Sort the Laundry Tag", "Match the Socks Race", "Match the Socks Toss", "Match the Socks Match", "Match the Socks Hunt", "Match the Socks Dash", "Match the Socks Relay", "Match the Socks Sort", "Match the Socks Spin", "Match the Socks Blitz", "Match the Socks Tag", "Wipe the Table Race", "Wipe the Table Toss", "Wipe the Table Match", "Wipe the Table Hunt", "Wipe the Table Dash", "Wipe the Table Relay", "Wipe the Table Sort", "Wipe the Table Spin", "Wipe the Table Blitz", "Wipe the Table Tag", "Fold the Towels Race", "Fold the Towels Toss", "Fold the Towels Match", "Fold the Towels Hunt", "Fold the Towels Dash", "Fold the Towels Relay", "Fold the Towels Sort", "Fold the Towels Spin", "Fold the Towels Blitz", "Fold the Towels Tag", "Put Books Away Race", "Put Books Away Toss", "Put Books Away Match", "Put Books Away Hunt", "Put Books Away Dash", "Put Books Away Relay", "Put Books Away Sort", "Put Books Away Spin", "Put Books Away Blitz", "Put Books Away Tag", "Water the Plants Race", "Water the Plants Toss", "Water the Plants Match", "Water the Plants Hunt", "Water the Plants Dash", "Water the Plants Relay", "Water the Plants Sort", "Water the Plants Spin", "Water the Plants Blitz", "Water the Plants Tag", "Feed the Pets Race", "Feed the Pets Toss", "Feed the Pets Match", "Feed the Pets Hunt", "Feed the Pets Dash", "Feed the Pets Relay", "Feed the Pets Sort", "Feed the Pets Spin", "Feed the Pets Blitz", "Feed the Pets Tag", "Set the Table Race", "Set the Table Toss", "Set the Table Match", "Set the Table Hunt", "Set the Table Dash", "Set the Table Relay", "Set the Table Sort", "Set the Table Spin", "Set the Table Blitz", "Set the Table Tag", "Clear the Dishes Race", "Clear the Dishes Toss", "Clear the Dishes Match", "Clear the Dishes Hunt", "Clear the Dishes Dash", "Clear the Dishes Relay", "Clear the Dishes Sort", "Clear the Dishes Spin", "Clear the Dishes Blitz", "Clear the Dishes Tag", "Sweep the Floor Race", "Sweep the Floor Toss", "Sweep the Floor Match", "Sweep the Floor Hunt", "Sweep the Floor Dash", "Sweep the Floor Relay", "Sweep the Floor Sort", "Sweep the Floor Spin", "Sweep the Floor Blitz", "Sweep the Floor Tag", "Dust the Shelf Race", "Dust the Shelf Toss", "Dust the Shelf Match", "Dust the Shelf Hunt", "Dust the Shelf Dash", "Dust the Shelf Relay", "Dust the Shelf Sort", "Dust the Shelf Spin", "Dust the Shelf Blitz", "Dust the Shelf Tag", "Fluff the Pillows Race", "Fluff the Pillows Toss", "Fluff the Pillows Match", "Fluff the Pillows Hunt", "Fluff the Pillows Dash", "Fluff the Pillows Relay", "Fluff the Pillows Sort", "Fluff the Pillows Spin", "Fluff the Pillows Blitz", "Fluff the Pillows Tag", "Put Shoes in a Row Race", "Put Shoes in a Row Toss", "Put Shoes in a Row Match", "Put Shoes in a Row Hunt", "Put Shoes in a Row Dash", "Put Shoes in a Row Relay", "Put Shoes in a Row Sort", "Put Shoes in a Row Spin", "Put Shoes in a Row Blitz", "Put Shoes in a Row Tag", "Fill the Toy Bin Race", "Fill the Toy Bin Toss", "Fill the Toy Bin Match", "Fill the Toy Bin Hunt", "Fill the Toy Bin Dash", "Fill the Toy Bin Relay", "Fill the Toy Bin Sort", "Fill the Toy Bin Spin", "Fill the Toy Bin Blitz", "Fill the Toy Bin Tag", "Straighten the Blanket Race", "Straighten the Blanket Toss", "Straighten the Blanket Match", "Straighten the Blanket Hunt", "Straighten the Blanket Dash", "Straighten the Blanket Relay", "Straighten the Blanket Sort", "Straighten the Blanket Spin", "Straighten the Blanket Blitz", "Straighten the Blanket Tag", "Hang Up Coats Race", "Hang Up Coats Toss", "Hang Up Coats Match", "Hang Up Coats Hunt", "Hang Up Coats Dash", "Hang Up Coats Relay", "Hang Up Coats Sort", "Hang Up Coats Spin", "Hang Up Coats Blitz", "Hang Up Coats Tag", "Wipe the Window Race", "Wipe the Window Toss", "Wipe the Window Match", "Wipe the Window Hunt", "Wipe the Window Dash", "Wipe the Window Relay", "Wipe the Window Sort", "Wipe the Window Spin", "Wipe the Window Blitz", "Wipe the Window Tag", "Tidy the Desk Race", "Tidy the Desk Toss", "Tidy the Desk Match", "Tidy the Desk Hunt", "Tidy the Desk Dash", "Tidy the Desk Relay", "Tidy the Desk Sort", "Tidy the Desk Spin", "Tidy the Desk Blitz", "Tidy the Desk Tag", "Wipe the Muddy Paw Prints", "Wipe the Muddy Paw Prints Dash", "Clean the Sticky Spill", "Clean the Sticky Spill Dash", "Scrub the Crayon Wall", "Scrub the Crayon Wall Dash", "Wash the Muddy Boots", "Wash the Muddy Boots Dash", "Mop the Juice Puddle", "Mop the Juice Puddle Dash", "Wipe the Fingerprint Door", "Wipe the Fingerprint Door Dash", "Pick Up the Spilled Cereal", "Pick Up the Spilled Cereal Dash", "Clean the Messy Chair", "Clean the Messy Chair Dash", "Scrub the Dirty Pot", "Scrub the Dirty Pot Dash", "Wash the Muddy Backpack", "Wash the Muddy Backpack Dash", "Wipe the Drippy Fridge", "Wipe the Drippy Fridge Dash", "Clean the Dusty Fan", "Clean the Dusty Fan Dash", "Scoop the Yard Mess", "Scoop the Yard Mess Dash", "Wash the Dirty Lunchbox", "Wash the Dirty Lunchbox Dash", "Wipe the Toothpaste Sink", "Wipe the Toothpaste Sink Dash", "Clean the Grassy Shoes", "Clean the Grassy Shoes Dash", "Scrub the Bathtub Ring", "Scrub the Bathtub Ring Dash", "Wipe the Smudgy Mirror", "Wipe the Smudgy Mirror Dash", "Pick Up the Torn Paper", "Pick Up the Torn Paper Dash", "Clean the Crumby Couch", "Clean the Crumby Couch Dash", "Arff: Fetch the Sock", "Arff Fetch the Sock Relay", "Arff: Carry the Mail", "Arff Carry the Mail Relay", "Arff: Push the Toy Bin", "Arff Push the Toy Bin Relay", "Arff: Find the Lost Shoe", "Arff Find the Lost Shoe Relay", "Arff: Bring the Newspaper", "Arff Bring the Newspaper Relay", "Arff: Tug the Blanket to the Bed", "Arff Tug the Blanket to the Bed Relay", "Arff: Sniff Out the Mess", "Arff Sniff Out the Mess Relay", "Arff: Drop Trash in the Can", "Arff Drop Trash in the Can Relay", "Arff: Round Up the Balls", "Arff Round Up the Balls Relay", "Arff: Deliver the Slippers", "Arff Deliver the Slippers Relay", "Arff: Guard the Clean Pile", "Arff Guard the Clean Pile Relay", "Arff: Pull the Toy Wagon", "Arff Pull the Toy Wagon Relay", "Arff: Fetch the Remote", "Arff Fetch the Remote Relay", "Arff: Carry the Laundry Basket", "Arff Carry the Laundry Basket Relay", "Arff: Herd the Toys to the Bin", "Arff Herd the Toys to the Bin Relay", "Arff: Bring the Leash", "Arff Bring the Leash Relay", "Arff: Fetch the Ball", "Arff Fetch the Ball Relay", "Arff: Carry the Towel", "Arff Carry the Towel Relay", "Arff: Nudge the Laundry In", "Arff Nudge the Laundry In Relay", "Arff: Bring Mo the Broom", "Arff Bring Mo the Broom Relay", "Meow: Bat the Sock to the Hamper", "Meow Bat the Sock to the Hamper Challenge", "Meow: Chase the Dust Bunny", "Meow Chase the Dust Bunny Challenge", "Meow: Knock the Crumbs to the Pan", "Meow Knock the Crumbs to the Pan Challenge", "Meow: Inspect the Shelf", "Meow Inspect the Shelf Challenge", "Meow: Test the Clean Bed", "Meow Test the Clean Bed Challenge", "Meow: Sit on the Folded Towels", "Meow Sit on the Folded Towels Challenge", "Meow: Guard the Tidy Corner", "Meow Guard the Tidy Corner Challenge", "Meow: Paw the Toy into the Bin", "Meow Paw the Toy into the Bin Challenge", "Meow: Sweep with the Tail", "Meow Sweep with the Tail Challenge", "Meow: Pounce the Lint", "Meow Pounce the Lint Challenge", "Meow: Sort the Yarn by Color", "Meow Sort the Yarn by Color Challenge", "Meow: Watch from Up High", "Meow Watch from Up High Challenge", "Meow: Nudge the Ball Home", "Meow Nudge the Ball Home Challenge", "Meow: Find the Hidden Mess", "Meow Find the Hidden Mess Challenge", "Meow: Bat the Crumbs Away", "Meow Bat the Crumbs Away Challenge", "Meow: Chase the Mop String", "Meow Chase the Mop String Challenge", "Meow: Tidy the Yarn Basket", "Meow Tidy the Yarn Basket Challenge", "Meow: Push the Pencil Back", "Meow Push the Pencil Back Challenge", "Meow: Line Up the Shoes", "Meow Line Up the Shoes Challenge", "Meow: Pat the Pillow Flat", "Meow Pat the Pillow Flat Challenge", "Clean-Up Relay", "Clean-Up Relay Timer", "Toy Sort Race", "Toy Sort Race Timer", "Laundry Match", "Laundry Match Timer", "Dish Dash", "Dish Dash Timer", "Trash Toss", "Trash Toss Timer", "Bed-Making Race", "Bed-Making Race Timer", "Sweep Sprint", "Sweep Sprint Timer", "Room Rescue", "Room Rescue Timer", "Tidy Tag", "Tidy Tag Timer", "Sock Match Mania", "Sock Match Mania Timer", "Book Shelf Shuffle", "Book Shelf Shuffle Timer", "Crumb Catch", "Crumb Catch Timer", "Table Wipe Rush", "Table Wipe Rush Timer", "Toy Bin Blitz", "Toy Bin Blitz Timer", "Recycle Sort Sprint", "Recycle Sort Sprint Timer", "Pillow Fluff Frenzy", "Pillow Fluff Frenzy Timer", "Bin Fill Blitz", "Bin Fill Blitz Timer", "Floor Mop Marathon", "Floor Mop Marathon Timer", "Window Wipe Race", "Window Wipe Race Timer", "Shoe Line-Up", "Shoe Line-Up Timer", "Bedroom: Tidy Everything", "Bedroom: Clean the Mess", "Bedroom: Sort and Put Away", "Bedroom: Wipe It Down", "Bedroom: Pick Up Race", "Bedroom: Reset the Room", "Kitchen: Tidy Everything", "Kitchen: Clean the Mess", "Kitchen: Sort and Put Away", "Kitchen: Wipe It Down", "Kitchen: Pick Up Race", "Kitchen: Reset the Room", "Living Room: Tidy Everything", "Living Room: Clean the Mess", "Living Room: Sort and Put Away", "Living Room: Wipe It Down", "Living Room: Pick Up Race", "Living Room: Reset the Room", "Bathroom: Tidy Everything", "Bathroom: Clean the Mess", "Bathroom: Sort and Put Away", "Bathroom: Wipe It Down", "Bathroom: Pick Up Race", "Bathroom: Reset the Room", "Play Room: Tidy Everything", "Play Room: Clean the Mess", "Play Room: Sort and Put Away", "Play Room: Wipe It Down", "Play Room: Pick Up Race", "Play Room: Reset the Room", "Backyard: Tidy Everything", "Backyard: Clean the Mess", "Backyard: Sort and Put Away", "Backyard: Wipe It Down", "Backyard: Pick Up Race", "Backyard: Reset the Room", "Garage: Tidy Everything", "Garage: Clean the Mess", "Garage: Sort and Put Away", "Garage: Wipe It Down", "Garage: Pick Up Race", "Garage: Reset the Room", "Hallway: Tidy Everything", "Hallway: Clean the Mess", "Hallway: Sort and Put Away", "Hallway: Wipe It Down", "Hallway: Pick Up Race", "Hallway: Reset the Room", "Car: Tidy Everything", "Car: Clean the Mess", "Car: Sort and Put Away", "Car: Wipe It Down", "Car: Pick Up Race", "Car: Reset the Room", "Laundry Room: Tidy Everything", "Laundry Room: Clean the Mess", "Laundry Room: Sort and Put Away", "Laundry Room: Wipe It Down", "Laundry Room: Pick Up Race", "Laundry Room: Reset the Room", "Beat the Clock Clean-Up", "1-Minute Tidy Blitz", "Sock Match Countdown", "Fetch-a-thon (Arff)", "Pounce Patrol (Meow)", "Chore Card Draw", "Job Wheel Spin", "Room Reset Race", "Star Collector Sprint", "Two-Job Tag Team", "Lightning Laundry", "Turbo Trash Toss", "Speedy Shelf Sort", "Flash Fold Folding", "Zoom Zone Cleanup", "Buzzer Beater Bins", "Mop Marathon", "Dust Dash", "Toy Tornado Tidy", "Snack Mess Sweep", "Be the Clean-Up Captain", "Clean-Up Captain Game", "Be the Fetch Boss (Arff)", "Fetch Boss (Arff) Game", "Be the Tidy Chief (Meow)", "Tidy Chief (Meow) Game", "Be the Star Giver", "Star Giver Game", "Be the Timer Keeper", "Timer Keeper Game", "Be the Job Picker", "Job Picker Game", "Be the Room Inspector", "Room Inspector Game", "Be the Trash Team Leader", "Trash Team Leader Game", "Be the Laundry Boss", "Laundry Boss Game", "Be the Dish Duty Star", "Dish Duty Star Game", "Be the Sweep Squad Leader", "Sweep Squad Leader Game", "Be the Toy Team Captain", "Toy Team Captain Game", "Be the Chore Chart Checker", "Chore Chart Checker Game", "Be the Pet Job Coach", "Pet Job Coach Game", "Be the Mess Detective", "Mess Detective Game", "Musical Clean-Up", "Freeze Tidy", "Blindfold Sock Match (peek is ok!)", "Balance the Laundry on Your Head Walk", "Backwards Clean-Up Race", "Silly Voice Chore Calls", "Hot-and-Cold Toy Hunt", "Whisper While You Work", "Clean-Up Dance Party", "Tip-Toe Tidy", "One-Handed Toy Pick-Up", "Beat Your Own Record Clean", "Job Bingo", "Pass the Job (like hot potato)", "Coin Toss Chore Picker", "Team vs Team Room Race", "Stuffie Helper Job Game", "Speed-Fold Sock Showdown", "Mystery Job Card Draw", "Rainbow Sort (by color) Clean-Up", "Race the Robot (pretend) Clean", "Clean-Up Simon Says", "Two-Minute Whole-Room Rush", "Milk the Cow", "Milk the Cow Fast", "Sort the Socks by Color", "Sort the Toys", "Sort the Laundry by Color", "Sort the Recycling", "Sort the Blocks", "Collect the Eggs", "Feed the Chickens", "Brush the Horse"];
+(function(){
+ var el=function(id){return document.getElementById(id);};
+ var RACERS=[["🧑","Mo"],["🐕","Arff"],["🐈","Meow"],["🐰","Hop"]];
+ var N=4, me=0, GOAL=JOBS.length, EMO=["🧹","🧽","🧺","🧴","🪣","🧼"];
+ var pos=[0,0,0,0], alltime=0, over=false, timer=null, done={};
+ el("tot").textContent=JOBS.length;
+ function saveProg(){ try{ localStorage.setItem("mojobrace_save", JSON.stringify({alltime:alltime, done:done})); }catch(e){} }
+ function loadProg(){ try{ var d=JSON.parse(localStorage.getItem("mojobrace_save")||"null"); if(d){ alltime=d.alltime||0; done=d.done||{}; el("alltime").textContent=alltime; el("allbar").style.width=(alltime/JOBS.length*100)+"%"; if(alltime>=JOBS.length) el("alldone").textContent="🎉 YOU DID ALL "+JOBS.length+" JOB GAMES! MO CHAMPION! 🎉"; } }catch(e){} }
+ window.saveGame=function(){ saveProg(); var m=el("savedmsg"); m.textContent="💾 Saved! "+alltime+" job games saved for next time."; setTimeout(function(){ if(m)m.textContent=""; },2500); };
+
+ var AC=null; function ac(){ if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}} return AC; }
+ function tone(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||'sine'; o.frequency.value=f; g.gain.value=v||0.14; o.connect(g);g.connect(a.destination); var n=a.currentTime; o.start(n); g.gain.exponentialRampToValueAtTime(0.001,n+d); o.stop(n+d); }
+ function ding(){ tone(700,0.07,'sine',0.15); setTimeout(function(){tone(980,0.09,'sine',0.13);},55); }
+ function bad(){ tone(150,0.14,'sawtooth',0.12); }
+ function tada(){ tone(700,0.1,'sine',0.14); setTimeout(function(){tone(950,0.1,'sine',0.14);},90); setTimeout(function(){tone(1250,0.16,'sine',0.14);},180); }
+
+ function draw(){ var cv=el("track"); if(!cv)return; var cx=cv.getContext("2d"),W=440,H=230;
+  cx.fillStyle="#8fd07b"; cx.fillRect(0,0,W,H);
+  var fx=W-40; for(var y=0;y<H;y+=12){ cx.fillStyle=(Math.floor(y/12)%2)?"#fff":"#333"; cx.fillRect(fx,y,10,12); }
+  for(var i=0;i<N;i++){ var ly=14+i*54; cx.fillStyle="rgba(255,255,255,.22)"; cx.fillRect(0,ly,W,48);
+   cx.strokeStyle="#ffffff88"; cx.setLineDash([10,10]); cx.beginPath(); cx.moveTo(0,ly+40); cx.lineTo(W,ly+40); cx.stroke(); cx.setLineDash([]);
+   var x=20+(pos[i]/GOAL)*(fx-30);
+   cx.font="28px serif"; cx.textAlign="center"; cx.fillText(RACERS[i][0], x, ly+34);
+   cx.fillStyle=i===me?"#c0501a":"#4a3a2a"; cx.font="bold 12px Trebuchet MS"; cx.textAlign="left"; cx.fillText(RACERS[i][1]+(i===me?" (you)":"")+"  "+pos[i], 4, ly+12);
+  }
+ }
+ function loop(){ draw(); if(MG.active) drawMini(); requestAnimationFrame(loop); }
+
+ function pick3(){ var out=[]; while(out.length<3){ var j=Math.floor(Math.random()*JOBS.length); if(out.indexOf(j)<0)out.push(j); } return out; }
+ function renderJobs(){ if(over){ el("jobs").innerHTML=""; return; }
+  var three=pick3(); var h="";
+  for(var k=0;k<3;k++){ var j=three[k];
+   h+='<button class="jobbtn '+(k===1?"b2":k===2?"b3":"")+'" onclick="pickJob('+j+')"><span class="em">'+EMO[k%6]+'</span>'+JOBS[j]+'</button>'; }
+  el("jobs").innerHTML=h;
+ }
+ window.pickJob=function(j){ if(over)return; ac(); startMini(j); };
+
+ function jobDone(j){
+  pos[me]++; ding();
+  if(!done[j]){ done[j]=1; if(alltime<JOBS.length){ alltime++; el("alltime").textContent=alltime; el("allbar").style.width=(alltime/JOBS.length*100)+"%";
+   if(alltime>=JOBS.length) el("alldone").textContent="🎉 YOU DID ALL "+JOBS.length+" JOB GAMES! MO CHAMPION! 🎉"; } saveProg(); }
+  el("raceinfo").textContent="✓ "+JOBS[j];
+  if(pos[me]>=GOAL){ finish(me); return; }
+  renderJobs();
+ }
+ function startBots(){ if(timer)clearInterval(timer); timer=setInterval(function(){ if(over)return;
+  for(var i=1;i<N;i++){ if(Math.random()<0.12){ pos[i]++; if(pos[i]>=GOAL){ finish(i); return; } } }
+ }, 1400); }
+ function finish(w){ if(over)return; over=true; if(timer)clearInterval(timer);
+  el("win").style.display="block"; el("win").textContent=(w===me?"🏆 YOU WIN, Mo!":"🏁 "+RACERS[w][1]+" wins!");
+  el("jobs").innerHTML=""; el("minipanel").style.display="none"; el("pickpanel").style.display="block"; MG.active=false; if(w===me)tada();
+ }
+ window.resetRace=function(){ pos=[0,0,0,0]; over=false; if(timer)clearInterval(timer); el("win").style.display="none"; el("raceinfo").textContent="Do the jobs to fill the bar! 🏁"; el("minipanel").style.display="none"; el("pickpanel").style.display="block"; MG.active=false; renderJobs(); startBots(); };
+
+ // ===== MINI-GAMES (each job type has its own) =====
+ var MG={active:false, type:"", items:[], sel:-1, selItem:-1, scols:[], job:-1, need:0, hit:0, mover:null, mt:0};
+ var mcv=el("mini");
+ function classify(name){ var s=name.toLowerCase();
+  if(/(milk|cow)/.test(s)) return "milk";
+  if(/sort/.test(s)) return "sort";
+  if(/(sock|match|pair)/.test(s)) return "match";
+  if(/(fold|towel|shirt)/.test(s)) return "fold";
+  if(/laundry/.test(s)) return "match";
+  if(/(dish|plate|wash)/.test(s)) return "dishes";
+  if(/(toss|trash|recycle|bin|catch|crumb)/.test(s)) return "toss";
+  if(/(water|plant)/.test(s)) return "water";
+  if(/(feed|food|bowl)/.test(s)) return "feed";
+  if(/(sweep|mop|floor|dust)/.test(s)) return "sweep";
+  if(/(bed|pillow|fluff|blanket)/.test(s)) return "bed";
+  if(/(book|shelf)/.test(s)) return "books";
+  if(/^arff|fetch|carry|bring|leash|newspaper/.test(s)) return "fetch";
+  if(/^meow|pounce|chase|bat|paw|yarn/.test(s)) return "pounce";
+  return "clean";
+ }
+ var TITLES={match:"🧦 Match the socks! Tap two the same.",fold:"🧺 Tap the clothes to fold them!",
+  dishes:"🍽️ Tap each dish to wash it!",toss:"🗑️ Tap the trash to toss it in!",water:"🌱 Tap each plant to water it!",
+  feed:"🍖 Tap each bowl to fill it!",sweep:"🧹 Tap the dust to sweep it up!",bed:"🛏️ Tap the pillows to fluff!",
+  books:"📚 Tap the books to shelf them!",clean:"🧽 Tap all the mess to clean it!",
+  fetch:"🐕 Tap the ball to make Arff fetch! (x6)",pounce:"🐈 Tap the toy so Meow pounces! (x6)",
+  milk:"🐄 Tap the cow to milk it! Fill the bucket!",
+  sort:"🧺 Sort each thing into its matching bin!"};
+ var SOCKCOLS=["#e05050","#3fa9f5","#5ac85a","#f0a800","#9b59b6","#e07aa0"];
+ function rnd(a,b){return a+Math.random()*(b-a);}
+ function startMini(j){
+  MG.active=true; MG.job=j; MG.type=classify(JOBS[j]); MG.sel=-1; MG.items=[]; MG.hit=0; MG.need=6; MG.mover=null;
+  el("pickpanel").style.display="none"; el("minipanel").style.display="block";
+  el("minittl").textContent=TITLES[MG.type]||TITLES.clean;
+  var t=MG.type;
+  if(t==="match"){
+   var cols=SOCKCOLS.slice(); for(var s=cols.length-1;s>0;s--){var r=Math.floor(Math.random()*(s+1));var x=cols[s];cols[s]=cols[r];cols[r]=x;}
+   var arr=[]; for(var p=0;p<4;p++){arr.push(cols[p]);arr.push(cols[p]);}
+   for(var s2=arr.length-1;s2>0;s2--){var r2=Math.floor(Math.random()*(s2+1));var x2=arr[s2];arr[s2]=arr[r2];arr[r2]=x2;}
+   for(var i=0;i<arr.length;i++){ MG.items.push({x:60+(i%4)*100,y:80+Math.floor(i/4)*130,col:arr[i],matched:false}); }
+  } else if(t==="fetch"||t==="pounce"){
+   MG.mover={x:220,y:150,r:20}; MG.need=6; MG.hit=0;
+  } else if(t==="milk"){
+   MG.need=10; MG.hit=0;
+  } else if(t==="sort"){
+   MG.selItem=-1; var scols=["#e05050","#3fa9f5"];
+   for(var i=0;i<6;i++){ MG.items.push({x:rnd(50,390),y:rnd(50,170),cat:Math.floor(Math.random()*2),col:scols[Math.floor(Math.random()*2)],done:false}); }
+   for(var i=0;i<MG.items.length;i++){ MG.items[i].col=scols[MG.items[i].cat]; }
+   MG.scols=scols;
+  } else {
+   var counts={dishes:6,toss:6,water:6,feed:5,sweep:8,bed:5,books:6,fold:6,clean:7};
+   var nn=counts[t]||6;
+   for(var i=0;i<nn;i++){ MG.items.push({x:rnd(40,400),y:rnd(50,250),ic:Math.floor(Math.random()*4),done:false}); }
+  }
+ }
+ function finishMini(){ MG.active=false; el("minipanel").style.display="none"; el("pickpanel").style.display="block"; tada(); jobDone(MG.job); }
+
+ // ---- drawing helpers ----
+ function drawSock(cx,x,y,col,sel,matched){ cx.save(); cx.translate(x,y); if(matched)cx.globalAlpha=0.35;
+  cx.fillStyle=col; cx.strokeStyle=sel?"#222":"rgba(0,0,0,.2)"; cx.lineWidth=sel?4:2;
+  cx.beginPath(); cx.moveTo(-16,-34); cx.lineTo(16,-34); cx.lineTo(16,8); cx.quadraticCurveTo(16,26,34,26); cx.lineTo(34,42); cx.quadraticCurveTo(-2,42,-16,20); cx.closePath(); cx.fill(); cx.stroke();
+  cx.fillStyle="rgba(255,255,255,.85)"; cx.fillRect(-16,-34,32,9);
+  if(matched){ cx.globalAlpha=1; cx.fillStyle="#2a8a3a"; cx.font="bold 22px Trebuchet MS"; cx.textAlign="center"; cx.fillText("✓",6,6); } cx.restore(); }
+ function dItem(cx,it,t){ var x=it.x,y=it.y,d=it.done;
+  if(t==="toss"){ if(d)return; var c=["#c85040","#8a6a3a","#6ab0f0","#c0a040"][it.ic]; cx.fillStyle=c; cx.beginPath(); cx.arc(x,y,12,0,7); cx.fill(); cx.fillStyle="rgba(0,0,0,.15)"; cx.beginPath(); cx.arc(x-3,y-2,4,0,7); cx.fill(); }
+  else if(t==="clean"||t==="sweep"){ if(d)return; cx.fillStyle=t==="sweep"?"#a98a5a":["#8a6a3a","#a0c0e0","#c8a050","#d0a0b0"][it.ic]; cx.beginPath(); cx.arc(x,y,12,0,7); cx.fill(); cx.fillStyle="rgba(0,0,0,.18)"; cx.beginPath(); cx.arc(x-3,y-3,4,0,7); cx.fill(); cx.beginPath(); cx.arc(x+4,y+2,3,0,7); cx.fill(); }
+  else if(t==="water"){ // pot + flower (wilted->bloom)
+   cx.fillStyle="#b5763a"; cx.beginPath(); cx.moveTo(x-12,y+4); cx.lineTo(x+12,y+4); cx.lineTo(x+8,y+20); cx.lineTo(x-8,y+20); cx.fill();
+   cx.strokeStyle="#3a8a3a"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(x,y+4); cx.lineTo(x,y-14); cx.stroke();
+   if(d){ cx.fillStyle="#f05a8a"; for(var a=0;a<5;a++){ var an=a/5*6.28; cx.beginPath(); cx.arc(x+Math.cos(an)*8,y-14+Math.sin(an)*8,5,0,7); cx.fill(); } cx.fillStyle="#f0d000"; cx.beginPath(); cx.arc(x,y-14,4,0,7); cx.fill(); }
+   else { cx.fillStyle="#8aa86a"; cx.beginPath(); cx.ellipse(x,y-14,7,4,0.6,0,7); cx.fill(); } }
+  else if(t==="feed"){ // bowl empty->kibble
+   cx.fillStyle=d?"#c07a3a":"#7aa0c0"; cx.beginPath(); cx.ellipse(x,y+6,20,8,0,0,7); cx.fill(); cx.fillStyle=d?"#a05a20":"#5a80a0"; cx.beginPath(); cx.arc(x,y,18,0.1,3.04); cx.fill();
+   if(d){ cx.fillStyle="#7a4a1a"; for(var k=0;k<6;k++){ cx.beginPath(); cx.arc(x-10+k*4,y-2+(k%2)*4,3,0,7); cx.fill(); } } }
+  else if(t==="dishes"){ if(d){ cx.fillStyle="#dff0ff"; cx.beginPath(); cx.arc(x,y,16,0,7); cx.fill(); cx.strokeStyle="#bfe0ff"; cx.lineWidth=2; cx.stroke(); cx.fillStyle="#8fd0ff"; cx.font="bold 14px Trebuchet MS"; cx.textAlign="center"; cx.fillText("✨",x,y+5); }
+   else { cx.fillStyle="#cfc0a0"; cx.beginPath(); cx.arc(x,y,16,0,7); cx.fill(); cx.fillStyle="#8a7a4a"; cx.beginPath(); cx.arc(x-4,y-2,4,0,7); cx.fill(); cx.beginPath(); cx.arc(x+5,y+4,3,0,7); cx.fill(); } }
+  else if(t==="bed"){ if(d){ cx.fillStyle="#f0b0c0"; } else { cx.fillStyle="#c090a0"; } cx.save(); cx.translate(x,y); if(!d)cx.rotate(0.2); cx.beginPath(); cx.moveTo(-20,-10); cx.lineTo(20,-10); cx.quadraticCurveTo(26,0,20,12); cx.lineTo(-20,12); cx.quadraticCurveTo(-26,0,-20,-10); cx.fill(); cx.restore(); if(d){ cx.fillStyle="#fff"; cx.font="bold 12px Trebuchet MS"; cx.textAlign="center"; cx.fillText("✓",x,y+4);} }
+  else if(t==="books"){ if(d)return; var bc=["#e05050","#3fa9f5","#5ac85a","#f0a800"][it.ic]; cx.save(); cx.translate(x,y); cx.rotate(0.3); cx.fillStyle=bc; cx.fillRect(-6,-16,12,32); cx.fillStyle="#fff"; cx.fillRect(-6,-16,12,3); cx.restore(); }
+  else if(t==="fold"){ if(d){ cx.fillStyle="#9bd0f0"; cx.fillRect(x-16,y-6,32,16); cx.strokeStyle="#6aa0c0"; cx.lineWidth=2; cx.strokeRect(x-16,y-6,32,16); cx.beginPath(); cx.moveTo(x,y-6); cx.lineTo(x,y+10); cx.stroke(); }
+   else { cx.fillStyle="#7ab0e0"; cx.save(); cx.translate(x,y); cx.rotate(rnd(-0.3,0.3)); cx.beginPath(); cx.moveTo(-18,-4); cx.lineTo(18,-8); cx.lineTo(16,14); cx.lineTo(-16,12); cx.fill(); cx.restore(); } }
+ }
+ function drawMini(){ var cx=mcv.getContext("2d"),W=440,H=300; cx.clearRect(0,0,W,H); cx.fillStyle="#eef4fb"; cx.fillRect(0,0,W,H);
+  var t=MG.type;
+  if(t==="match"){ for(var i=0;i<MG.items.length;i++){ var it=MG.items[i]; drawSock(cx,it.x,it.y,it.col,i===MG.sel,it.matched); } }
+  else if(t==="milk"){
+   // cow
+   cx.font="70px serif"; cx.textAlign="center"; cx.fillText("🐄",W/2-30,150);
+   // udder tap zone
+   cx.fillStyle="rgba(255,200,210,.5)"; cx.beginPath(); cx.arc(W/2-30,180,34,0,7); cx.fill();
+   cx.fillStyle="#e08aa0"; cx.beginPath(); cx.arc(W/2-30,180,18,0,7); cx.fill();
+   // bucket fill
+   var bx=W/2+90, by=H-40, bw=54, bh=90; cx.strokeStyle="#888"; cx.lineWidth=3; cx.strokeRect(bx,by-bh,bw,bh);
+   var fillh=bh*(MG.hit/MG.need); cx.fillStyle="#f7f3e0"; cx.fillRect(bx+2,by-fillh,bw-4,fillh);
+   cx.fillStyle="#2a6ab0"; cx.font="bold 13px Trebuchet MS"; cx.textAlign="right"; cx.fillText("milk: "+MG.hit+" / "+MG.need,W-8,18);
+   return;
+  }
+  else if(t==="sort"){
+   // two bins
+   var b1x=70,b2x=W-140,by=H-56;
+   cx.fillStyle=MG.scols[0]; cx.fillRect(b1x,by,70,50); cx.fillStyle=MG.scols[1]; cx.fillRect(b2x,by,70,50);
+   cx.fillStyle="#fff"; cx.font="bold 11px Trebuchet MS"; cx.textAlign="center"; cx.fillText("BIN",b1x+35,by+30); cx.fillText("BIN",b2x+35,by+30);
+   for(var i=0;i<MG.items.length;i++){ var it=MG.items[i]; if(it.done)continue;
+    cx.fillStyle=it.col; cx.strokeStyle=i===MG.selItem?"#111":"rgba(0,0,0,.2)"; cx.lineWidth=i===MG.selItem?4:2;
+    cx.beginPath(); cx.arc(it.x,it.y,15,0,7); cx.fill(); cx.stroke(); }
+   var ln=0; for(var i=0;i<MG.items.length;i++){ if(!MG.items[i].done)ln++; }
+   cx.fillStyle="#2a6ab0"; cx.font="bold 13px Trebuchet MS"; cx.textAlign="right"; cx.fillText("left: "+ln,W-8,18);
+   return;
+  }
+  else if(t==="fetch"||t==="pounce"){
+   // helper character at bottom
+   cx.font="40px serif"; cx.textAlign="center"; cx.fillText(t==="fetch"?"🐕":"🐈",60,H-30);
+   // moving toy
+   MG.mt+=0.05; var mv=MG.mover; if(t==="pounce"){ mv.x=220+Math.sin(MG.mt*1.7)*150; mv.y=150+Math.cos(MG.mt*1.3)*90; }
+   cx.fillStyle=t==="fetch"?"#ff8a3d":"#c0392b"; cx.beginPath(); cx.arc(mv.x,mv.y,mv.r,0,7); cx.fill();
+   cx.strokeStyle="#7a3a12"; cx.lineWidth=2; cx.beginPath(); cx.arc(mv.x,mv.y,mv.r,0,7); cx.stroke();
+   cx.fillStyle="#2a6ab0"; cx.font="bold 13px Trebuchet MS"; cx.textAlign="right"; cx.fillText((t==="fetch"?"fetches: ":"pounces: ")+MG.hit+" / "+MG.need,W-8,18);
+   return;
+  }
+  else {
+   if(t==="toss"){ cx.fillStyle="#5a7a9a"; cx.fillRect(W/2-34,H-58,68,50); cx.fillStyle="#456"; cx.fillRect(W/2-40,H-64,80,10); cx.fillStyle="#fff"; cx.font="bold 11px Trebuchet MS"; cx.textAlign="center"; cx.fillText("BIN",W/2,H-30); }
+   if(t==="books"){ cx.fillStyle="#a06a34"; cx.fillRect(20,H-40,W-40,10); cx.fillStyle="#c98a4a"; cx.fillRect(20,H-30,W-40,6); }
+   for(var i=0;i<MG.items.length;i++){ dItem(cx,MG.items[i],t); }
+  }
+  var leftn=0; for(var i=0;i<MG.items.length;i++){ if(!MG.items[i].done && !MG.items[i].matched)leftn++; }
+  cx.fillStyle="#2a6ab0"; cx.font="bold 13px Trebuchet MS"; cx.textAlign="right";
+  cx.fillText((t==="match"?"pairs left: "+Math.ceil(leftn/2):"left: "+leftn),W-8,18);
+ }
+ function mpos(e){ var r=mcv.getBoundingClientRect(); var t=e.touches?e.touches[0]:e; return {x:(t.clientX-r.left)*(440/r.width), y:(t.clientY-r.top)*(300/r.height)}; }
+ mcv.addEventListener("pointerdown",function(e){ e.preventDefault(); if(!MG.active)return; ac(); var p=mpos(e); var t=MG.type;
+  if(t==="match"){
+   for(var i=0;i<MG.items.length;i++){ var it=MG.items[i]; if(it.matched)continue;
+    if(Math.abs(p.x-it.x)<26 && p.y>it.y-40 && p.y<it.y+46){
+     if(MG.sel<0){ MG.sel=i; }
+     else if(MG.sel===i){ MG.sel=-1; }
+     else { if(MG.items[MG.sel].col===it.col){ MG.items[MG.sel].matched=true; it.matched=true; MG.sel=-1; ding();
+       if(MG.items.every(function(x){return x.matched;})) setTimeout(finishMini,300); }
+      else { bad(); MG.sel=i; } } return; } }
+  } else if(t==="fetch"||t==="pounce"){
+   var mv=MG.mover; if(Math.hypot(p.x-mv.x,p.y-mv.y)<mv.r+14){ MG.hit++; ding();
+    if(MG.hit>=MG.need){ setTimeout(finishMini,200); } else { mv.x=rnd(40,400); mv.y=rnd(40,240); } }
+  } else if(t==="milk"){
+   if(Math.hypot(p.x-(220-30),p.y-180)<40){ MG.hit++; tone(300+MG.hit*20,0.06,'sine',0.1); if(MG.hit>=MG.need){ ding(); setTimeout(finishMini,250); } }
+  } else if(t==="sort"){
+   var W=440,H=300, b1x=70,b2x=W-140,by=H-56;
+   // tap a bin with an item selected?
+   if(MG.selItem>=0 && p.y>by-6){ var it=MG.items[MG.selItem]; var binCat=(p.x<W/2)?0:1;
+    if(it.cat===binCat){ it.done=true; MG.selItem=-1; ding(); if(MG.items.every(function(x){return x.done;})) setTimeout(finishMini,250); }
+    else { bad(); } return; }
+   // else pick an item
+   for(var i=0;i<MG.items.length;i++){ var it=MG.items[i]; if(it.done)continue;
+    if(Math.hypot(p.x-it.x,p.y-it.y)<20){ MG.selItem=i; return; } }
+  } else {
+   for(var i=0;i<MG.items.length;i++){ var it=MG.items[i]; if(it.done)continue;
+    if(Math.abs(p.x-it.x)<22 && Math.abs(p.y-it.y)<22){ it.done=true; ding();
+     if(MG.items.every(function(x){return x.done;})) setTimeout(finishMini,250); return; } }
+  }
+ },{passive:false});
+
+ loadProg(); renderJobs(); startBots(); loop();
+})();
+</script>
+</body></html>
