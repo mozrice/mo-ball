@@ -27,8 +27,13 @@ function tada(){ tone(700,0.1,'sine',0.13); setTimeout(function(){tone(950,0.1,'
 function rr(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
 function hitB(b,p){ return b&&p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h; }
 
-var stars=0; try{ stars=JSON.parse(localStorage.getItem('mohousebuilder')||'0')||0; }catch(e){}
-function save(){ try{ localStorage.setItem('mohousebuilder', JSON.stringify(stars)); }catch(e){} }
+var stars=0, coins=60;
+try{ stars=JSON.parse(localStorage.getItem('mohousebuilder')||'0')||0; }catch(e){}
+try{ var cc=localStorage.getItem('mohousebuilder_coins'); coins=(cc===null)?60:(JSON.parse(cc)||0); }catch(e){}
+function save(){ try{ localStorage.setItem('mohousebuilder', JSON.stringify(stars)); localStorage.setItem('mohousebuilder_coins', JSON.stringify(coins)); }catch(e){} }
+var WALLITEMS={window:1,picture:1,tv:1,clock:1,mirror:1};
+function shade(hex,amt){ var n=parseInt(hex.slice(1),16); var r=Math.max(0,Math.min(255,((n>>16)&255)+amt)); var g=Math.max(0,Math.min(255,((n>>8)&255)+amt)); var b=Math.max(0,Math.min(255,(n&255)+amt)); return 'rgb('+r+','+g+','+b+')'; }
+var COST=3, flash=0;
 
 var ROOMS=['Bedroom','Living Room','Kitchen','Playroom'];
 var roomIdx=0;
@@ -96,7 +101,7 @@ function draw(){
  cx.fillStyle='#fff'; cx.font='900 20px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('🏠 '+ROOMS[roomIdx],LOGW/2,26);
  btns.prev={x:16,y:14,w:34,h:34}; cx.fillStyle='#3a6d9a'; rr(16,14,34,34,8); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 18px Segoe UI'; cx.fillText('◀',33,31);
  btns.next={x:LOGW-50,y:14,w:34,h:34}; cx.fillStyle='#3a6d9a'; rr(LOGW-50,14,34,34,8); cx.fill(); cx.fillText('▶',LOGW-33,31);
- cx.fillStyle='#ffd23f'; cx.font='bold 13px Segoe UI'; cx.fillText('⭐'+stars,LOGW/2,46);
+ cx.fillStyle='#ffd23f'; cx.font='bold 13px Segoe UI'; cx.fillText('💰 '+coins+'    ⭐ '+stars,LOGW/2,46);
 
  // room
  cx.fillStyle=wallCols[wallC]; cx.fillRect(RX,RY,RW,WALLH);
@@ -129,7 +134,7 @@ function draw(){
   cx.font='22px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(EMO[TYPES[i]],bx+26,by+20); }
 
  // drop / clear / done
- btns.drop={x:20,y:LOGH-52,w:150,h:42}; cx.fillStyle='#ff8c1a'; rr(20,LOGH-52,150,42,12); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 18px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('⬇️ DROP '+EMO[held],95,LOGH-31);
+ btns.drop={x:20,y:LOGH-52,w:150,h:42}; cx.fillStyle='#ff8c1a'; rr(20,LOGH-52,150,42,12); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 18px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('⬇️ DROP '+EMO[held]+' (-'+COST+'💰)',95,LOGH-31); if(flash>0){ flash--; cx.fillStyle='#ffd23f'; cx.font='bold 13px Segoe UI'; cx.fillText('Need more coins! Tap Done to earn 💰',LOGW/2,RY+RH+30); }
  btns.clear={x:178,y:LOGH-52,w:80,h:42}; cx.fillStyle='#c85050'; rr(178,LOGH-52,80,42,12); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 14px Segoe UI'; cx.fillText('🗑️ Clear',218,LOGH-31);
  btns.done={x:266,y:LOGH-52,w:154,h:42}; cx.fillStyle='#5ac85a'; rr(266,LOGH-52,154,42,12); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 17px Segoe UI'; cx.fillText('🌟 Done!',343,LOGH-31);
 
@@ -146,9 +151,9 @@ cv.addEventListener('pointerdown',function(e){ e.preventDefault(); ac(); var p=P
  for(i=0;i<wallCols.length;i++){ if(hitB(btns['wc'+i],p)){ wallC=i; pop(); return; } }
  for(i=0;i<floorCols.length;i++){ if(hitB(btns['fc'+i],p)){ floorC=i; pop(); return; } }
  for(var k in btns){ if(k.indexOf('pk_')===0 && hitB(btns[k],p)){ held=btns[k].type; pop(); return; } }
- if(hitB(btns.drop,p)){ placed.push({type:held, x:player.x, y:player.y}); pop(); return; }
+ if(hitB(btns.drop,p)){ if(coins>=COST){ placed.push({type:held, x:player.x, y:player.y}); coins-=COST; save(); pop(); } else { flash=90; } return; }
  if(hitB(btns.clear,p)){ placed=[]; pop(); return; }
- if(hitB(btns.done,p)){ if(placed.length>0){ stars++; save(); tada(); showDone=100; } return; }
+ if(hitB(btns.done,p)){ if(placed.length>0){ stars++; coins+=25; save(); tada(); showDone=100; } return; }
  // else: joystick if in room
  if(inRoom(p)){ joy.on=true; joy.bx=p.x; joy.by=p.y; joy.cx=p.x; joy.cy=p.y; }
 },{passive:false});

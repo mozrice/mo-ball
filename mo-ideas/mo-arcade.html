@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MO Arcade</title>
+<style>
+  :root{--bg:#0e1a22;--ink:#eaf6ff;}
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:radial-gradient(120% 90% at 50% 0%,#16303f,#0e1a22);color:var(--ink);
+    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;min-height:100%;}
+  header{text-align:center;padding:22px 14px 6px;}
+  .ball{width:64px;height:64px;display:block;margin:0 auto 6px;}
+  h1{margin:0;font-size:34px;letter-spacing:4px;color:#ff8b2c;text-transform:uppercase;text-shadow:0 3px 0 #b85c12;}
+  .sub{margin:6px 0 0;font-size:15px;color:#9fc0d0;letter-spacing:1px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;max-width:900px;margin:18px auto 40px;padding:0 14px;}
+  a.card{text-decoration:none;color:#12233a;border-radius:18px;padding:14px 12px 16px;display:flex;flex-direction:column;
+    align-items:center;text-align:center;box-shadow:0 6px 0 rgba(0,0,0,.35);transition:transform .08s;cursor:pointer;}
+  a.card:active{transform:translateY(4px);box-shadow:0 2px 0 rgba(0,0,0,.35);}
+  a.card svg{width:52px;height:52px;margin-bottom:6px;}
+  .nm{font-size:16px;font-weight:bold;letter-spacing:.5px;}
+  .ds{font-size:12px;margin-top:3px;opacity:.8;line-height:1.25;}
+  footer{text-align:center;color:#6f8a99;font-size:12px;padding:0 0 26px;}
+</style>
+</head>
+<body>
+<header>
+  <svg class="ball" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#ff8b2c"/><g stroke="#7a3a08" stroke-width="3" fill="none"><path d="M32 4v56M4 32h56M12 12c12 8 28 8 40 0M12 52c12-8 28-8 40 0"/></g></svg>
+  <h1>MO Arcade</h1>
+  <div class="sub">Pick a game to play!</div>
+</header>
+<div class="grid" id="grid"></div>
+<footer>Made by Coach Mo</footer>
+<script>
+// icon helpers (simple SVG, no emoji)
+function ic(kind,c){
+  var s='<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">';
+  function r(x,y,w,h,rd,f){return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+(rd||0)+'" fill="'+f+'"/>';}
+  function ci(x,y,rr,f){return '<circle cx="'+x+'" cy="'+y+'" r="'+rr+'" fill="'+f+'"/>';}
+  function tri(p,f){return '<polygon points="'+p+'" fill="'+f+'"/>';}
+  if(kind==='house'){ s+=r(10,22,28,18,2,'#fff')+tri('24,8 42,24 6,24','#7a3a08')+r(20,30,8,10,1,'#7a3a08'); }
+  else if(kind==='party'){ s+=tri('24,6 34,40 14,40','#fff')+ci(24,6,3,'#ffe08a')+ci(19,24,2.5,'#e0564b')+ci(28,30,2.5,'#4a9ad0')+ci(23,34,2.5,'#6bd18a'); }
+  else if(kind==='bed'){ s+=r(8,20,32,14,2,'#fff')+r(8,26,32,8,1,'#cfe0ee')+r(10,16,12,8,2,'#fff'); }
+  else if(kind==='build'){ s+=r(12,12,10,10,1,'#fff')+r(26,12,10,10,1,'#ffe08a')+r(12,26,10,10,1,'#ffe08a')+r(26,26,10,10,1,'#fff'); }
+  else if(kind==='city'){ s+=r(8,20,8,20,1,'#fff')+r(20,12,9,28,1,'#fff')+r(32,24,8,16,1,'#fff'); }
+  else if(kind==='pet'){ s+=ci(24,26,12,'#fff')+ci(16,14,5,'#fff')+ci(32,14,5,'#fff')+ci(20,24,1.8,'#20334f')+ci(28,24,1.8,'#20334f'); }
+  else if(kind==='job'){ s+=r(10,18,28,20,2,'#fff')+r(18,12,12,8,2,'#fff')+r(20,26,8,3,1,'#7a3a08'); }
+  else if(kind==='teacher'){ s+=r(8,12,32,22,2,'#fff')+r(11,15,26,16,1,'#3a6a4a')+tri('16,40 24,34 32,40','#ffe08a'); }
+  else if(kind==='play'){ s+=r(10,24,28,3,1,'#fff')+r(12,24,3,14,1,'#fff')+r(33,24,3,14,1,'#fff')+ci(24,16,6,'#ffe08a'); }
+  else if(kind==='care'){ s+=ci(19,20,6,'#fff')+ci(29,20,6,'#fff')+ci(24,28,8,'#fff')+ci(24,30,3,'#e0708a'); }
+  else if(kind==='fort'){ s+=tri('24,8 40,26 8,26','#fff')+r(12,26,24,12,1,'#fff')+r(20,30,8,8,1,'#7a3a08'); }
+  else if(kind==='song'){ s+=ci(16,34,5,'#fff')+ci(32,30,5,'#fff')+r(20,14,3,20,1,'#fff')+r(35,10,3,20,1,'#fff')+r(20,14,18,3,1,'#fff'); }
+  else if(kind==='video'){ s+=r(8,14,26,20,3,'#fff')+tri('36,20 46,14 46,34 36,28','#fff'); }
+  else if(kind==='car'){ s+=r(8,24,32,10,3,'#fff')+r(14,17,20,9,3,'#fff')+ci(15,35,4,'#20334f')+ci(33,35,4,'#20334f'); }
+  else if(kind==='ball'){ s+=ci(24,24,15,'#fff')+'<g stroke="#7a3a08" stroke-width="2" fill="none"><path d="M24 9v30M9 24h30"/></g>'; }
+  else { s+=ci(24,24,14,'#fff'); }
+  s+='</svg>'; return s;
+}
+var GAMES=[
+ ['MO Fix & Flip 3D','Clean, decorate & drive the city','mo-fix-flip-3d.html','#ff8b2c','house'],
+ ['MO Pig Homes','Build homes with Evie & Arff','mo-pig-homes.html','#ff9ec7','pet'],
+ ['MO Party','Throw a party in the 54-room house','mo-party.html','#e05a9a','party'],
+ ['MO Stay','Run an Airbnb & host guests','mo-stay.html','#3fbfa8','bed'],
+ ['MO Driving School','Drive, ramps & checkpoints','mo-driving.html','#e0a030','car'],
+ ['MO Playhouse','Build your own playhouse','mo-playhouse.html','#6bd18a','build'],
+ ['MO City 3D','Walk around a 3D city','mo-city-3d.html','#5a9ae0','city'],
+ ['MO House 3D','Furnish a 3D room','mo-house-3d.html','#b08ae0','house'],
+ ['MO Rover','Pick & name your pets','mo-rover.html','#f0c040','pet'],
+ ['MO Job Race','Do all the jobs','mo-job-race.html','#e0564b','job'],
+ ['MO Teacher','Be the teacher','mo-teacher.html','#7f8ae0','teacher'],
+ ['MO Playground','Play at the playground','mo-playground.html','#8ad06a','play'],
+ ['MO Pet Care','Take care of pets','mo-pet-care.html','#f0906a','care'],
+ ['MO Fort Class','Build forts in class','mo-fort-class.html','#c9a06a','fort'],
+ ['MO Song Builder','Make music','mo-song-builder.html','#d06ac0','song'],
+ ['MO YouTube','Make fun videos','mo-youtube.html','#e0504a','video'],
+ ['MO Coach Drills','Basketball drills','mo-coach-drills.html','#5aa0c9','ball']
+];
+var grid=document.getElementById('grid');
+GAMES.forEach(function(g){
+  var a=document.createElement('a'); a.className='card'; a.href=g[2];
+  a.style.background='linear-gradient(160deg,'+g[3]+','+shade(g[3])+')';
+  a.innerHTML=ic(g[4],g[3])+'<div class="nm">'+g[0]+'</div><div class="ds">'+g[1]+'</div>';
+  grid.appendChild(a);
+});
+function shade(hex){ var n=parseInt(hex.slice(1),16); var r=(n>>16)&255,gg=(n>>8)&255,b=n&255; r=Math.round(r*0.72);gg=Math.round(gg*0.72);b=Math.round(b*0.72); return '#'+((1<<24)+(r<<16)+(gg<<8)+b).toString(16).slice(1); }
+</script>
+</body>
+</html>

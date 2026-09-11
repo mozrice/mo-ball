@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MO ROVER</title>
+<style>
+  :root{ --bg:#0e1a22; --card:#15303f; --card2:#1b3a4c; --sel:#ff8b2c; --ink:#eaf6ff; --good:#6bd18a; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;}
+  header{padding:16px 14px 6px;text-align:center;}
+  h1{margin:0;font-size:22px;letter-spacing:2px;color:#7fd0ff;text-transform:uppercase;}
+  .step{margin:4px 0 0;font-size:15px;color:#ffcf5c;font-weight:bold;letter-spacing:1px;}
+  .sub{margin:2px 0 0;font-size:13px;color:#9fc0d0;}
+  .count{margin:8px auto 0;font-size:14px;font-weight:bold;color:var(--good);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;padding:12px 12px 110px;max-width:820px;margin:0 auto;}
+  .card{background:var(--card);border:3px solid #2f4a5c;border-radius:16px;padding:10px 8px 12px;text-align:center;cursor:pointer;
+    transition:transform .08s, border-color .12s, background .12s;position:relative;}
+  .card:active{transform:scale(.96);}
+  .card.sel{border-color:var(--sel);background:var(--card2);}
+  .card svg{width:100%;height:96px;display:block;}
+  .name{margin-top:6px;font-size:14px;font-weight:bold;letter-spacing:.5px;}
+  .tag{font-size:11px;color:#9fc0d0;}
+  .check{position:absolute;top:6px;right:8px;width:24px;height:24px;border-radius:50%;background:var(--sel);color:#2a1200;
+    font-weight:bold;font-size:15px;line-height:24px;opacity:0;transform:scale(.5);transition:.12s;}
+  .card.sel .check{opacity:1;transform:scale(1);}
+  .check::after{content:"";position:absolute;left:8px;top:4px;width:6px;height:11px;border:solid #2a1200;border-width:0 3px 3px 0;transform:rotate(45deg);}
+  footer{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(180deg,rgba(14,26,34,0),var(--bg) 40%);
+    padding:14px;display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;}
+  button.save{font:inherit;font-weight:bold;font-size:15px;letter-spacing:1px;text-transform:uppercase;padding:13px 26px;border:none;border-radius:999px;
+    background:var(--sel);color:#2a1200;box-shadow:0 4px 0 #b85c12;cursor:pointer;}
+  button.save:active{transform:translateY(3px);box-shadow:0 1px 0 #b85c12;}
+  button.clear{font:inherit;font-weight:bold;font-size:13px;padding:11px 16px;border:2px solid #3a5666;border-radius:999px;background:transparent;color:#9fc0d0;cursor:pointer;}
+  .done{position:fixed;inset:0;background:rgba(6,12,18,.9);display:none;align-items:center;justify-content:center;padding:20px;z-index:5;}
+  .done .box{background:var(--card2);border:3px solid var(--sel);border-radius:18px;padding:22px;max-width:420px;text-align:center;}
+  .done h2{margin:0 0 8px;color:#ffcf5c;letter-spacing:1px;}
+  .done p{margin:6px 0;color:var(--ink);font-size:15px;}
+  .done .list{margin:10px 0;font-weight:bold;color:var(--good);}
+  .done button{font:inherit;font-weight:bold;margin-top:10px;padding:11px 22px;border:none;border-radius:999px;background:var(--sel);color:#2a1200;cursor:pointer;box-shadow:0 4px 0 #b85c12;}
+</style>
+</head>
+<body>
+<header>
+  <h1>MO Rover</h1>
+  <div class="step">Step 1 — Pick Your Pets</div>
+  <div class="sub">Tap every pet you want. Pick as many as you like!</div>
+  <div class="count" id="count">0 pets picked</div>
+</header>
+<div class="grid" id="grid"></div>
+<footer>
+  <button class="clear" id="clearBtn">Clear</button>
+  <button class="save" id="saveBtn">Save My Pets</button>
+</footer>
+<div class="done" id="done"><div class="box">
+  <h2>Pets Saved!</h2>
+  <p>You picked these pets for your Rover:</p>
+  <div class="list" id="doneList"></div>
+  <p>Step 1 is done! Tell Coach Mo the next step.</p>
+  <button id="doneBtn">OK</button>
+</div></div>
+<script>
+// ---- hand-drawn pets (SVG, no emoji) ----
+function pet(type,c1,c2){
+  var W=120,H=100, s='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg">';
+  function ell(x,y,rx,ry,f){ return '<ellipse cx="'+x+'" cy="'+y+'" rx="'+rx+'" ry="'+ry+'" fill="'+f+'"/>'; }
+  function ci(x,y,r,f){ return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+f+'"/>'; }
+  function rectr(x,y,w,h,r,f){ return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+r+'" fill="'+f+'"/>'; }
+  function tri(pts,f){ return '<polygon points="'+pts+'" fill="'+f+'"/>'; }
+  var eyes=ci(52,50,4,'#20334f')+ci(68,50,4,'#20334f');
+  if(type==='dog'){ s+=ell(60,72,30,20,c1); s+=ci(60,46,24,c1); s+=ell(40,42,9,15,c2)+ell(80,42,9,15,c2); s+=eyes+ell(60,58,7,5,'#20334f'); }
+  else if(type==='cat'){ s+=ell(60,74,26,18,c1); s+=ci(60,48,22,c1); s+=tri('44,34 38,14 56,30',c1)+tri('76,34 82,14 64,30',c1); s+=eyes+tri('56,56 64,56 60,62','#e0708a'); s+='<path d="M40 56 h-14 M40 60 h-14 M80 56 h14 M80 60 h14" stroke="#cbd6de" stroke-width="1.5"/>'; }
+  else if(type==='bunny'){ s+=ell(60,74,22,18,c1); s+=ci(60,50,20,c1); s+=ell(50,22,7,22,c1)+ell(70,22,7,22,c1)+ell(50,22,3,14,c2)+ell(70,22,3,14,c2); s+=eyes+ci(60,58,4,'#e0708a'); }
+  else if(type==='bird'){ s+=ell(60,60,22,26,c1); s+=ci(60,36,16,c1); s+=ell(72,60,10,18,c2); s+=tri('74,34 92,38 74,42','#f0a24a'); s+=ci(56,34,3,'#20334f'); }
+  else if(type==='fish'){ s+=ell(56,56,30,20,c1); s+=tri('84,56 108,40 108,72',c2); s+=ci(44,50,4,'#20334f'); s+='<path d="M30 46 q10 10 0 20" stroke="'+c2+'" stroke-width="4" fill="none"/>'; }
+  else if(type==='hamster'){ s+=ell(60,64,28,24,c1); s+=ci(46,44,7,c1)+ci(74,44,7,c1); s+=ell(60,68,16,12,c2); s+=eyes+ci(60,60,3,'#e0708a'); }
+  else if(type==='turtle'){ s+=ell(60,66,32,20,c2); s+=ell(60,60,26,15,c1); s+=ci(90,66,10,c2); s+=ell(38,80,8,5,c2)+ell(82,80,8,5,c2); s+=ci(93,63,3,'#20334f'); }
+  else if(type==='pony'){ s+=ell(58,66,30,18,c1); s+=ci(88,48,15,c1); s+=tri('80,36 96,20 98,40',c2); s+=rectr(40,78,6,16,3,c1)+rectr(70,78,6,16,3,c1); s+=ci(92,46,3,'#20334f'); s+='<path d="M74 40 q10 -6 18 2" stroke="'+c2+'" stroke-width="6" fill="none"/>'; }
+  else if(type==='parrot'){ s+=ell(58,60,20,26,c1); s+=ci(58,34,15,c1); s+=ell(70,58,10,18,c2); s+=tri('72,32 90,40 72,44','#f2c94c'); s+=ci(54,32,3,'#20334f'); s+=tri('50,20 58,10 62,22',c2); }
+  else if(type==='frog'){ s+=ell(60,66,30,20,c1); s+=ci(48,44,10,c1)+ci(72,44,10,c1); s+=ci(48,42,5,'#fff')+ci(72,42,5,'#fff')+ci(48,42,2.5,'#20334f')+ci(72,42,2.5,'#20334f'); s+='<path d="M46 70 q14 10 28 0" stroke="#20553a" stroke-width="3" fill="none"/>'; }
+  else if(type==='duck'){ s+=ell(60,66,28,18,c1); s+=ci(78,46,14,c1); s+=tri('88,44 108,48 88,54','#f0a24a'); s+=ci(82,42,3,'#20334f'); }
+  else if(type==='mouse'){ s+=ell(58,66,24,18,c1); s+=ci(58,46,15,c1); s+=ci(44,36,10,c2)+ci(72,36,10,c2); s+=eyes+ci(58,54,3,'#e0708a'); s+='<path d="M82 70 q18 4 14 20" stroke="'+c1+'" stroke-width="3" fill="none"/>'; }
+  else { s+=ci(60,56,26,c1); s+=eyes; }
+  s+='</svg>'; return s;
+}
+var PETS=[
+ {name:'Arff', tag:'the real dog', type:'dog', c1:'#f4f0e8', c2:'#d8d2c4'},
+ {name:'Meow', tag:'game cat', type:'cat', c1:'#e0b048', c2:'#c89a38'},
+ {name:'Puppy', tag:'dog', type:'dog', c1:'#c9955e', c2:'#a97a44'},
+ {name:'Kitten', tag:'cat', type:'cat', c1:'#8a8f98', c2:'#6f757e'},
+ {name:'Bunny', tag:'', type:'bunny', c1:'#f0e6ea', c2:'#f4b8cc'},
+ {name:'Birdie', tag:'', type:'bird', c1:'#f2c94c', c2:'#e0a52a'},
+ {name:'Goldie', tag:'fish', type:'fish', c1:'#f0862a', c2:'#e05a1a'},
+ {name:'Hammy', tag:'hamster', type:'hamster', c1:'#e6b87a', c2:'#f2ddc0'},
+ {name:'Shelly', tag:'turtle', type:'turtle', c1:'#8ad07a', c2:'#4a9a4a'},
+ {name:'Pony', tag:'', type:'pony', c1:'#e6c9a0', c2:'#a06a3a'},
+ {name:'Polly', tag:'parrot', type:'parrot', c1:'#e0564b', c2:'#4a9ad0'},
+ {name:'Hopper', tag:'frog', type:'frog', c1:'#6bbf4a', c2:'#3a8a3a'},
+ {name:'Quacky', tag:'duck', type:'duck', c1:'#f4e08a', c2:'#e0a52a'},
+ {name:'Squeaky', tag:'mouse', type:'mouse', c1:'#b8bcc4', c2:'#f4b8cc'}
+];
+var picked={};
+try{ var saved=JSON.parse(localStorage.getItem('mo_rover_pets')||'[]'); saved.forEach(function(n){picked[n]=true;}); }catch(e){}
+var grid=document.getElementById('grid');
+PETS.forEach(function(p){
+  var card=document.createElement('div'); card.className='card'+(picked[p.name]?' sel':''); card.dataset.name=p.name;
+  card.innerHTML='<div class="check"></div>'+pet(p.type,p.c1,p.c2)+'<div class="name">'+p.name+'</div>'+(p.tag?'<div class="tag">'+p.tag+'</div>':'<div class="tag">&nbsp;</div>');
+  card.onclick=function(){ if(picked[p.name]){ delete picked[p.name]; card.classList.remove('sel'); } else { picked[p.name]=true; card.classList.add('sel'); } updateCount(); };
+  grid.appendChild(card);
+});
+function names(){ return PETS.filter(function(p){return picked[p.name];}).map(function(p){return p.name;}); }
+function updateCount(){ var n=names().length; document.getElementById('count').textContent=n+(n===1?' pet picked':' pets picked'); try{ localStorage.setItem('mo_rover_pets', JSON.stringify(names())); }catch(e){} }
+updateCount();
+document.getElementById('clearBtn').onclick=function(){ picked={}; [].forEach.call(grid.children,function(c){c.classList.remove('sel');}); updateCount(); };
+document.getElementById('saveBtn').onclick=function(){ var ns=names(); if(ns.length===0){ document.getElementById('count').textContent='Pick at least 1 pet!'; return; } document.getElementById('doneList').textContent=ns.join('  •  '); document.getElementById('done').style.display='flex'; };
+document.getElementById('doneBtn').onclick=function(){ document.getElementById('done').style.display='none'; };
+</script>
+</body>
+</html>

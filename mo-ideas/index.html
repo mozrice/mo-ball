@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Coach Mo Games</title>
+<style>
+ *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+ html,body{margin:0;min-height:100%;font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;
+  background:radial-gradient(120% 80% at 50% 0%,#3a1a6a 0%,#1c0e38 55%,#0c0620 100%);color:#fff;}
+ #wrap{max-width:640px;margin:0 auto;padding:26px 16px 50px;}
+ header{text-align:center;margin-bottom:18px;}
+ .ball{font-size:52px;filter:drop-shadow(0 4px 6px rgba(0,0,0,.4));}
+ h1{margin:6px 0 2px;font-size:34px;letter-spacing:3px;text-transform:uppercase;text-shadow:0 0 12px #ff9e3a,0 0 26px #e05aff;}
+ .tag{color:#e6c8ff;font-size:14px;margin:0;}
+ .row{display:grid;gap:14px;}
+ .hero{grid-template-columns:1fr;margin-bottom:16px;}
+ .big{border-radius:22px;padding:22px 16px;text-decoration:none;color:#160a2e;display:flex;align-items:center;gap:14px;
+  box-shadow:0 8px 0 rgba(0,0,0,.35),0 0 30px rgba(255,255,255,.08);transition:transform .08s;}
+ .big:active{transform:translateY(4px);box-shadow:0 3px 0 rgba(0,0,0,.35);}
+ .big .be{font-size:52px;}
+ .big .bt{flex:1;}
+ .big .bn{font-size:22px;font-weight:bold;letter-spacing:1px;display:block;}
+ .big .bd{font-size:13px;opacity:.85;}
+ .sect{color:#c9a6ff;font-size:13px;letter-spacing:2px;text-transform:uppercase;margin:20px 4px 8px;}
+ .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+ a.card{text-decoration:none;color:#160a2e;border-radius:16px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;text-align:center;
+  box-shadow:0 6px 0 rgba(0,0,0,.32);transition:transform .08s;}
+ a.card:active{transform:translateY(4px);box-shadow:0 2px 0 rgba(0,0,0,.32);}
+ a.card .ce{font-size:34px;}
+ a.card .cn{font-size:14px;font-weight:bold;margin-top:4px;}
+ a.card .cd{font-size:11px;opacity:.8;line-height:1.2;margin-top:2px;}
+ footer{text-align:center;color:#8a7ab0;font-size:12px;margin-top:26px;}
+</style>
+</head>
+<body>
+<div id="wrap">
+ <header>
+   <div class="ball">🏀</div>
+   <h1>Coach Mo Games</h1>
+   <p class="tag">🐾 Play Arff's games and all of Mo's games! 🏀</p>
+ </header>
+
+ <div class="row hero">
+   <a class="big" href="mo-arff-arcade.html" style="background:linear-gradient(135deg,#ffe58a,#ff9e3a);">
+     <span class="be">🐶</span>
+     <span class="bt"><span class="bn">Arff Arcade</span><span class="bd">15 tap &amp; drag games — win tickets &amp; prizes!</span></span>
+   </a>
+   <a class="big" href="mo-arcade.html" style="background:linear-gradient(135deg,#a0e0ff,#5aa0e0);">
+     <span class="be">🕹️</span>
+     <span class="bt"><span class="bn">MO Arcade</span><span class="bd">All of Mo's big 3D games in one menu</span></span>
+   </a>
+ </div>
+
+ <div class="sect">⭐ Play these big games</div>
+ <div class="grid" id="pro"></div>
+
+ <div class="sect">🐾 Arff Arcade games</div>
+ <div class="grid" id="arfflist"></div>
+
+ <footer>Made by Coach Mo 🏀🐾</footer>
+</div>
+<script>
+var PRO=[
+ ['🏨','MO Hotel','Run the hotel, ride the elevator','mo-hotel.html','linear-gradient(135deg,#ffb0d0,#e05a9a)'],
+ ['🚇','MO Subway','Drive &amp; run the subway','mo-subway.html','linear-gradient(135deg,#8fd6ff,#3a9ad0)'],
+ ['🛋️','MO Decorate','Build &amp; decorate rooms','mo-decorate.html','linear-gradient(135deg,#b0ffd0,#39c46a)'],
+ ['🏠','MO Playhouse','Build your playhouse','mo-playhouse.html','linear-gradient(135deg,#ffd08a,#e0863a)']
+];
+var ARFF=[
+ ['🏀','Arff Hoops'],['⚽','Arff Kick'],['🦴','Bone Claw'],['🎳','Skee-Ball'],
+ ['🐾','Tap-a-Paw'],['🎡','Prize Wheel'],['🍖','Feed Arff'],['🫧','Bubble Pop'],
+ ['🐿️','Whack Squirrel'],['🃏','Memory Match'],['🎵','Copy Paw'],['🎯','Bone Sling'],
+ ['🦴','Bone Stack'],['🎈','Balloon Darts'],['⚡','Fast Paws']
+];
+var pro=document.getElementById('pro');
+PRO.forEach(function(g){ var a=document.createElement('a'); a.className='card'; a.href=g[3]; a.style.background=g[4]; a.innerHTML='<span class="ce">'+g[0]+'</span><span class="cn">'+g[1]+'</span><span class="cd">'+g[2]+'</span>'; pro.appendChild(a); });
+var al=document.getElementById('arfflist');
+ARFF.forEach(function(g){ var a=document.createElement('a'); a.className='card'; a.href='mo-arff-arcade.html'; a.style.background='linear-gradient(135deg,#c79cff,#8b5ae0)'; a.innerHTML='<span class="ce">'+g[0]+'</span><span class="cn">'+g[1]+'</span>'; al.appendChild(a); });
+</script>
+</body>
+</html>
