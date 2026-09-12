@@ -305,6 +305,10 @@ var PRIZES=[['🦴','Big Bone',60],['🐶','Puppy Pal',120],['🎾','Tennis Ball
 var owned={};
 function openPrizes(){ var g=document.getElementById('prizeGrid'); g.innerHTML=''; PRIZES.forEach(function(p,i){ var d=document.createElement('div'); d.className='prize'+(owned[i]?' have':''); d.innerHTML='<div class="pe">'+p[0]+'</div><div class="pc">🎟️ '+p[2]+'</div><div class="pn">'+p[1]+(owned[i]?' ✓':'')+'</div>'; d.onclick=function(){ if(owned[i]){ toast('You already have it!','#7fd0ff'); return; } if(tickets>=p[2]){ tickets-=p[2]; owned[i]=true; setTix(); openPrizes(); toast('You got the '+p[1]+'! '+p[0],'#6bd18a'); beep(900,0.2,'triangle'); } else { toast('Need more tickets!','#ff8b6b'); beep(160,0.15); } }; g.appendChild(d); }); setTix(); document.getElementById('prizeOv').style.display='flex'; }
 document.getElementById('prizeClose').onclick=function(){ document.getElementById('prizeOv').style.display='none'; };
+
+// hub can open a game directly (embedded in the walkable arcade)
+window.addEventListener('message',function(e){ var d=e.data; if(d&&d.openGame){ var g=GAMES.filter(function(x){return x.id===d.openGame;})[0]; if(g)openGame(g); } }); // ARCADE_MSG_HOOK
+(function(){ if(location.hash){ var id=location.hash.slice(1); var g=GAMES.filter(function(x){return x.id===id;})[0]; if(g)setTimeout(function(){openGame(g);},60); } })();
 </script>
 </body>
 </html>
