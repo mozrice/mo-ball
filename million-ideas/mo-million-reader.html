@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>📖 1,000,000 Ideas Book</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;min-height:100%;font-family:'Trebuchet MS',Verdana,sans-serif;
+    background:linear-gradient(160deg,#fff4e6,#ffe6ef 55%,#e6ecff);color:#4a3418;}
+  #wrap{max-width:640px;margin:0 auto;padding:12px 12px 44px;}
+  .top{display:flex;justify-content:space-between;align-items:center;}
+  .homebtn{background:linear-gradient(#ffd23f,#f7a72b);color:#5a3a1a;font-weight:bold;border:none;
+    border-radius:14px;padding:8px 15px;font-size:15px;box-shadow:0 4px 0 #0004;text-decoration:none;}
+  h1{font-size:24px;margin:10px 0 2px;color:#c0501a;text-align:center;text-shadow:0 2px 0 #fff;}
+  .sub{text-align:center;font-size:14px;font-weight:bold;color:#7a5a9a;margin-bottom:12px;}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;margin:8px 0;}
+  .btn{background:linear-gradient(#7ad07a,#3aa03a);color:#fff;border:none;border-radius:12px;
+    padding:12px 16px;font-size:16px;font-weight:bold;font-family:inherit;box-shadow:0 4px 0 #0003;cursor:pointer;}
+  .btn.alt{background:linear-gradient(#5aa0e0,#3a70c0);}
+  .btn.rand{background:linear-gradient(#f78ac0,#e0509a);}
+  .btn:active{transform:translateY(2px);box-shadow:0 2px 0 #0003;}
+  .pageinfo{font-size:16px;font-weight:bold;color:#c0501a;text-align:center;margin:6px 0;}
+  .fields{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;margin:6px 0 4px;}
+  input{font-family:inherit;font-size:16px;padding:10px 12px;border:2px solid #ffce7a;border-radius:12px;width:150px;}
+  .list{margin-top:10px;}
+  .card{background:#fff;border:2px solid #ffe0a8;border-radius:14px;padding:14px 16px;margin:9px 0;
+    font-size:19px;font-weight:bold;color:#3a5a2a;box-shadow:0 3px 8px #0001;line-height:1.3;}
+  .card .num{color:#e0850e;margin-right:10px;font-size:15px;}
+  .card.hit{background:#fff6d6;border-color:#f0c040;}
+  .note{text-align:center;font-size:14px;color:#8a6a4a;margin:10px 0;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="top">
+    <a class="homebtn" href="../index.html">🏠 MO ARCADE</a>
+    <span style="font-size:26px">📖</span>
+  </div>
+  <h1>📖 1,000,000 IDEAS BOOK</h1>
+  <div class="sub">Big, easy-to-read ideas — flip page by page!</div>
+
+  <div class="pageinfo" id="pageinfo"></div>
+  <div class="bar">
+    <button class="btn" onclick="first()">⏮ First</button>
+    <button class="btn" onclick="prev()">◀ Back</button>
+    <button class="btn" onclick="next()">Next ▶</button>
+    <button class="btn rand" onclick="randpage()">🎲 Surprise</button>
+  </div>
+  <div class="fields">
+    <input id="jump" type="number" min="1" max="1000000" placeholder="Go to # (1–1000000)">
+    <button class="btn alt" onclick="jumpTo()">Go!</button>
+  </div>
+  <div class="fields">
+    <input id="q" type="text" placeholder="Search a word…">
+    <button class="btn alt" onclick="search()">🔎 Find</button>
+    <button class="btn alt" onclick="clearSearch()">✖ Clear</button>
+  </div>
+  <div class="note" id="note"></div>
+
+  <div class="list" id="list"></div>
+
+  <div class="bar" style="margin-top:14px">
+    <button class="btn" onclick="prev()">◀ Back</button>
+    <button class="btn" onclick="next()">Next ▶</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var ACTIONS=["Build","Design","Decorate","Paint","Make","Set up","Plant","Grow","Fill up","Clean",
+   "Wash","Fix up","Bake","Cook","Arrange","Organize","Light up","Fluff up","Sort","Stack",
+   "Water","Feed","Brush","Wrap up","Hang up","Sparkle up","Cozy up","Sprinkle","Style","Craft",
+   "Draw","Paste","Sweep","Polish","Pile up","Line up","Dust off","Scrub","Whip up","Set out"];
+  var SUBJECTS=["bedroom","kitchen","garden","treehouse","swimming pool","slide","bookshelf",
+   "cat tree","doghouse","pillow fort","playground","bathroom","living room","balcony",
+   "bunk bed","lemonade stand","tent","swing set","fish tank","flower box","snack bar",
+   "race track","rocket ship","castle","fairy garden","science lab","music stage","dance floor",
+   "movie room","trampoline","sandbox","bird feeder","veggie patch","cozy nook","puppet theater",
+   "treasure chest","ball pit","reading corner","ice-cream shop","robot helper","greenhouse",
+   "bakery corner","game room","art studio","spa bath","campfire circle","mailbox","porch swing",
+   "window seat","pet bed"];
+  var STYLES=["rainbow","cozy","sparkly","giant","tiny","fluffy","magical","sunny","spooky","snowy",
+   "fancy","silly","glowing","bouncy","pastel","neon","royal","jungle","ocean","candy",
+   "polka-dot","striped","starry","cloud","flower","dinosaur","space","pirate","unicorn","superhero",
+   "wooden","glittery","sunset","frosty","tropical","autumn","spring","cartoon","golden","velvet"];
+  var WHOS=["for Morgan","for Arff the pup","for Meow the cat","for the whole family","upstairs",
+   "in the backyard","on the roof","by the big window","in the attic","in the garden",
+   "for a party","for movie night","for a sleepover","for Sunday morning","for a rainy day",
+   "for summer","for winter","by the front door","in a secret room","for game night",
+   "for the pets","for a birthday","under the stairs","in a sunny corner","for a cozy night",
+   "for playtime","for the kids","for grandma's visit","in the playroom","for a picnic"];
+  var A=ACTIONS.length,SU=SUBJECTS.length,ST=STYLES.length,W=WHOS.length;
+  var TOTAL=A*SU*ST*W, N=1000000, STRIDE=1299709;
+  function ideaText(i){ var idx=(i*STRIDE)%TOTAL; var a=idx%A,r=(idx-a)/A; var su=r%SU; r=(r-su)/SU; var st=r%ST; r=(r-st)/ST; var w=r%W;
+    return ACTIONS[a]+" a "+STYLES[st]+" "+SUBJECTS[su]+" "+WHOS[w]+"!"; }
+  function commas(n){ return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,","); }
+
+  var PER=25, page=0, PAGES=Math.ceil(N/PER); // 40,000 pages
+  var el=function(id){return document.getElementById(id);};
+
+  function renderPage(hi){ var start=page*PER, end=Math.min(start+PER,N); var h="";
+    for(var i=start;i<end;i++){ var cls=(hi===i)?"card hit":"card"; h+='<div class="'+cls+'"><span class="num">'+commas(i+1)+'.</span>'+ideaText(i)+'</div>'; }
+    el("list").innerHTML=h;
+    el("pageinfo").textContent="Page "+commas(page+1)+" of "+commas(PAGES);
+    window.scrollTo(0,0);
+  }
+  window.first=function(){ page=0; renderPage(); };
+  window.prev=function(){ if(page>0)page--; renderPage(); };
+  window.next=function(){ if(page<PAGES-1)page++; renderPage(); };
+  window.randpage=function(){ page=Math.floor(Math.random()*PAGES); renderPage(); el("note").textContent="🎲 Jumped to a surprise page!"; };
+  window.jumpTo=function(){ var v=parseInt(el("jump").value,10); if(!v||v<1||v>N){ el("note").textContent="Type a number from 1 to 1,000,000."; return; }
+    var i=v-1; page=Math.floor(i/PER); renderPage(i); el("note").textContent="Jumped to idea #"+commas(v)+"!"; };
+
+  window.search=function(){ var q=el("q").value.trim().toLowerCase(); if(!q){ el("note").textContent="Type a word to search."; return; }
+    el("note").textContent="🔎 Searching all 1,000,000 ideas…";
+    setTimeout(function(){ var h="", found=0, CAP=200;
+      for(var i=0;i<N && found<CAP;i++){ var t=ideaText(i); if(t.toLowerCase().indexOf(q)>-1){ h+='<div class="card hit"><span class="num">'+commas(i+1)+'.</span>'+t+'</div>'; found++; } }
+      el("list").innerHTML=h||'<div class="note">No ideas found for "'+q+'". Try another word!</div>';
+      el("pageinfo").textContent='🔎 Results for "'+q+'"';
+      el("note").textContent="Showing the first "+found+" matches. Press ✖ Clear to go back to the book.";
+      window.scrollTo(0,0);
+    },30);
+  };
+  window.clearSearch=function(){ el("q").value=""; el("note").textContent=""; renderPage(); };
+
+  el("sub"); document.querySelector(".sub").textContent="Big, easy-to-read ideas — "+commas(N)+" of them, page by page!";
+  renderPage();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MO 2K26</title>
+<style>
+ *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+ html,body{margin:0;min-height:100%;font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;
+  background:radial-gradient(130% 90% at 50% 0%,#1b3a6a 0%,#0e1c3a 55%,#060b1c 100%);color:#fff;}
+ #wrap{max-width:760px;margin:0 auto;padding:18px 14px 60px;}
+ header{text-align:center;margin-bottom:10px;}
+ h1{margin:6px 0 2px;font-size:34px;letter-spacing:3px;text-transform:uppercase;text-shadow:0 0 12px #3aa0ff,0 0 26px #ff5ad0;}
+ .cast{color:#bfe0ff;font-size:13px;margin:0 0 2px;}
+ .free{display:inline-block;background:#39d06a;color:#04240f;font-weight:bold;font-size:12px;padding:3px 10px;border-radius:999px;margin-top:4px;}
+ .bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(10,20,40,.9);border:1px solid rgba(120,170,255,.3);border-radius:14px;padding:10px 14px;margin:12px 0;backdrop-filter:blur(4px);}
+ .coins{font-size:20px;font-weight:bold;color:#ffd23f;}
+ .songbtn{pointer-events:auto;font:inherit;font-weight:bold;font-size:13px;padding:8px 12px;border-radius:999px;border:none;background:#ff5ad0;color:#2a0020;box-shadow:0 4px 0 #a83090;cursor:pointer;}
+ .songbtn.on{background:#ffd23f;color:#2a1d00;box-shadow:0 4px 0 #b8901c;}
+ .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
+ .card{background:linear-gradient(160deg,#16294c,#0e1c38);border:1px solid rgba(120,170,255,.25);border-radius:16px;padding:12px 10px;text-align:center;position:relative;overflow:hidden;}
+ .card.owned{border-color:#39d06a;box-shadow:0 0 16px rgba(57,208,106,.25);}
+ .emoji{font-size:40px;line-height:1;}
+ .name{font-size:14px;font-weight:bold;margin:6px 0 2px;}
+ .price{font-size:13px;color:#ffd23f;margin-bottom:8px;}
+ .owned-badge{position:absolute;top:8px;right:8px;background:#39d06a;color:#04240f;font-size:10px;font-weight:bold;padding:2px 7px;border-radius:999px;}
+ button.act{pointer-events:auto;font:inherit;font-weight:bold;font-size:13px;padding:9px 0;width:100%;border-radius:10px;border:none;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.35);}
+ .buy{background:#3aa0ff;color:#031a33;box-shadow:0 4px 0 #1f5f9f;}
+ .cant{background:#5a6a80;color:#c0ccdc;box-shadow:0 4px 0 #3a4658;}
+ .row2{display:flex;gap:6px;}
+ .play{flex:1;background:#39d06a;color:#04240f;box-shadow:0 4px 0 #1f8f46;}
+ .sell{background:#ff8b6a;color:#2a0a00;box-shadow:0 4px 0 #b0492c;padding-left:10px;padding-right:10px;}
+ button.act:active{transform:translateY(3px);box-shadow:none;}
+ #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:rgba(10,20,40,.95);border:1px solid rgba(120,170,255,.4);color:#fff;font-weight:bold;padding:10px 18px;border-radius:999px;display:none;z-index:20;}
+ #otnote{text-align:center;color:#ff9ed6;font-size:12px;height:16px;margin-top:6px;}
+ footer{text-align:center;color:#6a86b0;font-size:12px;margin-top:22px;}
+</style>
+</head>
+<body>
+<div id="wrap">
+ <header>
+   <div style="font-size:46px;">🎮</div>
+   <h1>MO 2K26</h1>
+   <p class="cast">🏀 Mo · 🐾 Arff · 🐱 Meow · 🐷 Evie · ⚡ OKC City</p>
+   <span class="free">FREE PLAYSTATION — buy, play &amp; sell games!</span>
+ </header>
+
+ <div class="bar">
+   <span class="coins" id="coins">🪙 0</span>
+   <button class="songbtn" id="songBtn">🎵 MO Overtime</button>
+ </div>
+ <div id="otnote"></div>
+
+ <div class="grid" id="grid"></div>
+
+ <footer>Made by Coach Mo 🏀🐾 — pretend coins only, just for fun!</footer>
+</div>
+<div id="toast"></div>
+<script>
+// ===== coins + owned (saved on your device) =====
+var coins=120, owned={};
+try{ var sc=localStorage.getItem('mo2k26_coins'); if(sc!==null)coins=parseInt(sc); var so=localStorage.getItem('mo2k26_owned'); if(so)owned=JSON.parse(so); }catch(e){}
+function save(){ try{ localStorage.setItem('mo2k26_coins',coins); localStorage.setItem('mo2k26_owned',JSON.stringify(owned)); }catch(e){} }
+function setCoins(){ document.getElementById('coins').textContent='🪙 '+coins; }
+
+// ===== the games in the store =====
+var GAMES=[
+ ['MOBALL 2K26','🏀','mo-ball.html',50],
+ ['MO City','🏙️','mo-city-3d.html',50],
+ ['MO Subway','🚇','mo-subway.html',40],
+ ['MO Hotel','🏨','mo-hotel.html',40],
+ ['Arff Arcade','🐶','mo-arff-arcade.html',30],
+ ['Walk the Arcade','🚶','mo-arcade-walk.html',30],
+ ['Arff School','🎓','mo-arff-school.html',20],
+ ['MO Decorate','🛋️','mo-decorate.html',30],
+ ['MO Playhouse','🏠','mo-playhouse.html',20],
+ ['MO Driving','🚗','mo-driving.html',30],
+ ['MO Fix & Flip','🔨','mo-fix-flip-3d.html',20],
+ ['MO Party','🎉','mo-party.html',20],
+ ['MO Pig Homes','🐷','mo-pig-homes.html',20],
+ ['MO Stay','🛏️','mo-stay.html',20],
+ ['MO Wedding','💒','mo-wedding.html',20],
+ ['MO Move','📦','mo-move.html',20],
+ ['MO House','🏡','mo-house-3d.html',20],
+ ['MO Rover','🐕','mo-rover.html',0]
+];
+
+var grid=document.getElementById('grid');
+function render(){ setCoins(); grid.innerHTML='';
+ GAMES.forEach(function(g,i){ var name=g[0],emo=g[1],url=g[2],price=g[3]; var have=!!owned[url];
+   var card=document.createElement('div'); card.className='card'+(have?' owned':'');
+   var inner='<div class="emoji">'+emo+'</div><div class="name">'+name+'</div>';
+   inner+='<div class="price">'+(price===0?'FREE 🎁':('🪙 '+price))+'</div>';
+   if(have){ inner+='<span class="owned-badge">✓ OWNED</span><div class="row2"><button class="act play" data-p="'+i+'">▶ PLAY</button>'+(price>0?'<button class="act sell" data-s="'+i+'">💰</button>':'')+'</div>'; }
+   else if(coins>=price){ inner+='<button class="act buy" data-b="'+i+'">'+(price===0?'GET FREE':'BUY 🪙'+price)+'</button>'; }
+   else { inner+='<button class="act cant" data-n="'+i+'">NEED 🪙'+(price-coins)+'</button>'; }
+   card.innerHTML=inner; grid.appendChild(card);
+ });
+}
+function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; clearTimeout(window._tt); window._tt=setTimeout(function(){t.style.display='none';},1500); }
+
+grid.addEventListener('click',function(e){ var b=e.target;
+ if(b.dataset.b!=null){ var g=GAMES[b.dataset.b]; if(coins>=g[3]){ coins-=g[3]; owned[g[2]]=1; save(); blip(660); toast((g[3]===0?'Got ':'Bought ')+g[0]+'! 🎮'); render(); } }
+ else if(b.dataset.s!=null){ var g2=GAMES[b.dataset.s]; if(owned[g2[2]]){ var refund=Math.max(1,Math.floor(g2[3]*0.7)); coins+=refund; delete owned[g2[2]]; save(); blip(330); toast('Sold '+g2[0]+' for 🪙'+refund); render(); } }
+ else if(b.dataset.p!=null){ var g3=GAMES[b.dataset.p]; blip(880); toast('Loading '+g3[0]+'… 🎮'); setTimeout(function(){ location.href=g3[2]; },500); }
+ else if(b.dataset.n!=null){ toast('Not enough coins — sell a game or earn more! 🪙'); }
+});
+
+// ===== MO OVERTIME song (WebAudio loop) =====
+var AC=null; function ac(){ if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} return AC; }
+function blip(f){ var a=ac(); if(!a)return; if(a.state==='suspended')a.resume(); var o=a.createOscillator(),g=a.createGain(); o.type='square'; o.frequency.setValueAtTime(f,a.currentTime); g.gain.setValueAtTime(0.15,a.currentTime); g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+0.12); o.connect(g);g.connect(a.destination); o.start(); o.stop(a.currentTime+0.13); }
+var N={C:261.63,D:293.66,E:329.63,F:349.23,G:392.00,A:440.00,B:493.88,c:523.25,d:587.33,e:659.25,g:783.99,0:0};
+// "MO OVER-TIME!" bouncy tune
+var MELODY=[['G',1],['G',1],['c',1],['e',2],['d',1],['c',1],['G',2],['0',1],
+            ['A',1],['A',1],['c',1],['d',2],['c',1],['A',1],['G',3],['0',1],
+            ['e',1],['e',1],['d',1],['c',1],['G',2],['A',2],
+            ['c',2],['d',2],['e',3],['0',1]];
+var BASS=['C','G','A','F'];
+var songOn=false, step=0, bstep=0, songTimer=null;
+function playNote(freq,dur,vol,type){ var a=ac(); if(!a||!freq)return; var t=a.currentTime; var o=a.createOscillator(),g=a.createGain(); o.type=type||'triangle'; o.frequency.setValueAtTime(freq,t); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol||0.18,t+0.02); g.gain.exponentialRampToValueAtTime(0.001,t+dur*0.9); o.connect(g);g.connect(a.destination); o.start(t); o.stop(t+dur); }
+function kick(){ var a=ac(); if(!a)return; var t=a.currentTime; var o=a.createOscillator(),g=a.createGain(); o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(50,t+0.12); g.gain.setValueAtTime(0.3,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.16); o.connect(g);g.connect(a.destination); o.start(t); o.stop(t+0.17); }
+var BEAT=165; // ms per eighth
+function tick(){ var note=MELODY[step]; var freq=N[note[0]], dur=note[1]*BEAT/1000; playNote(freq,dur,0.2,'triangle');
+ if(step%4===0){ kick(); playNote(N[BASS[bstep%4]]/2,0.4,0.14,'sawtooth'); bstep++; }
+ // little sparkle harmony
+ if(freq) playNote(freq*2,dur*0.5,0.05,'sine');
+ var wait=note[1]*BEAT; step=(step+1)%MELODY.length;
+ if(step===0){ var el=document.getElementById('otnote'); el.textContent='🎵 M-O … O-VER-TIME! … GO MO &amp; ARFF! 🎵'; setTimeout(function(){ if(!songOn)el.textContent=''; },1500); }
+ songTimer=setTimeout(tick,wait);
+}
+document.getElementById('songBtn').onclick=function(){ var a=ac(); if(a&&a.state==='suspended')a.resume(); songOn=!songOn; var btn=this;
+ if(songOn){ btn.classList.add('on'); btn.textContent='🎵 Overtime ON'; document.getElementById('otnote').textContent='🎵 MO OVERTIME song playing! 🎵'; step=0; bstep=0; tick(); }
+ else { btn.classList.remove('on'); btn.textContent='🎵 MO Overtime'; clearTimeout(songTimer); document.getElementById('otnote').textContent=''; } };
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>💎 500 Ideas PRO</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;min-height:100%;font-family:'Trebuchet MS',Verdana,sans-serif;color:#eaf0ff;
+    background:radial-gradient(1200px 600px at 50% -10%,#3a3f6a,#20233f 60%,#161830);}
+  #wrap{max-width:680px;margin:0 auto;padding:12px 12px 46px;}
+  .top{display:flex;justify-content:space-between;align-items:center;}
+  .homebtn{background:linear-gradient(#ffd23f,#f7a72b);color:#4a2f0a;font-weight:bold;border:none;
+    border-radius:12px;padding:8px 15px;font-size:15px;box-shadow:0 4px 0 #0006;text-decoration:none;}
+  h1{font-size:28px;margin:12px 0 2px;text-align:center;
+    background:linear-gradient(90deg,#ffd23f,#ff8ac0,#7ad0ff);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .tag{display:inline-block;background:#ffd23f;color:#3a2a0a;font-weight:bold;font-size:12px;
+    padding:2px 9px;border-radius:20px;vertical-align:middle;margin-left:8px;letter-spacing:1px;}
+  .stats{display:flex;gap:10px;justify-content:center;margin:10px 0 4px;flex-wrap:wrap;}
+  .stat{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:14px;
+    padding:8px 16px;text-align:center;min-width:120px;}
+  .stat b{display:block;font-size:22px;color:#ffd77a;}
+  .stat span{font-size:12px;color:#b8c0e0;}
+  .panel{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:12px;margin:12px 0;}
+  .frow{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+  .field{display:flex;flex-direction:column;font-size:11px;color:#aab2d8;gap:3px;}
+  select,input{font-family:inherit;font-size:15px;padding:9px 10px;border-radius:10px;border:1px solid #4a5080;
+    background:#2a2e4e;color:#eaf0ff;}
+  .btn{background:linear-gradient(#6ad07a,#39a84a);color:#08210d;border:none;border-radius:11px;
+    padding:11px 15px;font-size:15px;font-weight:bold;font-family:inherit;box-shadow:0 4px 0 #0005;cursor:pointer;}
+  .btn.b{background:linear-gradient(#6ab0f0,#3a80d0);color:#04162e;}
+  .btn.p{background:linear-gradient(#f78ac0,#e0509a);color:#3a0a24;}
+  .btn.g{background:linear-gradient(#c0c8e0,#8a92c0);color:#1a1e38;}
+  .btn:active{transform:translateY(2px);box-shadow:0 2px 0 #0005;}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;margin:10px 0;}
+  .pageinfo{text-align:center;font-weight:bold;color:#ffd77a;margin:6px 0;font-size:15px;}
+  .list{margin-top:8px;}
+  .card{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.96);color:#242a44;
+    border-radius:14px;padding:12px 14px;margin:8px 0;box-shadow:0 4px 12px #0004;}
+  .card .num{color:#e0850e;font-size:13px;font-weight:bold;min-width:44px;}
+  .card .txt{flex:1;font-size:18px;font-weight:bold;color:#2a3a5a;line-height:1.3;}
+  .card .fav,.card .cp{cursor:pointer;background:none;border:none;}
+  .card .fav{font-size:20px;} .card .cp{font-size:16px;color:#7a86b0;}
+  .note{text-align:center;font-size:13px;color:#aab2d8;margin:8px 0;min-height:16px;}
+  .favttl{color:#ff9ec8;font-weight:bold;font-size:16px;margin:14px 0 6px;}
+  .favitem{background:rgba(255,158,200,.12);border:1px solid rgba(255,158,200,.35);border-radius:12px;
+    padding:9px 12px;margin:6px 0;font-size:15px;font-weight:bold;color:#ffd4e6;display:flex;justify-content:space-between;gap:8px}
+  .favitem button{background:none;border:none;color:#ff9ec8;cursor:pointer;font-size:16px}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="top">
+    <a class="homebtn" href="../index.html">🏠 MO ARCADE</a>
+    <span style="font-size:26px">💎</span>
+  </div>
+  <h1>500 IDEAS<span class="tag">PRO</span></h1>
+
+  <div class="stats">
+    <div class="stat"><b>500</b><span>hand-mixed ideas</span></div>
+    <div class="stat"><b id="s_show">500</b><span>showing now</span></div>
+    <div class="stat"><b id="s_fav">0</b><span>favorites</span></div>
+  </div>
+
+  <div class="panel">
+    <div class="note" style="margin-top:0">🎛️ Filter — pick any, or leave on “Any”</div>
+    <div class="frow">
+      <label class="field">Action<select id="f_action"></select></label>
+      <label class="field">Style<select id="f_style"></select></label>
+      <label class="field">Thing<select id="f_subject"></select></label>
+      <label class="field">For / Where<select id="f_who"></select></label>
+    </div>
+    <div class="bar" style="margin-bottom:0">
+      <button class="btn" onclick="applyF()">✨ Apply</button>
+      <button class="btn g" onclick="resetF()">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="pageinfo" id="pageinfo"></div>
+  <div class="bar">
+    <button class="btn" onclick="first()">⏮</button>
+    <button class="btn" onclick="prev()">◀ Back</button>
+    <button class="btn" onclick="next()">Next ▶</button>
+    <button class="btn" onclick="last()">⏭</button>
+    <button class="btn p" onclick="rand()">🎲 Surprise</button>
+  </div>
+  <div class="bar">
+    <input id="q" type="text" placeholder="Search a word…" style="width:170px">
+    <button class="btn b" onclick="doSearch()">🔎 Find</button>
+  </div>
+  <div class="note" id="note"></div>
+
+  <div class="list" id="list"></div>
+  <div id="favwrap"></div>
+
+  <div class="bar" style="margin-top:14px">
+    <button class="btn" onclick="prev()">◀ Back</button>
+    <button class="btn" onclick="next()">Next ▶</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var ACTIONS=["Build","Design","Decorate","Paint","Make","Set up","Plant","Grow","Fill up","Clean",
+   "Wash","Fix up","Bake","Cook","Arrange","Organize","Light up","Fluff up","Sort","Stack",
+   "Water","Feed","Brush","Wrap up","Hang up","Sparkle up","Cozy up","Sprinkle","Style","Craft",
+   "Draw","Paste","Sweep","Polish","Pile up","Line up","Dust off","Scrub","Whip up","Set out"];
+  var SUBJECTS=["bedroom","kitchen","garden","treehouse","swimming pool","slide","bookshelf",
+   "cat tree","doghouse","pillow fort","playground","bathroom","living room","balcony",
+   "bunk bed","lemonade stand","tent","swing set","fish tank","flower box","snack bar",
+   "race track","rocket ship","castle","fairy garden","science lab","music stage","dance floor",
+   "movie room","trampoline","sandbox","bird feeder","veggie patch","cozy nook","puppet theater",
+   "treasure chest","ball pit","reading corner","ice-cream shop","robot helper","greenhouse",
+   "bakery corner","game room","art studio","spa bath","campfire circle","mailbox","porch swing",
+   "window seat","pet bed"];
+  var STYLES=["rainbow","cozy","sparkly","giant","tiny","fluffy","magical","sunny","spooky","snowy",
+   "fancy","silly","glowing","bouncy","pastel","neon","royal","jungle","ocean","candy",
+   "polka-dot","striped","starry","cloud","flower","dinosaur","space","pirate","unicorn","superhero",
+   "wooden","glittery","sunset","frosty","tropical","autumn","spring","cartoon","golden","velvet"];
+  var WHOS=["for Morgan","for Arff the pup","for Meow the cat","for the whole family","upstairs",
+   "in the backyard","on the roof","by the big window","in the attic","in the garden",
+   "for a party","for movie night","for a sleepover","for Sunday morning","for a rainy day",
+   "for summer","for winter","by the front door","in a secret room","for game night",
+   "for the pets","for a birthday","under the stairs","in a sunny corner","for a cozy night",
+   "for playtime","for the kids","for grandma's visit","in the playroom","for a picnic"];
+  var A=ACTIONS.length,SU=SUBJECTS.length,ST=STYLES.length,W=WHOS.length;
+  var TOTAL=A*SU*ST*W, N=500, STRIDE=1299709, PER=25;
+  function commas(n){return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,",");}
+  function txt(o){return ACTIONS[o.a]+" a "+STYLES[o.st]+" "+SUBJECTS[o.su]+" "+WHOS[o.w]+"!";}
+
+  // build the 500 ideas
+  var ALL=[];
+  for(var i=0;i<N;i++){ var idx=(i*STRIDE)%TOTAL; var a=idx%A,r=(idx-a)/A; var su=r%SU; r=(r-su)/SU; var st=r%ST; r=(r-st)/ST; var w=r%W;
+    var o={n:i+1,a:a,st:st,su:su,w:w}; o.text=txt(o); ALL.push(o); }
+
+  var el=function(id){return document.getElementById(id);};
+  function fill(id,arr){ var h='<option value="-1">Any</option>'; for(var i=0;i<arr.length;i++)h+='<option value="'+i+'">'+arr[i]+'</option>'; el(id).innerHTML=h; }
+  fill("f_action",ACTIONS); fill("f_style",STYLES); fill("f_subject",SUBJECTS); fill("f_who",WHOS);
+
+  var view=ALL.slice(), page=0, favs=[];
+  function pages(){return Math.max(1,Math.ceil(view.length/PER));}
+  function isFav(t){return favs.indexOf(t)>-1;}
+
+  function render(){ var start=page*PER,end=Math.min(start+PER,view.length),h="";
+    if(!view.length){ h='<div class="note">No ideas match. Try ↺ Reset.</div>'; }
+    for(var i=start;i<end;i++){ var o=view[i],star=isFav(o.text)?"⭐":"☆";
+      h+='<div class="card"><span class="num">'+o.n+'.</span><span class="txt">'+o.text+'</span>'
+       +'<button class="cp" title="copy" onclick="cp('+i+')">📋</button>'
+       +'<button class="fav" title="favorite" onclick="tf('+i+',this)">'+star+'</button></div>'; }
+    el("list").innerHTML=h;
+    el("pageinfo").textContent="Page "+(page+1)+" of "+pages();
+    el("s_show").textContent=commas(view.length);
+    window.scrollTo(0,0);
+  }
+  window.first=function(){page=0;render();};
+  window.last=function(){page=pages()-1;render();};
+  window.prev=function(){if(page>0)page--;render();};
+  window.next=function(){if(page<pages()-1)page++;render();};
+  window.rand=function(){page=Math.floor(Math.random()*pages());render();el("note").textContent="🎲 Surprise page!";};
+
+  window.cp=function(i){ var t=view[i].text; if(navigator.clipboard)navigator.clipboard.writeText(t); el("note").textContent='📋 Copied: "'+t+'"'; };
+  window.tf=function(i,btn){ var t=view[i].text,p=favs.indexOf(t); if(p>-1){favs.splice(p,1);btn.textContent="☆";}else{favs.push(t);btn.textContent="⭐";} el("s_fav").textContent=favs.length; renderFavs(); };
+  function renderFavs(){ if(!favs.length){el("favwrap").innerHTML="";return;} var h='<div class="favttl">⭐ My Favorites ('+favs.length+')</div>';
+    favs.forEach(function(f,i){ h+='<div class="favitem"><span>'+f+'</span><button onclick="rf('+i+')">✖</button></div>'; }); el("favwrap").innerHTML=h; }
+  window.rf=function(i){favs.splice(i,1);el("s_fav").textContent=favs.length;renderFavs();render();};
+
+  window.applyF=function(){ var fa=+el("f_action").value,fs=+el("f_style").value,fsu=+el("f_subject").value,fw=+el("f_who").value;
+    view=ALL.filter(function(o){ return (fa<0||o.a===fa)&&(fs<0||o.st===fs)&&(fsu<0||o.su===fsu)&&(fw<0||o.w===fw); });
+    page=0; render(); el("note").textContent=view.length?("Found "+view.length+" matching ideas."):"No matches — try fewer filters."; };
+  window.resetF=function(){ el("f_action").value="-1";el("f_style").value="-1";el("f_subject").value="-1";el("f_who").value="-1"; view=ALL.slice(); page=0; el("q").value=""; el("note").textContent=""; render(); };
+
+  window.doSearch=function(){ var q=el("q").value.trim().toLowerCase(); if(!q){el("note").textContent="Type a word to search.";return;}
+    view=ALL.filter(function(o){return o.text.toLowerCase().indexOf(q)>-1;}); page=0; render();
+    el("note").textContent=view.length?('🔎 '+view.length+' ideas match "'+q+'". Press ↺ Reset to go back.'):'No ideas found for "'+q+'".'; };
+
+  render();
+})();
+</script>
+</body>
+</html>
