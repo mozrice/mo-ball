@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO HOUSEBOAT</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0a6ea0;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #wrap{position:fixed;inset:0;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0008;}
+  .pill{background:#0008;border-radius:20px;padding:6px 14px;font-size:17px;}
+  #hint{position:fixed;bottom:12px;left:12px;font-size:13px;color:#eaf6ff;background:#0006;padding:6px 10px;border-radius:10px;pointer-events:none;}
+  #buildBtn{position:fixed;right:12px;bottom:14px;background:linear-gradient(#ffcf5a,#f0a929);border:none;color:#5a3b00;font-weight:bold;font-size:19px;padding:13px 18px;border-radius:14px;box-shadow:0 4px 0 #a86f10;font-family:inherit;}
+  #buildBtn:active{transform:translateY(2px);box-shadow:0 2px 0 #a86f10;}
+  #buildPanel{position:fixed;left:0;right:0;bottom:0;background:#062a40f2;border-top:3px solid #ffd23f;padding:10px 12px 16px;display:none;max-height:72%;overflow:auto;}
+  #buildPanel h3{margin:2px 0 6px;text-align:center;color:#ffd23f;font-size:17px;}
+  #buildPanel .sec{margin:6px 0 3px;text-align:center;color:#9fe0ff;font-size:14px;font-weight:bold;}
+  .prow{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;}
+  .pbtn{background:#0e4a6b;border:2px solid #2a86bd;color:#fff;font-weight:bold;font-size:14px;padding:9px 10px;border-radius:12px;font-family:inherit;min-width:86px;}
+  .pbtn.owned{background:#1f7a3a;border-color:#3ec46a;}
+  #closeBuild{display:block;margin:10px auto 0;background:#e0453a;border:none;color:#fff;font-weight:bold;font-size:16px;padding:8px 22px;border-radius:12px;font-family:inherit;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#04263bdb;text-align:center;z-index:20;}
+  #over h1{font-size:38px;margin:0 0 6px;color:#ffd23f;text-shadow:0 3px 0 #0007;}
+  #over p{font-size:19px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#43c6ff,#1a8fd6);border:none;color:#fff;font-weight:bold;font-size:21px;padding:14px 28px;border-radius:16px;box-shadow:0 5px 0 #0e5a8a;cursor:pointer;font-family:inherit;}
+  .btn:active{transform:translateY(3px);box-shadow:0 2px 0 #0e5a8a;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div class="hud">
+    <div class="pill">🛟 MO'S RAFT</div>
+    <div class="pill">🏠 <span id="items">0</span></div>
+  </div>
+  <div id="hint">Tap deck = walk Mo 🚶 • Tap a shark 🦈 to BONK it & save your stuff!</div>
+  <button id="buildBtn">🔨 Build</button>
+  <div id="buildPanel">
+    <h3>🛥️ Decorate your raft — FREE! Tap to add or remove</h3>
+    <div class="prow" style="margin-bottom:6px;">
+      <button class="pbtn" id="addAll" style="background:#1f7a3a;border-color:#3ec46a;">✨ ADD EVERYTHING</button>
+      <button class="pbtn" id="clearAll" style="background:#8a3a2a;border-color:#d2603a;">🗑️ Clear All</button>
+    </div>
+    <div class="sec">🏠 Household Items</div>
+    <div class="prow" id="rowHouse"></div>
+    <div class="sec">👨‍👩‍👧 People</div>
+    <div class="prow" id="rowPeople"></div>
+    <div class="sec">🐾 Pets</div>
+    <div class="prow" id="rowPets"></div>
+    <button id="closeBuild">Close</button>
+  </div>
+  <div id="over">
+    <h1 id="otitle">🦈 RAFT BROKEN!</h1>
+    <p id="ostat"></p>
+    <button class="btn" id="again">Rebuild &amp; Play Again</button>
+  </div>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=window.innerWidth; H=window.innerHeight;
+    cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); computeBoat(); }
+  window.addEventListener('resize',resize);
+
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());
+    var o=a.createOscillator(),g=a.createGain(); o.type=t||'sine'; o.frequency.value=f;
+    g.gain.value=v||0.06; o.connect(g); g.connect(a.destination); o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.12)); o.stop(a.currentTime+(d||0.12)+0.02);}catch(e){} }
+
+  // boat geometry (screen space, centered)
+  var BW,BH,DW,DH,CX,CY;
+  function computeBoat(){ var m=Math.min(W,H); BW=Math.min(W*0.94, m*1.5, 820); BH=BW*0.66;
+    DW=BW/2-Math.max(26,BW*0.06); DH=BH/2-Math.max(24,BH*0.08); CX=W/2; CY=H*0.5; }
+
+  // household items: fx,fy are fractions of deck placed on the deck
+  var HOUSE=[
+    {k:'sofa', n:'Sofa',   e:'🛋️', fx:-0.62,fy:-0.55},
+    {k:'tv',   n:'TV',     e:'📺', fx:-0.08,fy:-0.72},
+    {k:'bed',  n:'Bed',    e:'🛏️', fx:0.55, fy:-0.55},
+    {k:'chair',n:'Chair',  e:'🪑', fx:0.86, fy:0.02},
+    {k:'lamp', n:'Lamp',   e:'💡', fx:-0.86,fy:0.05},
+    {k:'plant',n:'Plant',  e:'🪴', fx:-0.5, fy:0.6},
+    {k:'books',n:'Books',  e:'📚', fx:0.02, fy:0.62},
+    {k:'tub',  n:'Hot Tub',e:'♨️', fx:0.56, fy:0.56},
+    {k:'rug',  n:'Rug',    e:'🟥', fx:0.0,  fy:-0.02},
+    {k:'flag', n:'MO Flag',e:'🚩', fx:-0.92,fy:-0.85},
+    {k:'campfire',n:'Campfire',e:'🔥', fx:-0.3, fy:-0.32},
+    {k:'table',n:'Table',  e:'🍽️', fx:0.3,  fy:0.28},
+    {k:'guitar',n:'Guitar',e:'🎸', fx:-0.78,fy:0.5},
+    {k:'ball', n:'Ball',   e:'🏀', fx:0.78, fy:-0.78},
+    {k:'umbrella',n:'Umbrella',e:'⛱️', fx:0.88,fy:-0.42},
+    {k:'flowers',n:'Flowers',e:'🌷', fx:-0.16,fy:-0.42},
+    {k:'fishing',n:'Fishing',e:'🎣', fx:0.9,  fy:0.86},
+    {k:'gift', n:'Treasure',e:'🎁', fx:-0.86,fy:0.86},
+    {k:'clock',n:'Clock',  e:'🕐', fx:0.16, fy:-0.78},
+    {k:'painting',n:'Painting',e:'🖼️', fx:0.46,fy:-0.8},
+    {k:'grill',n:'Grill',  e:'🍔', fx:0.3,  fy:-0.55},
+    {k:'cake', n:'Cake',   e:'🎂', fx:-0.02,fy:0.28},
+    {k:'woodpile',n:'Wood',e:'🪵', fx:-0.62,fy:0.86},
+    {k:'gate', n:'Gate',   e:'🚧', fx:0.0,  fy:0.9},
+    {k:'rooms',n:'Rooms',  e:'🚪', fx:0.0,  fy:0.0},
+    {k:'bottle',n:'Bottle',e:'🍼', fx:-0.35,fy:0.52},
+    {k:'teddy', n:'Teddy', e:'🧸', fx:0.68, fy:0.4},
+    {k:'blocks',n:'Blocks',e:'🧱', fx:-0.72,fy:0.32},
+    {k:'balloon',n:'Balloon',e:'🎈', fx:0.62,fy:-0.16},
+    {k:'crib',  n:'Crib',  e:'🚼', fx:0.9,  fy:0.55},
+    {k:'walls', n:'Walls', e:'🧱', fx:0.0,  fy:0.0},
+    {k:'ceiling',n:'Ceiling',e:'🏠', fx:0.0, fy:0.0}
+  ];
+  var PEOPLE=[
+    {k:'dad',    n:'Dad',    e:'👨'},
+    {k:'mom',    n:'Mom',    e:'👩'},
+    {k:'kid',    n:'Kid',    e:'🧒'},
+    {k:'boy',    n:'Boy',    e:'👦'},
+    {k:'girl',   n:'Girl',   e:'👧'},
+    {k:'baby',   n:'Baby',   e:'👶'},
+    {k:'grandpa',n:'Grandpa',e:'👴'},
+    {k:'grandma',n:'Grandma',e:'👵'},
+    {k:'teen',   n:'Teen',   e:'🧑'}
+  ];
+  var PETS=[
+    {k:'dog',    n:'Dog',    e:'🐶'},
+    {k:'cat',    n:'Cat',    e:'🐱'},
+    {k:'puppy',  n:'Puppy',  e:'🐕'},
+    {k:'kitty',  n:'Kitty',  e:'🐈'},
+    {k:'bunny',  n:'Bunny',  e:'🐰'},
+    {k:'parrot', n:'Parrot', e:'🦜'},
+    {k:'dolphin',n:'Dolphin',e:'🐬'},
+    {k:'turtle', n:'Turtle', e:'🐢'},
+    {k:'duck',   n:'Duck',   e:'🦆'},
+    {k:'seagull',n:'Seagull',e:'🐦'}
+  ];
+  // these ones walk around the deck on their own
+  var WALKERS=['dad','mom','kid','boy','girl','grandpa','grandma','teen','dog','cat','puppy','kitty','bunny','parrot'];
+  function emojiFor(k){ var all=HOUSE.concat(PEOPLE).concat(PETS); for(var i=0;i<all.length;i++) if(all[i].k===k) return all[i].e; return '❓'; }
+
+  var mo, parts, t=0, fish, clouds, waves, finX, walkerState;
+  var sharks, sharkTimer, hp, broken, shakeT, woods;
+  function emptyParts(){ var o={}; HOUSE.forEach(function(p){o[p.k]=false;}); PEOPLE.forEach(function(p){o[p.k]=false;}); PETS.forEach(function(p){o[p.k]=false;}); return o; }
+  function itemCount(){ var c=0; for(var k in parts){ if(parts[k]) c++; } return c; }
+  function rnd(a,b){return a+Math.random()*(b-a);}
+
+  function reset(){
+    computeBoat();
+    mo={x:0,y:0,tx:0,ty:0,face:1,step:0};
+    parts=emptyParts();
+    walkerState={};
+    fish=[]; for(var i=0;i<7;i++) fish.push({x:rnd(0,W),y:rnd(0,H),sp:rnd(0.4,1.1)*(Math.random()<0.5?1:-1),c:['#ffd23f','#ff7bd5','#7bff9e','#ff9d5c'][Math.floor(rnd(0,4))],ph:rnd(0,6)});
+    clouds=[]; for(var j=0;j<4;j++) clouds.push({x:rnd(0,W),y:rnd(20,H*0.28),s:rnd(0.7,1.4),sp:rnd(0.05,0.15)});
+    finX=-100;
+    sharks=[]; sharkTimer=300; broken=false; shakeT=0; flashT=0;
+    document.getElementById('items').textContent=0;
+    document.getElementById('over').style.display='none';
+    renderBuildPanel();
+  }
+
+  function spawnShark(){
+    var edge=Math.floor(rnd(0,4)); var x,y;
+    if(edge===0){x=rnd(0,W);y=-60;} else if(edge===1){x=W+60;y=rnd(0,H);}
+    else if(edge===2){x=rnd(0,W);y=H+60;} else {x=-60;y=rnd(0,H);}
+    sharks.push({x:x,y:y,ang:0,flee:false,bite:0,spd:rnd(1.1,1.7)});
+  }
+
+  // input: tap a shark to bonk it, otherwise tap deck to walk Mo
+  function tap(e){ var r=cv.getBoundingClientRect();
+    var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+    var py=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+    // tap a shark to bonk it — if it stole something, you get it back!
+    for(var i=0;i<sharks.length;i++){ var s=sharks[i];
+      if(Math.hypot(s.x-px,s.y-py)<54){
+        if(s.carrying){ parts[s.carrying]=true; updateItemsHUD(); renderBuildPanel(); talkFlash('🎉 You got your '+nameFor(s.carrying)+' back!'); s.carrying=null; }
+        s.flee=true; s.bonk=8;
+        beep(220,0.08,'square',0.08); setTimeout(function(){beep(140,0.12,'square',0.07);},60); return; } }
+    // else walk Mo on the deck
+    var lx=px-CX, ly=py-CY;
+    lx=Math.max(-DW,Math.min(DW,lx)); ly=Math.max(-DH,Math.min(DH,ly));
+    mo.tx=lx; mo.ty=ly; }
+  cv.addEventListener('mousedown',tap);
+  cv.addEventListener('touchstart',function(e){tap(e);e.preventDefault();},{passive:false});
+
+  // build panel
+  var bPanel=document.getElementById('buildPanel');
+  var rowHouse=document.getElementById('rowHouse'), rowPeople=document.getElementById('rowPeople'), rowPets=document.getElementById('rowPets');
+  document.getElementById('buildBtn').addEventListener('click',function(){ bPanel.style.display=(bPanel.style.display==='block'?'none':'block'); renderBuildPanel(); });
+  document.getElementById('closeBuild').addEventListener('click',function(){ bPanel.style.display='none'; });
+  function makeBtn(p,row){
+    var b=document.createElement('button'); b.className='pbtn'+(parts&&parts[p.k]?' owned':'');
+    b.textContent=p.e+' '+p.n+(parts&&parts[p.k]?' ✓':'');
+    b.addEventListener('click',function(){ parts[p.k]=!parts[p.k];
+      document.getElementById('items').textContent=itemCount();
+      beep(parts[p.k]?800:400,0.1,'square',0.06); if(parts[p.k]) setTimeout(function(){beep(1050,0.1,'square',0.05);},60);
+      renderBuildPanel(); });
+    row.appendChild(b);
+  }
+  function renderBuildPanel(){ if(!parts) return; rowHouse.innerHTML=''; rowPeople.innerHTML=''; rowPets.innerHTML='';
+    HOUSE.forEach(function(p){ makeBtn(p,rowHouse); }); PEOPLE.forEach(function(p){ makeBtn(p,rowPeople); }); PETS.forEach(function(p){ makeBtn(p,rowPets); }); }
+  function totalKeys(){ var n=0; for(var k in parts) n++; return n; }
+  function addEverything(){ for(var k in parts) parts[k]=true;
+    document.getElementById('items').textContent=itemCount(); beep(700,0.1,'square',0.06); setTimeout(function(){beep(1050,0.12,'square',0.05);},70); renderBuildPanel(); }
+  function clearEverything(){ for(var k in parts) parts[k]=false;
+    document.getElementById('items').textContent=0; beep(400,0.1,'sine',0.06); setTimeout(function(){beep(240,0.12,'sine',0.05);},70); renderBuildPanel(); }
+  function toggleAll(){ if(itemCount()>=totalKeys()) clearEverything(); else addEverything(); }
+  document.getElementById('addAll').addEventListener('click',addEverything);
+  document.getElementById('clearAll').addEventListener('click',function(){ for(var k in parts) parts[k]=false;
+    document.getElementById('items').textContent=0; beep(300,0.1,'sine',0.06); renderBuildPanel(); });
+
+  // ---- wandering walkers that use the furniture ----
+  var ACT={sofa:'😌', tv:'😃', bed:'💤', tub:'🎶', chair:'☕', books:'📖', plant:'💧', lamp:'✨',
+    campfire:'🔥', table:'🍴', guitar:'🎵', grill:'😋', cake:'🥳', ball:'⛹️', flowers:'🌸', fishing:'🎣'};
+  function usableSpots(){ var out=[]; for(var i=0;i<HOUSE.length;i++){ var it=HOUSE[i]; if(parts[it.k] && ACT[it.k]){ out.push({x:it.fx*DW, y:it.fy*DH, act:ACT[it.k]}); } } return out; }
+  function pickTarget(isPerson){
+    var spots=usableSpots();
+    if(isPerson && spots.length && Math.random()<0.65){ var s=spots[Math.floor(Math.random()*spots.length)];
+      return {tx:s.x+rnd(-6,6), ty:s.y+rnd(-6,6), act:s.act}; }
+    return {tx:rnd(-DW*0.9,DW*0.9), ty:rnd(-DH*0.9,DH*0.9), act:null};
+  }
+  function isPersonKey(k){ for(var i=0;i<PEOPLE.length;i++) if(PEOPLE[i].k===k) return true; return false; }
+  function babyTarget(){ if(parts.bed){ for(var i=0;i<HOUSE.length;i++){ if(HOUSE[i].k==='bed') return {tx:HOUSE[i].fx*DW+rnd(-8,8), ty:HOUSE[i].fy*DH+rnd(-6,6), act:'💤'}; } }
+    return {tx:rnd(-DW*0.7,DW*0.7), ty:rnd(-DH*0.7,DH*0.7), act:'💤'}; }
+  function updateWalkers(dt){
+    for(var i=0;i<WALKERS.length;i++){ var k=WALKERS[i];
+      if(!parts[k]){ if(walkerState[k]) delete walkerState[k]; continue; }
+      var person=isPersonKey(k);
+      var w=walkerState[k];
+      if(!w){ var s=pickTarget(person); w=walkerState[k]={x:rnd(-DW*0.8,DW*0.8),y:rnd(-DH*0.8,DH*0.8),tx:s.tx,ty:s.ty,act:s.act,doing:null,pause:0,step:rnd(0,6)}; }
+      if(w.pause>0){ w.pause-=dt; continue; }
+      w.doing=null;
+      var dx=w.tx-w.x, dy=w.ty-w.y, d=Math.hypot(dx,dy);
+      var spd=(k==='baby')?0.8:(k==='grandpa'||k==='grandma')?0.9:1.6;
+      if(d>2){ w.x+=dx/d*spd*dt; w.y+=dy/d*spd*dt; w.step+=0.35*dt; }
+      else { // arrived: do the activity here (if any), then choose a new spot
+        if(k==='baby'){ w.doing='💤'; w.pause=rnd(260,420); var bt=babyTarget(); w.tx=bt.tx; w.ty=bt.ty; w.act='💤'; }
+        else { if(w.act){ w.doing=w.act; w.pause=rnd(80,180); } else { w.pause=rnd(20,55); }
+          var nx=pickTarget(person); w.tx=nx.tx; w.ty=nx.ty; w.act=nx.act; } }
+    }
+  }
+
+  function update(dt){
+    t+=dt;
+    if(broken){ return; }
+    updateSharks(dt);
+    // Mo walks toward target on the deck
+    var dx=mo.tx-mo.x, dy=mo.ty-mo.y, d=Math.hypot(dx,dy);
+    if(d>1.5){ var sp=Math.min(d,2.4*dt); mo.x+=dx/d*sp; mo.y+=dy/d*sp; mo.step+=0.3*dt; if(Math.abs(dx)>0.5) mo.face=dx<0?-1:1; }
+    updateWalkers(dt);
+    // fish drift across the water
+    for(var i=0;i<fish.length;i++){ var f=fish[i]; f.x+=f.sp*dt; f.ph+=0.08*dt;
+      if(f.sp>0&&f.x>W+30){f.x=-30;f.y=rnd(0,H);} if(f.sp<0&&f.x<-30){f.x=W+30;f.y=rnd(0,H);} }
+    for(var c=0;c<clouds.length;c++){ var cl=clouds[c]; cl.x+=cl.sp*dt; if(cl.x>W+80) cl.x=-80; }
+    // occasional passing shark fin (harmless scenery)
+    finX+=0.5*dt; if(finX>W+120) { if(Math.random()<0.004) finX=-120; }
+  }
+
+  // things a shark can grab: any built HOUSE item (not the gate fence) + built pets
+  function stealableKeys(){ var out=[]; for(var i=0;i<HOUSE.length;i++){ if(parts[HOUSE[i].k] && HOUSE[i].k!=='gate'){ out.push(HOUSE[i].k); } }
+    for(var j=0;j<PETS.length;j++){ if(parts[PETS[j].k]){ out.push(PETS[j].k); } } return out; }
+  function updateSharks(dt){
+    sharkTimer-=dt;
+    if(sharkTimer<=0){ if(sharks.length<2) spawnShark(); sharkTimer=Math.max(320, 520 - t*0.03); }
+    var rr=BW*0.5; // raft radius
+    for(var i=sharks.length-1;i>=0;i--){ var s=sharks[i];
+      if(s.bonk>0) s.bonk-=dt;
+      if(s.flee){ // swim away (maybe with a stolen item) and vanish
+        var fdx=s.x-CX, fdy=s.y-CY, fd=Math.hypot(fdx,fdy)||1;
+        s.ang=Math.atan2(fdy,fdx); s.x+=fdx/fd*3.0*dt; s.y+=fdy/fd*3.0*dt;
+        if(s.x<-90||s.x>W+90||s.y<-90||s.y>H+90) sharks.splice(i,1);
+        continue;
+      }
+      var dx=CX-s.x, dy=(CY+bob)-s.y, d=Math.hypot(dx,dy)||1;
+      s.ang=Math.atan2(dy,dx);
+      if(d>rr+8){ s.x+=dx/d*s.spd*dt; s.y+=dy/d*s.spd*dt; s.chew=0; }
+      else { // reached the raft — just bump it and swim away (no stealing!)
+        shakeT=1; beepMaybe(); s.flee=true;
+      }
+    }
+    if(shakeT>0) shakeT-=0.04*dt;
+  }
+  function beepMaybe(){ if(Math.random()<0.04) beep(rnd(120,180),0.1,'sawtooth',0.05); }
+  function updateItemsHUD(){ document.getElementById('items').textContent=itemCount(); }
+  function nameFor(k){ var all=HOUSE.concat(PEOPLE).concat(PETS); for(var i=0;i<all.length;i++) if(all[i].k===k) return all[i].n; return 'thing'; }
+  var flashMsg='', flashT=0;
+  function talkFlash(m){ flashMsg=m; flashT=180; }
+  document.getElementById('again').addEventListener('click',function(){ reset(); });
+
+  var bob=0;
+  function emoji(e,x,y,size){ ctx.font=size+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(e,x,y); }
+  function roundRectC(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+  function render(){
+    bob=Math.sin(t*0.04)*4;
+    // sky
+    var sky=ctx.createLinearGradient(0,0,0,H*0.4); sky.addColorStop(0,'#8fd3ff'); sky.addColorStop(1,'#cdeeff');
+    ctx.fillStyle=sky; ctx.fillRect(0,0,W,H*0.34);
+    // sun
+    ctx.fillStyle='#fff3b0'; ctx.beginPath(); ctx.arc(W*0.82,H*0.12,34,0,6.29); ctx.fill();
+    // clouds
+    ctx.fillStyle='#ffffff'; for(var c=0;c<clouds.length;c++){ var cl=clouds[c]; drawCloud(cl.x,cl.y,cl.s); }
+    // ocean
+    var sea=ctx.createLinearGradient(0,H*0.3,0,H); sea.addColorStop(0,'#1aa0d8'); sea.addColorStop(1,'#065b86');
+    ctx.fillStyle=sea; ctx.fillRect(0,H*0.32,W,H);
+    // wave lines
+    ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=2;
+    for(var wy=H*0.4; wy<H; wy+=34){ ctx.beginPath();
+      for(var x=0;x<=W;x+=20){ var yy=wy+Math.sin((x*0.03)+(t*0.05)+(wy))*4; if(x===0)ctx.moveTo(x,yy); else ctx.lineTo(x,yy); } ctx.stroke(); }
+    // background fish
+    for(var i=0;i<fish.length;i++) drawFish(fish[i]);
+    // passing shark fin
+    if(finX>-100&&finX<W+100){ var fy=H*0.8; ctx.fillStyle='#4a586a'; ctx.beginPath();
+      ctx.moveTo(finX,fy); ctx.quadraticCurveTo(finX+14,fy-26,finX+30,fy); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.beginPath(); ctx.moveTo(finX-20,fy+2); ctx.lineTo(finX+50,fy+2); ctx.stroke(); }
+
+    drawBoat();
+    drawSharks();
+    // flash message when a shark steals / you rescue an item
+    if(flashT>0){ flashT-=1; ctx.fillStyle='rgba(0,0,0,0.55)';
+      var fw=Math.min(W-20, 30+flashMsg.length*8.5);
+      roundRectC(W/2-fw/2, 52, fw, 30, 12); ctx.fill();
+      ctx.fillStyle='#ffe08a'; ctx.font='bold 15px "Trebuchet MS"'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(flashMsg, W/2, 67); }
+  }
+
+  function drawSharks(){
+    for(var i=0;i<sharks.length;i++){ var s=sharks[i];
+      ctx.save(); ctx.translate(s.x,s.y); ctx.rotate(s.ang);
+      var fl=Math.sin(t*0.3+i)*10;
+      ctx.fillStyle='#5b6b7a'; ctx.beginPath(); ctx.ellipse(0,0,34,17,0,0,6.29); ctx.fill();
+      ctx.fillStyle='#c9d6e2'; ctx.beginPath(); ctx.ellipse(-4,7,22,8,0,0,6.29); ctx.fill();
+      ctx.fillStyle='#4a586a'; ctx.beginPath(); ctx.moveTo(-28,0); ctx.lineTo(-52,-16+fl); ctx.lineTo(-44,0); ctx.lineTo(-52,16+fl); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-2,-15); ctx.lineTo(10,-34); ctx.lineTo(16,-14); ctx.closePath(); ctx.fill();
+      // chomping mouth
+      var open=6+Math.abs(Math.sin(t*0.5+i))*8*(s.bite>0?1:0.3);
+      ctx.fillStyle='#20303e'; ctx.beginPath(); ctx.moveTo(20,-open*0.5); ctx.lineTo(36,0); ctx.lineTo(20,open); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#fff'; for(var k=0;k<4;k++){ ctx.beginPath(); ctx.moveTo(22+k*3,-open*0.4); ctx.lineTo(24+k*3,-open*0.4+3); ctx.lineTo(25+k*3,-open*0.4); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(22+k*3,open*0.7); ctx.lineTo(24+k*3,open*0.7-3); ctx.lineTo(25+k*3,open*0.7); ctx.closePath(); ctx.fill(); }
+      ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(14,-4,3,0,6.29); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(15,-5,1,0,6.29); ctx.fill();
+      ctx.restore();
+      if(s.bonk>0){ ctx.font='26px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('💥',s.x,s.y-24); }
+      if(s.carrying){ ctx.font='20px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(emojiFor(s.carrying),s.x,s.y-26); }
+    }
+  }
+
+  function drawCloud(x,y,s){ ctx.save(); ctx.translate(x,y); ctx.scale(s,s); ctx.globalAlpha=0.9;
+    ctx.beginPath(); ctx.arc(0,0,18,0,6.29); ctx.arc(20,4,14,0,6.29); ctx.arc(-20,4,14,0,6.29); ctx.arc(0,8,20,0,6.29); ctx.fill(); ctx.globalAlpha=1; ctx.restore(); }
+
+  function drawFish(f){ ctx.save(); ctx.translate(f.x,f.y+Math.sin(f.ph)*3); ctx.scale(f.sp<0?-1:1,1);
+    ctx.fillStyle=f.c; ctx.beginPath(); ctx.ellipse(0,0,10,6,0,0,6.29); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(8,0); ctx.lineTo(15,-5); ctx.lineTo(15,5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-4,-1,2,0,6.29); ctx.fill(); ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(-4,-1,1,0,6.29); ctx.fill(); ctx.restore(); }
+
+  function drawBoat(){
+    var cy=CY+bob;
+    var shk=(shakeT>0)?Math.sin(t*0.9)*5*shakeT:0;
+    ctx.save(); ctx.translate(CX+shk,cy);
+    var isz=Math.max(15,DW*0.13);
+
+    // pets in the WATER around the boat (behind boat)
+    if(parts.turtle){ var tx=-BW*0.62+Math.cos(t*0.02)*20, ty=BH*0.2+Math.sin(t*0.02)*14; emoji('🐢',tx,ty,isz*1.5); }
+    if(parts.dolphin){ var jx=BW*0.6, jy=BH*0.18-Math.abs(Math.sin(t*0.03))*40; emoji('🐬',jx,jy,isz*1.8);
+      if(jy<BH*0.05){ ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.ellipse(jx,BH*0.28,16,5,0,0,6.29); ctx.fill(); } }
+    if(parts.duck){ var dkx=-BW*0.5+Math.sin(t*0.015)*24, dky=-BH*0.4+Math.cos(t*0.02)*10; emoji('🦆',dkx,dky,isz*1.4);
+      ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(dkx,dky+isz*0.6,isz*0.7,isz*0.22,0,0,6.29); ctx.stroke(); }
+
+    // raft shadow
+    ctx.fillStyle='rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.ellipse(0,BH*0.5,BW*0.5,BH*0.26,0,0,6.29); ctx.fill();
+    // wooden raft = horizontal logs lashed together
+    var rW=(DW+14)*2, rH=(DH+14)*2, x0=-DW-14, y0=-DH-14;
+    var logH=Math.max(20, rH/7);
+    for(var ly=y0; ly<y0+rH-1; ly+=logH){
+      ctx.fillStyle='#8a5a2b'; roundRectC(x0, ly, rW, logH-2, logH*0.45); ctx.fill();
+      ctx.fillStyle='#b5793c'; roundRectC(x0, ly+1, rW, (logH-2)*0.55, logH*0.4); ctx.fill();
+      ctx.fillStyle='#c98a4a'; roundRectC(x0+4, ly+2, rW-8, (logH-2)*0.28, logH*0.25); ctx.fill();
+      // log end rings
+      ctx.fillStyle='#9c6631'; ctx.beginPath(); ctx.arc(x0+9, ly+logH/2, logH*0.3,0,6.29); ctx.fill();
+      ctx.beginPath(); ctx.arc(x0+rW-9, ly+logH/2, logH*0.3,0,6.29); ctx.fill();
+      ctx.strokeStyle='#7d4e22'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x0+9, ly+logH/2, logH*0.15,0,6.29); ctx.stroke();
+      ctx.beginPath(); ctx.arc(x0+rW-9, ly+logH/2, logH*0.15,0,6.29); ctx.stroke();
+    }
+    // rope lashings across the logs
+    ctx.strokeStyle='#e6d199'; ctx.lineWidth=5; ctx.setLineDash([7,5]);
+    ctx.beginPath(); ctx.moveTo(x0+rW*0.24, y0+4); ctx.lineTo(x0+rW*0.24, y0+rH-4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0+rW*0.76, y0+4); ctx.lineTo(x0+rW*0.76, y0+rH-4); ctx.stroke();
+    ctx.setLineDash([]);
+    // cracks appear as the raft gets damaged
+    if(hp<70){ ctx.strokeStyle='rgba(20,10,0,0.5)'; ctx.lineWidth=3;
+      var cracks=hp<35?5:(hp<55?3:2);
+      for(var ck=0;ck<cracks;ck++){ var seed=ck*97; var cxp=((seed%100)/100-0.5)*rW*0.8; var cyp=(((seed*7)%100)/100-0.5)*rH*0.8;
+        ctx.beginPath(); ctx.moveTo(cxp,cyp); ctx.lineTo(cxp+18,cyp+10); ctx.lineTo(cxp+8,cyp+26); ctx.lineTo(cxp+26,cyp+34); ctx.stroke(); } }
+
+    // household items on the deck
+    for(var i=0;i<HOUSE.length;i++){ var it=HOUSE[i]; if(!parts[it.k]) continue;
+      var ix=it.fx*DW, iy=it.fy*DH;
+      if(it.k==='flag'){ ctx.strokeStyle='#333'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(ix,iy); ctx.lineTo(ix,iy-46); ctx.stroke();
+        ctx.fillStyle='#e0453a'; ctx.beginPath(); ctx.moveTo(ix,iy-46); ctx.lineTo(ix+30,iy-40); ctx.lineTo(ix,iy-34); ctx.closePath(); ctx.fill();
+        ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('MO',ix+12,iy-40);
+      } else if(it.k==='rug'){ ctx.fillStyle='rgba(224,69,58,0.65)'; roundRectC(ix-isz*1.5,iy-isz,isz*3,isz*2,8); ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=3; ctx.strokeRect(ix-isz*1.2,iy-isz*0.75,isz*2.4,isz*1.5);
+      } else if(it.k==='tub'){ ctx.fillStyle='#9b6b3a'; ctx.beginPath(); ctx.arc(ix,iy,isz*0.8,0,6.29); ctx.fill();
+        ctx.fillStyle='#5fd0e0'; ctx.beginPath(); ctx.arc(ix,iy,isz*0.6,0,6.29); ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,0.6)'; for(var s=0;s<4;s++){ ctx.beginPath(); ctx.arc(ix-isz*0.4+s*isz*0.27,iy+Math.sin(t*0.1+s)*2,1.8,0,6.29); ctx.fill(); }
+      } else if(it.k==='gate'||it.k==='rooms'||it.k==='walls'||it.k==='ceiling'){ /* drawn specially below */ }
+      else { emoji(it.e, ix, iy, isz); }
+    }
+
+    // walls = solid wooden cabin walls around the raft (with a front doorway)
+    if(parts.walls){ var ww=Math.max(9,DW*0.045), dgw=DW*0.16;
+      ctx.fillStyle='#7a4a22';
+      ctx.fillRect(-DW-4,-DH-4, 2*DW+8, ww);                 // top wall
+      ctx.fillRect(-DW-4,-DH-4, ww, 2*DH+8);                 // left wall
+      ctx.fillRect(DW+4-ww,-DH-4, ww, 2*DH+8);               // right wall
+      ctx.fillRect(-DW-4,DH+4-ww, DW-dgw+4, ww);             // bottom-left (doorway gap in middle)
+      ctx.fillRect(dgw,DH+4-ww, DW-dgw+4, ww);               // bottom-right
+      ctx.fillStyle='#9c6631';                               // inner highlight
+      ctx.fillRect(-DW-4,-DH-4, 2*DW+8, ww*0.35);
+      ctx.fillRect(-DW-4,-DH-4, ww*0.35, 2*DH+8);
+    }
+
+    // rooms = wooden walls splitting the raft into 4 rooms, each with a door
+    if(parts.rooms){ var wt=Math.max(6,DW*0.028), dg=Math.min(DW,DH)*0.13;
+      var vwall=function(a,b){ ctx.fillRect(-wt/2,Math.min(a,b),wt,Math.abs(b-a)); ctx.fillStyle='#a9743e'; ctx.fillRect(-wt/2,Math.min(a,b),wt*0.4,Math.abs(b-a)); ctx.fillStyle='#5a3a1a'; };
+      var hwall=function(a,b){ ctx.fillRect(Math.min(a,b),-wt/2,Math.abs(b-a),wt); ctx.fillStyle='#a9743e'; ctx.fillRect(Math.min(a,b),-wt/2,Math.abs(b-a),wt*0.4); ctx.fillStyle='#5a3a1a'; };
+      ctx.fillStyle='#5a3a1a';
+      // vertical wall with doorways centered at y=-DH/2 and y=+DH/2
+      vwall(-DH,-DH*0.5-dg); vwall(-DH*0.5+dg,DH*0.5-dg); vwall(DH*0.5+dg,DH);
+      // horizontal wall with doorways centered at x=-DW/2 and x=+DW/2
+      hwall(-DW,-DW*0.5-dg); hwall(-DW*0.5+dg,DW*0.5-dg); hwall(DW*0.5+dg,DW);
+      // door leaves in each doorway (swung open)
+      var doorLeaf=function(cx,cy,ang){ ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang);
+        ctx.fillStyle='#c98a4a'; ctx.fillRect(0,-wt*0.5,dg*1.5,wt*1.4);
+        ctx.strokeStyle='#7d4e22'; ctx.lineWidth=1.5; ctx.strokeRect(0,-wt*0.5,dg*1.5,wt*1.4);
+        ctx.fillStyle='#ffd23f'; ctx.beginPath(); ctx.arc(dg*1.35,wt*0.2,2.4,0,6.29); ctx.fill(); ctx.restore(); };
+      doorLeaf(-dg*0.3,-DH*0.5,-0.5); doorLeaf(-dg*0.3,DH*0.5,0.5);   // doors in vertical wall
+      doorLeaf(-DW*0.5,dg*0.3,1.1); doorLeaf(DW*0.5,-dg*0.3,-1.1);    // doors in horizontal wall
+      // room labels
+      ctx.fillStyle='rgba(74,47,20,0.6)'; ctx.font='bold '+Math.max(11,DW*0.045)+'px "Trebuchet MS"'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('🛋️ LIVING', -DW*0.5, -DH*0.86);
+      ctx.fillText('🛏️ BEDROOM', DW*0.5, -DH*0.86);
+      ctx.fillText('🍽️ KITCHEN', -DW*0.5, DH*0.86);
+      ctx.fillText('🛁 BATH', DW*0.5, DH*0.86);
+    }
+
+    // gate = protective wooden fence around the raft edge
+    if(parts.gate){ var gx0=-DW-8,gy0=-DH-8,gw=(DW+8)*2,gh=(DH+8)*2;
+      // wooden rails around the edge
+      ctx.strokeStyle='#6b4423'; ctx.lineWidth=6; ctx.strokeRect(gx0,gy0,gw,gh);
+      ctx.strokeStyle='#8a5a2b'; ctx.lineWidth=3; ctx.strokeRect(gx0-3,gy0-3,gw+6,gh+6);
+      var picket=function(cx,cy){ ctx.fillStyle='#9c6631'; roundRectC(cx-5,cy-8,10,16,3); ctx.fill();
+        ctx.fillStyle='#b5793c'; roundRectC(cx-5,cy-8,10,6,3); ctx.fill();
+        ctx.strokeStyle='#7d4e22'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(cx,cy-7); ctx.lineTo(cx,cy+7); ctx.stroke(); };
+      var pk=Math.max(8,Math.floor(gw/24));
+      for(var gi=0;gi<=pk;gi++){ var fx2=gx0+gw*gi/pk; picket(fx2,gy0); picket(fx2,gy0+gh); }
+      var pv=Math.max(5,Math.floor(gh/24));
+      for(var gj=0;gj<=pv;gj++){ var fy2=gy0+gh*gj/pv; picket(gx0,fy2); picket(gx0+gw,fy2); }
+      // wooden gate doors at the front (bottom center)
+      ctx.fillStyle='#c98a4a'; roundRectC(-22,gy0+gh-9,20,18,3); ctx.fill(); roundRectC(2,gy0+gh-9,20,18,3); ctx.fill();
+      ctx.strokeStyle='#7d4e22'; ctx.lineWidth=2; ctx.strokeRect(-22,gy0+gh-9,20,18); ctx.strokeRect(2,gy0+gh-9,20,18);
+      ctx.beginPath(); ctx.moveTo(-12,gy0+gh-9); ctx.lineTo(-12,gy0+gh+9); ctx.moveTo(12,gy0+gh-9); ctx.lineTo(12,gy0+gh+9); ctx.stroke(); }
+
+    // Mo (little person walking on deck)
+    drawMoPerson(mo.x, mo.y, isz);
+
+    // people + land pets walking around the deck on their own
+    for(var wi=0;wi<WALKERS.length;wi++){ var wk=WALKERS[wi]; var w=walkerState[wk]; if(!w) continue;
+      var wob=(w.pause>0?0:Math.abs(Math.sin(w.step))*3);
+      var sz=(wk==='baby')?isz*0.85:(wk==='crab')?isz*0.95:isz*1.15;
+      emoji(emojiFor(wk), w.x, w.y-wob, sz);
+      // thought bubble when doing an activity
+      if(w.pause>0 && w.doing){ var bx=w.x+sz*0.55, by=w.y-sz*0.7;
+        ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.beginPath(); ctx.arc(bx,by,isz*0.55,0,6.29); ctx.fill();
+        ctx.beginPath(); ctx.arc(bx-isz*0.5,by+isz*0.5,isz*0.14,0,6.29); ctx.fill();
+        emoji(w.doing, bx, by, isz*0.7); }
+    }
+
+    // baby sleeps in the crib/bed (does not walk around)
+    if(parts.baby){ var bx=0.5*DW, byy=0.5*DH;
+      if(parts.crib){ for(var qi=0;qi<HOUSE.length;qi++){ if(HOUSE[qi].k==='crib'){ bx=HOUSE[qi].fx*DW; byy=HOUSE[qi].fy*DH; } } }
+      else if(parts.bed){ for(var qj=0;qj<HOUSE.length;qj++){ if(HOUSE[qj].k==='bed'){ bx=HOUSE[qj].fx*DW; byy=HOUSE[qj].fy*DH; } } }
+      emoji('👶', bx, byy, isz);
+      var bbx=bx+isz*0.55, bby=byy-isz*0.6;
+      ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.beginPath(); ctx.arc(bbx,bby,isz*0.5,0,6.29); ctx.fill();
+      ctx.beginPath(); ctx.arc(bbx-isz*0.45,bby+isz*0.45,isz*0.13,0,6.29); ctx.fill();
+      emoji('💤', bbx, bby, isz*0.62); }
+
+    // seagull flies above (front)
+    if(parts.seagull){ var gx=Math.cos(t*0.015)*BW*0.4, gy=-BH*0.62+Math.sin(t*0.03)*8; emoji('🐦',gx,gy,isz*1.2); }
+
+    // ceiling = a see-through wooden roof over the whole house (drawn last)
+    if(parts.ceiling){ ctx.save();
+      ctx.globalAlpha=0.26; ctx.fillStyle='#8a5a2b'; ctx.fillRect(-DW-6,-DH-6,2*DW+12,2*DH+12);
+      ctx.globalAlpha=0.45; ctx.strokeStyle='#5a3a1a'; ctx.lineWidth=3;
+      var step=Math.max(22,DH*0.14);
+      for(var cb=-DH; cb<=DH; cb+=step){ ctx.beginPath(); ctx.moveTo(-DW-6,cb); ctx.lineTo(DW+6,cb); ctx.stroke(); }
+      ctx.globalAlpha=0.85; ctx.fillStyle='#6b4423'; ctx.fillRect(-DW-8,-DH-10,2*DW+16,8); // roof ridge beam
+      ctx.restore(); }
+
+    ctx.restore();
+  }
+
+  function drawMoPerson(x,y,isz){
+    var r=Math.max(9,isz*0.62);
+    var wob=Math.sin(mo.step)*2;
+    ctx.save(); ctx.translate(x,y);
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(0,r*0.9,r*0.9,r*0.35,0,0,6.29); ctx.fill();
+    // body (MO jersey)
+    ctx.fillStyle='#1a6fd0'; roundRectC(-r*0.7,-r*0.2+wob*0.3,r*1.4,r*1.1,r*0.4); ctx.fill();
+    // arms
+    ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(-r*0.75,r*0.2+wob,r*0.22,0,6.29); ctx.fill(); ctx.beginPath(); ctx.arc(r*0.75,r*0.2-wob,r*0.22,0,6.29); ctx.fill();
+    // head
+    ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(0,-r*0.5,r*0.5,0,6.29); ctx.fill();
+    ctx.fillStyle='#3a2a1a'; ctx.beginPath(); ctx.arc(0,-r*0.62,r*0.52,Math.PI,6.29); ctx.fill();
+    // face dot toward facing
+    ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(mo.face*r*0.18,-r*0.45,r*0.07,0,6.29); ctx.fill();
+    // MO on jersey
+    ctx.fillStyle='#fff'; ctx.font='bold '+Math.max(8,r*0.5)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('MO',0,r*0.35+wob*0.3);
+    ctx.restore();
+  }
+
+  var last=0;
+  function loop(ts){ if(!last) last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts;
+    update(dt); render(); requestAnimationFrame(loop); }
+  resize(); reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

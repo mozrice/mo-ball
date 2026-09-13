@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Space</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#05061a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:rgba(5,6,26,.7);}
+  #obox{background:#12143a;border:3px solid #5ad0ff;color:#fff;border-radius:18px;padding:26px 30px;text-align:center;max-width:80%;}
+  #obox h1{color:#5ad0ff;margin:0 0 6px;}
+  #go{margin-top:14px;border:none;background:#5ad0ff;color:#05061a;font-family:inherit;font-weight:900;font-size:20px;padding:12px 28px;border-radius:14px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div id="over"><div id="obox"><h1>🚀 MO Space</h1><div id="omsg">Drag to fly your rocket.<br>Dodge asteroids, grab the stars!</div><button id="go">BLAST OFF</button></div></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  var playing=false, score=0, best=+(localStorage.getItem('moSpaceBest')||0);
+  var px=0, targetX=0, rocks=[], stars=[], sky=[], t=0;
+  for(var i=0;i<70;i++)sky.push({x:Math.random(),y:Math.random(),s:Math.random()*2+1});
+  function reset(){ px=W/2; targetX=W/2; rocks=[]; stars=[]; score=0; t=0; }
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function beep(f,d){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.08)); }
+  function rocket(cx,cy){ x.save(); x.translate(cx,cy);
+    x.fillStyle='#ffb04a'; x.beginPath(); x.moveTo(-8,20); x.lineTo(0,20+18+Math.random()*8); x.lineTo(8,20); x.fill(); // flame
+    x.fillStyle='#e2342f'; x.beginPath(); x.moveTo(0,-30); x.quadraticCurveTo(16,-10,14,16); x.lineTo(-14,16); x.quadraticCurveTo(-16,-10,0,-30); x.fill();
+    x.fillStyle='#bfe3ff'; x.beginPath(); x.arc(0,-6,7,0,7); x.fill();
+    x.fillStyle='#fff'; x.font='900 9px Trebuchet MS'; x.textAlign='center'; x.fillText('MO',0,10);
+    x.fillStyle='#e2342f'; x.beginPath(); x.moveTo(-14,16); x.lineTo(-22,26); x.lineTo(-14,26); x.fill(); x.beginPath(); x.moveTo(14,16); x.lineTo(22,26); x.lineTo(14,26); x.fill();
+    x.restore(); }
+  function loop(){ t++;
+    x.fillStyle='#05061a'; x.fillRect(0,0,W,H);
+    for(var i=0;i<sky.length;i++){ var s=sky[i]; s.y+=(playing?0.004:0.001); if(s.y>1)s.y=0; x.fillStyle='rgba(255,255,255,'+(0.4+s.s*0.2)+')'; x.fillRect(s.x*W,s.y*H,s.s,s.s); }
+    px+=(targetX-px)*0.2; var py=H*0.8;
+    if(playing){ if(t%28===0)rocks.push({x:Math.random()*W,y:-40,v:3+Math.random()*3+score*0.002,r:16+Math.random()*18,sp:Math.random()*0.1}); if(t%50===25)stars.push({x:Math.random()*W,y:-20,v:3}); if(t%120===0)score+=0; }
+    // stars
+    for(var j=stars.length-1;j>=0;j--){ var st=stars[j]; st.y+=st.v; x.fillStyle='#ffd23f'; drawStar(st.x,st.y,10);
+      if(Math.hypot(st.x-px,st.y-py)<28){ score+=5; beep(1100); stars.splice(j,1); continue; } if(st.y>H+30)stars.splice(j,1); }
+    // rocks
+    for(var k=rocks.length-1;k>=0;k--){ var ro=rocks[k]; ro.y+=ro.v; x.save(); x.translate(ro.x,ro.y); x.rotate(t*ro.sp); x.fillStyle='#8a7a6a'; x.beginPath(); for(var a=0;a<8;a++){ var an=a/8*6.283; var rr2=ro.r*(0.8+((a*37)%10)/25); x.lineTo(Math.cos(an)*rr2,Math.sin(an)*rr2);} x.closePath(); x.fill(); x.fillStyle='#6a5a4a'; x.beginPath(); x.arc(-ro.r*0.2,-ro.r*0.2,ro.r*0.2,0,7); x.fill(); x.restore();
+      if(playing && Math.hypot(ro.x-px,ro.y-py)<ro.r+16){ playing=false; over(); } if(ro.y>H+50)rocks.splice(k,1); }
+    rocket(px,py);
+    x.fillStyle='#fff'; x.font='900 '+Math.round(W*0.06)+'px Trebuchet MS'; x.textAlign='left'; x.fillText('⭐ '+score, 14, 40);
+    x.textAlign='right'; x.font='900 '+Math.round(W*0.04)+'px Trebuchet MS'; x.fillText('Best '+best, W-14, 36);
+    if(playing)score++;
+    requestAnimationFrame(loop);
+  }
+  function drawStar(cx,cy,r){ x.save(); x.translate(cx,cy); x.beginPath(); for(var i=0;i<5;i++){ var a=-1.57+i*1.2566; x.lineTo(Math.cos(a)*r,Math.sin(a)*r); var a2=a+0.628; x.lineTo(Math.cos(a2)*r*0.45,Math.sin(a2)*r*0.45);} x.closePath(); x.fill(); x.restore(); }
+  function over(){ beep(180,0.3); if(score>best){ best=score; try{localStorage.setItem('moSpaceBest',score);}catch(e){} }
+    document.getElementById('omsg').innerHTML='You scored <b>'+score+'</b>!<br>Best: '+best; document.getElementById('go').textContent='FLY AGAIN'; document.getElementById('over').style.display='flex'; }
+  document.getElementById('go').addEventListener('click',function(){ reset(); playing=true; document.getElementById('over').style.display='none'; });
+  function setX(cx){ targetX=Math.max(20,Math.min(W-20,cx)); }
+  var down=false; cv.addEventListener('pointerdown',function(e){ down=true; setX(e.clientX); }); cv.addEventListener('pointermove',function(e){ if(down)setX(e.clientX); }); addEventListener('pointerup',function(){ down=false; });
+  document.getElementById('over').style.display='flex'; loop();
+})();
+</script>
+</body></html>

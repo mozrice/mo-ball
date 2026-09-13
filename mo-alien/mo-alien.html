@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Alien</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0a1030;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:rgba(10,16,48,.72);}
+  #obox{background:#fff;color:#222;border-radius:18px;padding:26px 30px;text-align:center;max-width:80%;}
+  #obox h1{color:#5ad080;margin:0 0 6px;}
+  #go{margin-top:14px;border:none;background:#3aa85a;color:#fff;font-family:inherit;font-weight:900;font-size:20px;padding:12px 28px;border-radius:14px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div id="over"><div id="obox"><h1>🛸 MO Alien</h1><div id="omsg">Drag the UFO left & right.<br>Beam up cows 🐄, dodge meteors ☄️!</div><button id="go">BEAM UP</button></div></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  var playing=false, score=0, lives=3, best=+(localStorage.getItem('moAlienBest')||0);
+  var ux=0, tx=0, items=[], stars=[], t=0;
+  for(var i=0;i<50;i++)stars.push({x:Math.random(),y:Math.random(),s:Math.random()*2+1});
+  function reset(){ ux=W/2; tx=W/2; items=[]; score=0; lives=3; t=0; }
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function beep(f,d){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.08)); }
+  function loop(){ t++;
+    x.fillStyle='#0a1030'; x.fillRect(0,0,W,H);
+    for(var i=0;i<stars.length;i++){ var s=stars[i]; x.fillStyle='rgba(255,255,255,'+(0.3+s.s*0.2)+')'; x.fillRect(s.x*W,s.y*H,s.s,s.s); }
+    // ground
+    x.fillStyle='#2a5a2a'; x.fillRect(0,H-30,W,30);
+    var uy=H*0.2;
+    if(playing){ ux+=(tx-ux)*0.3;
+      if(t%Math.max(28,64-Math.floor(score/30))===0){ var meteor=Math.random()<0.3; items.push({x:40+Math.random()*(W-80),y:-30,v:2.6+Math.random()*2.4+score*0.008,m:meteor}); } }
+    for(var j=items.length-1;j>=0;j--){ var it=items[j]; it.y+=it.v;
+      if(it.m){ x.save(); x.translate(it.x,it.y); x.rotate(t*0.1); x.fillStyle='#8a5a3a'; x.beginPath(); x.arc(0,0,15,0,7); x.fill(); x.fillStyle='#ffb04a'; x.beginPath(); x.moveTo(-15,0); x.lineTo(-30,-6); x.lineTo(-26,4); x.fill(); x.restore(); }
+      else { x.save(); x.translate(it.x,it.y); x.fillStyle='#fff'; x.beginPath(); x.ellipse(0,2,14,10,0,0,7); x.fill(); x.fillStyle='#e0a0b0'; x.fillRect(-14,-2,28,5); x.fillStyle='#333'; x.fillRect(-8,6,4,8); x.fillRect(4,6,4,8); x.fillStyle='#333'; x.beginPath(); x.arc(-8,-6,7,0,7); x.fill(); x.fillStyle='#fff'; x.beginPath(); x.arc(-8,-6,4,0,7); x.fill(); x.fillStyle='#333'; x.beginPath(); x.arc(-8,-6,2,0,7); x.fill(); x.restore(); }
+      // beam catch: item under UFO and in upper area
+      if(Math.abs(it.x-ux)<46 && it.y>uy && it.y<uy+120){ if(it.m){ lives--; beep(180); if(lives<=0){ playing=false; over(); } } else { score+=5; beep(1100); } items.splice(j,1); continue; }
+      if(it.y>H-20){ if(!it.m){/* cow escaped */} items.splice(j,1); } }
+    // tractor beam
+    x.fillStyle='rgba(120,255,160,0.18)'; x.beginPath(); x.moveTo(ux-16,uy+8); x.lineTo(ux-52,uy+130); x.lineTo(ux+52,uy+130); x.lineTo(ux+16,uy+8); x.fill();
+    // UFO
+    x.save(); x.translate(ux,uy); x.fillStyle='#7a8aa0'; x.beginPath(); x.ellipse(0,8,46,14,0,0,7); x.fill(); x.fillStyle='#9adfff'; x.beginPath(); x.arc(0,-2,20,Math.PI,0); x.fill(); for(var d=0;d<5;d++){ x.fillStyle=(t+d)%10<5?'#ffd23f':'#e2342f'; x.beginPath(); x.arc(-32+d*16,10,4,0,7); x.fill(); } x.fillStyle='#e2342f'; x.font='900 12px Trebuchet MS'; x.textAlign='center'; x.fillText('MO',0,-4); x.restore();
+    x.fillStyle='#fff'; x.font='900 '+Math.round(W*0.06)+'px Trebuchet MS'; x.textAlign='left'; x.fillText('🐄 '+score, 14, 40);
+    x.textAlign='center'; x.fillText('❤️'.repeat(Math.max(0,lives)), W/2, 40);
+    x.textAlign='right'; x.font='900 '+Math.round(W*0.04)+'px Trebuchet MS'; x.fillText('Best '+best, W-14, 36);
+    requestAnimationFrame(loop);
+  }
+  function over(){ beep(160,0.3); if(score>best){ best=score; try{localStorage.setItem('moAlienBest',score);}catch(e){} }
+    document.getElementById('omsg').innerHTML='You beamed up <b>'+score+'</b>!<br>Best: '+best; document.getElementById('go').textContent='BEAM AGAIN'; document.getElementById('over').style.display='flex'; }
+  document.getElementById('go').addEventListener('click',function(){ reset(); playing=true; document.getElementById('over').style.display='none'; });
+  var down=false; function setX(cx){ tx=Math.max(46,Math.min(W-46,cx)); }
+  cv.addEventListener('pointerdown',function(e){ down=true; setX(e.clientX); }); cv.addEventListener('pointermove',function(e){ if(down)setX(e.clientX); }); addEventListener('pointerup',function(){ down=false; });
+  document.getElementById('over').style.display='flex'; loop();
+})();
+</script>
+</body></html>

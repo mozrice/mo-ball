@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Arff School</title>
+<style>
+ *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+ html,body{margin:0;height:100%;overflow:hidden;font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;
+  background:radial-gradient(120% 90% at 50% 0%,#bfe6ff 0%,#8fc9ef 45%,#5a9ad0 100%);color:#123;touch-action:manipulation;}
+ #app{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;}
+ #topbar{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;}
+ #logo{font-size:22px;font-weight:bold;letter-spacing:2px;color:#fff;text-shadow:0 2px 6px #2a6a9a;}
+ #stars{font-size:17px;font-weight:bold;color:#fff;text-shadow:0 2px 6px #b8860b,0 0 8px #ffd23f;background:#e0863a;padding:4px 12px;border-radius:999px;}
+ #lobby{width:100%;max-width:520px;flex:1;overflow:auto;padding:6px 14px 18px;}
+ #tag{text-align:center;color:#0a3a5a;font-size:14px;margin:0 0 14px;}
+ .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+ .card{border:none;border-radius:18px;padding:18px 10px;cursor:pointer;color:#12233a;font-weight:bold;text-align:center;
+  box-shadow:0 6px 0 rgba(0,0,0,.22);transition:transform .08s;}
+ .card:active{transform:translateY(4px);box-shadow:0 2px 0 rgba(0,0,0,.22);}
+ .card .e{font-size:42px;display:block;}
+ .card .n{font-size:15px;margin-top:4px;}
+ .card .d{font-size:11px;font-weight:normal;opacity:.8;}
+ .grad{grid-column:span 2;background:linear-gradient(135deg,#ffe58a,#ffb02c);}
+ #screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;background:radial-gradient(120% 90% at 50% 0%,#dff2ff,#9fd0ef);z-index:10;}
+ #scTop{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;}
+ #back{font:inherit;font-weight:bold;font-size:13px;padding:8px 14px;border-radius:999px;border:none;background:#e0785a;color:#fff;box-shadow:0 4px 0 #a84e34;cursor:pointer;}
+ #scTitle{font-size:16px;font-weight:bold;color:#0a3a5a;}
+ #scInfo{font-size:14px;font-weight:bold;color:#0a5a8a;}
+ canvas{background:linear-gradient(180deg,#eaf7ff,#c7e6fb);border-radius:18px;box-shadow:0 10px 0 rgba(0,0,0,.18);touch-action:none;max-width:94vw;max-height:66vh;}
+ #actRow{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center;max-width:94vw;}
+ .act{font:inherit;font-weight:bold;font-size:14px;padding:10px 16px;border-radius:999px;border:none;background:#6bd18a;color:#06280f;box-shadow:0 4px 0 #3a8f56;cursor:pointer;}
+ .act.alt{background:#ff8b2c;color:#2a1200;box-shadow:0 4px 0 #b85c12;}
+ .act:active{transform:translateY(3px);}
+ #scHint{color:#0a3a5a;font-size:12px;margin-top:8px;text-align:center;padding:0 12px;height:18px;}
+ #toast{position:fixed;top:38%;left:0;right:0;text-align:center;font-size:26px;font-weight:bold;color:#e0863a;text-shadow:0 2px 8px #fff;display:none;pointer-events:none;z-index:30;}
+</style>
+</head>
+<body>
+<div id="app">
+ <div id="topbar"><div id="logo">🐶 Arff School</div><div id="stars">⭐ 0</div></div>
+ <div id="lobby">
+   <p id="tag">Welcome to Arff Academy! Build the school and teach Arff. Earn ⭐ to graduate!</p>
+   <div class="grid" id="cards"></div>
+ </div>
+</div>
+<div id="screen">
+ <div id="scTop"><button id="back">◀ Back</button><div id="scTitle">Activity</div><div id="scInfo"></div></div>
+ <canvas id="cv" width="360" height="460"></canvas>
+ <div id="actRow"></div>
+ <div id="scHint"></div>
+</div>
+<div id="toast"></div>
+<script>
+var stars=0;
+function setStars(){ document.getElementById('stars').textContent='⭐ '+stars; }
+function addStar(n){ stars+=n; setStars(); }
+function toast(m,c){ var t=document.getElementById('toast'); t.textContent=m; t.style.color=c||'#e0863a'; t.style.display='block'; clearTimeout(toast._t); toast._t=setTimeout(function(){t.style.display='none';},1300); }
+var actx=null; function AC(){ if(!actx){try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} return actx; }
+function beep(f,d,ty){ var a=AC(); if(!a)return; if(a.state==='suspended')a.resume(); var o=a.createOscillator(),g=a.createGain(); o.type=ty||'square'; o.frequency.setValueAtTime(f,a.currentTime); o.frequency.exponentialRampToValueAtTime(Math.max(40,f/2),a.currentTime+(d||0.12)); g.gain.setValueAtTime(0.25,a.currentTime); g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+(d||0.12)); o.connect(g);g.connect(a.destination); o.start(); o.stop(a.currentTime+(d||0.12)+0.02); }
+function bark(){ var a=AC(); if(!a)return; if(a.state==='suspended')a.resume(); [0,0.17].forEach(function(dt){ var t=a.currentTime+dt; var o=a.createOscillator(),g=a.createGain(),f=a.createBiquadFilter(); o.type='sawtooth'; o.frequency.setValueAtTime(430,t); o.frequency.exponentialRampToValueAtTime(170,t+0.12); f.type='bandpass'; f.frequency.value=950; f.Q.value=1.3; g.gain.setValueAtTime(0.001,t); g.gain.exponentialRampToValueAtTime(0.45,t+0.02); g.gain.exponentialRampToValueAtTime(0.001,t+0.14); o.connect(f);f.connect(g);g.connect(a.destination); o.start(t); o.stop(t+0.16); }); }
+
+var ACTS=[
+ {id:'build',e:'🏫',n:'Build School',d:'tap to build it',bg:'linear-gradient(135deg,#ffd08a,#e0863a)'},
+ {id:'trick',e:'🎓',n:'Trick Class',d:'teach Arff tricks',bg:'linear-gradient(135deg,#b0ffd0,#39c46a)'},
+ {id:'fetch',e:'🎾',n:'Recess: Fetch',d:'throw the ball',bg:'linear-gradient(135deg,#a0e0ff,#5aa0e0)'},
+ {id:'agility',e:'🐕',n:'Agility Run',d:'tap to jump',bg:'linear-gradient(135deg,#ffb0d0,#e05a9a)'}
+];
+(function(){ var c=document.getElementById('cards'); ACTS.forEach(function(g){ var b=document.createElement('button'); b.className='card'; b.style.background=g.bg; b.innerHTML='<span class="e">'+g.e+'</span><span class="n">'+g.n+'</span><span class="d">'+g.d+'</span>'; b.onclick=function(){ openAct(g); }; c.appendChild(b); });
+ var gb=document.createElement('button'); gb.className='card grad'; gb.innerHTML='<span class="e">🎉</span><span class="n">Graduation!</span><span class="d">earn 15 ⭐ to graduate Arff</span>'; gb.onclick=function(){ openAct({id:'grad',n:'Graduation'}); }; c.appendChild(gb); })();
+setStars();
+
+var cv=document.getElementById('cv'), cx=cv.getContext('2d'), W=360, H=460, raf=null, cleanup=[];
+function on(el,ev,fn){ el.addEventListener(ev,fn); cleanup.push(function(){el.removeEventListener(ev,fn);}); }
+function pos(e){ var r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*(W/r.width), y:(e.clientY-r.top)*(H/r.height)}; }
+function actBtn(label,cls,fn){ var b=document.createElement('button'); b.className='act'+(cls?' '+cls:''); b.textContent=label; b.onclick=fn; document.getElementById('actRow').appendChild(b); return b; }
+function stopAct(){ if(raf)cancelAnimationFrame(raf); raf=null; cleanup.forEach(function(f){f();}); cleanup=[]; document.getElementById('actRow').innerHTML=''; }
+function openAct(g){ stopAct(); document.getElementById('screen').style.display='flex'; document.getElementById('scTitle').textContent=g.n; document.getElementById('scInfo').textContent=''; document.getElementById('scHint').textContent=''; if(AC()&&AC().state==='suspended')AC().resume(); SC[g.id](); }
+document.getElementById('back').onclick=function(){ stopAct(); document.getElementById('screen').style.display='none'; };
+function setInfo(t){ document.getElementById('scInfo').textContent=t; }
+function setHint(t){ document.getElementById('scHint').textContent=t; }
+function rr(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
+function shown(){ return document.getElementById('screen').style.display!=='none'; }
+
+// ==== cute Arff dog (front view). pose: stand/sit/jump/happy ====
+function drawArff(x,y,s,pose,t){ var coat='#ffffff',coat2='#e9edf2',ear='#dfe4ea',harn='#ff7ab0'; cx.save(); cx.translate(x,y); cx.scale(s,s);
+ var bob=pose==='jump'?-34:(pose==='sit'?10:0); var tw=Math.sin((t||0)*0.3)*10;
+ // fluffy tail
+ cx.fillStyle=coat; cx.beginPath(); cx.arc(38,bob+6+tw*0.4,9,0,7); cx.fill();
+ // legs
+ cx.fillStyle=coat2; cx.beginPath(); cx.ellipse(-14,bob+44,9,11,0,0,7); cx.ellipse(14,bob+44,9,11,0,0,7); cx.fill();
+ // white body
+ cx.fillStyle=coat; cx.beginPath(); cx.ellipse(0,bob+16,28,32,0,0,7); cx.fill();
+ // PINK HARNESS: body band + chest strap + clip
+ cx.fillStyle=harn; cx.beginPath(); cx.ellipse(0,bob+24,29,9,0,0,7); cx.fill();
+ cx.fillRect(-6,bob-2,12,30);
+ cx.fillStyle='#ffd23f'; cx.beginPath(); cx.arc(0,bob+8,4,0,7); cx.fill();
+ // head
+ cx.fillStyle=coat; cx.beginPath(); cx.arc(0,bob-30,37,0,7); cx.fill();
+ // floppy ears
+ cx.fillStyle=ear; cx.save(); cx.translate(-30,bob-36); cx.rotate(-0.3); cx.beginPath(); cx.ellipse(0,14,11,21,0,0,7); cx.fill(); cx.restore(); cx.save(); cx.translate(30,bob-36); cx.rotate(0.3); cx.beginPath(); cx.ellipse(0,14,11,21,0,0,7); cx.fill(); cx.restore();
+ // pink harness neck loop
+ cx.strokeStyle=harn; cx.lineWidth=7; cx.beginPath(); cx.arc(0,bob-2,21,0.2,Math.PI-0.2); cx.stroke();
+ // fluffy cheeks
+ cx.fillStyle=coat; cx.beginPath(); cx.arc(-22,bob-20,12,0,7); cx.arc(22,bob-20,12,0,7); cx.fill();
+ // snout
+ cx.fillStyle=coat2; cx.beginPath(); cx.ellipse(0,bob-16,13,10,0,0,7); cx.fill();
+ // nose
+ cx.fillStyle='#2a2a2a'; cx.beginPath(); cx.ellipse(0,bob-24,6,5,0,0,7); cx.fill(); cx.fillStyle='#555'; cx.beginPath(); cx.arc(-2,bob-26,1.6,0,7); cx.fill();
+ // big puppy eyes (no lashes)
+ cx.fillStyle='#20263a'; cx.beginPath(); cx.arc(-13,bob-33,6.5,0,7); cx.arc(13,bob-33,6.5,0,7); cx.fill();
+ cx.fillStyle='#fff'; cx.beginPath(); cx.arc(-11,bob-35,2.4,0,7); cx.arc(15,bob-35,2.4,0,7); cx.fill();
+ // tongue when happy
+ if(pose==='happy'||pose==='jump'){ cx.fillStyle='#f4a6c0'; cx.beginPath(); cx.ellipse(0,bob-8,5,7,0,0,7); cx.fill(); }
+ cx.restore(); }
+var SC={};
+
+// ---- BUILD SCHOOL ----
+SC.build=function(){ var parts=[['Walls','walls'],['Roof','roof'],['Door','door'],['Windows','win'],['Sign','sign'],['Flag','flag']], built={}, i=0, done=false;
+ setInfo('Parts: 0/6'); setHint('Tap the next part to build Arff Academy!');
+ var btns=parts.map(function(p){ return actBtn(p[0], 'alt', function(){ if(built[p[1]]||done)return; if(p!==parts[i]){ toast('Build in order!','#e0563b'); beep(160,0.12); return; } built[p[1]]=true; i++; beep(400+i*40,0.1); setInfo('Parts: '+i+'/6'); if(i>=parts.length){ done=true; setHint('Arff Academy is built! ⭐⭐⭐'); addStar(3); toast('School built! +3 ⭐','#39c46a'); bark(); } draw(); }); });
+ function draw(){ cx.clearRect(0,0,W,H); cx.fillStyle='#8ad06a'; cx.fillRect(0,410,W,50);
+  if(built.walls){ cx.fillStyle='#ffd8a8'; rr(90,220,180,190,6); cx.fill(); cx.strokeStyle='#e0a060'; cx.lineWidth=3; cx.stroke(); }
+  if(built.roof){ cx.fillStyle='#e0563b'; cx.beginPath(); cx.moveTo(76,222); cx.lineTo(180,150); cx.lineTo(284,222); cx.closePath(); cx.fill(); }
+  if(built.door){ cx.fillStyle='#8a5a2a'; rr(155,330,50,80,6); cx.fill(); cx.fillStyle='#ffd23f'; cx.beginPath(); cx.arc(196,372,3,0,7); cx.fill(); }
+  if(built.win){ cx.fillStyle='#bfe3f5'; rr(108,250,44,44,4); cx.fill(); rr(208,250,44,44,4); cx.fill(); cx.strokeStyle='#fff'; cx.lineWidth=3; cx.strokeRect(108,250,44,44); cx.strokeRect(208,250,44,44); }
+  if(built.sign){ cx.fillStyle='#6b4ad0'; rr(120,190,120,26,6); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 14px Trebuchet MS'; cx.textAlign='center'; cx.fillText('ARFF ACADEMY',180,208); }
+  if(built.flag){ cx.strokeStyle='#888'; cx.lineWidth=3; cx.beginPath(); cx.moveTo(270,150); cx.lineTo(270,110); cx.stroke(); cx.fillStyle='#ffd23f'; cx.beginPath(); cx.moveTo(270,112); cx.lineTo(300,120); cx.lineTo(270,128); cx.closePath(); cx.fill(); }
+  drawArff(56,400,0.7,done?'happy':'stand',0);
+  cx.fillStyle='#0a3a5a'; cx.font='bold 16px Trebuchet MS'; cx.textAlign='center'; cx.fillText(done?'All built! 🎉':'Build Arff Academy!',180,40); }
+ draw(); };
+
+// ---- TRICK CLASS ----
+SC.trick=function(){ var CMDS=['Sit','Stay','Come','Shake','Roll'], round=0, total=6, cmd='', pose='stand', wait=false, t=0;
+ setInfo('Trick: 0/'+total); setHint('Tap the trick the teacher says!');
+ CMDS.forEach(function(cm){ actBtn(cm,'', function(){ if(wait)return; if(cm===cmd){ pose=(cm==='Sit'||cm==='Stay')?'sit':(cm==='Roll'||cm==='Shake')?'happy':'happy'; round++; setInfo('Trick: '+round+'/'+total); toast('Good girl! ⭐','#39c46a'); addStar(1); beep(700,0.12,'triangle'); bark(); wait=true; setTimeout(function(){ if(round>=total){ setHint('Arff learned her tricks! 🎓'); toast('Class done! 🎓','#39c46a'); addStar(2); } else { newCmd(); } wait=false; },900); } else { toast('Try again!','#e0563b'); beep(180,0.15); } }); });
+ function newCmd(){ cmd=CMDS[(Math.random()*CMDS.length)|0]; pose='stand'; setHint('Teacher says: '+cmd.toUpperCase()+'!'); beep(500,0.1); }
+ newCmd();
+ function step(){ t++; cx.clearRect(0,0,W,H); cx.fillStyle='#8ad06a'; cx.fillRect(0,410,W,50);
+  cx.fillStyle='#0a3a5a'; cx.font='bold 22px Trebuchet MS'; cx.textAlign='center'; cx.fillText('Teacher says:',180,60); cx.fillStyle='#e0563b'; cx.font='bold 34px Trebuchet MS'; cx.fillText(cmd.toUpperCase()+'!',180,100);
+  drawArff(180,400,1.4,pose,t);
+  raf=requestAnimationFrame(step); }
+ step(); };
+
+// ---- FETCH ----
+SC.fetch=function(){ var throws=5, got=0, ball={x:60,y:380,vx:0,vy:0,fly:false,landed:false}, arff={x:60,tx:60,run:false,carry:false}, drag=null, t=0;
+ setInfo('Fetch: 0/'+throws); setHint('Drag the ball and let go to throw it!');
+ on(cv,'pointerdown',function(e){ if(ball.fly||arff.run)return; var p=pos(e); if(Math.hypot(p.x-ball.x,p.y-ball.y)<50)drag=p; });
+ on(cv,'pointermove',function(e){ if(drag)drag=pos(e); });
+ on(cv,'pointerup',function(e){ if(!drag||ball.fly)return; var p=pos(e); var dx=p.x-ball.x, dy=p.y-ball.y; if(Math.hypot(dx,dy)<20){drag=null;return;} ball.vx=dx*0.16; ball.vy=dy*0.16; ball.fly=true; ball.landed=false; drag=null; beep(420,0.1); });
+ function step(){ t++;
+  if(ball.fly){ ball.x+=ball.vx; ball.y+=ball.vy; ball.vy+=0.4; ball.vx*=0.99; if(ball.y>380){ ball.y=380; ball.fly=false; ball.landed=true; ball.x=Math.max(30,Math.min(330,ball.x)); arff.run=true; arff.tx=ball.x-30; } }
+  if(arff.run && !arff.carry){ arff.x+=(arff.tx-arff.x)*0.12; if(Math.abs(arff.x-arff.tx)<4){ arff.carry=true; got++; addStar(1); setInfo('Fetch: '+got+'/'+throws); toast('Fetch! ⭐','#39c46a'); bark(); arff.tx=60; } }
+  else if(arff.carry){ ball.x=arff.x+30; ball.y=360; arff.x+=(arff.tx-arff.x)*0.12; if(Math.abs(arff.x-60)<4){ arff.run=false; arff.carry=false; ball.x=60; ball.y=380; throws--; if(throws<=0){ setHint('Great fetching! 🎾'); addStar(1); } else setInfo('Fetch: '+got+'/'+throws+' left'); } }
+  draw(); raf=requestAnimationFrame(step); }
+ function draw(){ cx.clearRect(0,0,W,H); cx.fillStyle='#8ad06a'; cx.fillRect(0,395,W,65);
+  if(drag){ cx.strokeStyle='rgba(224,134,58,.8)'; cx.lineWidth=4; cx.setLineDash([10,8]); cx.beginPath(); cx.moveTo(ball.x,ball.y); cx.lineTo(ball.x+(ball.x-drag.x),ball.y+(ball.y-drag.y)); cx.stroke(); cx.setLineDash([]); }
+  cx.fillStyle='#c9f04a'; cx.beginPath(); cx.arc(ball.x,ball.y,13,0,7); cx.fill(); cx.strokeStyle='#8ab030'; cx.lineWidth=2; cx.beginPath(); cx.arc(ball.x,ball.y,13,0,7); cx.stroke();
+  drawArff(arff.x,400,0.8,arff.carry?'happy':'stand',t);
+  cx.fillStyle='#0a3a5a'; cx.font='bold 18px Trebuchet MS'; cx.textAlign='center'; cx.fillText('Throw the ball for Arff!',180,36); }
+ draw(); };
+
+// ---- AGILITY ----
+SC.agility=function(){ var score=0, hurdles=[], t=0, endAt=Date.now()+22000, arffY=0, vy=0, jumping=false, spawnT=40;
+ setInfo('Jumps: 0'); setHint('Tap anywhere to make Arff JUMP the hurdles!');
+ on(cv,'pointerdown',function(e){ if(!jumping){ jumping=true; vy=-9; beep(500,0.1); } });
+ function step(){ t++; var now=Date.now(); var tl=Math.max(0,Math.ceil((endAt-now)/1000)); setInfo('Time: '+tl+'  Jumps: '+score);
+  if(now>=endAt){ setHint('Agility done! You cleared '+score+' hurdles 🏅'); addStar(Math.min(3,1+Math.floor(score/4))); draw(); setTimeout(function(){ if(shown()){stopAct();SC.agility();} },1800); return; }
+  if(jumping){ arffY+=vy; vy+=0.6; if(arffY>=0){ arffY=0; jumping=false; } }
+  spawnT--; if(spawnT<=0){ hurdles.push({x:400,passed:false}); spawnT=48+((Math.random()*24)|0); }
+  hurdles.forEach(function(h){ h.x-=4.2; if(!h.passed && h.x<70){ if(arffY<-24){ h.passed=true; score++; addStar(0); setInfo('Time: '+tl+'  Jumps: '+score); beep(650,0.08,'triangle'); } else if(h.x<58){ h.passed=true; toast('Bonk!','#e0563b'); beep(160,0.15); } } });
+  hurdles=hurdles.filter(function(h){return h.x>-30;});
+  draw(); raf=requestAnimationFrame(step); }
+ function draw(){ cx.clearRect(0,0,W,H); cx.fillStyle='#8ad06a'; cx.fillRect(0,395,W,65);
+  hurdles.forEach(function(h){ cx.fillStyle='#e0563b'; rr(h.x,350,14,45,3); cx.fill(); cx.fillStyle='#fff'; rr(h.x,358,14,8,2); cx.fill(); rr(h.x,376,14,8,2); cx.fill(); });
+  drawArff(60,398+arffY,0.8,jumping?'jump':'stand',t);
+  cx.fillStyle='#0a3a5a'; cx.font='bold 18px Trebuchet MS'; cx.textAlign='center'; cx.fillText('Tap to jump! 🐕',180,36); }
+ draw(); };
+
+// ---- GRADUATION ----
+SC.grad=function(){ var t=0, ok=stars>=15, conf=[];
+ for(var i=0;i<60;i++)conf.push({x:Math.random()*360,y:Math.random()*-460,vy:2+Math.random()*3,c:['#e0563b','#6bd18a','#7fd0ff','#ffd23f','#e05a9a'][(Math.random()*5)|0],s:4+Math.random()*5});
+ setInfo(ok?'GRADUATE!':('Need '+(15-stars)+' more ⭐'));
+ setHint(ok?'Arff graduates from Arff Academy! 🎉':'Play activities to earn 15 ⭐, then come back!');
+ if(ok){ addStarOnce(); }
+ function addStarOnce(){ if(!SC.grad._done){ SC.grad._done=true; setTimeout(bark,300); } }
+ function step(){ t++; cx.clearRect(0,0,W,H);
+  var g=cx.createLinearGradient(0,0,0,460); g.addColorStop(0,'#fff2c8'); g.addColorStop(1,'#ffd8f0'); cx.fillStyle=g; cx.fillRect(0,0,W,H);
+  if(ok){ conf.forEach(function(p){ p.y+=p.vy; if(p.y>470){p.y=-10;p.x=Math.random()*360;} cx.fillStyle=p.c; cx.fillRect(p.x,p.y,p.s,p.s); }); }
+  drawArff(180,340,1.5,ok?'happy':'sit',t);
+  if(ok){ // grad cap
+   cx.save(); cx.translate(180,340-1.5*58); cx.fillStyle='#20263a'; cx.fillRect(-30,-8,60,10); cx.beginPath(); cx.moveTo(-40,-8); cx.lineTo(40,-8); cx.lineTo(0,-24); cx.closePath(); cx.fill(); cx.fillStyle='#ffd23f'; cx.beginPath(); cx.arc(0,-16,3,0,7); cx.fill(); cx.strokeStyle='#ffd23f'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(0,-16); cx.lineTo(22,-2); cx.stroke(); cx.restore();
+   cx.fillStyle='#b03a6c'; cx.font='bold 30px Trebuchet MS'; cx.textAlign='center'; cx.fillText('🎓 GOOD DOG! 🎓',180,80); cx.fillStyle='#0a3a5a'; cx.font='bold 18px Trebuchet MS'; cx.fillText('Arff graduates from',180,120); cx.fillText('Arff Academy!',180,144);
+  } else {
+   cx.fillStyle='#0a3a5a'; cx.font='bold 22px Trebuchet MS'; cx.textAlign='center'; cx.fillText('Arff needs '+(15-stars)+' more ⭐',180,90); cx.font='bold 15px Trebuchet MS'; cx.fillText('Build, teach, fetch & jump',180,120); cx.fillText('to earn stars!',180,142);
+  }
+  raf=requestAnimationFrame(step); }
+ step(); };
+</script>
+</body>
+</html>

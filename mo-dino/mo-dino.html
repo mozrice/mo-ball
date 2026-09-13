@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO DINO DIG</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#c8a06a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#3a2a10;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none;font-weight:bold;}
+  .pill{background:#ffffffcc;border-radius:20px;padding:6px 14px;font-size:17px;color:#3a2a10;box-shadow:0 2px 0 #0001;}
+  #hint{position:fixed;bottom:14px;left:0;right:0;text-align:center;font-size:14px;color:#3a2a10;background:#ffffff99;padding:5px;pointer-events:none;}
+  #msg{position:fixed;top:48%;left:0;right:0;text-align:center;font-size:34px;font-weight:bold;color:#7a4a10;text-shadow:0 2px 0 #fff8;pointer-events:none;opacity:0;transition:opacity .2s;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">🦴 <span id="bones">0</span>/6</div>
+  <div class="pill">🦖 <span id="dinos">0</span></div>
+  <div class="pill">💎 <span id="gems">0</span></div>
+</div>
+<div id="msg"></div>
+<div id="hint">TAP the dirt to dig! Find all 6 🦴 bones to build your dino!</div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); layout(); }
+  addEventListener('resize',resize);
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  var COLS,ROWS,CS,GX,GY,GTOP;
+  function layout(){ GTOP=H*0.32; COLS=Math.max(5,Math.floor(W/70)); CS=Math.floor(W*0.92/COLS); ROWS=Math.floor((H-GTOP-40)/CS); GX=(W-COLS*CS)/2; GY=GTOP+10; }
+  var grid, bones, dinos, gems, msg, msgT, pops, nowv=0;
+  function reset(){ dinos=0; gems=0; msg=''; msgT=0; pops=[]; layout(); newSite(); document.getElementById('dinos').textContent='0'; document.getElementById('gems').textContent='0'; }
+  function newSite(){ bones=0; document.getElementById('bones').textContent='0';
+    grid=[]; var cells=COLS*ROWS; var contents=[]; for(var i=0;i<6;i++) contents.push('bone');
+    while(contents.length<cells){ var r=Math.random(); contents.push(r<0.16?'gem':r<0.34?'rock':'empty'); }
+    // shuffle
+    for(var i2=contents.length-1;i2>0;i2--){ var j=Math.floor(Math.random()*(i2+1)); var t=contents[i2];contents[i2]=contents[j];contents[j]=t; }
+    var k=0; for(var y=0;y<ROWS;y++){ grid[y]=[]; for(var x=0;x<COLS;x++){ grid[y][x]={c:contents[k++],dug:false}; } }
+  }
+  function showMsg(m){ msg=m; msgT=1; var e=document.getElementById('msg'); e.textContent=m; e.style.opacity=1; }
+  function pos(e){ var r=cv.getBoundingClientRect(); return {x:(e.touches?e.touches[0].clientX:e.clientX)-r.left,y:(e.touches?e.touches[0].clientY:e.clientY)-r.top}; }
+  function tap(e){ var p=pos(e); var cx=Math.floor((p.x-GX)/CS), cy=Math.floor((p.y-GY)/CS);
+    if(cx<0||cy<0||cx>=COLS||cy>=ROWS) return; var cell=grid[cy][cx]; if(cell.dug) return;
+    cell.dug=true; var mx=GX+cx*CS+CS/2, my=GY+cy*CS+CS/2;
+    if(cell.c==='bone'){ bones++; document.getElementById('bones').textContent=bones; pops.push({x:mx,y:my,t:1,txt:'🦴'}); beep(700,0.09,'square',0.06); setTimeout(function(){beep(1000,0.09,'square',0.05);},60);
+      if(bones>=6){ dinos++; document.getElementById('dinos').textContent=dinos; showMsg('🦖 DINO BUILT!'); beep(880,0.15,'square',0.07); setTimeout(function(){beep(1200,0.16,'square',0.06);},100); setTimeout(newSite,1400); } }
+    else if(cell.c==='gem'){ gems++; document.getElementById('gems').textContent=gems; pops.push({x:mx,y:my,t:1,txt:'💎'}); beep(900,0.08,'sine',0.06); }
+    else if(cell.c==='rock'){ pops.push({x:mx,y:my,t:1,txt:'🪨'}); beep(180,0.1,'sawtooth',0.05); }
+    else { beep(300,0.05,'sine',0.04); }
+  }
+  cv.addEventListener('mousedown',tap); cv.addEventListener('touchstart',function(e){tap(e);e.preventDefault();},{passive:false});
+  function update(dt){ for(var i=pops.length-1;i>=0;i--){ pops[i].y-=0.8*dt; pops[i].t-=0.02*dt; if(pops[i].t<=0)pops.splice(i,1); }
+    if(msgT>0){ msgT-=0.008*dt; if(msgT<=0)document.getElementById('msg').style.opacity=0; } }
+  function render(){
+    // museum top
+    var g=ctx.createLinearGradient(0,0,0,GTOP); g.addColorStop(0,'#3a4a6a'); g.addColorStop(1,'#5a6a8a'); ctx.fillStyle=g; ctx.fillRect(0,0,W,GTOP);
+    ctx.fillStyle='#2a3a5a'; ctx.fillRect(0,GTOP-8,W,8);
+    ctx.fillStyle='#cdd6e6'; ctx.font='bold 15px Trebuchet MS'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🏛️ MO DINO MUSEUM — Dino #'+(dinos+1),W/2,26);
+    drawSkeleton(W/2,GTOP*0.62, bones);
+    // dirt
+    ctx.fillStyle='#a5764a'; ctx.fillRect(0,GTOP,W,H-GTOP);
+    for(var y=0;y<ROWS;y++){ for(var x=0;x<COLS;x++){ var cell=grid[y][x]; var px=GX+x*CS, py=GY+y*CS;
+      if(!cell.dug){ ctx.fillStyle=(x+y)%2?'#9a6a3a':'#a5764a'; roundRect(px+1,py+1,CS-2,CS-2,6); ctx.fill(); ctx.fillStyle='#8a5a2a'; for(var d=0;d<3;d++) { ctx.fillRect(px+6+d*7,py+8+((x*7+d*11)%(CS-16)),3,3); } }
+      else { ctx.fillStyle='#6a4a2a'; roundRect(px+1,py+1,CS-2,CS-2,6); ctx.fill();
+        if(cell.c==='bone'){ ctx.font=(CS*0.6)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.globalAlpha=0.4; ctx.fillText('🕳️',px+CS/2,py+CS/2); ctx.globalAlpha=1; }
+        else if(cell.c==='gem'){ ctx.font=(CS*0.5)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.globalAlpha=0.4; ctx.fillText('🕳️',px+CS/2,py+CS/2); ctx.globalAlpha=1; }
+        else if(cell.c==='rock'){ ctx.font=(CS*0.55)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🪨',px+CS/2,py+CS/2); }
+      } } }
+    for(var p=0;p<pops.length;p++){ ctx.globalAlpha=Math.max(0,pops[p].t); ctx.font='24px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(pops[p].txt,pops[p].x,pops[p].y); ctx.globalAlpha=1; }
+  }
+  function drawSkeleton(x,y,n){ // 6 parts of a bronto skeleton light up as found
+    ctx.strokeStyle='#2a3a5a'; ctx.lineWidth=2; ctx.setLineDash([4,4]);
+    // outline ghost
+    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.moveTo(x-90,y+20); ctx.quadraticCurveTo(x-70,y-30,x-40,y-40); ctx.stroke(); ctx.setLineDash([]);
+    var parts=[
+      function(){ ctx.beginPath(); ctx.moveTo(x-30,y+30); ctx.lineTo(x-30,y+60); ctx.moveTo(x-10,y+30); ctx.lineTo(x-10,y+60); ctx.stroke(); }, // front legs
+      function(){ ctx.beginPath(); ctx.moveTo(x+30,y+30); ctx.lineTo(x+30,y+60); ctx.moveTo(x+50,y+30); ctx.lineTo(x+50,y+60); ctx.stroke(); }, // back legs
+      function(){ ctx.beginPath(); ctx.ellipse(x+10,y+15,50,26,0,0,6.29); ctx.stroke(); }, // body
+      function(){ ctx.beginPath(); ctx.moveTo(x-30,y+5); ctx.quadraticCurveTo(x-70,y-30,x-78,y-46); ctx.stroke(); }, // neck
+      function(){ ctx.beginPath(); ctx.arc(x-80,y-52,10,0,6.29); ctx.stroke(); }, // head
+      function(){ ctx.beginPath(); ctx.moveTo(x+55,y+10); ctx.quadraticCurveTo(x+100,y+20,x+120,y+40); ctx.stroke(); } // tail
+    ];
+    ctx.strokeStyle='#eef3f7'; ctx.lineWidth=5; ctx.lineCap='round';
+    for(var i=0;i<6;i++){ if(i<n){ parts[i](); } }
+    // ribs on body if body found
+    if(n>=3){ ctx.lineWidth=2; for(var r=-1;r<=2;r++){ ctx.beginPath(); ctx.moveTo(x+r*22,y-4); ctx.lineTo(x+r*22,y+34); ctx.stroke(); } }
+    ctx.fillStyle='#cdd6e6'; ctx.font='12px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText(n+' / 6 bones',x,y+80);
+  }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; update(dt); render(); requestAnimationFrame(loop); }
+  resize(); reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

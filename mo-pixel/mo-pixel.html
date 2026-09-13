@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO PIXEL ART</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#20243a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;display:flex;flex-direction:column;}
+  #top{text-align:center;padding:8px;font-weight:bold;font-size:20px;color:#ffd23f;}
+  #wrap{flex:1;display:flex;align-items:center;justify-content:center;}
+  canvas{background:#fff;border-radius:8px;box-shadow:0 6px 0 #0006;touch-action:none;}
+  #pal{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:8px 10px;}
+  .sw{width:40px;height:40px;border-radius:9px;border:3px solid #fff3;}
+  .sw.sel{border-color:#fff;transform:scale(1.12);}
+  #tools{display:flex;gap:8px;justify-content:center;padding:6px 10px 14px;flex-wrap:wrap;}
+  .tb{background:#3a4060;border:2px solid #5a6090;color:#fff;font-weight:bold;font-size:15px;padding:10px 14px;border-radius:12px;font-family:inherit;}
+  .tb.sel{background:#ffd23f;color:#3a2600;border-color:#fff;}
+  .tb:active{transform:translateY(2px);}
+</style>
+</head>
+<body>
+<div id="top">🎨 MO PIXEL ART</div>
+<div id="wrap"><canvas id="c"></canvas></div>
+<div id="pal"></div>
+<div id="tools">
+  <button class="tb" id="erase">🧽 Eraser</button>
+  <button class="tb" id="fill">🪣 Fill</button>
+  <button class="tb" id="clear">🗑️ Clear</button>
+  <button class="tb" id="save">💾 Save</button>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var GRID=16, CS=0, DPR=1;
+  var cells, color, erasing, fillMode;
+  var COLORS=['#000000','#ffffff','#e0453a','#ff8a1e','#ffd23f','#37b06a','#2f6fd0','#7bd9ff','#8a63d2','#ff6ad5','#8a5a2b','#f6c48a'];
+  function layout(){ var maxW=Math.min(innerWidth-20, innerHeight*0.5); CS=Math.floor(maxW/GRID); DPR=Math.min(2,window.devicePixelRatio||1);
+    cv.width=GRID*CS*DPR; cv.height=GRID*CS*DPR; cv.style.width=(GRID*CS)+'px'; cv.style.height=(GRID*CS)+'px'; ctx.setTransform(DPR,0,0,DPR,0,0); draw(); }
+  addEventListener('resize',layout);
+  function reset(){ cells=[]; for(var y=0;y<GRID;y++){ cells[y]=[]; for(var x=0;x<GRID;x++) cells[y][x]=null; } color='#000000'; erasing=false; fillMode=false; }
+  function draw(){ ctx.clearRect(0,0,GRID*CS,GRID*CS);
+    for(var y=0;y<GRID;y++){ for(var x=0;x<GRID;x++){ if(cells[y][x]){ ctx.fillStyle=cells[y][x]; ctx.fillRect(x*CS,y*CS,CS,CS); }
+      else { ctx.fillStyle=((x+y)%2)?'#f0f0f0':'#ffffff'; ctx.fillRect(x*CS,y*CS,CS,CS); } } }
+    ctx.strokeStyle='rgba(0,0,0,0.08)'; ctx.lineWidth=1; for(var i=0;i<=GRID;i++){ ctx.beginPath(); ctx.moveTo(i*CS,0); ctx.lineTo(i*CS,GRID*CS); ctx.moveTo(0,i*CS); ctx.lineTo(GRID*CS,i*CS); ctx.stroke(); } }
+  function cellAt(e){ var r=cv.getBoundingClientRect(); var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left; var py=(e.touches?e.touches[0].clientY:e.clientY)-r.top; return {x:Math.floor(px/CS),y:Math.floor(py/CS)}; }
+  function paint(e){ var c=cellAt(e); if(c.x<0||c.y<0||c.x>=GRID||c.y>=GRID)return;
+    if(fillMode){ floodFill(c.x,c.y, cells[c.y][c.x], erasing?null:color); fillMode=false; document.getElementById('fill').classList.remove('sel'); }
+    else { cells[c.y][c.x]=erasing?null:color; } draw(); }
+  function floodFill(x,y,target,repl){ if(target===repl)return; var stack=[[x,y]]; while(stack.length){ var p=stack.pop(); var cx=p[0],cy=p[1]; if(cx<0||cy<0||cx>=GRID||cy>=GRID)continue; if(cells[cy][cx]!==target)continue; cells[cy][cx]=repl; stack.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]); } }
+  var down=false;
+  cv.addEventListener('mousedown',function(e){down=true;paint(e);}); cv.addEventListener('mousemove',function(e){if(down&&!fillMode)paint(e);}); addEventListener('mouseup',function(){down=false;});
+  cv.addEventListener('touchstart',function(e){down=true;paint(e);e.preventDefault();},{passive:false}); cv.addEventListener('touchmove',function(e){if(!fillMode)paint(e);e.preventDefault();},{passive:false}); addEventListener('touchend',function(){down=false;});
+  // palette
+  var pal=document.getElementById('pal');
+  function renderPal(){ pal.innerHTML=''; COLORS.forEach(function(c){ var b=document.createElement('button'); b.className='sw'+((!erasing&&color===c)?' sel':''); b.style.background=c;
+    b.onclick=function(){ color=c; erasing=false; document.getElementById('erase').classList.remove('sel'); renderPal(); }; pal.appendChild(b); }); }
+  document.getElementById('erase').onclick=function(){ erasing=!erasing; this.classList.toggle('sel',erasing); renderPal(); };
+  document.getElementById('fill').onclick=function(){ fillMode=!fillMode; this.classList.toggle('sel',fillMode); };
+  document.getElementById('clear').onclick=function(){ reset(); renderPal(); draw(); };
+  document.getElementById('save').onclick=function(){ var out=document.createElement('canvas'); var S=20; out.width=GRID*S; out.height=GRID*S; var o=out.getContext('2d');
+    for(var y=0;y<GRID;y++)for(var x=0;x<GRID;x++){ o.fillStyle=cells[y][x]||'#ffffff'; o.fillRect(x*S,y*S,S,S); }
+    var a=document.createElement('a'); a.href=out.toDataURL('image/png'); a.download='mo-pixel-art.png'; a.click(); };
+  reset(); renderPal(); layout();
+})();
+</script>
+</body>
+</html>

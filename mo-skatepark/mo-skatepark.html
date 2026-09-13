@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Skate Park Builder</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:#2a2a3a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  a.back{position:fixed;top:8px;left:10px;color:#bcd0ea;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:17px;font-weight:bold;color:#ffd23f;pointer-events:none;}
+  #tools{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:6px;flex-wrap:wrap;padding:8px;background:#0a1224dd;}
+  .tool{font-size:22px;background:#26325a;border:2px solid #3a4a7a;border-radius:12px;padding:6px 9px;font-family:inherit;color:#fff;}
+  .tool.sel{border-color:#ffd23f;background:#3a4a2a;}
+  .act{font-size:14px;font-weight:bold;background:#1a9a5a;border:none;border-radius:12px;padding:8px 10px;color:#fff;font-family:inherit;}
+  #ride{background:#e0662a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">⬅ Games</a>
+<div id="hud">🛹 Build a skate park! &nbsp; ✨<span id="tricks">0</span></div>
+<canvas id="c"></canvas>
+<div id="tools">
+  <button class="tool sel" data-t="ramp">⛰️</button>
+  <button class="tool" data-t="rail">🚊</button>
+  <button class="tool" data-t="box">📦</button>
+  <button class="tool" data-t="cone">🚧</button>
+  <button class="tool" data-t="erase">🧽</button>
+  <button class="act" id="ride">🛹 RIDE!</button>
+  <button class="act" id="clear">🧹</button>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener('resize',fit); fit();
+  var items=[], tool='ramp', groundY, skater=null, tricks=0;
+  function gy(){ return H*0.72; }
+  var EMO={ramp:'⛰️',rail:'🚊',box:'📦',cone:'🚧'};
+  var tools=document.querySelectorAll('.tool'); for(var i=0;i<tools.length;i++){ (function(b){ b.onclick=function(){ for(var j=0;j<tools.length;j++)tools[j].classList.remove('sel'); b.classList.add('sel'); tool=b.dataset.t; }; })(tools[i]); }
+  function place(e){ var t0=e.changedTouches?e.changedTouches[0]:e; var r=cv.getBoundingClientRect(); var x=t0.clientX-r.left; if((t0.clientY-r.top)>H-64)return;
+    if(tool==='erase'){ for(var i=items.length-1;i>=0;i--){ if(Math.abs(items[i].x-x)<30){ items.splice(i,1); break; } } }
+    else { items.push({x:x,t:tool,e:EMO[tool]}); items.sort(function(a,b){return a.x-b.x;}); } }
+  cv.addEventListener('touchstart',function(e){place(e);e.preventDefault();},{passive:false});
+  cv.addEventListener('mousedown',function(e){place(e);});
+  document.getElementById('ride').onclick=function(){ skater={x:-20,y:gy(),vy:0,onGround:true,trick:0}; tricks=0; document.getElementById('tricks').textContent=0; beep(400,0.1); };
+  document.getElementById('clear').onclick=function(){ items=[]; };
+  function loop(){ if(skater){ skater.x+=4; skater.vy+=0.6; skater.y+=skater.vy; if(skater.y>=gy()){ skater.y=gy(); skater.vy=0; skater.onGround=true; }
+      for(var i=0;i<items.length;i++){ var it=items[i]; if(Math.abs(it.x-skater.x)<26&&skater.onGround){ if(it.t==='ramp'){ skater.vy=-12; skater.onGround=false; tricks++; document.getElementById('tricks').textContent=tricks; beep(700,0.08); for(var s=0;s<4;s++)burst.push({x:skater.x,y:skater.y-20,vx:(Math.random()-0.5)*4,vy:-Math.random()*4,life:20}); } else if(it.t==='rail'||it.t==='box'){ skater.vy=-7; skater.onGround=false; tricks++; document.getElementById('tricks').textContent=tricks; beep(600,0.08); } } }
+      if(skater.x>W+30){ skater=null; } }
+    for(var b=burst.length-1;b>=0;b--){ var p=burst[b]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.3; p.life--; if(p.life<=0)burst.splice(b,1); }
+    draw(); requestAnimationFrame(loop); }
+  var burst=[];
+  function draw(){ var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#4a4a6a'); g.addColorStop(1,'#2a2a3a'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#5a5a6a'; ctx.fillRect(0,gy(),W,H-gy()); ctx.strokeStyle='#ffd23f'; ctx.lineWidth=2; ctx.setLineDash([16,14]); ctx.beginPath(); ctx.moveTo(0,gy()+20); ctx.lineTo(W,gy()+20); ctx.stroke(); ctx.setLineDash([]);
+    for(var i=0;i<items.length;i++){ ctx.font='34px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(items[i].e,items[i].x,gy()-14); }
+    if(skater){ ctx.font='30px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.save(); ctx.translate(skater.x,skater.y-14); if(!skater.onGround)ctx.rotate(Math.sin(Date.now?0:0)); ctx.fillText('🛹',0,10); ctx.fillText(skater.onGround?'🧍':'🤸',0,-8); ctx.restore(); }
+    for(var b=0;b<burst.length;b++){ ctx.globalAlpha=burst[b].life/20; ctx.fillStyle='#ffd23f'; ctx.fillRect(burst[b].x-2,burst[b].y-2,5,5); ctx.globalAlpha=1; }
+    ctx.fillStyle='#fff9'; ctx.font='12px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('👆 Place ramps & rails, then RIDE to do tricks!',W/2,H-72); }
+  var ac; function beep(f,d){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),gg=ac.createGain(); o.frequency.value=f; o.type='square'; o.connect(gg); gg.connect(ac.destination); gg.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  items.push({x:W*0.4,t:'ramp',e:'⛰️'}); items.push({x:W*0.7,t:'rail',e:'🚊'});
+  requestAnimationFrame(loop);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration - shows a gold badge + confetti on win/finish */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function hookText(el){ if(!el)return; var was=false; new MutationObserver(function(){ var t=(el.textContent||'').trim(); if(t&&!was){ was=true; celebrate(); } else if(!t){ was=false; } }).observe(el,{childList:true,characterData:true,subtree:true}); }
+  function init(){ hookVisible(document.getElementById('over')); hookText(document.getElementById('win')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+
+</body></html>

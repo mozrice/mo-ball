@@ -1,0 +1,348 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>MO TEACHER - School Day</title>
+<style>
+html,body{margin:0;height:100%;background:#2a3d5c;overflow:hidden;
+  font-family:'Segoe UI',Arial,sans-serif;-webkit-user-select:none;user-select:none;touch-action:manipulation;}
+#wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+canvas{background:#fff;display:block;box-shadow:0 10px 40px rgba(0,0,0,.6);border-radius:10px;}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<script>
+(function(){
+var cv=document.getElementById('cv'), cx=cv.getContext('2d');
+var LOGW=440, LOGH=640;
+var HD=Math.max(2,Math.min(4,Math.floor((window.devicePixelRatio||1)*2)));
+cv.width=LOGW*HD; cv.height=LOGH*HD;
+cx.setTransform(HD,0,0,HD,0,0);
+function fitScreen(){ var s=Math.min(window.innerWidth/LOGW, window.innerHeight/LOGH);
+  cv.style.width=(LOGW*s)+'px'; cv.style.height=(LOGH*s)+'px'; }
+window.addEventListener('resize',fitScreen); fitScreen();
+function pos(e){ var r=cv.getBoundingClientRect(); var t=e.touches?e.touches[0]:e;
+  return { x:(t.clientX-r.left)*(LOGW/r.width), y:(t.clientY-r.top)*(LOGH/r.height) }; }
+
+// sound
+var AC=null; function ac(){ if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}} return AC; }
+function tone(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||'sine'; o.frequency.value=f; g.gain.value=v||0.14; o.connect(g);g.connect(a.destination); var n=a.currentTime; o.start(n); g.gain.exponentialRampToValueAtTime(0.001,n+d); o.stop(n+d); }
+function ding(){ tone(880,0.12,'sine',0.16); setTimeout(function(){tone(1240,0.14,'sine',0.14);},80); }
+function bell(){ tone(700,0.5,'triangle',0.18); }
+function nope(){ tone(160,0.2,'sawtooth',0.12); }
+function star(){ tone(1000,0.08,'sine',0.14); setTimeout(function(){tone(1400,0.1,'sine',0.12);},60); }
+
+// state
+var happy=70, stars=0;
+function loadS(){ try{var d=JSON.parse(localStorage.getItem('moteacher')||'{}'); stars=d.stars||0;}catch(e){} }
+function saveS(){ try{localStorage.setItem('moteacher',JSON.stringify({stars:stars}));}catch(e){} }
+loadS();
+
+// Mo is the TEACHER. These are the 2nd grade students.
+// (c = skin, s = hair color, style = hair style, shirt = shirt color)
+var KIDS=[
+ {n:'Ava',  c:'#e6ac82', s:'#3a2a1a', style:'pigtails', shirt:'#e05a8a'},
+ {n:'Leo',  c:'#f2cca0', s:'#d0a030', style:'short',    shirt:'#3fa9f5'},
+ {n:'Mia',  c:'#dda072', s:'#402820', style:'pigtails', shirt:'#9b59b6'},
+ {n:'Sam',  c:'#f0c79a', s:'#8a5a2a', style:'short',    shirt:'#5ac85a'},
+ {n:'Lily', c:'#eab690', s:'#5a3a1a', style:'buns',     shirt:'#f0a800'},
+ {n:'Kai',  c:'#c98a5a', s:'#201510', style:'short',    shirt:'#3fbfa8'}
+];
+// Teacher Mo (a grown-up)
+var TEACHER={ c:'#f0c79a', s:'#5a3410', shirt:'#ff8c1a' };
+function drawTeacher(x,y){
+  // legs
+  cx.fillStyle='#3a4a66'; cx.fillRect(x-11,y+18,9,26); cx.fillRect(x+2,y+18,9,26);
+  cx.fillStyle='#2a2a2a'; cx.fillRect(x-13,y+42,13,6); cx.fillRect(x,y+42,13,6);
+  // body (dress/shirt)
+  cx.fillStyle=TEACHER.shirt; rr(x-18,y-14,36,36,8); cx.fill();
+  // arm holding pointer
+  cx.strokeStyle=TEACHER.c; cx.lineWidth=8; cx.lineCap='round';
+  cx.beginPath(); cx.moveTo(x+14,y-4); cx.lineTo(x+30,y-24); cx.stroke();
+  cx.strokeStyle='#8a5a2a'; cx.lineWidth=3; cx.beginPath(); cx.moveTo(x+30,y-24); cx.lineTo(x+48,y-46); cx.stroke();
+  // other arm
+  cx.strokeStyle=TEACHER.c; cx.lineWidth=8; cx.beginPath(); cx.moveTo(x-14,y-2); cx.lineTo(x-24,y+14); cx.stroke();
+  // head
+  cx.fillStyle=TEACHER.c; cx.beginPath(); cx.arc(x,y-30,17,0,7); cx.fill();
+  // hair
+  cx.fillStyle=TEACHER.s; cx.beginPath(); cx.arc(x,y-33,17,Math.PI*1.02,Math.PI*1.98); cx.fill();
+  cx.beginPath(); cx.moveTo(x-16,y-32); cx.quadraticCurveTo(x,y-50,x+16,y-32); cx.quadraticCurveTo(x,y-40,x-16,y-32); cx.fill();
+  // glasses (teacher look)
+  cx.strokeStyle='#3a3a3a'; cx.lineWidth=1.6;
+  cx.beginPath(); cx.arc(x-6,y-30,4.5,0,7); cx.stroke(); cx.beginPath(); cx.arc(x+6,y-30,4.5,0,7); cx.stroke();
+  cx.beginPath(); cx.moveTo(x-1.5,y-30); cx.lineTo(x+1.5,y-30); cx.stroke();
+  // eyes + smile
+  cx.fillStyle='#20334f'; cx.beginPath(); cx.arc(x-6,y-30,1.8,0,7); cx.fill(); cx.beginPath(); cx.arc(x+6,y-30,1.8,0,7); cx.fill();
+  cx.strokeStyle='#20334f'; cx.lineWidth=1.6; cx.beginPath(); cx.arc(x,y-25,5,0.15*Math.PI,0.85*Math.PI); cx.stroke();
+  // name tag
+  cx.fillStyle='#fff'; rr(x-16,y-6,32,12,3); cx.fill();
+  cx.fillStyle=TEACHER.shirt; cx.font='bold 9px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('MO',x,y);
+}
+
+// scene machine
+var scene='menu', g={};
+var S={};
+function go(name){ scene=name; g={}; if(S[name]&&S[name].init)S[name].init(); }
+
+function drawKid(x,y,r,who,arm,bounce){
+  bounce=bounce||0; var yy=y-bounce;
+  cx.fillStyle=who.c; cx.beginPath(); cx.arc(x,yy,r,0,7); cx.fill();
+  cx.strokeStyle=who.s; cx.lineWidth=r*0.14; cx.stroke();
+  cx.fillStyle='#20334f';
+  cx.beginPath(); cx.arc(x-r*0.32,yy-r*0.1,r*0.13,0,7); cx.fill();
+  cx.beginPath(); cx.arc(x+r*0.32,yy-r*0.1,r*0.13,0,7); cx.fill();
+  // rosy cheeks
+  cx.fillStyle='rgba(230,120,120,.35)'; cx.beginPath(); cx.arc(x-r*0.5,yy+r*0.18,r*0.14,0,7); cx.fill(); cx.beginPath(); cx.arc(x+r*0.5,yy+r*0.18,r*0.14,0,7); cx.fill();
+  cx.strokeStyle='#20334f'; cx.lineWidth=r*0.1; cx.lineCap='round';
+  cx.beginPath(); cx.arc(x,yy+r*0.12,r*0.34,0.15*Math.PI,0.85*Math.PI); cx.stroke();
+  // hair (kid hair styles)
+  cx.fillStyle=who.s;
+  // top hair cap
+  cx.beginPath(); cx.arc(x,yy-r*0.12,r*0.98,Math.PI*1.05,Math.PI*1.95); cx.fill();
+  cx.beginPath(); cx.moveTo(x-r*0.95,yy-r*0.15); cx.quadraticCurveTo(x-r*0.6,yy-r*1.15,x,yy-r*1.02); cx.quadraticCurveTo(x+r*0.6,yy-r*1.15,x+r*0.95,yy-r*0.15); cx.quadraticCurveTo(x,yy-r*0.55,x-r*0.95,yy-r*0.15); cx.fill();
+  if(who.style==='pigtails'){ cx.beginPath(); cx.arc(x-r*0.95,yy-r*0.05,r*0.32,0,7); cx.fill(); cx.beginPath(); cx.arc(x+r*0.95,yy-r*0.05,r*0.32,0,7); cx.fill();
+    cx.fillStyle='#e05a8a'; cx.beginPath(); cx.arc(x-r*0.95,yy-r*0.32,r*0.12,0,7); cx.fill(); cx.beginPath(); cx.arc(x+r*0.95,yy-r*0.32,r*0.12,0,7); cx.fill(); }
+  else if(who.style==='buns'){ cx.beginPath(); cx.arc(x-r*0.7,yy-r*0.85,r*0.28,0,7); cx.fill(); cx.beginPath(); cx.arc(x+r*0.7,yy-r*0.85,r*0.28,0,7); cx.fill(); }
+  // raised hand (skin colored arm)
+  if(arm){ cx.strokeStyle=who.c; cx.lineWidth=r*0.28; cx.lineCap='round';
+    cx.beginPath(); cx.moveTo(x+r*0.7,yy); cx.lineTo(x+r*1.1,yy-r*1.3); cx.stroke();
+    cx.fillStyle=who.c; cx.beginPath(); cx.arc(x+r*1.1,yy-r*1.4,r*0.22,0,7); cx.fill(); }
+}
+
+function rr(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
+function btn(x,y,w,h,label,col,tcol,fs){ cx.fillStyle=col||'#ff8c1a'; rr(x,y,w,h,14); cx.fill();
+  cx.fillStyle='rgba(255,255,255,.15)'; rr(x,y,w,h*0.5,14); cx.fill();
+  cx.fillStyle=tcol||'#fff'; cx.font='bold '+(fs||22)+'px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(label,x+w/2,y+h/2);
+  return {x:x,y:y,w:w,h:h}; }
+function hit(b,p){ return b&&p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h; }
+
+// classroom bg
+function room(){
+  var gr=cx.createLinearGradient(0,0,0,LOGH); gr.addColorStop(0,'#fde8c8'); gr.addColorStop(1,'#f6d9a8');
+  cx.fillStyle=gr; cx.fillRect(0,0,LOGW,LOGH);
+  // chalkboard
+  cx.fillStyle='#2e5d3a'; rr(30,70,LOGW-60,90,10); cx.fill();
+  cx.strokeStyle='#8a5a2a'; cx.lineWidth=6; rr(30,70,LOGW-60,90,10); cx.stroke();
+  // floor
+  cx.fillStyle='#c98a4a'; cx.fillRect(0,LOGH-90,LOGW,90);
+}
+
+// top bar (happy meter + stars)
+function topbar(){
+  cx.fillStyle='#fff'; cx.font='bold 16px Segoe UI'; cx.textAlign='left'; cx.textBaseline='middle';
+  cx.fillStyle='#2a3d5c'; cx.fillText('😊 Happy Class',12,20);
+  // meter
+  var bx=120,by=12,bw=180,bh=16;
+  cx.fillStyle='#d8c0a0'; rr(bx,by,bw,bh,8); cx.fill();
+  var col=happy>60?'#4caf50':happy>30?'#f0a000':'#e05050';
+  cx.fillStyle=col; rr(bx,by,bw*(Math.max(0,Math.min(100,happy))/100),bh,8); cx.fill();
+  cx.textAlign='right'; cx.fillStyle='#2a3d5c'; cx.fillText('⭐ '+stars,LOGW-12,20);
+}
+function backBtn(){ return btn(12,LOGH-52,84,40,'← Menu','#5a6d8c','#fff',15); }
+
+// win/msg banner
+function banner(txt,sub){
+  cx.fillStyle='rgba(20,30,50,.78)'; cx.fillRect(0,LOGH/2-70,LOGW,140);
+  cx.fillStyle='#ffcf33'; cx.font='900 30px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle';
+  cx.fillText(txt,LOGW/2,LOGH/2-12);
+  cx.fillStyle='#fff'; cx.font='bold 16px Segoe UI'; cx.fillText(sub||'Tap to go back',LOGW/2,LOGH/2+24);
+}
+
+// ============ MENU ============
+var ACTS=[
+ {k:'roll',  n:'Take Roll Call', col:'#ff8c1a', d:'Tap each student — say good morning!'},
+ {k:'math',  n:'Math Class',     col:'#3fa9f5', d:'Teach the right answer!'},
+ {k:'hands', n:'Raise Your Hand',col:'#5ac85a', d:'Call on the one with a hand up!'},
+ {k:'stars', n:'Give Gold Stars',col:'#f0a800', d:'Reward good work!'},
+ {k:'quiet', n:'Quiet Down!',    col:'#c86bf0', d:'Shush the noisy class!'}
+];
+var mb=[];
+S.menu={
+  draw:function(){
+    var gr=cx.createLinearGradient(0,0,0,LOGH); gr.addColorStop(0,'#fbe3bf'); gr.addColorStop(1,'#f3cf9c');
+    cx.fillStyle=gr; cx.fillRect(0,0,LOGW,LOGH);
+    // banner
+    cx.fillStyle='#2e5d3a'; rr(24,24,LOGW-48,84,16); cx.fill();
+    cx.fillStyle='#fff'; cx.font='900 27px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle';
+    cx.fillText('🍎 TEACHER MO',LOGW/2,50);
+    cx.font='bold 14px Segoe UI'; cx.fillStyle='#cfe8cf';
+    cx.fillText('You are Mo — the 2nd grade teacher!  ⭐ '+stars,LOGW/2,82);
+    // teacher Mo at the corner of the banner
+    drawTeacher(LOGW-52,96);
+    mb=[]; var y=124, ch=66, gap=9;
+    for(var i=0;i<ACTS.length;i++){ var a=ACTS[i];
+      cx.fillStyle=a.col; rr(28,y,LOGW-56,ch,14); cx.fill();
+      cx.fillStyle='rgba(255,255,255,.18)'; rr(28,y,LOGW-56,ch*0.45,14); cx.fill();
+      cx.fillStyle='#fff'; cx.font='bold 21px Segoe UI'; cx.textAlign='left'; cx.textBaseline='middle';
+      cx.fillText(a.n,48,y+24);
+      cx.font='13px Segoe UI'; cx.fillStyle='rgba(255,255,255,.92)'; cx.fillText(a.d,48,y+46);
+      mb.push({x:28,y:y,w:LOGW-56,h:ch,k:a.k}); y+=ch+gap;
+    }
+    // students row
+    cx.textAlign='center';
+    for(var j=0;j<KIDS.length;j++){ var kx=42+j*72; drawKid(kx,LOGH-52,20,KIDS[j],false,0);
+      cx.fillStyle='#5a3a1a'; cx.font='bold 12px Segoe UI'; cx.textBaseline='middle'; }
+  },
+  tap:function(p){ for(var i=0;i<mb.length;i++){ if(hit(mb[i],p)){ ding(); go(mb[i].k); return; } } }
+};
+
+// desk positions for 6 kids (2 cols x 3 rows)
+function deskSpots(){ var out=[]; for(var r=0;r<3;r++)for(var c=0;c<2;c++){ out.push({x:130+c*180,y:230+r*115}); } return out; }
+
+// ============ ROLL CALL ============
+S.roll={
+  init:function(){ g.spots=deskSpots(); g.here=[false,false,false,false,false,false]; g.count=0; g.win=false; },
+  draw:function(){ room(); topbar();
+    cx.fillStyle='#fff'; cx.font='bold 18px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('Good Morning, Class!',LOGW/2,115);
+    cx.fillStyle='#cfe8cf'; cx.font='14px Segoe UI'; cx.fillText('Tap each student to say hi',LOGW/2,140);
+    g.kb=[];
+    for(var i=0;i<KIDS.length;i++){ var s=g.spots[i];
+      // desk
+      cx.fillStyle='#a86a3a'; rr(s.x-42,s.y+18,84,16,4); cx.fill();
+      drawKid(s.x,s.y,26,KIDS[i],false, g.here[i]?4:0);
+      if(g.here[i]){ cx.fillStyle='#4caf50'; cx.font='bold 13px Segoe UI'; cx.textAlign='center'; cx.fillText('✓ Here!',s.x,s.y-42); }
+      
+      g.kb.push({x:s.x-32,y:s.y-32,w:64,h:80,i:i});
+    }
+    drawTeacher(LOGW-46,LOGH-118); g.back=backBtn();
+    if(g.win) banner('⭐ Everyone is here!','Tap to go back');
+  },
+  tap:function(p){ if(hit(g.back,p)){ go('menu'); return; } if(g.win){ go('menu'); return; }
+    for(var i=0;i<g.kb.length;i++){ if(hit(g.kb[i],p)&&!g.here[g.kb[i].i]){ g.here[g.kb[i].i]=true; g.count++; ding();
+      happy=Math.min(100,happy+2);
+      if(g.count>=KIDS.length){ g.win=true; stars++; saveS(); star(); } return; } }
+  }
+};
+
+// ============ MATH CLASS ============
+function mathNewP(){ var a=1+Math.floor(Math.random()*9), b=1+Math.floor(Math.random()*9);
+  g.a=a; g.b=b; g.ans=a+b;
+  var opts=[g.ans]; while(opts.length<3){ var w=g.ans+(Math.floor(Math.random()*7)-3); if(w>0&&opts.indexOf(w)<0)opts.push(w); }
+  for(var i=opts.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=opts[i];opts[i]=opts[j];opts[j]=t; }
+  g.opts=opts; g.msg='';
+}
+S.math={
+  init:function(){ g.score=0; g.win=false; mathNewP(); },
+  draw:function(){ room(); topbar();
+    // problem on board
+    cx.fillStyle='#fff'; cx.font='900 40px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle';
+    cx.fillText(g.a+' + '+g.b+' = ?',LOGW/2,116);
+    cx.fillStyle='#5a3a1a'; cx.font='bold 16px Segoe UI'; cx.fillText('Teacher, what is the answer?  ('+g.score+' / 5)',LOGW/2,190);
+    // teacher (Mo waving pointer) - draw a couple students
+    drawKid(110,300,28,KIDS[1],false,0); drawKid(330,300,28,KIDS[2],false,0);
+    drawKid(220,300,28,KIDS[3],true,0);
+    // answer buttons
+    g.ob=[];
+    for(var i=0;i<3;i++){ var bx=40+i*128, by=400;
+      var b=btn(bx,by,116,70,''+g.opts[i],'#3fa9f5','#fff',30); g.ob.push({x:bx,y:by,w:116,h:70,v:g.opts[i]}); }
+    if(g.msg){ cx.fillStyle=g.good?'#2e7d32':'#c04040'; cx.font='900 26px Segoe UI'; cx.textAlign='center'; cx.fillText(g.msg,LOGW/2,510); }
+    drawTeacher(LOGW-46,LOGH-118); g.back=backBtn();
+    if(g.win) banner('⭐ Great math teacher!','Tap to go back');
+  },
+  tap:function(p){ if(hit(g.back,p)){ go('menu'); return; } if(g.win){ go('menu'); return; }
+    for(var i=0;i<g.ob.length;i++){ if(hit(g.ob[i],p)){
+      if(g.ob[i].v===g.ans){ g.score++; g.good=true; g.msg='Correct! 🎉'; ding(); happy=Math.min(100,happy+3);
+        if(g.score>=5){ g.win=true; stars++; saveS(); star(); } else setTimeout(function(){ if(scene==='math')mathNewP(); },700); }
+      else { g.good=false; g.msg='Try again!'; nope(); happy=Math.max(0,happy-2); }
+      return; } }
+  }
+};
+
+// ============ RAISE YOUR HAND ============
+function handsPick(){ g.up=Math.floor(Math.random()*KIDS.length); g.t=180; }
+S.hands={
+  init:function(){ g.spots=deskSpots(); g.score=0; g.win=false; handsPick(); },
+  draw:function(){ room(); topbar();
+    cx.fillStyle='#fff'; cx.font='bold 18px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('Call on the raised hand!',LOGW/2,115);
+    cx.fillStyle='#cfe8cf'; cx.font='14px Segoe UI'; cx.fillText('Called on: '+g.score+' / 6',LOGW/2,140);
+    if(!g.win){ g.t--; if(g.t<=0){ happy=Math.max(0,happy-4); nope(); handsPick(); } }
+    g.kb=[];
+    for(var i=0;i<KIDS.length;i++){ var s=g.spots[i];
+      cx.fillStyle='#a86a3a'; rr(s.x-42,s.y+18,84,16,4); cx.fill();
+      drawKid(s.x,s.y,26,KIDS[i], i===g.up, i===g.up?3:0);
+      
+      g.kb.push({x:s.x-32,y:s.y-46,w:80,h:94,i:i});
+    }
+    drawTeacher(LOGW-46,LOGH-118); g.back=backBtn();
+    if(g.win) banner('⭐ You called on everyone!','Tap to go back');
+  },
+  tap:function(p){ if(hit(g.back,p)){ go('menu'); return; } if(g.win){ go('menu'); return; }
+    for(var i=0;i<g.kb.length;i++){ if(hit(g.kb[i],p)){
+      if(g.kb[i].i===g.up){ g.score++; ding(); happy=Math.min(100,happy+3); if(g.score>=6){ g.win=true; stars++; saveS(); star(); } else handsPick(); }
+      else { nope(); happy=Math.max(0,happy-2); }
+      return; } }
+  }
+};
+
+// ============ GIVE GOLD STARS ============
+S.stars={
+  init:function(){ g.spots=deskSpots(); g.given=[false,false,false,false,false,false]; g.count=0; g.win=false; g.work=Math.floor(Math.random()*KIDS.length); g.t=0; },
+  draw:function(){ room(); topbar(); g.t++;
+    if(g.t%90===0){ g.work=Math.floor(Math.random()*KIDS.length); }
+    cx.fillStyle='#fff'; cx.font='bold 18px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('Give a star to the ⭐ glowing student!',LOGW/2,115);
+    cx.fillStyle='#cfe8cf'; cx.font='14px Segoe UI'; cx.fillText('Stars given today: '+g.count+' / 6',LOGW/2,140);
+    g.kb=[];
+    for(var i=0;i<KIDS.length;i++){ var s=g.spots[i];
+      if(i===g.work && !g.given[i]){ cx.fillStyle='rgba(240,200,40,.4)'; cx.beginPath(); cx.arc(s.x,s.y,40,0,7); cx.fill(); }
+      cx.fillStyle='#a86a3a'; rr(s.x-42,s.y+18,84,16,4); cx.fill();
+      drawKid(s.x,s.y,26,KIDS[i],false,0);
+      if(g.given[i]){ cx.fillStyle='#f0a800'; cx.font='20px Segoe UI'; cx.textAlign='center'; cx.fillText('⭐',s.x,s.y-40); }
+      
+      g.kb.push({x:s.x-32,y:s.y-32,w:64,h:80,i:i});
+    }
+    drawTeacher(LOGW-46,LOGH-118); g.back=backBtn();
+    if(g.win) banner('⭐ Everyone earned a star!','Tap to go back');
+  },
+  tap:function(p){ if(hit(g.back,p)){ go('menu'); return; } if(g.win){ go('menu'); return; }
+    for(var i=0;i<g.kb.length;i++){ if(hit(g.kb[i],p)){ var idx=g.kb[i].i;
+      if(idx===g.work && !g.given[idx]){ g.given[idx]=true; g.count++; stars++; saveS(); star(); happy=Math.min(100,happy+4);
+        // pick new worker among not-given
+        var rem=[]; for(var k=0;k<KIDS.length;k++)if(!g.given[k])rem.push(k);
+        if(rem.length){ g.work=rem[Math.floor(Math.random()*rem.length)]; }
+        if(g.count>=KIDS.length){ g.win=true; } }
+      else { nope(); }
+      return; } }
+  }
+};
+
+// ============ QUIET DOWN ============
+S.quiet={
+  init:function(){ g.noise=40; g.calm=0; g.win=false; g.t=0; g.puffs=[]; },
+  draw:function(){ room(); topbar(); g.t++;
+    if(!g.win){ g.noise+=0.35 + g.calm*0.05; }
+    cx.fillStyle='#fff'; cx.font='bold 18px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('Class is noisy! Tap SHHH!',LOGW/2,115);
+    // noise meter
+    var bx=70,by=150,bw=LOGW-140,bh=20;
+    cx.fillStyle='#d8c0a0'; rr(bx,by,bw,bh,8); cx.fill();
+    cx.fillStyle=g.noise>70?'#e05050':'#f0a000'; rr(bx,by,bw*(Math.min(100,g.noise)/100),bh,8); cx.fill();
+    cx.fillStyle='#5a3a1a'; cx.font='bold 13px Segoe UI'; cx.textAlign='center'; cx.fillText('Noise',LOGW/2,by+34);
+    // noisy kids wobble
+    var sp=deskSpots();
+    for(var i=0;i<KIDS.length;i++){ var s=sp[i]; var w=Math.sin(g.t*0.2+i)*(g.noise>60?5:2);
+      cx.fillStyle='#a86a3a'; rr(s.x-42,s.y+18,84,16,4); cx.fill();
+      drawKid(s.x+w,s.y,24,KIDS[i],false,0); }
+    if(g.noise>=100){ // lost -> reset a bit
+      happy=Math.max(0,happy-15); g.noise=55; nope();
+    }
+    g.btn=btn(LOGW/2-110,LOGH-120,220,54,'🤫 SHHH!','#c86bf0','#fff',26);
+    drawTeacher(LOGW-46,LOGH-118); g.back=backBtn();
+    if(g.win) banner('⭐ Nice and quiet now!','Tap to go back');
+  },
+  tap:function(p){ if(hit(g.back,p)){ go('menu'); return; } if(g.win){ go('menu'); return; }
+    if(hit(g.btn,p)){ g.noise=Math.max(0,g.noise-14); g.calm++; ding(); happy=Math.min(100,happy+1);
+      if(g.noise<=6){ g.win=true; stars++; saveS(); star(); happy=Math.min(100,happy+5); } }
+  }
+};
+
+// loop
+function loop(){ cx.setTransform(HD,0,0,HD,0,0); cx.clearRect(0,0,LOGW,LOGH);
+  var s=S[scene]; if(s&&s.draw)s.draw(); requestAnimationFrame(loop); }
+if(S.menu.init)S.menu.init(); loop();
+
+cv.addEventListener('pointerdown',function(e){ e.preventDefault(); ac(); var p=pos(e); var s=S[scene]; if(s&&s.tap)s.tap(p); },{passive:false});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO GROCERY DASH</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#eef3f7;font-family:'Trebuchet MS',system-ui,sans-serif;color:#213;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:8px;left:0;right:0;display:flex;justify-content:center;gap:8px;pointer-events:none;font-weight:bold;flex-wrap:wrap;}
+  .pill{background:#ffffffdd;border-radius:18px;padding:5px 12px;font-size:16px;color:#213;box-shadow:0 2px 0 #0001;}
+  #list{position:fixed;top:44px;left:0;right:0;text-align:center;pointer-events:none;}
+  #list span{display:inline-block;background:#fff;border-radius:12px;padding:4px 8px;margin:2px;font-size:20px;box-shadow:0 2px 0 #0001;}
+  #list span.got{background:#7be07b;opacity:.6;text-decoration:line-through;}
+  #hint{position:fixed;bottom:14px;left:0;right:0;text-align:center;font-size:14px;color:#456;pointer-events:none;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#eef3f7d8;text-align:center;}
+  #over h1{font-size:38px;margin:0 0 6px;color:#e0453a;} #over p{font-size:20px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#7be07b,#2fbf4a);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #1f8a34;font-family:inherit;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">🛒 <span id="score">0</span></div>
+  <div class="pill">⏱️ <span id="time">50</span>s</div>
+</div>
+<div id="list"></div>
+<div id="hint">Tap the floor to walk • grab the 📝 items on your list!</div>
+<div id="over"><h1 id="ot">⏰ TIME UP!</h1><p id="os"></p><button class="btn" id="again">Shop Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  var POOL=['🍎','🍌','🥛','🍞','🧀','🥚','🍪','🥕','🍕','🍫','🧃','🍓','🍇','🥦','🍗','🧁'];
+  var mo, items, list, score, timeLeft, running, msg, msgT, nowv=0;
+  function reset(){ mo={x:W/2,y:H*0.6,tx:W/2,ty:H*0.6,step:0}; score=0; timeLeft=50; running=true; msg=''; msgT=0; newRound();
+    document.getElementById('over').style.display='none'; document.getElementById('score').textContent='0'; document.getElementById('time').textContent='50';
+    if(!reset._t){ reset._t=setInterval(function(){ if(running){ timeLeft--; document.getElementById('time').textContent=Math.max(0,timeLeft); if(timeLeft<=0) over(); } },1000); } }
+  function rnd(a,b){return a+Math.random()*(b-a);}
+  function newRound(){
+    // place ~10 items on shelves
+    items=[]; var used={};
+    var shelfY=[H*0.28,H*0.46,H*0.64,H*0.82];
+    for(var s=0;s<shelfY.length;s++){ var cnt=Math.floor(rnd(3,5)); for(var i=0;i<cnt;i++){ var e=POOL[Math.floor(Math.random()*POOL.length)];
+      items.push({e:e,x:rnd(W*0.12,W*0.88),y:shelfY[s]-16,got:false}); } }
+    // list = 4 distinct items that exist
+    var avail=items.map(function(o){return o.e;}); list=[]; var tries=0;
+    while(list.length<4 && tries<50){ var e2=avail[Math.floor(Math.random()*avail.length)]; if(list.indexOf(e2)<0) list.push({e:e2,got:false}); tries++; }
+    renderList();
+  }
+  function renderList(){ var el=document.getElementById('list'); el.innerHTML='📝 '+list.map(function(l){ return '<span class="'+(l.got?'got':'')+'">'+l.e+'</span>'; }).join(''); }
+  function pos(e){ var r=cv.getBoundingClientRect(); return {x:(e.touches?e.touches[0].clientX:e.clientX)-r.left,y:(e.touches?e.touches[0].clientY:e.clientY)-r.top}; }
+  function tap(e){ var p=pos(e); mo.tx=Math.max(20,Math.min(W-20,p.x)); mo.ty=Math.max(H*0.2,Math.min(H-20,p.y)); }
+  cv.addEventListener('mousedown',tap); cv.addEventListener('touchstart',function(e){tap(e);e.preventDefault();},{passive:false});
+  document.getElementById('again').onclick=reset;
+  function showMsg(m){ msg=m; msgT=1; }
+  function over(){ running=false; document.getElementById('os').innerHTML='You grabbed <b>'+score+'</b> items! 🛒'; document.getElementById('over').style.display='flex'; }
+  function update(dt){
+    var dx=mo.tx-mo.x, dy=mo.ty-mo.y, d=Math.hypot(dx,dy);
+    if(d>2){ var sp=Math.min(d,3*dt); mo.x+=dx/d*sp; mo.y+=dy/d*sp; mo.step+=0.3*dt; if(Math.abs(dx)>0.5)mo.face=dx<0?-1:1; }
+    for(var i=0;i<items.length;i++){ var it=items[i]; if(it.got)continue;
+      if(Math.hypot(it.x-mo.x,it.y-mo.y)<28){ // is it on the list & still needed?
+        var need=null; for(var l=0;l<list.length;l++){ if(!list[l].got && list[l].e===it.e){ need=list[l]; break; } }
+        if(need){ need.got=true; it.got=true; score++; document.getElementById('score').textContent=score; renderList(); beep(700,0.08,'square',0.06); setTimeout(function(){beep(1000,0.09,'square',0.05);},60);
+          if(list.every(function(x){return x.got;})){ timeLeft+=8; showMsg('✅ List done! +8s'); beep(880,0.14,'square',0.07); setTimeout(newRound,400); }
+        }
+      }
+    }
+    if(msgT>0)msgT-=0.01*dt;
+  }
+  function render(){
+    ctx.fillStyle='#e7edf2'; ctx.fillRect(0,0,W,H);
+    // floor tiles
+    ctx.strokeStyle='#d5dde4'; ctx.lineWidth=2; for(var x=0;x<W;x+=48){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); } for(var y=0;y<H;y+=48){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    // shelves
+    var shelfY=[H*0.28,H*0.46,H*0.64,H*0.82];
+    for(var s=0;s<shelfY.length;s++){ ctx.fillStyle='#b98a5a'; ctx.fillRect(W*0.06,shelfY[s],W*0.88,10); ctx.fillStyle='#a5764a'; ctx.fillRect(W*0.06,shelfY[s]+10,W*0.88,4); }
+    // items
+    for(var i=0;i<items.length;i++){ var it=items[i]; if(it.got)continue; var need=list.some(function(l){return !l.got&&l.e===it.e;});
+      if(need){ ctx.fillStyle='rgba(255,210,63,'+(0.4+0.3*Math.sin(nowv*0.006))+')'; ctx.beginPath(); ctx.arc(it.x,it.y,20,0,6.29); ctx.fill(); }
+      ctx.font='30px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(it.e,it.x,it.y); }
+    drawMo();
+    if(msgT>0 && msg){ ctx.fillStyle='#0a5a2a'; ctx.font='bold 22px Trebuchet MS'; ctx.textAlign='center'; ctx.globalAlpha=Math.min(1,msgT*2); ctx.fillText(msg,W/2,H*0.15); ctx.globalAlpha=1; }
+  }
+  function drawMo(){ var x=mo.x,y=mo.y,r=14,wob=Math.sin(mo.step)*2; ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(0,r,r*0.9,r*0.35,0,0,6.29); ctx.fill();
+    // cart
+    ctx.fillStyle='#e0453a'; ctx.fillRect(r*0.5,-4,16,12); ctx.strokeStyle='#e0453a'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(r*0.5,-4); ctx.lineTo(r*0.3,-12); ctx.stroke();
+    ctx.fillStyle='#1a6fd0'; roundRect(-r*0.7,-r*0.2+wob*0.3,r*1.4,r*1.1,r*0.4); ctx.fill();
+    ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(0,-r*0.5,r*0.5,0,6.29); ctx.fill(); ctx.fillStyle='#3a2a1a'; ctx.beginPath(); ctx.arc(0,-r*0.62,r*0.52,Math.PI,6.29); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('MO',0,r*0.35);
+    ctx.restore(); }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(running) update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO MVP CAREER</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#1a0e2e;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:8px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0007;}
+  .pill{background:#0008;border-radius:20px;padding:6px 12px;font-size:16px;}
+  #rankbar{position:fixed;top:46px;left:8%;right:8%;height:16px;background:#0007;border-radius:10px;overflow:hidden;pointer-events:none;border:2px solid #ffffff44;}
+  #rankfill{height:100%;width:0;background:linear-gradient(90deg,#ffd23f,#ff8a1e);transition:width .2s;}
+  #rankname{position:fixed;top:66px;left:0;right:0;text-align:center;font-size:14px;color:#ffd23f;font-weight:bold;pointer-events:none;text-shadow:0 1px 2px #000;}
+  #hint{position:fixed;bottom:14px;left:0;right:0;text-align:center;font-size:15px;color:#e7d6ff;pointer-events:none;text-shadow:0 1px 2px #000;}
+  #msg{position:fixed;top:42%;left:0;right:0;text-align:center;font-size:38px;font-weight:bold;color:#ffd23f;text-shadow:0 3px 0 #0008,0 0 18px #ffae00;pointer-events:none;opacity:0;transition:opacity .12s;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#1a0e2edd;text-align:center;padding:20px;}
+  #over h1{font-size:34px;margin:0 0 6px;color:#ffd23f;} #over p{font-size:19px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#b06aff,#7a2af0);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #5a1ab4;font-family:inherit;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">🏀 <span id="score">0</span></div>
+  <div class="pill">⏱️ <span id="time">90</span>s</div>
+  <div class="pill">🔥 <span id="streak">0</span></div>
+</div>
+<div id="rankbar"><div id="rankfill"></div></div>
+<div id="rankname">🏀 ROOKIE</div>
+<div id="msg"></div>
+<div id="hint">HOLD & release on GREEN 🟩 — make shots to rank up from ROOKIE to MVP!</div>
+<div id="over"><h1 id="ot">🏆</h1><p id="os"></p><button class="btn" id="again">New Career</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1,GY=0,T=42,G=0.4;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); GY=H*0.8; }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  var RANKS=[{n:'🏀 ROOKIE',need:0},{n:'⭐ STARTER',need:6},{n:'🌟 ALL-STAR',need:16},{n:'💫 SUPERSTAR',need:30},{n:'👑 MVP',need:50}];
+  var GC=0.84;
+  var best=+(localStorage.getItem('momvp_best')||0);
+  var hoop, ball, score, streak, timeLeft, running, holding, meter, msgT, crowd, rank, hoopDir, nowv=0;
+  function rankIdx(s){ var r=0; for(var i=0;i<RANKS.length;i++){ if(s>=RANKS[i].need) r=i; } return r; }
+  function gwFor(){ return Math.max(0.05, 0.10 - rank*0.012); } // green shrinks as you rank up
+  function reset(){ hoop={x:W/2,y:H*0.26,r:26}; score=0; streak=0; timeLeft=90; running=true; msgT=0; holding=false; meter=0; rank=0; hoopDir=1;
+    crowd=[]; for(var i=0;i<70;i++) crowd.push({x:Math.random()*W,row:Math.floor(Math.random()*4),c:['#ff8a1e','#43c6ff','#ffd23f','#ff6ad5','#7bff9e'][Math.floor(Math.random()*5)],j:0});
+    newBall(); document.getElementById('over').style.display='none'; upd();
+    if(!reset._t){ reset._t=setInterval(function(){ if(running){ timeLeft--; document.getElementById('time').textContent=Math.max(0,timeLeft); if(timeLeft<=0) over(); } },1000); } }
+  function upd(){ document.getElementById('score').textContent=score; document.getElementById('streak').textContent=streak; document.getElementById('time').textContent=Math.max(0,timeLeft);
+    document.getElementById('rankname').textContent=RANKS[rank].n;
+    var nxt=rank<RANKS.length-1?RANKS[rank+1].need:RANKS[rank].need; var cur=RANKS[rank].need; var frac=rank<RANKS.length-1?(score-cur)/(nxt-cur):1;
+    document.getElementById('rankfill').style.width=Math.max(0,Math.min(1,frac))*100+'%'; }
+  function newBall(){ ball={x:W/2,y:GY-16,vx:0,vy:0,flying:false,spin:0,frame:0,green:false}; }
+  function startHold(){ if(!running||ball.flying||holding)return; holding=true; meter=0; }
+  function release(){ if(!holding)return; holding=false; doShoot(meter); }
+  function doShoot(m){ var perfectVy=(hoop.y-ball.y-0.5*G*T*T)/T; var off=m-GC; var pf=1+off*1.4; ball.vy=perfectVy*pf; ball.vx=(hoop.x-ball.x)/T; ball.flying=true; ball.frame=0; ball.green=Math.abs(off)<gwFor(); beep(ball.green?520:300,0.1,'sine',0.05); }
+  cv.addEventListener('mousedown',startHold); addEventListener('mouseup',release);
+  cv.addEventListener('touchstart',function(e){startHold();e.preventDefault();},{passive:false}); addEventListener('touchend',release);
+  addEventListener('keydown',function(e){ if(e.key===' ')startHold(); }); addEventListener('keyup',function(e){ if(e.key===' ')release(); });
+  document.getElementById('again').onclick=reset;
+  function showMsg(m,col){ var e=document.getElementById('msg'); e.textContent=m; e.style.color=col||'#ffd23f'; e.style.opacity=1; msgT=1; }
+  function afterShot(made){ if(made){ streak++; var pts=(ball.green?2:1)+(streak>=3?1:0); score+=pts; showMsg(ball.green?('🟩 GREEN! +'+pts):('SWISH! +'+pts)); beep(660,0.1,'square',0.06); for(var i=0;i<crowd.length;i++)crowd[i].j=1;
+      var nr=rankIdx(score); if(nr>rank){ rank=nr; showMsg('⬆ '+RANKS[rank].n+'!','#7bff9e'); beep(880,0.25,'square',0.07); } }
+    else { streak=0; beep(160,0.15,'sawtooth',0.05); }
+    upd(); newBall(); }
+  function over(){ running=false; if(score>best){best=score;localStorage.setItem('momvp_best',best);}
+    document.getElementById('ot').textContent=RANKS[rank].n; document.getElementById('os').innerHTML='Final rank: <b>'+RANKS[rank].n+'</b><br>Score: <b>'+score+'</b> — Best: <b>'+best+'</b>'; document.getElementById('over').style.display='flex'; beep(700,0.2,'square',0.06); }
+  function update(dt){
+    // hoop drifts side to side more at higher ranks
+    var amp=rank*0.9; hoop.x+=hoopDir*amp*dt; if(hoop.x>W*0.72){hoop.x=W*0.72;hoopDir=-1;} if(hoop.x<W*0.28){hoop.x=W*0.28;hoopDir=1;}
+    hoop.r=26-rank*2.4;
+    if(holding){ meter+=0.02*dt; if(meter>=1){ meter=1; release(); } }
+    if(ball.flying){ ball.frame+=dt; ball.x+=ball.vx*dt; ball.y+=ball.vy*dt; ball.vy+=G*dt; ball.spin+=0.3*dt;
+      if(ball.frame>=T){ var made=ball.green||Math.abs(ball.y-hoop.y)<18; afterShot(made); return; }
+      if(ball.y>GY+30){ afterShot(false); } }
+    for(var i=0;i<crowd.length;i++){ if(crowd[i].j>0)crowd[i].j-=0.05*dt; }
+    if(msgT>0){ msgT-=0.014*dt; if(msgT<=0)document.getElementById('msg').style.opacity=0; }
+  }
+  function render(){
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#3a1a5a'); g.addColorStop(1,'#160a26'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#0e0620'; ctx.fillRect(0,0,W,H*0.2); for(var i=0;i<crowd.length;i++){ var c=crowd[i]; ctx.fillStyle=c.c; ctx.beginPath(); ctx.arc(c.x,16+c.row*16-(c.j>0?c.j*6:0),4,0,6.29); ctx.fill(); }
+    ctx.fillStyle='#c98a44'; ctx.fillRect(0,GY,W,H-GY);
+    ctx.fillStyle='#8a94a0'; ctx.fillRect(hoop.x-4,hoop.y-46,8,-30);
+    ctx.fillStyle='#eef3f7'; ctx.fillRect(hoop.x-30,hoop.y-46,60,10); ctx.strokeStyle='#c0392b'; ctx.lineWidth=3; ctx.strokeRect(hoop.x-30,hoop.y-46,60,10);
+    ctx.strokeStyle='#ff7b00'; ctx.lineWidth=5; ctx.beginPath(); ctx.ellipse(hoop.x,hoop.y,hoop.r,8,0,0,6.29); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=1.5; for(var n=0;n<7;n++){ var an=n/7*6.28; ctx.beginPath(); ctx.moveTo(hoop.x+Math.cos(an)*hoop.r,hoop.y+Math.sin(an)*8); ctx.lineTo(hoop.x+Math.cos(an)*hoop.r*0.5,hoop.y+20); ctx.stroke(); }
+    drawBall(ball.x,ball.y); draw2K();
+  }
+  function draw2K(){ if(ball.flying)return;
+    var mx=ball.x+30, my=ball.y-140, mh=150, mw=18, gw=gwFor();
+    ctx.fillStyle='#0009'; roundRect(mx,my,mw,mh,9); ctx.fill();
+    var gy1=my+mh*(1-(GC+gw)), gy2=my+mh*(1-(GC-gw)); ctx.fillStyle='#37d06a'; ctx.fillRect(mx+2,gy1,mw-4,gy2-gy1);
+    ctx.fillStyle=holding?'#ffd23f':'#888'; ctx.fillRect(mx+2,my+mh*(1-meter),mw-4,mh*meter);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; roundRect(mx,my,mw,mh,9); ctx.stroke();
+    if(!holding){ ctx.fillStyle='#fff'; ctx.font='bold 11px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('HOLD',mx+mw/2,my+mh+16); } }
+  function drawBall(x,y){ var r=14; ctx.save(); ctx.translate(x,y); ctx.rotate(ball.spin);
+    var grd=ctx.createRadialGradient(-r*0.3,-r*0.3,r*0.2,0,0,r); grd.addColorStop(0,'#ffb15c'); grd.addColorStop(1,'#e0701f'); ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(0,0,r,0,6.29); ctx.fill();
+    ctx.strokeStyle='#7a3d10'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,r,0,6.29); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-r,0); ctx.lineTo(r,0); ctx.moveTo(0,-r); ctx.lineTo(0,r); ctx.stroke(); ctx.restore(); }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(running) update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

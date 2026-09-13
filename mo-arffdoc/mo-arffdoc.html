@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Arff Doctor</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:#cfe4ec;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;position:absolute;inset:0;}
+  a.back{position:fixed;top:8px;left:10px;color:#2a5a6a;opacity:.95;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;text-shadow:0 1px 2px #fff8;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:18px;font-weight:bold;color:#2a6a5a;pointer-events:none;text-shadow:0 1px 3px #fff9;z-index:4;}
+  #sub{position:fixed;top:34px;left:0;right:0;text-align:center;font-size:14px;font-weight:bold;color:#3a7a6a;pointer-events:none;text-shadow:0 1px 2px #fff9;z-index:4;}
+  #tray{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:10px 8px;background:#2a7a6ad9;border-top:3px solid #4aa08a;z-index:6;}
+  .item{position:relative;font-size:30px;background:#eafcf6;border:3px solid #bfeee0;border-radius:16px;width:60px;height:60px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 0 #7abca8;}
+  .item .lbl{position:absolute;bottom:-16px;left:0;right:0;text-align:center;font-size:10px;color:#eafcf6;font-weight:bold;}
+  .item.done{opacity:.4;}
+  .item.done::after{content:'✓';position:absolute;top:-6px;right:-6px;background:#2ec46a;color:#fff;font-size:15px;font-weight:bold;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+  .item:active{transform:translateY(3px);box-shadow:0 1px 0 #7abca8;}
+  #start,#over{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8;text-align:center;padding:20px;color:#fff;}
+  #start{background:linear-gradient(#a0e0d0,#4aa090);}
+  #start h1{font-size:26px;margin:0 0 6px;text-shadow:0 2px 4px #0006;} #start p{font-size:15px;margin:4px;max-width:330px;}
+  #start .big{font-size:60px;}
+  #over{background:#000a;display:none;}
+  #over h1{font-size:30px;color:#ffd23f;margin:0 0 6px;text-shadow:0 2px 0 #b47a1a;} #over p{font-size:17px;margin:3px;}
+  #start button,#over button{margin-top:16px;background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+  #start button:active,#over button:active{transform:translateY(3px);box-shadow:0 2px 0 #b4801a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">&#11013; Games</a>
+<div id="hud">🏥 <span id="n">0</span>/<span id="tot">0</span></div>
+<div id="sub">Tap a tool — it helps Arff get all better!</div>
+<canvas id="c"></canvas>
+<div id="tray"></div>
+<div id="start"><div class="big">🏥🐶</div><h1>MO Arff Doctor</h1><p>Arff is at the doctor in one BIG room! Tap each tool on the tray and watch it help Arff. Use them all to make Arff all better!</p><button id="go">▶ START</button></div>
+<div id="over"><h1 id="ot">🎉 ALL BETTER!</h1><p id="om"></p><button id="rs">▶ Check Up Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener('resize',fit); fit();
+  var ITEMS=[
+    {e:'🩺',n:'Checkup',fx:'check'},{e:'🌡️',n:'Temp',fx:'stick',ox:0.30,oy:0.10},{e:'💉',n:'Shot',fx:'shot'},
+    {e:'💊',n:'Pill',fx:'pill'},{e:'🩹',n:'Bandage',fx:'stick',ox:-0.12,oy:0.44},{e:'🧴',n:'Medicine',fx:'drops'},
+    {e:'😷',n:'Mask',fx:'stick',ox:0.0,oy:0.10},{e:'🧤',n:'Gloves',fx:'spark'},{e:'🔦',n:'Light',fx:'spark'},
+    {e:'❤️',n:'Heal',fx:'hearts'},{e:'📋',n:'Chart',fx:'spark'},{e:'🧻',n:'Wipe',fx:'spark'},
+    {e:'⭐',n:'Sticker',fx:'stick',ox:0.32,oy:-0.18},{e:'🦴',n:'Treat',fx:'treat'},{e:'💛',n:'Love',fx:'hearts'}
+  ];
+  var used, running, arff, flyers, sparks, tt, hearts, stuck, glow;
+  var tray=document.getElementById('tray'); document.getElementById('tot').textContent=ITEMS.length;
+  function arffPos(){ return {x:W*0.5, y:H*0.44}; }
+  function buildTray(){ tray.innerHTML=''; ITEMS.forEach(function(it,i){ var b=document.createElement('button'); b.className='item'; b.innerHTML=it.e+'<span class="lbl">'+it.n+'</span>'; b.onclick=function(){ useItem(i,b); }; it.btn=b; tray.appendChild(b); }); }
+  function reset(){ used=0; running=true; arff={ouch:5,well:false}; flyers=[]; sparks=[]; tt=0; hearts=[]; stuck=[]; glow=0;
+    ITEMS.forEach(function(it){ it.done=false; }); buildTray();
+    document.getElementById('n').textContent=0; document.getElementById('over').style.display='none'; document.getElementById('start').style.display='none'; document.getElementById('sub').textContent='👇 Tap a tool — it helps Arff!'; }
+  function useItem(i,b){ if(!running)return; var it=ITEMS[i]; if(it.done)return; it.done=true; b.classList.add('done'); used++; document.getElementById('n').textContent=used;
+    var r=b.getBoundingClientRect(), cr=cv.getBoundingClientRect(); var sx=r.left+r.width/2-cr.left, sy=r.top+r.height/2-cr.top; var ap=arffPos();
+    flyers.push({e:it.e,x:sx,y:sy,tx:ap.x,ty:ap.y,fx:it.fx,ox:it.ox,oy:it.oy,t:0}); beep(560+used*28,0.06);
+    document.getElementById('sub').textContent=it.n+' — good job, Dr. MO! '+(ITEMS.length-used)+' left';
+    if(used>=ITEMS.length){ setTimeout(function(){ if(used>=ITEMS.length&&running) win(); },700); } }
+  function applyFx(f,ap){
+    var s=Math.min(W*0.30,84);
+    if(f.fx==='stick'){ stuck.push({e:f.e,ox:(f.ox||0)*s,oy:(f.oy||0)*s}); if(arff.ouch>0)arff.ouch-=1; glow=14; for(var i=0;i<8;i++)sparks.push({x:ap.x+(f.ox||0)*s,y:ap.y+(f.oy||0)*s,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:22,c:'#8fffcf'}); }
+    else if(f.fx==='check'){ glow=16; for(var i=0;i<16;i++)sparks.push({x:ap.x+(Math.random()-0.5)*90,y:ap.y+(Math.random()-0.5)*70,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,life:26,c:'#7fe0ff'}); if(arff.ouch>0)arff.ouch-=1; }
+    else if(f.fx==='shot'){ for(var i=0;i<10;i++)sparks.push({x:ap.x+(Math.random()-0.5)*30,y:ap.y,vx:(Math.random()-0.5)*4,vy:-2-Math.random()*3,life:20,c:'#ffd23f'}); if(arff.ouch>0)arff.ouch-=1; }
+    else if(f.fx==='pill'||f.fx==='drops'){ for(var i=0;i<12;i++)sparks.push({x:ap.x+(Math.random()-0.5)*70,y:ap.y-20,vx:(Math.random()-0.5)*3,vy:1+Math.random()*2,life:26,c:f.fx==='pill'?'#ffb0e0':'#b0e0ff'}); if(arff.ouch>0)arff.ouch-=1; }
+    else if(f.fx==='spark'){ for(var i=0;i<12;i++)sparks.push({x:ap.x+(Math.random()-0.5)*90,y:ap.y+(Math.random()-0.5)*70,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,life:24,c:'#fff'}); }
+    else if(f.fx==='hearts'){ for(var i=0;i<8;i++)hearts.push({x:ap.x+(Math.random()-0.5)*80,y:ap.y,vy:-1-Math.random()*1.5,ph:Math.random()*6.28,life:60}); if(arff.ouch>0)arff.ouch-=1; }
+    else if(f.fx==='treat'){ stuck.push({e:'🦴',ox:0,oy:s*0.66}); for(var i=0;i<6;i++)hearts.push({x:ap.x+(Math.random()-0.5)*40,y:ap.y,vy:-1-Math.random(),ph:Math.random()*6.28,life:50}); }
+  }
+  function win(){ running=false; arff.well=true; arff.ouch=0; var ap=arffPos(); for(var i=0;i<44;i++)sparks.push({x:ap.x+(Math.random()-0.5)*130,y:ap.y+(Math.random()-0.5)*100,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,life:32,c:['#ffe27a','#8fe0ff','#fff','#8fffcf'][i%4]});
+    document.getElementById('ot').innerHTML='🎉 ALL BETTER! 🎉'; document.getElementById('om').textContent='Dr. MO fixed Arff up! Arff feels great! 🐶💚'; document.getElementById('sub').textContent='✨ Arff is all healthy!';
+    setTimeout(function(){ document.getElementById('over').style.display='flex'; if(window.MO_MVP)window.MO_MVP(); },1100); }
+  function draw(){ tt+=0.05; var ap=arffPos();
+    // ONE BIG doctor room — wall + floor
+    var wg=ctx.createLinearGradient(0,0,0,H*0.66); wg.addColorStop(0,'#eaf6f2'); wg.addColorStop(1,'#cfe6dc'); ctx.fillStyle=wg; ctx.fillRect(0,0,W,H*0.66);
+    ctx.fillStyle='#b8d8cc'; ctx.fillRect(0,H*0.66,W,H*0.34);
+    ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1; for(var gx=0;gx<W;gx+=52){ ctx.beginPath();ctx.moveTo(gx,H*0.66);ctx.lineTo(gx-30,H);ctx.stroke(); }
+    // wall stuff: cross sign, window, clock
+    ctx.fillStyle='#ffffff'; rr(W*0.10,H*0.08,W*0.14,W*0.14,10); ctx.fill(); ctx.fillStyle='#e0453a'; var cs=W*0.045; ctx.fillRect(W*0.10+W*0.07-cs*0.28,H*0.08+W*0.07-cs,cs*0.56,cs*2); ctx.fillRect(W*0.10+W*0.07-cs,H*0.08+W*0.07-cs*0.28,cs*2,cs*0.56);
+    ctx.fillStyle='#bfe4f4'; rr(W*0.68,H*0.09,W*0.20,H*0.16,10); ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=4; ctx.stroke(); ctx.beginPath(); ctx.moveTo(W*0.78,H*0.09); ctx.lineTo(W*0.78,H*0.25); ctx.moveTo(W*0.68,H*0.17); ctx.lineTo(W*0.88,H*0.17); ctx.stroke();
+    // exam bed
+    var bw=Math.min(W*0.78,400), bh=bw*0.34, bx=W*0.5, by=H*0.56;
+    ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(bx,by+bh*0.55,bw*0.5,bh*0.18,0,0,6.29); ctx.fill();
+    ctx.fillStyle='#8ab0c8'; rr(bx-bw/2,by-bh*0.1,bw,bh*0.7,10); ctx.fill();
+    ctx.fillStyle='#eaf4fb'; rr(bx-bw/2,by-bh*0.5,bw,bh*0.5,14); ctx.fill(); ctx.strokeStyle='#cfe0ea'; ctx.lineWidth=3; ctx.stroke();
+    ctx.fillStyle='#ffffff'; rr(bx-bw*0.42,by-bh*0.46,bw*0.26,bh*0.34,10); ctx.fill(); // pillow
+    // Arff on the bed (bobbing gently)
+    var byy=Math.sin(tt*2)*3; ctx.textAlign='center'; ctx.textBaseline='middle';
+    drawArff(bx, by-bh*0.55+byy, Math.min(bw*0.30,84));
+    // ouch spots (boo-boos) fade as healed
+    if(!arff.well){ ctx.fillStyle='rgba(230,90,90,0.55)'; for(var d=0;d<arff.ouch;d++){ var a=d*1.9; ctx.beginPath(); ctx.arc(bx+Math.cos(a)*bw*0.12, by-bh*0.55+byy+Math.sin(a)*bh*0.22, 5,0,6.29); ctx.fill(); } }
+    // glow ring when healing
+    if(glow>0){ glow--; ctx.save(); ctx.globalAlpha=glow/16*0.6; ctx.strokeStyle='#8fffcf'; ctx.lineWidth=5; ctx.beginPath(); ctx.arc(bx,by-bh*0.55+byy,Math.min(bw*0.30,84)*1.1,0,6.29); ctx.stroke(); ctx.restore(); }
+    // stuck items on Arff
+    var ss=Math.min(bw*0.30,84);
+    for(var st=0;st<stuck.length;st++){ ctx.font=Math.max(20,ss*0.34)+'px sans-serif'; ctx.fillText(stuck[st].e, bx+stuck[st].ox, by-bh*0.55+byy+stuck[st].oy); }
+    // floating hearts
+    for(var hI=hearts.length-1;hI>=0;hI--){ var ht=hearts[hI]; ht.y+=ht.vy; ht.x+=Math.sin(tt+ht.ph)*0.5; ht.life--; if(ht.life<=0){hearts.splice(hI,1);continue;} ctx.globalAlpha=Math.min(1,ht.life/30); ctx.font='20px sans-serif'; ctx.fillText('💚',ht.x,ht.y); ctx.globalAlpha=1; }
+    // flyers
+    for(var fl2=flyers.length-1;fl2>=0;fl2--){ var fl=flyers[fl2]; fl.t+=0.06; fl.x+=(fl.tx-fl.x)*0.18; fl.y+=(fl.ty-fl.y)*0.18; ctx.font='34px sans-serif'; ctx.fillText(fl.e,fl.x,fl.y); if(Math.hypot(fl.tx-fl.x,fl.ty-fl.y)<8){ applyFx(fl,ap); flyers.splice(fl2,1); } }
+    // sparks
+    for(var sp=sparks.length-1;sp>=0;sp--){ var k=sparks[sp]; k.x+=k.vx; k.y+=k.vy; k.vy+=0.12; k.life--; if(k.life<=0){sparks.splice(sp,1);continue;} ctx.globalAlpha=k.life/26; ctx.fillStyle=k.c; ctx.fillRect(k.x,k.y,3,3); ctx.globalAlpha=1; }
+    requestAnimationFrame(draw); }
+  function rr(x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function puff(cx,cy,r){ ctx.beginPath(); ctx.arc(cx,cy,r,0,6.29); ctx.fill(); }
+  function drawArff(cx,cy,s){
+    ctx.save(); ctx.translate(cx,cy);
+    ctx.fillStyle='#f2f2ee'; ctx.strokeStyle='#dcdcd6'; ctx.lineWidth=2;
+    puff(-s*0.62,-s*0.05,s*0.28); ctx.stroke(); puff(s*0.62,-s*0.05,s*0.28); ctx.stroke();
+    ctx.fillStyle='#ffffff'; puff(0,s*0.55,s*0.66); ctx.strokeStyle='#e6e6e0'; ctx.stroke();
+    ctx.fillStyle='#ffffff'; ctx.strokeStyle='#e6e6e0'; ctx.lineWidth=2;
+    var pf=[[-0.42,-0.2,0.34],[0.42,-0.2,0.34],[-0.2,-0.5,0.32],[0.2,-0.5,0.32],[0,-0.62,0.3],[-0.55,0.18,0.3],[0.55,0.18,0.3],[0,0.05,0.62]];
+    for(var i=0;i<pf.length;i++){ puff(pf[i][0]*s,pf[i][1]*s,pf[i][2]*s); }
+    for(var i=0;i<pf.length;i++){ ctx.beginPath(); ctx.arc(pf[i][0]*s,pf[i][1]*s,pf[i][2]*s,0,6.29); ctx.stroke(); }
+    ctx.fillStyle='#2a2a2a'; puff(-s*0.22,-s*0.02,s*0.075); puff(s*0.22,-s*0.02,s*0.075);
+    ctx.fillStyle='#fff'; puff(-s*0.20,-s*0.045,s*0.025); puff(s*0.24,-s*0.045,s*0.025);
+    ctx.fillStyle='#3a2a2a'; ctx.beginPath(); ctx.moveTo(0,s*0.14); ctx.lineTo(-s*0.09,s*0.06); ctx.lineTo(s*0.09,s*0.06); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#5a4a4a'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(0,s*0.14); ctx.lineTo(0,s*0.2); ctx.arc(-s*0.06,s*0.2,s*0.06,0,Math.PI); ctx.moveTo(0,s*0.2); ctx.arc(s*0.06,s*0.2,s*0.06,0,Math.PI); ctx.stroke();
+    ctx.fillStyle='#ff9ab0'; rr(-s*0.05,s*0.22,s*0.1,s*0.12,s*0.05); ctx.fill();
+    ctx.fillStyle='rgba(255,170,190,0.5)'; puff(-s*0.34,s*0.08,s*0.08); puff(s*0.34,s*0.08,s*0.08);
+    ctx.fillStyle='#e0453a'; rr(-s*0.44,s*0.30,s*0.88,s*0.13,s*0.06); ctx.fill(); ctx.strokeStyle='#b5342a'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle='#ffd23f'; ctx.beginPath(); ctx.arc(0,s*0.46,s*0.085,0,6.29); ctx.fill(); ctx.strokeStyle='#c8a020'; ctx.lineWidth=2; ctx.stroke();
+    ctx.font=(s*0.1)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🦴',0,s*0.46);
+    ctx.restore();
+  }
+  var ac; function beep(f,d,ty){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type=ty||'square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  document.getElementById('go').onclick=function(){ reset(); };
+  document.getElementById('rs').onclick=function(){ reset(); };
+  used=0; running=false; arff={ouch:5,well:false}; flyers=[]; sparks=[]; tt=0; hearts=[]; stuck=[]; glow=0; buildTray();
+  requestAnimationFrame(draw);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function init(){ hookVisible(document.getElementById('over')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+</body></html>

@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>🎤 MO Song Builder</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;min-height:100%;font-family:'Trebuchet MS',Verdana,sans-serif;color:#eaf0ff;
+    background:radial-gradient(1000px 500px at 50% -10%,#3a2f5a,#241f3a 60%,#161327);}
+  #wrap{max-width:660px;margin:0 auto;padding:12px 12px 48px;}
+  .top{display:flex;justify-content:space-between;align-items:center;}
+  .homebtn{background:linear-gradient(#ffd23f,#f7a72b);color:#4a2f0a;font-weight:bold;border:none;border-radius:12px;padding:8px 15px;font-size:15px;box-shadow:0 4px 0 #0006;text-decoration:none;}
+  h1{font-size:26px;margin:12px 0 2px;text-align:center;background:linear-gradient(90deg,#ffd23f,#ff8ac0,#7ad0ff);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .sub{text-align:center;font-size:13px;color:#b8c0e0;margin-bottom:12px;}
+  .panel{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:12px;margin:10px 0;}
+  .ptitle{font-size:14px;font-weight:bold;color:#ffd77a;margin:0 0 8px;}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;}
+  .chip{background:#3a3560;border:1px solid #5a5090;color:#eaf0ff;border-radius:20px;padding:8px 12px;font-size:13px;font-weight:bold;font-family:inherit;cursor:pointer;}
+  .chip:active{transform:scale(.96);}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;}
+  input{font-family:inherit;font-size:15px;padding:10px 12px;border-radius:10px;border:1px solid #5a5090;background:#2a2646;color:#eaf0ff;flex:1;min-width:150px;}
+  .btn{background:linear-gradient(#6ad07a,#39a84a);color:#08210d;border:none;border-radius:11px;padding:11px 15px;font-size:15px;font-weight:bold;font-family:inherit;box-shadow:0 4px 0 #0005;cursor:pointer;}
+  .btn.b{background:linear-gradient(#6ab0f0,#3a80d0);color:#04162e;}
+  .btn.r{background:linear-gradient(#f78ac0,#e0509a);color:#3a0a24;}
+  .btn.g{background:linear-gradient(#c0c8e0,#8a92c0);color:#1a1e38;}
+  .btn:active{transform:translateY(2px);box-shadow:0 2px 0 #0005;}
+  .song{min-height:60px;}
+  .line{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.95);color:#242a44;border-radius:12px;padding:9px 12px;margin:6px 0;font-weight:bold;font-size:15px;}
+  .line .n{color:#e0850e;min-width:22px;}
+  .line .t{flex:1;}
+  .line button{background:none;border:none;cursor:pointer;font-size:16px;color:#7a86b0;}
+  .line.on{background:#fff3c0;}
+  .beats{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+  .beatbtn{background:#3a3560;border:2px solid #5a5090;color:#eaf0ff;border-radius:12px;padding:10px 14px;font-weight:bold;font-family:inherit;cursor:pointer;font-size:14px;}
+  .beatbtn.sel{background:#ffd23f;color:#3a2a0a;border-color:#ffd23f;}
+  .bigrow{display:flex;gap:10px;justify-content:center;margin-top:12px;}
+  .empty{color:#aab2d8;text-align:center;font-size:14px;padding:12px;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="top"><a class="homebtn" href="../index.html">🏠 MO ARCADE</a><span style="font-size:26px">🎤</span></div>
+  <h1>MO SONG BUILDER</h1>
+  <div class="sub">Tap lines to add them, or type your own — then PLAY your rap over the beat!</div>
+
+  <div class="panel">
+    <div class="ptitle">🏀 Quick moves — tap to add</div>
+    <div class="chips" id="moves"></div>
+    <div class="ptitle" style="margin-top:12px">✨ More lines — tap to add</div>
+    <div class="chips" id="chips"></div>
+    <div class="row">
+      <input id="mine" type="text" placeholder="…or type your own line" maxlength="40">
+      <button class="btn b" onclick="addMine()">➕ Add</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ptitle">🎵 Your Song (tap a line to remove)</div>
+    <div class="song" id="song"><div class="empty">No lines yet — add some above!</div></div>
+    <div class="row" style="justify-content:center">
+      <button class="btn g" onclick="clearSong()">🗑️ Clear</button>
+      <button class="btn g" onclick="shuffleSong()">🔀 Shuffle</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ptitle">🥁 Pick a beat</div>
+    <div class="beats" id="beatrow"></div>
+    <div class="row" style="margin-top:10px;align-items:center">
+      <span style="font-size:13px;color:#b8c0e0">🐢 Slow</span>
+      <input id="tempo" type="range" min="80" max="180" value="130" style="flex:1;min-width:120px" oninput="setTempo()">
+      <span style="font-size:13px;color:#b8c0e0">Fast 🐇</span>
+    </div>
+    <div class="ptitle" style="margin-top:12px">🎙️ Pick a voice</div>
+    <div class="beats" id="voicerow"></div>
+    <div class="ptitle" style="margin-top:12px">🔊 Tap a sound effect</div>
+    <div class="chips" id="sfxrow"></div>
+  </div>
+
+  <div class="panel">
+    <div class="ptitle">🏀 Shoot with Power! — pick a ball, time the meter, swish it!</div>
+    <div class="beats" id="ballrow"></div>
+    <div class="beats" id="ctrlrow" style="margin-top:8px"></div>
+    <canvas id="court" width="360" height="200" style="margin-top:8px"></canvas>
+    <div class="row" style="justify-content:center;margin-top:8px">
+      <button class="btn" id="shootBtn" onclick="shootBtn()" style="font-size:17px;padding:13px 20px">🏀 START</button>
+      <button class="btn b" id="stealBtn" onclick="stealBtn()" style="font-size:17px;padding:13px 20px">🖐️ STEAL</button>
+    </div>
+    <div class="row" style="justify-content:center;margin-top:6px">
+      <span id="score" style="font-weight:bold;color:#ffd77a;font-size:15px">Made 0/0</span>
+      <span id="stealc" style="font-weight:bold;color:#8ad0ff;font-size:15px">Steals 0</span>
+    </div>
+    <div class="hint" style="color:#b8c0e0;text-align:center;font-size:12px">🕹️ Drag on the court to move Arff/Meow • get near the loose ball & tap STEAL • tap START then SHOOT in the green zone to score!</div>
+  </div>
+
+  <div class="panel">
+    <div class="ptitle">💾 My Saved Songs</div>
+    <div class="row" style="margin-bottom:8px"><button class="btn b" onclick="saveSong()">💾 Save This Song</button></div>
+    <div id="saved"><div class="empty">No saved songs yet — build one and save it!</div></div>
+  </div>
+
+  <div class="bigrow">
+    <button class="btn" onclick="play()" style="font-size:20px;padding:16px 26px">▶ PLAY MY SONG</button>
+    <button class="btn r" onclick="stop()" style="font-size:20px;padding:16px 26px">⏹ Stop</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var STARTERS=["MO Overtime!","Get on the court!","Morgan shoots, score!","Arff steals the ball!","Meow from downtown!","We do drills!","Go to the finals!","Slam dunk!","Swish, all net!","3 2 1... buzzer!","Team MO for the win!","MO Arcade all day!","Arff says go go go!","Meow's on the beat!","Fast break, let's go!","Block that shot!","Crossover, ankles!","Championship rings!","MO! MO! MOOOO!","Ball is life!"];
+  var song=[];
+  var el=function(id){return document.getElementById(id);};
+
+  var MOVES=["Shoot!","Block!","Steal!","Dunk!","Pass!","Rebound!","Layup!","Crossover!","Swish!","And one!","Fast break!","Buzzer beater!"];
+  function renderChips(){ var h=""; STARTERS.forEach(function(s,i){ h+='<button class="chip" onclick="addLine('+i+')">'+s+'</button>'; }); el("chips").innerHTML=h;
+    var m=""; MOVES.forEach(function(s){ m+='<button class="chip" style="background:#4a3a70;border-color:#7a5aa0" onclick="addWord('+"'"+s.replace(/'/g,"")+"'"+')">🏀 '+s+'</button>'; }); el("moves").innerHTML=m; }
+  window.addLine=function(i){ song.push(STARTERS[i]); renderSong(); };
+  window.addWord=function(w){ song.push(w); renderSong(); };
+  window.addMine=function(){ var v=el("mine").value.trim(); if(v){ song.push(v); el("mine").value=""; renderSong(); } };
+  window.clearSong=function(){ song=[]; renderSong(); };
+  window.shuffleSong=function(){ for(var i=song.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=song[i];song[i]=song[j];song[j]=t; } renderSong(); };
+  function renderSong(){ if(!song.length){ el("song").innerHTML='<div class="empty">No lines yet — add some above!</div>'; return; }
+    var h=""; song.forEach(function(s,i){ h+='<div class="line" id="ln'+i+'"><span class="n">'+(i+1)+'.</span><span class="t">'+s+'</span><button onclick="removeLine('+i+')">✖</button></div>'; }); el("song").innerHTML=h; }
+  window.removeLine=function(i){ song.splice(i,1); renderSong(); };
+
+  var beat=0;
+  window.pickBeat=function(b,btn){ beat=b; el("beatrow").querySelectorAll(".beatbtn").forEach(function(x){x.classList.remove("sel");}); btn.classList.add("sel"); };
+
+  // ---- audio beat + rap ----
+  var AC=null, timer=null, step=0, bar=0, playing=false, nb=null;
+  var CFG=[
+    {n:"🎧 Beat 1",tempo:140,K:[1,0,0,1,0,0,1,0,1,0,0,1,0,0,0,0],SN:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1],HH:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,1],BS:[55,0,110,0,73,0,55,0,82,0,110,98,73,0,55,49]},
+    {n:"🎶 Beat 2",tempo:118,K:[1,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0],SN:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],HH:[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],BS:[65,0,0,65,98,0,73,0,55,0,0,55,82,0,73,0]},
+    {n:"💀 Bad Beat",tempo:105,K:[1,0,1,1,1,0,1,1,1,0,1,1,1,0,1,1],SN:[0,0,0,0,1,0,0,1,0,0,0,0,1,0,1,1],HH:[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],BS:[41,41,0,41,55,0,41,41,49,49,0,49,41,0,55,41]},
+    {n:"🥁 Drumline",tempo:120,K:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0],SN:[0,0,1,1,0,0,1,1,0,0,1,1,0,1,1,1],HH:[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],BS:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},
+    {n:"👏 Clap Beat",tempo:130,K:[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],SN:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],HH:[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0],BS:[55,0,0,0,65,0,0,0,49,0,0,0,73,0,0,0]},
+    {n:"⚡ Turbo",tempo:78,K:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0],SN:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],HH:[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],BS:[55,55,65,55,73,73,55,49,55,55,82,73,65,55,49,55]},
+    {n:"😌 Chill",tempo:175,K:[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],SN:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],HH:[1,0,0,1,0,0,1,0,1,0,0,1,0,0,1,0],BS:[49,0,0,0,55,0,0,0,41,0,0,0,49,0,0,0]},
+    {n:"🏟️ Stomp",tempo:150,K:[1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0],SN:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1],HH:[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0],BS:[41,41,0,0,55,55,0,0,49,49,0,0,55,55,0,0]}
+  ];
+  var VOICES=[["🎤 Rapper",1.55,0.75],["🔊 Deep",1.2,0.5],["🐭 Squeaky",1.6,1.7],["🤖 Robot",1.0,0.4],["⚡ Fast",1.9,0.9],["📣 Announcer",1.35,1.0]];
+  var voice=0, tempoMul=1;
+  var SFX=[["🏀 Swish","swish"],["📣 Buzzer","buzzer"],["🎉 Crowd","crowd"],["📯 Horn","horn"],["👏 Clap","clap"],["🐕 Arff","arff"]];
+  window.setTempo=function(){ tempoMul=(220-parseInt(el("tempo").value,10))/90; };
+  function ac(){ if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.resume)AC.resume();
+    if(!nb){ nb=AC.createBuffer(1,Math.floor(AC.sampleRate*0.25),AC.sampleRate); var nd=nb.getChannelData(0); for(var i=0;i<nd.length;i++)nd[i]=Math.random()*2-1; } }
+  function kick(tm){ var o=AC.createOscillator(),g=AC.createGain(); o.type="sine"; o.frequency.setValueAtTime(165,tm); o.frequency.exponentialRampToValueAtTime(50,tm+0.11); g.gain.setValueAtTime(0.38,tm); g.gain.exponentialRampToValueAtTime(0.001,tm+0.15); o.connect(g); g.connect(AC.destination); o.start(tm); o.stop(tm+0.17); }
+  function noise(tm,dur,hp,vol){ var s=AC.createBufferSource(); s.buffer=nb; var f=AC.createBiquadFilter(); f.type="highpass"; f.frequency.value=hp; var g=AC.createGain(); g.gain.setValueAtTime(vol,tm); g.gain.exponentialRampToValueAtTime(0.001,tm+dur); s.connect(f); f.connect(g); g.connect(AC.destination); s.start(tm); s.stop(tm+dur+0.03); }
+  function bass(fq,tm,dur){ var o=AC.createOscillator(),lp=AC.createBiquadFilter(),g=AC.createGain(); o.type="sawtooth"; o.frequency.value=fq; lp.type="lowpass"; lp.frequency.value=650; g.gain.setValueAtTime(0.15,tm); g.gain.exponentialRampToValueAtTime(0.001,tm+dur); o.connect(lp); lp.connect(g); g.connect(AC.destination); o.start(tm); o.stop(tm+dur+0.03); }
+  function rap(line){ try{ if(window.speechSynthesis){ if(window.speechSynthesis.speaking||window.speechSynthesis.pending)return false; var v=VOICES[voice]; var u=new SpeechSynthesisUtterance(line); u.rate=v[1]; u.pitch=v[2]; u.volume=1; window.speechSynthesis.speak(u); return true; } }catch(e){} return false; }
+  function highlight(i){ document.querySelectorAll(".line").forEach(function(x){x.classList.remove("on");}); var e=document.getElementById("ln"+i); if(e)e.classList.add("on"); }
+  function tone(f,tm,dur,ty,vol){ var o=AC.createOscillator(),g=AC.createGain(); o.type=ty||"square"; o.frequency.value=f; g.gain.setValueAtTime(vol||0.2,tm); g.gain.exponentialRampToValueAtTime(0.001,tm+dur); o.connect(g); g.connect(AC.destination); o.start(tm); o.stop(tm+dur+0.02); }
+  window.sfx=function(k){ ac(); var t0=AC.currentTime+0.02;
+    if(k==="swish"){ noise(t0,0.18,4000,0.16); }
+    else if(k==="buzzer"){ tone(160,t0,0.5,"sawtooth",0.2); }
+    else if(k==="crowd"){ noise(t0,0.8,500,0.12); }
+    else if(k==="horn"){ tone(330,t0,0.4,"sawtooth",0.18); tone(247,t0,0.4,"sawtooth",0.18); }
+    else if(k==="clap"){ noise(t0,0.06,1500,0.25); }
+    else if(k==="arff"){ tone(500,t0,0.09,"square",0.2); tone(380,t0+0.11,0.12,"square",0.2); } };
+
+  window.play=function(){ if(!song.length){ el("song").innerHTML='<div class="empty">Add some lines first! 👆</div>'; return; }
+    stop(); ac(); playing=true; step=0; bar=0; var c=CFG[beat];
+    (function tick(){ if(!playing)return; try{ var i=step%16, tm=AC.currentTime+0.03;
+      if(i===0){ var li=bar%song.length; if(rap(song[li])){ highlight(li); bar++; } }
+      if(c.K[i])kick(tm); if(c.SN[i])noise(tm,0.13,1200,0.22); if(c.HH[i])noise(tm,0.03,7000,0.06); var bf=c.BS[i]; if(bf)bass(bf,tm,0.15);
+    }catch(e){} step++; timer=setTimeout(tick,Math.round(c.tempo*tempoMul)); })();
+  };
+  window.stop=function(){ playing=false; if(timer){clearTimeout(timer);timer=null;} try{if(window.speechSynthesis)window.speechSynthesis.cancel();}catch(e){} document.querySelectorAll(".line").forEach(function(x){x.classList.remove("on");}); };
+
+  // ---- pickers ----
+  function renderBeats(){ var h=""; CFG.forEach(function(c,i){ h+='<button class="beatbtn'+(i===beat?" sel":"")+'" onclick="pickBeat('+i+',this)">'+c.n+'</button>'; }); el("beatrow").innerHTML=h; }
+  function renderVoices(){ var h=""; VOICES.forEach(function(v,i){ h+='<button class="beatbtn'+(i===voice?" sel":"")+'" onclick="pickVoice('+i+',this)">'+v[0]+'</button>'; }); el("voicerow").innerHTML=h; }
+  function renderSfx(){ var h=""; SFX.forEach(function(s){ h+='<button class="chip" onclick="sfx(\''+s[1]+'\')">'+s[0]+'</button>'; }); el("sfxrow").innerHTML=h; }
+  window.pickVoice=function(i,btn){ voice=i; el("voicerow").querySelectorAll(".beatbtn").forEach(function(x){x.classList.remove("sel");}); btn.classList.add("sel"); };
+
+  // ---- saved songs ----
+  var saved=[];
+  window.saveSong=function(){ if(!song.length)return; saved.push({name:"Song "+(saved.length+1),lines:song.slice(),beat:beat}); renderSaved(); };
+  function renderSaved(){ if(!saved.length){ el("saved").innerHTML='<div class="empty">No saved songs yet — build one and save it!</div>'; return; }
+    var h=""; saved.forEach(function(s,i){ h+='<div class="line"><span class="t">🎵 '+s.name+' ('+s.lines.length+' lines)</span><button onclick="loadSong('+i+')">▶</button><button onclick="rmSong('+i+')">✖</button></div>'; }); el("saved").innerHTML=h; }
+  window.loadSong=function(i){ song=saved[i].lines.slice(); beat=saved[i].beat; renderSong(); renderBeats(); window.scrollTo(0,0); };
+  window.rmSong=function(i){ saved.splice(i,1); renderSaved(); };
+
+  // ---- shoot mini-game ----
+  var BALLS=[["🏀 Classic","#e0813a"],["🔥 Fire","#ff5a2a"],["⭐ Gold","#ffd23f"]];
+  var ballPick=0;
+  function renderBalls(){ var h=""; BALLS.forEach(function(bl,i){ h+='<button class="beatbtn'+(i===ballPick?" sel":"")+'" onclick="pickBall('+i+',this)">'+bl[0]+'</button>'; }); el("ballrow").innerHTML=h; }
+  window.pickBall=function(i,btn){ ballPick=i; el("ballrow").querySelectorAll(".beatbtn").forEach(function(x){x.classList.remove("sel");}); btn.classList.add("sel"); };
+  var G={ph:"idle",power:0,dir:1,made:0,att:0,st:0,mk:false,msg:"",msgT:0,
+    ctrl:"arff", you:{x:180,y:150}, loose:{x:250,y:110,vx:1.6,vy:1.1}, steals:0,
+    joy:{active:false,bx:44,by:150,kx:44,ky:150}};
+  var HX=312,HY=56,SX=64,SY=150,ZL=55,ZH=82;
+  function renderCtrl(){ var opt=[["🐕 Arff","arff"],["🐈 Meow","meow"]]; var h=""; opt.forEach(function(o){ h+='<button class="beatbtn'+(G.ctrl===o[1]?" sel":"")+'" onclick="pickCtrl(\''+o[1]+'\',this)">'+o[0]+'</button>'; }); el("ctrlrow").innerHTML=h; }
+  window.pickCtrl=function(w,btn){ G.ctrl=w; el("ctrlrow").querySelectorAll(".beatbtn").forEach(function(x){x.classList.remove("sel");}); btn.classList.add("sel"); };
+  function drawDogS(cx,x,y){ cx.fillStyle="#f7f4ee"; cx.beginPath(); cx.ellipse(x,y,13,9,0,0,7); cx.fill(); cx.beginPath(); cx.arc(x-11,y-5,6,0,7); cx.fill(); cx.fillStyle="#2a2320"; cx.beginPath(); cx.arc(x-14,y-6,1.4,0,7); cx.fill(); }
+  function drawCatS(cx,x,y){ cx.fillStyle="#e0a83a"; cx.beginPath(); cx.ellipse(x,y,12,8,0,0,7); cx.fill(); cx.beginPath(); cx.arc(x-10,y-4,6,0,7); cx.fill(); cx.fillStyle="#d09a2a"; cx.beginPath(); cx.moveTo(x-14,y-8); cx.lineTo(x-11,y-2); cx.lineTo(x-17,y-2); cx.closePath(); cx.fill(); cx.fillStyle="#2a2320"; cx.beginPath(); cx.arc(x-12,y-5,1.3,0,7); cx.fill(); }
+  (function courtInput(){ var cv=el("court"); if(!cv)return;
+    function P(e){ var r=cv.getBoundingClientRect(),sx=360/r.width,sy=200/r.height,cxp,cyp; if(e.touches&&e.touches[0]){cxp=e.touches[0].clientX;cyp=e.touches[0].clientY;}else{cxp=e.clientX;cyp=e.clientY;} return {x:(cxp-r.left)*sx,y:(cyp-r.top)*sy}; }
+    function d(e){ e.preventDefault(); var p=P(e); G.joy.active=true; G.joy.bx=p.x; G.joy.by=p.y; G.joy.kx=p.x; G.joy.ky=p.y; }
+    function m(e){ if(!G.joy.active)return; e.preventDefault(); var p=P(e); var dx=p.x-G.joy.bx,dy=p.y-G.joy.by,dd=Math.hypot(dx,dy),mm=Math.min(dd,26); if(dd>0){G.joy.kx=G.joy.bx+dx/dd*mm;G.joy.ky=G.joy.by+dy/dd*mm;} }
+    function u(){ G.joy.active=false; G.joy.kx=G.joy.bx; G.joy.ky=G.joy.by; }
+    cv.addEventListener("mousedown",d); cv.addEventListener("mousemove",m); window.addEventListener("mouseup",u);
+    cv.addEventListener("touchstart",d,{passive:false}); cv.addEventListener("touchmove",m,{passive:false}); cv.addEventListener("touchend",u);
+  })();
+  window.stealBtn=function(){ var dx=G.you.x-G.loose.x, dy=G.you.y-G.loose.y; if(Math.hypot(dx,dy)<30){ G.steals++; G.msg="STEAL! 🖐️"; G.mk=true; G.msgT=40; try{sfx("arff");}catch(e){} G.loose.x=120+Math.random()*180; G.loose.y=90+Math.random()*40; var s=el("stealc"); if(s)s.textContent="Steals "+G.steals; } else { G.msg="Get closer!"; G.mk=false; G.msgT=30; } };
+  function drawCourt(){ var cv=el("court"); if(!cv)return; var cx=cv.getContext("2d"),W=360,H=200;
+    var g=cx.createLinearGradient(0,0,0,H); g.addColorStop(0,"#2e2a4a"); g.addColorStop(1,"#3a3560"); cx.fillStyle=g; cx.fillRect(0,0,W,H);
+    cx.fillStyle="#5a4a34"; cx.fillRect(0,160,W,40); cx.strokeStyle="#ffffff44"; cx.lineWidth=2; cx.beginPath(); cx.arc(W/2,200,34,3.14,0); cx.stroke();
+    // hoop
+    cx.fillStyle="#fff"; cx.fillRect(HX-4,HY-20,40,30); cx.strokeStyle="#e0703a"; cx.lineWidth=3; cx.strokeRect(HX-4,HY-20,40,30); cx.strokeStyle="#e0703a"; cx.beginPath(); cx.ellipse(HX,HY+14,14,4,0,0,7); cx.stroke();
+    cx.strokeStyle="#fff"; cx.lineWidth=1; for(var i=-2;i<=2;i++){ cx.beginPath(); cx.moveTo(HX+i*6,HY+14); cx.lineTo(HX+i*4,HY+30); cx.stroke(); }
+    // shooter
+    cx.fillStyle="#e0506a"; cx.fillRect(SX-8,SY-24,16,24); cx.fillStyle="#f6c9a0"; cx.beginPath(); cx.arc(SX,SY-30,8,0,7); cx.fill(); cx.fillStyle="#3a2a1a"; cx.beginPath(); cx.arc(SX,SY-33,8,3.14,0); cx.fill(); cx.fillStyle="#e0506a"; cx.fillRect(SX-8,SY,6,14); cx.fillRect(SX+2,SY,6,14);
+    // ball
+    var bx=SX+14,by=SY-30;
+    if(G.ph==="shoot"){ var t2=G.st; var made=G.mk; var ex=made?HX:(G.power<ZL?HX-40:HX+34); var ey=made?HY+16:HY+50; bx=SX+14+(ex-(SX+14))*t2; by=(SY-30)+(ey-(SY-30))*t2 - Math.sin(t2*3.14)*90; }
+    var bc=BALLS[ballPick][1]; cx.fillStyle=bc; cx.beginPath(); cx.arc(bx,by,10,0,7); cx.fill(); cx.strokeStyle="#5a2a10"; cx.lineWidth=1.5; cx.beginPath(); cx.arc(bx,by,10,0,7); cx.moveTo(bx-10,by); cx.lineTo(bx+10,by); cx.moveTo(bx,by-10); cx.lineTo(bx,by+10); cx.stroke();
+    // power meter
+    var mx=30,mw=300,my=182;
+    cx.fillStyle="#00000055"; cx.fillRect(mx,my,mw,12);
+    cx.fillStyle="#3aa84a"; cx.fillRect(mx+mw*ZL/100,my,mw*(ZH-ZL)/100,12);
+    if(G.ph==="charge"){ cx.fillStyle="#fff"; cx.fillRect(mx+mw*G.power/100-2,my-3,4,18); }
+    cx.strokeStyle="#fff8"; cx.lineWidth=1; cx.strokeRect(mx,my,mw,12);
+    // loose ball to steal
+    cx.fillStyle="#e0813a"; cx.beginPath(); cx.arc(G.loose.x,G.loose.y,8,0,7); cx.fill(); cx.strokeStyle="#5a2a10"; cx.lineWidth=1; cx.beginPath(); cx.arc(G.loose.x,G.loose.y,8,0,7); cx.stroke();
+    // controlled Arff/Meow with ring
+    var near=Math.hypot(G.you.x-G.loose.x,G.you.y-G.loose.y)<30; cx.strokeStyle=near?"#6ad07a":"#ffd23f"; cx.lineWidth=2; cx.setLineDash([4,3]); cx.beginPath(); cx.arc(G.you.x,G.you.y,17,0,7); cx.stroke(); cx.setLineDash([]);
+    if(G.ctrl==="arff")drawDogS(cx,G.you.x,G.you.y); else drawCatS(cx,G.you.x,G.you.y);
+    // joystick
+    cx.fillStyle="rgba(0,0,0,.2)"; cx.beginPath(); cx.arc(G.joy.bx,G.joy.by,22,0,7); cx.fill(); cx.fillStyle="rgba(255,255,255,.7)"; cx.beginPath(); cx.arc(G.joy.kx,G.joy.ky,10,0,7); cx.fill();
+    // message
+    if(G.msgT>0){ cx.fillStyle=G.mk?"#6ad07a":"#ff8a8a"; cx.font="bold 22px Trebuchet MS"; cx.textAlign="center"; cx.fillText(G.msg,W/2,90); }
+  }
+  window.shootBtn=function(){ var btn=el("shootBtn");
+    if(G.ph==="idle"){ G.ph="charge"; G.power=0; G.dir=1; btn.textContent="🏀 SHOOT!"; }
+    else if(G.ph==="charge"){ G.att++; G.mk=(G.power>=ZL&&G.power<=ZH); G.ph="shoot"; G.st=0; btn.textContent="..."; }
+  };
+  (function courtLoop(){
+    if(G.ph==="charge"){ G.power+=G.dir*2.4; if(G.power>=100){G.power=100;G.dir=-1;} if(G.power<=0){G.power=0;G.dir=1;} }
+    if(G.ph==="shoot"){ G.st+=0.05; if(G.st>=1){ G.st=1; if(G.mk){ G.made++; G.msg="SWISH! 🏀"; try{sfx("swish");}catch(e){} } else { G.msg="Missed!"; try{sfx("buzzer");}catch(e){} } G.msgT=45; G.ph="idle"; el("shootBtn").textContent="🏀 START"; var s=el("score"); if(s)s.textContent="Made "+G.made+" / "+G.att; } }
+    // move controlled Arff/Meow with joystick
+    if(G.joy.active){ var jx=G.joy.kx-G.joy.bx, jy=G.joy.ky-G.joy.by, jd=Math.hypot(jx,jy); if(jd>4){ G.you.x=Math.max(16,Math.min(344,G.you.x+jx/jd*2.6)); G.you.y=Math.max(96,Math.min(160,G.you.y+jy/jd*2.6)); } }
+    // roam the loose ball
+    G.loose.x+=G.loose.vx; G.loose.y+=G.loose.vy; if(G.loose.x<30||G.loose.x>300){G.loose.vx*=-1;} if(G.loose.y<96||G.loose.y>150){G.loose.vy*=-1;}
+    if(G.msgT>0)G.msgT--;
+    drawCourt(); requestAnimationFrame(courtLoop);
+  })();
+
+  renderChips(); renderSong(); renderBeats(); renderVoices(); renderSfx(); renderSaved(); renderBalls(); renderCtrl(); setTempo();
+})();
+</script>
+</body>
+</html>

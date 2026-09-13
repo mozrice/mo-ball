@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>🐕🐱 Family Home Build</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:#1a1526;color:#f3ecff;font-family:'Trebuchet MS',Verdana,sans-serif;overflow:hidden;}
+  #wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;padding:8px;}
+  .namebtn{display:block;margin:6px auto 2px;background:linear-gradient(#ffd24a,#f0a52b);color:#4a2f08;font-weight:bold;border:none;border-radius:14px;padding:9px 22px;font-size:16px;font-family:inherit;box-shadow:0 4px 0 #0006;text-decoration:none;}
+  h1{margin:2px 0;font-size:19px;color:#ffcf6a;text-shadow:0 2px 0 #0007;}
+  #steps{font-size:13px;color:#e0c6ff;margin:2px 0 6px;font-weight:bold;}
+  canvas{background:#efe6d2;border-radius:16px;box-shadow:0 8px 24px #0009;touch-action:none;max-width:100%;height:auto;}
+  #nav{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center;}
+  .nb{background:#2e2440;border:2px solid #5a4880;color:#e8dcff;font-weight:bold;font-size:14px;padding:8px 14px;border-radius:12px;font-family:inherit;text-decoration:none;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <a class="namebtn" href="../index.html">🏠 MO ARCADE</a>
+  <h1>🐕🐱 Family Home Build</h1>
+  <div id="steps">Pick an item, tap the room to place it!</div>
+  <canvas id="cv" width="440" height="640"></canvas>
+  <div id="nav">
+    <a class="nb" href="../index.html">← Back</a>
+    <a class="nb" href="../mo-home.html">🏠 MO Home</a>
+    <a class="nb" href="../games.html">🎮 All Games</a>
+  </div>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById("cv"), cx=cv.getContext("2d"), steps=document.getElementById("steps");
+  var W=cv.width, H=cv.height, t=0;
+  var items=[]; try{ items=JSON.parse(localStorage.getItem("arffmeow_home")||"[]")||[]; }catch(e){ items=[]; }
+  function save(){ try{ localStorage.setItem("arffmeow_home",JSON.stringify(items)); }catch(e){} }
+
+  var AC=null; function beep(f,d,ty){ try{ if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)(); var o=AC.createOscillator(),ga=AC.createGain(); o.frequency.value=f;o.type=ty||"square";o.connect(ga);ga.connect(AC.destination);ga.gain.value=.05;o.start();ga.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+(d||.08));o.stop(AC.currentTime+(d||.08)); }catch(e){} }
+  function rr(x,y,w,h,r){ cx.beginPath();cx.moveTo(x+r,y);cx.arcTo(x+w,y,x+w,y+h,r);cx.arcTo(x+w,y+h,x,y+h,r);cx.arcTo(x,y+h,x,y,r);cx.arcTo(x,y,x+w,y,r);cx.closePath(); }
+  function text(s,x,y,sz,c,al){ cx.fillStyle=c||"#fff";cx.font="bold "+sz+"px Trebuchet MS,sans-serif";cx.textAlign=al||"center";cx.textBaseline="middle";cx.fillText(s,x,y); }
+  function emo(ch,x,y,s){ cx.font=s+"px serif";cx.textAlign="center";cx.textBaseline="middle";cx.fillText(ch,x,y); }
+
+  // FX
+  var conf=[], hearts=[], parts=[];
+  function burst(x,y,col,n){ n=n||8; for(var i=0;i<n;i++){ var a=Math.random()*6.28,s=1.4+Math.random()*2.6; parts.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:1,col:col||"#ffe27a",r:2+Math.random()*2}); } }
+  function homeLevel(){ var hp=happiness(); return hp>=100?"🏆 DREAM HOME":hp>=66?"🌟 Happy Home":hp>=33?"😊 Cozy Home":"🏗️ Just Starting"; }
+  function confetti(){ for(var i=0;i<24;i++){ conf.push({x:Math.random()*W,y:-10-Math.random()*40,vy:1.6+Math.random()*2.4,vx:Math.random()*2-1,r:3+Math.random()*4,c:["#ff5a7a","#ffd23f","#5ad0a0","#5aa0ff","#c77aff"][i%5],rot:Math.random()*6,vr:Math.random()*0.3-0.15}); } }
+  function heart(x,y){ hearts.push({x:x,y:y,life:1}); }
+  function updFX(){ for(var i=conf.length-1;i>=0;i--){ var c=conf[i]; c.y+=c.vy;c.x+=c.vx;c.rot+=c.vr; if(c.y>H+20)conf.splice(i,1);} for(var j=hearts.length-1;j>=0;j--){ var hh=hearts[j]; hh.y-=1; hh.life-=0.02; if(hh.life<=0)hearts.splice(j,1);} for(var k=parts.length-1;k>=0;k--){ var pp=parts[k]; pp.x+=pp.vx; pp.y+=pp.vy; pp.vy+=0.12; pp.life-=0.03; if(pp.life<=0)parts.splice(k,1);} for(var m=0;m<items.length;m++){ if(items[m].pop!==undefined && items[m].pop<1)items[m].pop=Math.min(1,items[m].pop+0.14); } }
+  function renFX(){ parts.forEach(function(pp){ cx.globalAlpha=Math.max(0,pp.life); cx.fillStyle=pp.col; cx.beginPath(); cx.arc(pp.x,pp.y,Math.max(0.5,pp.r*pp.life),0,7); cx.fill(); }); cx.globalAlpha=1; hearts.forEach(function(hh){ cx.globalAlpha=Math.max(0,hh.life); emo("❤️",hh.x,hh.y,16); cx.globalAlpha=1; }); conf.forEach(function(c){ cx.save(); cx.translate(c.x,c.y); cx.rotate(c.rot); cx.fillStyle=c.c; cx.fillRect(-c.r/2,-c.r/2,c.r,c.r*1.6); cx.restore(); }); }
+
+  // room bounds
+  var RX0=22, RY0=56, RX1=W-22, RY1=H*0.55;
+  // palette
+  var PAL=[["🛋️","Sofa"],["🛏️","Bed"],["📺","TV"],["🍽️","Table"],["🪑","Chair"],["🪴","Plant"],["💡","Lamp"],["🖼️","Art"],
+           ["🏠","Doghouse"],["🐈","Cat Tower"],["🦴","Dog Bowl"],["🐟","Cat Bowl"],["🛁","Bath"],["🚽","Toilet"],["🧸","Toys"],["🪟","Window"],["❄️","AC"],["🌀","Fan"],["🌟","Star Light"],["🗄️","Wall Shelf"],["🐠","Fish Tank"]];
+  var sel=0, erase=false, playMode=false;
+  function happiness(){ return Math.min(100, items.length*7); }
+
+  // characters
+  function drawDog(x,y,s){ s=s||1; cx.save(); cx.translate(x,y); cx.scale(s,s); var wag=Math.sin(t*0.25)*4;
+    // fluffy tail
+    cx.fillStyle="#f6f2ec"; cx.beginPath(); cx.arc(-19,-5+wag*0.5,6,0,7); cx.fill(); cx.fillStyle="#e6e0d6"; cx.beginPath(); cx.arc(-22,-8+wag*0.5,4,0,7); cx.fill();
+    // legs
+    cx.fillStyle="#eee9e0"; [-8,6].forEach(function(lx){ rr(lx,4,5,10,2); cx.fill(); });
+    // white body + head
+    cx.fillStyle="#f6f2ec"; rr(-16,-13,29,18,9); cx.fill(); cx.beginPath(); cx.arc(13,-11,9,0,7); cx.fill();
+    // belly shadow
+    cx.fillStyle="rgba(180,170,150,.30)"; rr(-15,0,28,4,4); cx.fill();
+    // fur tufts along the back
+    cx.fillStyle="#ffffff"; [[-14,-13],[-9,-14],[-4,-14],[1,-14],[6,-13]].forEach(function(p){ cx.beginPath(); cx.moveTo(p[0]-2,p[1]+2); cx.lineTo(p[0],p[1]-3); cx.lineTo(p[0]+2,p[1]+2); cx.closePath(); cx.fill(); });
+    // head fluff + chest
+    cx.fillStyle="#fbf8f2"; cx.beginPath(); cx.arc(9,-17,3,0,7); cx.fill(); cx.beginPath(); cx.arc(2,-2,5,0,7); cx.fill();
+    // edge fur strokes
+    cx.strokeStyle="#e4ded3"; cx.lineWidth=1; [[-16,-5],[-16,-9],[13,3],[-10,5],[8,5]].forEach(function(p){ cx.beginPath(); cx.moveTo(p[0],p[1]); cx.lineTo(p[0]-2,p[1]+2); cx.stroke(); });
+    // soft gray ear
+    cx.fillStyle="#d8d0c4"; cx.beginPath(); cx.ellipse(8,-19,4,7,-.4,0,7); cx.fill();
+    // eye + nose
+    cx.fillStyle="#222"; cx.beginPath(); cx.arc(16,-12,1.6,0,7); cx.fill(); cx.fillStyle="#333"; cx.beginPath(); cx.arc(20,-9,2,0,7); cx.fill(); cx.restore(); }
+  function drawCat(x,y,s){ s=s||1; cx.save(); cx.translate(x,y); cx.scale(s,s); var tail=Math.sin(t*0.2)*5;
+    cx.strokeStyle="#c99a2a"; cx.lineWidth=3; cx.lineCap="round"; cx.beginPath(); cx.moveTo(-13,0); cx.quadraticCurveTo(-24,-4,-20,-14+tail); cx.stroke();
+    cx.fillStyle="#e0b84a"; [-7,5].forEach(function(lx){ cx.fillRect(lx,4,4,8); });
+    cx.fillStyle="#f2c94c"; rr(-15,-10,26,14,7); cx.fill(); cx.beginPath(); cx.arc(12,-10,8,0,7); cx.fill();
+    cx.fillStyle="#c99a2a"; cx.beginPath(); cx.moveTo(6,-16); cx.lineTo(9,-24); cx.lineTo(12,-16); cx.closePath(); cx.fill(); cx.beginPath(); cx.moveTo(14,-16); cx.lineTo(17,-24); cx.lineTo(19,-16); cx.closePath(); cx.fill();
+    cx.fillStyle="#2a2a30"; cx.beginPath(); cx.arc(11,-11,1.4,0,7); cx.fill(); cx.beginPath(); cx.arc(16,-11,1.4,0,7); cx.fill(); cx.fillStyle="#e88"; cx.beginPath(); cx.arc(13.5,-8,1.4,0,7); cx.fill(); cx.restore(); }
+  function drawFig(x,y,shirt,hair,s){ s=s||1; cx.save(); cx.translate(x,y); cx.scale(s,s);
+    cx.strokeStyle="#3a2a1a"; cx.lineWidth=4; cx.lineCap="round"; cx.beginPath(); cx.moveTo(-4,8); cx.lineTo(-5,20); cx.moveTo(4,8); cx.lineTo(5,20); cx.stroke();
+    cx.fillStyle=shirt; rr(-8,-9,16,18,5); cx.fill();
+    cx.fillStyle="#f6c9a0"; cx.beginPath(); cx.arc(0,-16,7,0,7); cx.fill();
+    cx.fillStyle=hair; cx.beginPath(); cx.arc(0,-19,7,Math.PI,2*Math.PI); cx.fill();
+    cx.fillStyle="#222"; cx.beginPath(); cx.arc(2,-16,1.2,0,7); cx.fill(); cx.restore(); }
+
+  function drawScene(){
+    // walls + floor
+    cx.fillStyle="#e7dcc4"; cx.fillRect(0,0,W,H);
+    cx.fillStyle="#d8c7a6"; cx.fillRect(RX0,RY0,RX1-RX0,RY1-RY0);
+    cx.fillStyle="#c8a06a"; cx.fillRect(RX0,RY1-40,RX1-RX0,40);
+    cx.strokeStyle="#8a6a3a"; cx.lineWidth=4; cx.strokeRect(RX0,RY0,RX1-RX0,RY1-RY0);
+    cx.strokeStyle="rgba(0,0,0,.06)"; cx.lineWidth=1; for(var gx=RX0+30;gx<RX1;gx+=30){ cx.beginPath(); cx.moveTo(gx,RY0); cx.lineTo(gx,RY1); cx.stroke(); }
+    // window with animated sky
+    var wx=RX0+16, wy=RY0+12; cx.fillStyle="#8a5a2f"; rr(wx-3,wy-3,66,50,4); cx.fill();
+    var sg=cx.createLinearGradient(wx,wy,wx,wy+44); sg.addColorStop(0,"#8fd0f0"); sg.addColorStop(1,"#d9f0ff"); cx.fillStyle=sg; cx.fillRect(wx,wy,60,44);
+    cx.fillStyle="#ffe45e"; cx.beginPath(); cx.arc(wx+46,wy+12,8,0,7); cx.fill();
+    cx.fillStyle="#fff"; var cl=(t*0.35)%74; cx.beginPath(); cx.arc(wx-8+cl,wy+16,7,0,7); cx.arc(wx-1+cl,wy+18,6,0,7); cx.fill();
+    cx.strokeStyle="#8a5a2f"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(wx+30,wy); cx.lineTo(wx+30,wy+44); cx.moveTo(wx,wy+22); cx.lineTo(wx+60,wy+22); cx.stroke();
+    // wall art top-right
+    var ax=RX1-64, ay=RY0+16; cx.fillStyle="#5a3a1e"; rr(ax-2,ay-2,50,38,3); cx.fill(); cx.fillStyle="#e0857a"; cx.fillRect(ax,ay,46,34); cx.fillStyle="#4aa0d8"; cx.beginPath(); cx.arc(ax+15,ay+22,7,0,7); cx.fill(); cx.fillStyle="#7bd07b"; cx.fillRect(ax+27,ay+10,12,18);
+    // placed items
+    items.forEach(function(it){ var sc=(it.pop!==undefined)?Math.max(0.1,it.pop):1; cx.fillStyle="rgba(0,0,0,.12)"; cx.beginPath(); cx.ellipse(it.x,it.y+15,15*sc,5,0,0,7); cx.fill(); cx.save(); cx.translate(it.x,it.y); cx.scale(sc,sc); emo(it.e,0,0,30); cx.restore(); });
+    // characters roam the home
+    var midY=RY1-22; function bob(ph){ return playMode? -Math.abs(Math.sin(t*0.16+ph))*8 : 0; }
+    drawFig(RX0+50+Math.sin(t*0.02)*10, midY+bob(0), "#e0453a","#6b4423",0.9);
+    drawFig(RX0+92+Math.cos(t*0.018)*10, midY+2+bob(1), "#2b5aa0","#3a2a1a",0.82);
+    drawFig(RX0+130+Math.sin(t*0.025)*8, midY+bob(2), "#3aa856","#7a5a2a",0.66);
+    drawDog(RX1-64+Math.sin(t*0.03)*8, midY+bob(3), 1.0);
+    drawCat(RX1-30+Math.cos(t*0.024)*6, midY-2+bob(4), 0.9);
+  }
+
+  function drawPalette(){
+    var y0=RY1+16, cw=(W-30)/11;
+    for(var i=0;i<PAL.length;i++){ var col=i%11, row=Math.floor(i/11); var bx=15+col*cw, by=y0+row*46;
+      var on=(!erase && sel===i);
+      cx.fillStyle=on?"#ffe6a0":"#2e2440"; rr(bx+2,by,cw-4,42,9); cx.fill(); cx.strokeStyle=on?"#ffd24a":"#5a4880"; cx.lineWidth=on?3:2; rr(bx+2,by,cw-4,42,9); cx.stroke();
+      emo(PAL[i][0], bx+cw/2, by+20, 15); }
+    // controls row
+    var cy=y0+96;
+    cx.fillStyle=erase?"#e0857a":"#2e2440"; rr(15,cy,W/2-24,40,10); cx.fill(); cx.strokeStyle="#5a4880"; cx.lineWidth=2; rr(15,cy,W/2-24,40,10); cx.stroke(); text("🧽 Erase",15+(W/2-24)/2,cy+20,15,erase?"#3a1510":"#e8dcff");
+    cx.fillStyle="#7a2e2e"; rr(W/2+9,cy,W/2-24,40,10); cx.fill(); text("🗑️ Clear All",W/2+9+(W/2-24)/2,cy+20,15,"#ffdcdc");
+    var py=cy+50; cx.fillStyle="#7bd07b"; rr(15,py,W-30,42,12); cx.fill(); var plp=1+Math.sin(t*0.12)*0.05; text("▶ PLAY IN THE HOME",W/2,py+21,17*plp,"#06280f");
+  }
+
+  function render(){
+    drawScene();
+    // happiness meter
+    var hp=happiness();
+    cx.fillStyle="rgba(0,0,0,.14)"; rr(RX0,30,RX1-RX0,18,9); cx.fill();
+    var mg=cx.createLinearGradient(RX0,0,RX1,0); mg.addColorStop(0,"#e0857a"); mg.addColorStop(0.5,"#f2c94c"); mg.addColorStop(1,"#4bbf6a"); cx.save(); rr(RX0,30,(RX1-RX0)*hp/100,18,9); cx.clip(); cx.fillStyle=mg; cx.fillRect(RX0,30,RX1-RX0,18); cx.restore();
+    var pls=hp>=100?1+Math.sin(t*0.15)*0.06:1; text(homeLevel()+"  ·  "+hp+"%",W/2,39,13*pls,"#4a2f08");
+    if(playMode){ if(t%16===0){ var wx2=(Math.random()<0.5?RX0+90:RX1-46)+Math.random()*24-12; heart(wx2,RY1-36); } if(t%70===0)confetti(); text("🏡 Your family loves it! Tap for ❤️",W/2,RY1+20,14,"#4a2f08"); cx.fillStyle="#ffb043"; rr(15,H-54,W-30,42,12); cx.fill(); text("🔨 BACK TO BUILDING",W/2,H-33,16,"#3a2208"); renFX(); return; }
+    renFX();
+    drawPalette();
+    text(erase?"🧽 Tap an item to erase it":("Placing: "+PAL[sel][1]+" "+PAL[sel][0]),W/2,H-16,13,"#4a2f08","center");
+    if(hp>=100 && t%50===0)confetti();
+  }
+
+  var lastHp=0;
+  function place(x,y){
+    // in room?
+    if(x>RX0+6 && x<RX1-6 && y>RY0+22 && y<RY1-6){
+      if(erase){ for(var i=items.length-1;i>=0;i--){ if(Math.hypot(items[i].x-x,items[i].y-y)<22){ items.splice(i,1); beep(200,.06); save(); return; } } return; }
+      items.push({e:PAL[sel][0], x:x, y:y, pop:0.1}); beep(560,.06); burst(x,y,"#ffe27a",10); heart(x,y-16); save();
+      var hp=happiness(); [25,50,75,100].forEach(function(mk){ if(hp>=mk && lastHp<mk){ confetti(); beep(760+mk*2,.16); } }); lastHp=hp;
+    }
+  }
+  function tapPalette(x,y){
+    var y0=RY1+16, cw=(W-30)/11;
+    for(var i=0;i<PAL.length;i++){ var col=i%11, row=Math.floor(i/11); var bx=15+col*cw, by=y0+row*46; if(x>bx&&x<bx+cw&&y>by&&y<by+42){ sel=i; erase=false; beep(500,.05); return true; } }
+    var cy=y0+96;
+    if(y>cy&&y<cy+40){ if(x<W/2){ erase=!erase; beep(300,.06); } else { items=[]; save(); beep(160,.15,"sawtooth"); lastHp=0; } return true; }
+    var py=cy+50; if(y>py&&y<py+42){ playMode=true; confetti(); beep(760,.16); return true; }
+    return false;
+  }
+
+  // input
+  function pos(e){ var r=cv.getBoundingClientRect(), sx=cv.width/r.width, sy=cv.height/r.height; var a=(e.touches&&e.touches[0])?e.touches[0]:e; return {x:(a.clientX-r.left)*sx, y:(a.clientY-r.top)*sy}; }
+  function down(e){ e.preventDefault(); var p=pos(e);
+    if(playMode){ if(p.y>H-54 && p.y<H-12 && p.x>15 && p.x<W-15){ playMode=false; beep(300,.08); return; } heart(p.x,p.y); burst(p.x,p.y,"#ff8aa8",6); beep(600,.05); return; }
+    if(!tapPalette(p.x,p.y)){ place(p.x,p.y); } }
+  cv.addEventListener("mousedown",down); cv.addEventListener("touchstart",down,{passive:false});
+
+  function loop(){ t++; updFX(); render(); requestAnimationFrame(loop); }
+  loop();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO THEME PARK</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#6bbf5a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#0a2a44;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none;font-weight:bold;}
+  .pill{background:#ffffffcc;border-radius:20px;padding:6px 14px;font-size:17px;color:#0a2a44;box-shadow:0 2px 0 #0001;}
+  #bar{position:fixed;bottom:0;left:0;right:0;background:#0a3a2af2;border-top:3px solid #ffd23f;padding:8px;display:flex;gap:7px;justify-content:center;flex-wrap:wrap;}
+  .rb{background:#0e5a3a;border:2px solid #2abd7a;color:#fff;font-weight:bold;font-size:14px;padding:9px 10px;border-radius:12px;font-family:inherit;}
+  .rb.sel{background:#ffd23f;color:#3a2600;border-color:#fff;} .rb:disabled{opacity:.45;}
+  #hint{position:fixed;bottom:70px;left:0;right:0;text-align:center;font-size:14px;color:#0a2a44;background:#ffffffaa;padding:5px;pointer-events:none;}
+  #msg{position:fixed;top:50px;left:0;right:0;text-align:center;font-weight:bold;font-size:16px;color:#0a5a2a;pointer-events:none;opacity:0;transition:opacity .2s;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">🪙 <span id="coins">30</span></div>
+  <div class="pill">🎢 <span id="rides">0</span></div>
+  <div class="pill">🧍 <span id="guests">0</span></div>
+</div>
+<div id="msg"></div>
+<div id="hint">Pick a ride, tap the park to place it • tap a ride to run it!</div>
+<div id="bar"></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  var RIDES=[{k:'ferris',e:'🎡',n:'Ferris',cost:15},{k:'coaster',e:'🎢',n:'Coaster',cost:20},{k:'carousel',e:'🎠',n:'Carousel',cost:10},{k:'tent',e:'🎪',n:'Big Top',cost:12},{k:'rocket',e:'🚀',n:'Rocket',cost:18},{k:'popcorn',e:'🍿',n:'Snacks',cost:6},{k:'balloon',e:'🎈',n:'Balloons',cost:4},{k:'fountain',e:'⛲',n:'Fountain',cost:8}];
+  var coins, rides, guests, sel, spawnT, hearts, msgT, nowv=0;
+  function reset(){ coins=30; rides=[]; guests=[]; sel=null; spawnT=60; hearts=[]; msgT=0; updateHUD(); renderBar(); }
+  function updateHUD(){ document.getElementById('coins').textContent=coins; document.getElementById('rides').textContent=rides.length; document.getElementById('guests').textContent=guests.length;
+    var btns=document.querySelectorAll('.rb'); for(var i=0;i<btns.length;i++){ var r=RIDES[i]; btns[i].disabled=coins<r.cost; btns[i].classList.toggle('sel',sel===r.k); } }
+  function rnd(a,b){return a+Math.random()*(b-a);}
+  function showMsg(m){ var e=document.getElementById('msg'); e.textContent=m; e.style.opacity=1; msgT=1; }
+  var bar=document.getElementById('bar');
+  function renderBar(){ bar.innerHTML=''; RIDES.forEach(function(r){ var b=document.createElement('button'); b.className='rb'+(sel===r.k?' sel':''); b.textContent=r.e+' '+r.cost+'🪙';
+    b.onclick=function(){ sel=(sel===r.k?null:r.k); updateHUD(); renderBar(); }; bar.appendChild(b); }); updateHUD(); }
+  function pos(e){ var r=cv.getBoundingClientRect(); return {x:(e.touches?e.touches[0].clientX:e.clientX)-r.left,y:(e.touches?e.touches[0].clientY:e.clientY)-r.top}; }
+  function tap(e){ var p=pos(e); if(p.y>H-70) return;
+    // tap existing ride to run it
+    for(var i=0;i<rides.length;i++){ if(Math.hypot(rides[i].x-p.x,rides[i].y-p.y)<34){ rides[i].anim=1; coins+=1; for(var h=0;h<6;h++) hearts.push({x:rides[i].x+rnd(-20,20),y:rides[i].y-20,t:1}); beep(700,0.08,'square',0.05); updateHUD(); return; } }
+    // place selected ride
+    if(sel){ var r=null; for(var j=0;j<RIDES.length;j++) if(RIDES[j].k===sel) r=RIDES[j];
+      if(coins>=r.cost && p.y<H-90 && p.y>70){ coins-=r.cost; rides.push({k:r.k,e:r.e,x:p.x,y:p.y,anim:0}); showMsg('Built a '+r.n+'! 🎉'); beep(600,0.1,'square',0.06); setTimeout(function(){beep(900,0.1,'square',0.05);},70); updateHUD(); renderBar(); } }
+  }
+  cv.addEventListener('mousedown',tap); cv.addEventListener('touchstart',function(e){tap(e);e.preventDefault();},{passive:false});
+  function newGuest(){ return {x:rnd(20,W-20),y:H-80,tx:0,ty:0,c:['#e0453a','#2f6fd0','#37b06a','#f2b705','#8a63d2','#e86bb0'][Math.floor(rnd(0,6))],pick:false}; }
+  function update(dt){
+    spawnT-=dt; if(spawnT<=0 && guests.length< Math.min(14,3+rides.length*2)){ guests.push(newGuest()); spawnT=Math.max(30,120-rides.length*6); updateHUD(); }
+    for(var i=0;i<guests.length;i++){ var g=guests[i];
+      if(!g.pick){ if(rides.length){ var r=rides[Math.floor(Math.random()*rides.length)]; g.tx=r.x+rnd(-20,20); g.ty=r.y+rnd(10,26); } else { g.tx=rnd(30,W-30); g.ty=rnd(90,H-100); } g.pick=true; }
+      var dx=g.tx-g.x, dy=g.ty-g.y, d=Math.hypot(dx,dy);
+      if(d>3){ g.x+=dx/d*1.1*dt; g.y+=dy/d*1.1*dt; }
+      else { g.pick=false; if(rides.length){ coins+=1; hearts.push({x:g.x,y:g.y-16,t:1}); updateHUD(); } }
+    }
+    for(var r2=0;r2<rides.length;r2++){ if(rides[r2].anim>0) rides[r2].anim-=0.02*dt; }
+    for(var h=hearts.length-1;h>=0;h--){ hearts[h].y-=0.8*dt; hearts[h].t-=0.02*dt; if(hearts[h].t<=0)hearts.splice(h,1); }
+    if(msgT>0){ msgT-=0.01*dt; if(msgT<=0) document.getElementById('msg').style.opacity=0; }
+  }
+  function render(){
+    // grass + paths
+    ctx.fillStyle='#6bbf5a'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#c8b48a'; ctx.fillRect(0,H*0.5-16,W,32); ctx.fillRect(W*0.5-16,0,32,H);
+    ctx.fillStyle='#5aa64a'; for(var i=0;i<30;i++){ var gx=((i*137)%W), gy=((i*89)%H); ctx.beginPath(); ctx.arc(gx,gy,3,0,6.29); ctx.fill(); }
+    // entrance sign
+    ctx.fillStyle='#e0453a'; ctx.fillRect(W/2-70,8,140,26); ctx.fillStyle='#fff'; ctx.font='bold 15px Trebuchet MS'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🎡 MO PARK 🎢',W/2,22);
+    // depth sort rides + guests
+    var items=[]; for(var r=0;r<rides.length;r++) items.push({t:'ride',o:rides[r]}); for(var g=0;g<guests.length;g++) items.push({t:'guest',o:guests[g]});
+    items.sort(function(a,b){return a.o.y-b.o.y;});
+    for(var n=0;n<items.length;n++){ var it=items[n]; if(it.t==='ride'){ var rd=it.o; var sc=1+(rd.anim>0?Math.sin(nowv*0.03)*0.12:0);
+        ctx.fillStyle='rgba(0,0,0,0.14)'; ctx.beginPath(); ctx.ellipse(rd.x,rd.y+18,26,8,0,0,6.29); ctx.fill();
+        ctx.font=(48*sc)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(rd.e,rd.x,rd.y);
+      } else { var gu=it.o; ctx.save(); ctx.translate(gu.x,gu.y);
+        ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(0,8,7,3,0,0,6.29); ctx.fill();
+        ctx.fillStyle=gu.c; roundRect(-5,-12,10,14,3); ctx.fill(); ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(0,-16,5,0,6.29); ctx.fill(); ctx.restore(); } }
+    for(var h=0;h<hearts.length;h++){ ctx.globalAlpha=Math.max(0,hearts[h].t); ctx.font='16px sans-serif'; ctx.textAlign='center'; ctx.fillText('🪙',hearts[h].x,hearts[h].y); ctx.globalAlpha=1; }
+  }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

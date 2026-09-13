@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO ANKLE BREAKER</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#b5863c;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0007;}
+  .pill{background:#0008;border-radius:20px;padding:6px 14px;font-size:17px;}
+  .key{position:fixed;bottom:24px;width:44%;height:96px;border-radius:20px;border:3px solid #ffffff77;display:flex;align-items:center;justify-content:center;font-size:40px;color:#fff;background:#0004;}
+  #kl{left:3%;} #kr{right:3%;}
+  .key:active{background:#0007;}
+  #hint{position:fixed;bottom:128px;left:0;right:0;text-align:center;font-size:14px;color:#fff;background:#0005;padding:5px;pointer-events:none;}
+  #msg{position:fixed;top:40%;left:0;right:0;text-align:center;font-size:38px;font-weight:bold;color:#ffd23f;text-shadow:0 3px 0 #0008;pointer-events:none;opacity:0;transition:opacity .12s;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#b5863cd8;text-align:center;}
+  #over h1{font-size:38px;margin:0 0 6px;color:#7a1c18;} #over p{font-size:20px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#e88a2a,#c0501a);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #7a3010;font-family:inherit;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">💨 <span id="ankles">0</span></div>
+  <div class="pill">🏀 <span id="buckets">0</span></div>
+  <div class="pill">🏆 <span id="best">0</span></div>
+</div>
+<div class="key" id="kl">◀</div>
+<div class="key" id="kr">▶</div>
+<div id="hint">Swipe/tap ◀ ▶ to juke past defenders — break their ankles! 💨</div>
+<div id="msg"></div>
+<div id="over"><h1 id="ot">🛑 STRIPPED!</h1><p id="os"></p><button class="btn" id="again">Run It Back</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1,LANES=3;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'square';o.frequency.value=f;g.gain.value=v||0.05;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.08));o.stop(a.currentTime+(d||0.08)+0.02);}catch(e){} }
+  var best=+(localStorage.getItem('moankle_best')||0); document.getElementById('best').textContent=best;
+  var mo, defs, items, lane, speed, ankles, buckets, running, scroll, spawnT, msgT, moX, nowv=0, dribble;
+  function laneX(l){ return W*(0.25+l*0.25); }
+  function reset(){ lane=1; mo={x:laneX(1),y:H*0.76}; defs=[]; items=[]; speed=4; ankles=0; buckets=0; running=true; scroll=0; spawnT=40; msgT=0; dribble=0;
+    document.getElementById('over').style.display='none'; document.getElementById('ankles').textContent='0'; document.getElementById('buckets').textContent='0'; }
+  function move(d){ if(!running)return; lane=Math.max(0,Math.min(LANES-1,lane+d)); beep(400,0.05,'square',0.04);
+    // juke check: if there's a defender in the lane you left near you, ankles!
+  }
+  document.getElementById('kl').addEventListener('touchstart',function(e){move(-1);e.preventDefault();},{passive:false}); document.getElementById('kl').addEventListener('mousedown',function(){move(-1);});
+  document.getElementById('kr').addEventListener('touchstart',function(e){move(1);e.preventDefault();},{passive:false}); document.getElementById('kr').addEventListener('mousedown',function(){move(1);});
+  addEventListener('keydown',function(e){ if(e.key==='ArrowLeft')move(-1); if(e.key==='ArrowRight')move(1); });
+  var sx0=null; cv.addEventListener('touchstart',function(e){sx0=e.touches[0].clientX;},{passive:true}); cv.addEventListener('touchend',function(e){ if(sx0!=null){ var dx=(e.changedTouches[0].clientX-sx0); if(dx>30)move(1); else if(dx<-30)move(-1); sx0=null; } });
+  document.getElementById('again').onclick=reset;
+  function showMsg(m){ var e=document.getElementById('msg'); e.textContent=m; e.style.opacity=1; msgT=1; }
+  function over(){ running=false; if(ankles>best){best=ankles;localStorage.setItem('moankle_best',best);document.getElementById('best').textContent=best;}
+    document.getElementById('os').innerHTML='You broke <b>'+ankles+'</b> ankles & hit <b>'+buckets+'</b> buckets!<br>Best: <b>'+best+'</b>'; document.getElementById('over').style.display='flex'; beep(160,0.3,'sawtooth',0.08); }
+  function update(dt){
+    speed+=0.002*dt; scroll+=speed*dt; dribble+=0.3*dt;
+    mo.x+=(laneX(lane)-mo.x)*0.3*dt;
+    spawnT-=dt; if(spawnT<=0){ var r=Math.random(); if(r<0.75){ var dl=Math.floor(Math.random()*LANES); defs.push({lane:dl,y:-40,passed:false}); } else { items.push({lane:Math.floor(Math.random()*LANES),y:-40,t:r<0.88?'coin':'hoop'}); } spawnT=Math.max(20,44-speed*2); }
+    for(var i=defs.length-1;i>=0;i--){ var d=defs[i]; d.y+=speed*dt;
+      if(d.y>H+40){ defs.splice(i,1); continue; }
+      if(!d.passed && d.y>mo.y-24 && d.y<mo.y+24){ if(d.lane===lane){ over(); return; } }
+      if(!d.passed && d.y>mo.y+24){ d.passed=true; ankles++; document.getElementById('ankles').textContent=ankles; if(Math.abs(d.lane-lane)===1){ showMsg('💨 ANKLES!'); beep(700,0.08,'square',0.05); } }
+    }
+    for(var j=items.length-1;j>=0;j--){ var it=items[j]; it.y+=speed*dt; if(it.y>H+40){ items.splice(j,1); continue; }
+      if(it.lane===lane && Math.abs(it.y-mo.y)<28){ if(it.t==='coin'){ ankles++; document.getElementById('ankles').textContent=ankles; } else { buckets++; document.getElementById('buckets').textContent=buckets; showMsg('🏀 BUCKET! +5'); } beep(800,0.08,'square',0.05); items.splice(j,1); } }
+    if(msgT>0){ msgT-=0.016*dt; if(msgT<=0)document.getElementById('msg').style.opacity=0; }
+  }
+  function render(){
+    ctx.fillStyle='#c99a5a'; ctx.fillRect(0,0,W,H);
+    // court lines scrolling
+    ctx.strokeStyle='#b5863c'; ctx.lineWidth=3; for(var y=(scroll%80)-80;y<H;y+=80){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=2; ctx.setLineDash([12,12]); for(var l=1;l<LANES;l++){ ctx.beginPath(); ctx.moveTo(W*0.125+l*W*0.25,0); ctx.lineTo(W*0.125+l*W*0.25,H); ctx.stroke(); } ctx.setLineDash([]);
+    // items
+    for(var j=0;j<items.length;j++){ var it=items[j]; ctx.font='32px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(it.t==='coin'?'🪙':'🏀',laneX(it.lane),it.y); }
+    // defenders
+    for(var i=0;i<defs.length;i++){ var d=defs[i]; drawDefender(laneX(d.lane),d.y); }
+    drawMo();
+    if(msgT>0){}
+  }
+  function drawDefender(x,y){ ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle='#8a2be2'; roundRect(-13,-16,26,30,8); ctx.fill();
+    ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(0,-24,10,0,6.29); ctx.fill(); ctx.fillStyle='#2a2a3a'; ctx.beginPath(); ctx.arc(0,-27,10,Math.PI,6.29); ctx.fill();
+    ctx.strokeStyle='#8a2be2'; ctx.lineWidth=5; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-10,-6); ctx.lineTo(-20,-16); ctx.moveTo(10,-6); ctx.lineTo(20,-16); ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('D',0,-2); ctx.restore(); }
+  function drawMo(){ var x=mo.x,y=mo.y; ctx.save(); ctx.translate(x,y);
+    // dribbling ball beside
+    var by=Math.abs(Math.sin(dribble))*10; ctx.fillStyle='#e0701f'; ctx.beginPath(); ctx.arc(16,14+ -by,8,0,6.29); ctx.fill();
+    ctx.fillStyle='#1a6fd0'; roundRect(-13,-16,26,30,8); ctx.fill();
+    ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(0,-24,10,0,6.29); ctx.fill(); ctx.fillStyle='#3a2a1a'; ctx.beginPath(); ctx.arc(0,-27,10,Math.PI,6.29); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('MO',0,-2); ctx.restore(); }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(running) update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

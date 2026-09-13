@@ -1,0 +1,7 @@
+# junk files we don't want on GitHub
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+_to_delete/
+.claude/

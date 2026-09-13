@@ -1,0 +1,16 @@
+{
+  "name": "Mo Hardware",
+  "short_name": "Mo Hardware",
+  "description": "Drive to the store with Arff & Meow, grab 500 items, check out, and build it!",
+  "start_url": "./mo-hardware.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#20160e",
+  "theme_color": "#e0670e",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

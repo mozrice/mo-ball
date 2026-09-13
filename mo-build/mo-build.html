@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>MO BUILD</title>
+<style>
+  html,body { margin:0; height:100%; background:#111820; overflow:hidden; font-family:'Trebuchet MS',system-ui,sans-serif; }
+  #stage { position:absolute; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+  #hud { position:absolute; top:8px; left:12px; z-index:3; color:#fff; font-weight:bold; text-shadow:0 2px 3px #0009; pointer-events:none; font-size:16px; }
+  #panel { position:absolute; left:0; right:0; bottom:0; z-index:4; background:linear-gradient(#1c2733,#121a22); border-top:3px solid #33475a;
+    padding:8px 8px calc(8px + env(safe-area-inset-bottom)); }
+  #blocks { display:flex; gap:6px; overflow-x:auto; padding-bottom:6px; }
+  .blk { flex:0 0 auto; width:50px; height:50px; border-radius:10px; border:3px solid transparent; cursor:pointer; position:relative;
+    display:flex; align-items:flex-end; justify-content:center; font-size:26px; box-shadow:0 3px 0 #0006; overflow:hidden; }
+  .blk .nm { position:absolute; bottom:1px; left:0; right:0; font-size:8px; color:#000a; font-weight:bold; text-align:center; }
+  .blk.on { border-color:#ffe45c; box-shadow:0 0 0 2px #ffe45c66,0 3px 0 #0006; }
+  #tools { display:flex; gap:8px; justify-content:center; margin-top:8px; flex-wrap:wrap; }
+  .tool { border:none; border-radius:11px; padding:9px 14px; font-size:15px; font-weight:bold; color:#fff; cursor:pointer; background:linear-gradient(#3a5570,#243747); box-shadow:0 3px 0 #12202c; }
+  .tool.on { background:linear-gradient(#ffe07a,#f0b429); color:#5a3d00; }
+  .tool:active { transform:translateY(3px); box-shadow:0 1px 0 #12202c; }
+  #clearBtn { background:linear-gradient(#e0664a,#b23a22); }
+  .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; z-index:6; background:#0a1018cc; }
+  .overlay.hide { display:none; }
+  .card { background:#1c2733ee; border:3px solid #6cd0ff; border-radius:22px; padding:22px 26px; max-width:90%; color:#fff; box-shadow:0 20px 60px #000a; }
+  .card h1 { margin:0 0 6px; font-size:30px; color:#8fe3ff; }
+  .card p { margin:8px 0; line-height:1.35; }
+  .big { margin-top:14px; padding:14px 28px; font-size:20px; font-weight:bold; background:linear-gradient(#ffe07a,#f0b429); color:#5a3d00; border:none; border-radius:14px; box-shadow:0 4px 0 #b8922a; cursor:pointer; }
+  .big:active { transform:translateY(4px); box-shadow:0 1px 0 #b8922a; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hud">🔨 MO BUILD</div>
+  <div id="panel">
+    <div id="blocks"></div>
+    <div id="tools">
+      <button class="tool on" id="tPaint" data-t="paint">🖌️ Paint</button>
+      <button class="tool" id="tErase" data-t="erase">🧽 Erase</button>
+      <button class="tool" id="tFill" data-t="fill">🪣 Fill</button>
+      <button class="tool" id="clearBtn">🗑️ Clear</button>
+    </div>
+  </div>
+  <div class="overlay" id="startOv">
+    <div class="card">
+      <h1>🔨 MO BUILD</h1>
+      <p>Build anything on the board — houses, castles, gardens, pixel art!</p>
+      <p>Pick a <b>block</b>, then tap or drag on the board to place it.<br>Use <b>🧽 Erase</b>, <b>🪣 Fill</b>, and <b>🗑️ Clear</b>. Your build saves automatically.</p>
+      <button class="big" id="startBtn">▶ START BUILDING</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), ctx=cv.getContext("2d"), stage=document.getElementById("stage");
+  var DPR=Math.min(2, window.devicePixelRatio||1);
+  var W=0,H=0, panelH=150, cols=18, cell=20, rows=10, boardH=0;
+  function computeGrid(){ panelH=document.getElementById("panel").offsetHeight||150; boardH=H-panelH; cell=Math.max(16, Math.floor(W/cols)); rows=Math.max(4,Math.floor(boardH/cell)); }
+  function resize(){ W=stage.clientWidth; H=stage.clientHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0); computeGrid(); }
+  window.addEventListener("resize",function(){ resize(); });
+  resize();
+
+  var AC=null; function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||"sine"; o.frequency.value=f; g.gain.value=v||0.05; o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.08)); o.stop(a.currentTime+(d||0.08)+0.02); }
+  function placeSfx(){ beep(420+Math.random()*120,0.04,"square",0.04); }
+  function fillSfx(){ beep(500,0.06,"triangle",0.06); setTimeout(function(){beep(760,0.07,"triangle",0.05);},60); }
+
+  // blocks: color tiles + emoji tiles
+  var BLOCKS=[
+    {id:"grass", nm:"Grass", c:"#5ec06a"},
+    {id:"dirt",  nm:"Dirt",  c:"#8a5a34"},
+    {id:"stone", nm:"Stone", c:"#8a929c"},
+    {id:"brick", nm:"Brick", c:"#b5533a", brick:true},
+    {id:"wood",  nm:"Wood",  c:"#c8945a", plank:true},
+    {id:"sand",  nm:"Sand",  c:"#e6d08a"},
+    {id:"water", nm:"Water", c:"#3a86e0", water:true},
+    {id:"snow",  nm:"Snow",  c:"#eef4fb"},
+    {id:"roof",  nm:"Roof",  c:"#c0392b", roof:true},
+    {id:"glass", nm:"Window",c:"#bfe6ff", window:true},
+    {id:"gold",  nm:"Gold",  c:"#ffd24a"},
+    {id:"lava",  nm:"Lava",  c:"#e0662a"},
+    {id:"door",  nm:"Door",  e:"🚪", bg:"#8a5a34"},
+    {id:"tree",  nm:"Tree",  e:"🌳", bg:"#bfe6a0"},
+    {id:"flower",nm:"Flower",e:"🌸", bg:"#bfe6a0"},
+    {id:"star",  nm:"Star",  e:"⭐", bg:"#1a2b4e"},
+    {id:"hoop",  nm:"Hoop",  e:"🏀", bg:"#c8945a"},
+    {id:"heart", nm:"Heart", e:"❤️", bg:"#ffd6e6"}
+  ];
+  var BMAP={}; BLOCKS.forEach(function(b){ BMAP[b.id]=b; });
+
+  var mode="start", sel="grass", tool="paint", grid={}, painting=false;
+  function key(r,c){ return r+","+c; }
+  function load(){ try{ var s=JSON.parse(localStorage.getItem("moBuild")); if(s&&s.grid){ grid=s.grid; return; } }catch(e){} grid={}; }
+  var saveT=0; function save(){ try{ localStorage.setItem("moBuild",JSON.stringify({grid:grid})); }catch(e){} }
+  load();
+
+  // build palette
+  var blocksEl=document.getElementById("blocks");
+  BLOCKS.forEach(function(b){ var d=document.createElement("div"); d.className="blk"+(b.id===sel?" on":""); d.dataset.id=b.id;
+    if(b.e){ d.style.background=b.bg||"#333"; d.innerHTML=b.e+'<span class="nm">'+b.nm+'</span>'; }
+    else { d.style.background=b.c; d.innerHTML='<span class="nm">'+b.nm+'</span>'; }
+    d.onclick=function(){ ac(); sel=b.id; if(tool==="erase"){ setTool("paint"); } document.querySelectorAll(".blk").forEach(function(x){x.classList.remove("on");}); d.classList.add("on"); };
+    blocksEl.appendChild(b._el=d); });
+
+  function setTool(t){ tool=t; document.querySelectorAll("#tools .tool[data-t]").forEach(function(x){ x.classList.toggle("on", x.dataset.t===t); }); }
+  document.getElementById("tPaint").onclick=function(){ ac(); setTool("paint"); };
+  document.getElementById("tErase").onclick=function(){ ac(); setTool("erase"); };
+  document.getElementById("tFill").onclick=function(){ ac(); setTool("fill"); };
+  document.getElementById("clearBtn").onclick=function(){ ac(); if(Object.keys(grid).length){ grid={}; fillSfx(); save(); } };
+  document.getElementById("startBtn").onclick=function(){ ac(); mode="build"; document.getElementById("startOv").classList.add("hide"); };
+
+  function cellAt(x,y){ if(y>=rows*cell) return null; var c=Math.floor(x/cell), r=Math.floor(y/cell); if(r<0||c<0||r>=rows||c>=cols) return null; return {r:r,c:c}; }
+  function apply(cellRC){ if(!cellRC) return; var k=key(cellRC.r,cellRC.c);
+    if(tool==="erase"){ if(grid[k]!==undefined){ delete grid[k]; placeSfx(); } }
+    else if(tool==="fill"){ floodFill(cellRC.r,cellRC.c); fillSfx(); }
+    else { if(grid[k]!==sel){ grid[k]=sel; placeSfx(); } }
+  }
+  function floodFill(r,c){ var target=grid[key(r,c)]; if(target===sel) return; var stack=[[r,c]], seen={};
+    while(stack.length){ var p=stack.pop(), rr=p[0], cc=p[1], kk=key(rr,cc); if(rr<0||cc<0||rr>=rows||cc>=cols||seen[kk]) continue; seen[kk]=1;
+      if((grid[kk]===undefined?null:grid[kk])!==(target===undefined?null:target)) continue; grid[kk]=sel;
+      stack.push([rr+1,cc],[rr-1,cc],[rr,cc+1],[rr,cc-1]); }
+  }
+  function relXY(e){ var r=cv.getBoundingClientRect(); var t=e.touches&&e.touches[0]?e.touches[0]:e; return {x:(t.clientX-r.left)*(W/r.width), y:(t.clientY-r.top)*(H/r.height)}; }
+  function down(e){ if(mode!=="build")return; ac(); painting=true; var p=relXY(e); apply(cellAt(p.x,p.y)); if(tool==="fill"){ painting=false; } save(); }
+  function move(e){ if(!painting||mode!=="build"||tool==="fill")return; var p=relXY(e); apply(cellAt(p.x,p.y)); }
+  function up(){ if(painting){ painting=false; save(); } }
+  cv.onmousedown=down; cv.onmousemove=move; window.addEventListener("mouseup",up);
+  cv.addEventListener("touchstart",function(e){ e.preventDefault(); down(e); },{passive:false});
+  cv.addEventListener("touchmove",function(e){ e.preventDefault(); move(e); },{passive:false});
+  window.addEventListener("touchend",up);
+
+  var last=0;
+  function frame(ts){ var dt=Math.min(3,((ts-last)/16.67)||1); last=ts; render(); requestAnimationFrame(frame); }
+
+  function render(){
+    // sky background for the board
+    var g=ctx.createLinearGradient(0,0,0,rows*cell); g.addColorStop(0,"#8fd3f4"); g.addColorStop(1,"#d8f0e0"); ctx.fillStyle=g; ctx.fillRect(0,0,W,rows*cell);
+    // grid cells
+    for(var r=0;r<rows;r++){ for(var c=0;c<cols;c++){ var id=grid[key(r,c)]; if(id===undefined) continue; drawCell(r,c,BMAP[id]); } }
+    // grid lines (subtle)
+    ctx.strokeStyle="rgba(0,0,0,0.07)"; ctx.lineWidth=1;
+    for(var x=0;x<=cols;x++){ ctx.beginPath(); ctx.moveTo(x*cell,0); ctx.lineTo(x*cell,rows*cell); ctx.stroke(); }
+    for(var y=0;y<=rows;y++){ ctx.beginPath(); ctx.moveTo(0,y*cell); ctx.lineTo(cols*cell,y*cell); ctx.stroke(); }
+    // bottom shelf line
+    ctx.fillStyle="#2a3a2a"; ctx.fillRect(0,rows*cell,W,H-rows*cell-panelH>0?4:4);
+  }
+  function drawCell(r,c,b){ if(!b)return; var x=c*cell, y=r*cell;
+    if(b.e){ ctx.fillStyle=b.bg||"#ddd"; ctx.fillRect(x,y,cell,cell); ctx.font=Math.floor(cell*0.78)+"px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(b.e, x+cell/2, y+cell/2+1); return; }
+    ctx.fillStyle=b.c; ctx.fillRect(x,y,cell,cell);
+    // bevel
+    ctx.fillStyle="rgba(255,255,255,0.18)"; ctx.fillRect(x,y,cell,Math.max(2,cell*0.14));
+    ctx.fillStyle="rgba(0,0,0,0.14)"; ctx.fillRect(x,y+cell-Math.max(2,cell*0.14),cell,Math.max(2,cell*0.14));
+    if(b.brick){ ctx.strokeStyle="rgba(0,0,0,0.22)"; ctx.lineWidth=1; ctx.strokeRect(x+0.5,y+0.5,cell-1,cell/2); ctx.strokeRect(x+0.5,y+cell/2,cell-1,cell/2); ctx.beginPath(); ctx.moveTo(x+cell/2,y); ctx.lineTo(x+cell/2,y+cell/2); ctx.moveTo(x,y+cell/2); ctx.lineTo(x+cell,y+cell/2); ctx.moveTo(x+cell/2,y+cell/2); ctx.lineTo(x+cell/2,y+cell); ctx.stroke(); }
+    if(b.plank){ ctx.strokeStyle="rgba(90,50,20,0.4)"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x,y+cell/2); ctx.lineTo(x+cell,y+cell/2); ctx.stroke(); }
+    if(b.window){ ctx.strokeStyle="#5a7fa0"; ctx.lineWidth=2; ctx.strokeRect(x+2,y+2,cell-4,cell-4); ctx.beginPath(); ctx.moveTo(x+cell/2,y+2); ctx.lineTo(x+cell/2,y+cell-2); ctx.moveTo(x+2,y+cell/2); ctx.lineTo(x+cell-2,y+cell/2); ctx.stroke(); ctx.fillStyle="rgba(255,255,255,0.4)"; ctx.fillRect(x+3,y+3,cell*0.3,cell*0.3); }
+    if(b.roof){ ctx.strokeStyle="rgba(0,0,0,0.2)"; ctx.lineWidth=1; for(var t=0;t<cell;t+=5){ ctx.beginPath(); ctx.moveTo(x,y+t); ctx.lineTo(x+cell,y+t); ctx.stroke(); } }
+    if(b.water){ ctx.fillStyle="rgba(255,255,255,0.25)"; var wob=Math.sin(last/300+r+c)*2; ctx.fillRect(x+3,y+cell*0.4+wob,cell*0.5,2); }
+    if(b.id==="lava"){ ctx.fillStyle="rgba(255,220,120,0.5)"; ctx.beginPath(); ctx.arc(x+cell*0.5,y+cell*0.5+Math.sin(last/250+r+c)*2,cell*0.18,0,7); ctx.fill(); }
+    if(b.id==="gold"){ ctx.fillStyle="rgba(255,255,255,0.5)"; ctx.fillRect(x+cell*0.2,y+cell*0.2,cell*0.18,cell*0.18); }
+  }
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO World Adventure</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#8fd0ff;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:rgba(30,60,90,.6);}
+  #obox{background:#fff;color:#222;border-radius:18px;padding:26px 30px;text-align:center;max-width:80%;}
+  #obox h1{color:#2a8fd0;margin:0 0 6px;}
+  #go{margin-top:14px;border:none;background:#2a8fd0;color:#fff;font-family:inherit;font-weight:900;font-size:20px;padding:12px 28px;border-radius:14px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div id="over"><div id="obox"><h1>🌍 MO World Adventure</h1><div id="omsg">Hold the screen to fly UP, let go to dive DOWN.<br>Fly around the world collecting landmarks!</div><button id="go">TRAVEL</button></div></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  var LANDS=[
+    {n:'Beach 🏖️', sky:['#8fd0ff','#cfeeff'], ground:'#f2d9a0', items:['🏖️','⛱️','🐚','🌴'], gc:'#3aa0e0'},
+    {n:'Desert 🏜️', sky:['#ffd9a0','#ffeccf'], ground:'#e0b060', items:['🐫','🌵','🏜️','🦂'], gc:'#c89040'},
+    {n:'Jungle 🌴', sky:['#a0e0b0','#d0f0d8'], ground:'#3a7a3a', items:['🦜','🐒','🌺','🐸'], gc:'#2a6a2a'},
+    {n:'Snow ❄️', sky:['#cfe6ff','#eef6ff'], ground:'#eef6ff', items:['⛄','🎿','🐧','❄️'], gc:'#a0c8e0'},
+    {n:'City 🏙️', sky:['#8fb0d0','#cfe0f0'], ground:'#5a6a7a', items:['🏙️','🚕','🗽','🎡'], gc:'#3a4a5a'}
+  ];
+  var playing=false, score=0, best=+(localStorage.getItem('moWorldBest')||0);
+  var py=0, vy=0, dist=0, land=0, landT=0, holding=false, items=[], obst=[], t=0;
+  function reset(){ py=H*0.4; vy=0; dist=0; land=0; landT=0; score=0; items=[]; obst=[]; t=0; }
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function beep(f,d){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.08)); }
+  function plane(cx,cy){ x.save(); x.translate(cx,cy); x.rotate(Math.max(-0.35,Math.min(0.5,vy*0.04)));
+    x.fillStyle='#e2342f'; x.beginPath(); x.ellipse(0,0,30,12,0,0,7); x.fill(); x.fillStyle='#c01f1a'; x.beginPath(); x.moveTo(-6,0); x.lineTo(6,-16); x.lineTo(14,0); x.fill(); x.fillStyle='#bfe3ff'; x.beginPath(); x.arc(10,-3,6,0,7); x.fill(); x.fillStyle='#c01f1a'; x.beginPath(); x.moveTo(-30,0); x.lineTo(-40,-8); x.lineTo(-24,-2); x.fill(); x.fillStyle='#fff'; x.font='900 10px Trebuchet MS'; x.textAlign='center'; x.fillText('MO',-4,3);
+    x.fillStyle='rgba(255,255,255,0.6)'; x.beginPath(); x.moveTo(-30,0); x.lineTo(-30-Math.random()*10,2); x.stroke(); x.restore(); }
+  function loop(){ t++;
+    var L=LANDS[land%LANDS.length];
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,L.sky[0]); g.addColorStop(1,L.sky[1]); x.fillStyle=g; x.fillRect(0,0,W,H);
+    var gy=H*0.82; x.fillStyle=L.ground; x.fillRect(0,gy,W,H-gy);
+    // ground decorations scroll
+    x.font=Math.round(W*0.06)+'px serif'; x.textAlign='center';
+    for(var d=0;d<6;d++){ var dx=((d*160 - dist*0.6)%(W+160)); if(dx<-80)dx+=W+160; x.fillText(L.items[d%L.items.length], dx, gy+H*0.09); }
+    if(playing){ dist+=6; landT++; if(landT> 600){ landT=0; land++; score+=10; beep(1400); }
+      vy += holding? -0.9 : 0.7; vy=Math.max(-9,Math.min(9,vy)); py+=vy; if(py<40){py=40;vy=0;} if(py>gy-14){ py=gy-14; vy=0; }
+      if(t%70===0)items.push({x:W+30,y:60+Math.random()*(gy-120),e:L.items[Math.floor(Math.random()*L.items.length)],got:false});
+      if(t%Math.max(80,130-land*6)===0)obst.push({x:W+30,y:60+Math.random()*(gy-100)});
+    }
+    for(var i=items.length-1;i>=0;i--){ var it=items[i]; it.x-=6; if(it.got){ items.splice(i,1); continue; } x.font=Math.round(W*0.07)+'px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(it.e,it.x,it.y); x.textBaseline='alphabetic';
+      if(Math.abs(it.x-W*0.28)<30 && Math.abs(it.y-py)<30){ it.got=true; score+=5; beep(1000); } if(it.x<-30)items.splice(i,1); }
+    for(var i=obst.length-1;i>=0;i--){ var o=obst[i]; o.x-=6; x.fillStyle='rgba(255,255,255,0.9)'; x.beginPath(); x.arc(o.x,o.y,20,0,7); x.arc(o.x+16,o.y+4,16,0,7); x.arc(o.x-16,o.y+4,16,0,7); x.fill();
+      if(playing && Math.abs(o.x-W*0.28)<28 && Math.abs(o.y-py)<26){ playing=false; over(); } if(o.x<-40)obst.splice(i,1); }
+    plane(W*0.28,py);
+    x.fillStyle='#fff'; x.font='900 '+Math.round(W*0.055)+'px Trebuchet MS'; x.textAlign='left'; x.strokeStyle='#2a5a8a'; x.lineWidth=3; x.strokeText('🎫 '+score,14,42); x.fillText('🎫 '+score,14,42);
+    x.textAlign='center'; x.strokeText(L.n,W/2,42); x.fillText(L.n,W/2,42);
+    x.textAlign='right'; x.font='900 '+Math.round(W*0.04)+'px Trebuchet MS'; x.strokeText('Best '+best,W-14,38); x.fillText('Best '+best,W-14,38);
+    requestAnimationFrame(loop);
+  }
+  function over(){ beep(180,0.3); if(score>best){ best=score; try{localStorage.setItem('moWorldBest',score);}catch(e){} }
+    document.getElementById('omsg').innerHTML='You traveled and got <b>'+score+'</b>!<br>Best: '+best; document.getElementById('go').textContent='TRAVEL AGAIN'; document.getElementById('over').style.display='flex'; }
+  document.getElementById('go').addEventListener('click',function(){ reset(); playing=true; document.getElementById('over').style.display='none'; });
+  cv.addEventListener('pointerdown',function(){ holding=true; }); addEventListener('pointerup',function(){ holding=false; });
+  document.getElementById('over').style.display='flex'; loop();
+})();
+</script>
+</body></html>

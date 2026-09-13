@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Kart Champions</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#3a8a3a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  .ctl{position:fixed;bottom:24px;z-index:8;border:none;font-family:inherit;font-weight:900;color:#fff;border-radius:20px;height:84px;font-size:34px;}
+  #lft{left:16px;width:90px;background:#00000055;} #rgt{left:118px;width:90px;background:#00000055;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:rgba(20,50,20,.65);}
+  #obox{background:#fff;color:#222;border-radius:18px;padding:26px 30px;text-align:center;max-width:80%;}
+  #obox h1{color:#e2342f;margin:0 0 6px;}
+  #go{margin-top:14px;border:none;background:#e2342f;color:#fff;font-family:inherit;font-weight:900;font-size:20px;padding:12px 28px;border-radius:14px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<button id="lft" class="ctl">◀</button><button id="rgt" class="ctl">▶</button>
+<div id="over"><div id="obox"><h1>🏎️ MO Kart Champions</h1><div id="omsg">Hold ◀ ▶ to steer.<br>Dodge rival karts, grab boosts ⚡, finish 3 laps 1st!</div><button id="go">RACE</button></div></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  var playing=false, best=+(localStorage.getItem('moKartBest')||0);
+  var LAPLEN=6000, LAPS=3, dist=0, px=0, speed=0, rivals=[], items=[], roadY=0, dirL=false,dirR=false, boost=0, t=0, place=1;
+  function reset(){ dist=0; px=W/2; speed=10; rivals=[]; items=[]; boost=0; t=0; place=1;
+    for(var i=0;i<3;i++)rivals.push({d:200+i*400, x:W*(0.3+i*0.2), col:['#3aa0e0','#7bcf7b','#e0b040'][i], base:9+Math.random()*1.5}); }
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function beep(f,d){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.08)); }
+  function rr(a,b,c,d,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+c,b,a+c,b+d,r); x.arcTo(a+c,b+d,a,b+d,r); x.arcTo(a,b+d,a,b,r); x.arcTo(a,b,a+c,b,r); x.closePath(); }
+  function roadX(){ return W*0.16; } // left edge
+  function roadW(){ return W*0.68; }
+  function kart(cx,cy,col,me){ x.save(); x.translate(cx,cy); x.fillStyle=col; rr(-24,-30,48,60,10); x.fill(); x.fillStyle='#222'; x.fillRect(-30,-24,8,18); x.fillRect(22,-24,8,18); x.fillRect(-30,8,8,18); x.fillRect(22,8,8,18); x.fillStyle='#1a2530'; rr(-16,-18,32,20,5); x.fill(); if(me){ x.fillStyle='#fff'; x.font='900 16px Trebuchet MS'; x.textAlign='center'; x.fillText('MO',0,-2); } x.restore(); }
+  function loop(){ t++;
+    // grass
+    x.fillStyle='#4a9a3a'; x.fillRect(0,0,W,H);
+    // road
+    var rx=roadX(), rw=roadW(); x.fillStyle='#4a4f57'; x.fillRect(rx,0,rw,H);
+    x.fillStyle='#c8c8c8'; x.fillRect(rx-6,0,6,H); x.fillStyle='#c8c8c8'; x.fillRect(rx+rw,0,6,H);
+    roadY=(roadY+speed)%80; x.fillStyle='#ffd23f'; for(var y=-80;y<H;y+=80){ x.fillRect(rx+rw/2-4,y+roadY,8,40); }
+    // start/finish stripe when near lap boundary
+    var lapPos=dist%LAPLEN; var untilLap=(LAPLEN-lapPos); var stripeY=H*0.5 - (untilLap*0.12); if(stripeY>-30&&stripeY<H){ for(var cxk=0;cxk<rw;cxk+=24){ x.fillStyle=(Math.floor(cxk/24)%2)?'#fff':'#111'; x.fillRect(rx+cxk,stripeY,24,16); } }
+    if(playing){ if(dirL)px-=7; if(dirR)px+=7; px=Math.max(rx+24,Math.min(rx+rw-24,px));
+      var maxS=boost>0?20:13; if(boost>0)boost--; speed+=(maxS-speed)*0.05; dist+=speed;
+      // spawn items
+      if(t%90===0)items.push({d:dist+H+Math.random()*H, x:rx+30+Math.random()*(rw-60), boost:Math.random()<0.5});
+      // finish
+      if(dist>=LAPLEN*LAPS){ playing=false; over(); }
+      // place calc
+      place=1; for(var i=0;i<rivals.length;i++){ if(rivals[i].d>dist)place++; }
+    }
+    // rivals
+    for(var i=0;i<rivals.length;i++){ var r=rivals[i]; if(playing)r.d+=r.base + (r.d<dist?1.5:0); // rubber-band
+      var sy=H*0.72-(r.d-dist)*0.5; if(sy>-60&&sy<H+60){ kart(r.x,sy,r.col,false);
+        if(Math.abs(sy-H*0.72)<52 && Math.abs(r.x-px)<44){ speed*=0.6; if(playing&&t%10===0)beep(200); } } }
+    // items
+    for(var i=items.length-1;i>=0;i--){ var it=items[i]; var sy=H*0.72-(it.d-dist)*0.5; if(sy>H+40){ items.splice(i,1); continue; } if(sy<-40)continue;
+      if(it.boost){ x.fillStyle='#ffd23f'; x.font='26px serif'; x.textAlign='center'; x.fillText('⚡',it.x,sy); } else { x.fillStyle='#8a4ac0'; x.font='24px serif'; x.textAlign='center'; x.fillText('🛢️',it.x,sy); }
+      if(Math.abs(sy-H*0.72)<40 && Math.abs(it.x-px)<40){ if(it.boost){ boost=60; beep(1300); } else { speed*=0.5; beep(220); } items.splice(i,1); } }
+    // player
+    kart(px,H*0.72,'#e2342f',true);
+    // HUD
+    var lap=Math.min(LAPS,Math.floor(dist/LAPLEN)+1);
+    x.fillStyle='#fff'; x.font='900 '+Math.round(W*0.06)+'px Trebuchet MS'; x.textAlign='left'; x.strokeStyle='#1a3a1a'; x.lineWidth=3; x.strokeText('Lap '+lap+'/'+LAPS,14,42); x.fillText('Lap '+lap+'/'+LAPS,14,42);
+    x.textAlign='right'; x.strokeText(place+(place===1?'st':place===2?'nd':place===3?'rd':'th'),W-14,42); x.fillText(place+(place===1?'st':place===2?'nd':place===3?'rd':'th'),W-14,42);
+    if(boost>0){ x.fillStyle='#ffd23f'; x.textAlign='center'; x.font='900 '+Math.round(W*0.05)+'px Trebuchet MS'; x.fillText('⚡ BOOST!',W/2,42); }
+    requestAnimationFrame(loop);
+  }
+  function over(){ beep(place===1?1500:300,0.4); var win=place===1; if(win && best<1){ best=1; } try{localStorage.setItem('moKartBest',Math.max(best,win?1:0));}catch(e){}
+    document.getElementById('omsg').innerHTML=(win?'🏆 You WON the race!':'You finished '+place+(place===2?'nd':place===3?'rd':'th')+'!')+'<br>Try for 1st place!'; document.getElementById('go').textContent='RACE AGAIN'; document.getElementById('over').style.display='flex'; }
+  document.getElementById('go').addEventListener('click',function(){ reset(); playing=true; document.getElementById('over').style.display='none'; });
+  function hold(id,set){ var el=document.getElementById(id); el.addEventListener('pointerdown',function(e){e.preventDefault();set(true);}); el.addEventListener('pointerup',function(e){e.preventDefault();set(false);}); el.addEventListener('pointercancel',function(){set(false);}); el.addEventListener('pointerleave',function(){set(false);}); }
+  hold('lft',function(v){dirL=v;}); hold('rgt',function(v){dirR=v;});
+  addEventListener('keydown',function(e){ if(e.key==='ArrowLeft')dirL=true; if(e.key==='ArrowRight')dirR=true; }); addEventListener('keyup',function(e){ if(e.key==='ArrowLeft')dirL=false; if(e.key==='ArrowRight')dirR=false; });
+  reset(); playing=false; document.getElementById('over').style.display='flex'; loop();
+})();
+</script>
+</body></html>

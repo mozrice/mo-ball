@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Prize Wheel</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:#1a1030;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;text-align:center;}
+  canvas{display:block;margin:10px auto 0;}
+  #hud{padding:30px 10px 0;font-size:20px;font-weight:bold;color:#ffd23f;}
+  a.back{position:fixed;top:8px;left:10px;color:#c8b0ff;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;}
+  #msg{height:28px;font-size:22px;font-weight:bold;color:#7bff9e;margin-top:6px;}
+  #spin{background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:24px;padding:16px 40px;border-radius:18px;font-family:inherit;box-shadow:0 6px 0 #b4801a;margin-top:6px;}
+  #spin:active{transform:translateY(4px);} #spin:disabled{opacity:.5;}
+</style></head>
+<body>
+<a class="back" href="../games.html">⬅ Games</a>
+<div id="hud">🎡 Prize Wheel &nbsp; 💰<span id="coins">0</span></div>
+<canvas id="c" width="300" height="300"></canvas>
+<div id="msg">Spin to win coins!</div>
+<button id="spin">🎡 SPIN!</button>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d');
+  var CK='moWheelCoins'; function getC(){ try{return +localStorage.getItem(CK)||0;}catch(e){return 0;} } function setC(v){ try{localStorage.setItem(CK,v);}catch(e){} }
+  var SEG=[{t:'5',v:5,c:'#ff5a5a'},{t:'10',v:10,c:'#ffd23f'},{t:'🎁',v:25,c:'#7bff9e'},{t:'2',v:2,c:'#43c6ff'},{t:'20',v:20,c:'#ff6ad5'},{t:'1',v:1,c:'#b06aff'},{t:'💎',v:50,c:'#2ad17a'},{t:'5',v:5,c:'#ff9f43'}];
+  var ang=0,spinning=false,vel=0;
+  document.getElementById('coins').textContent=getC();
+  function draw(){ ctx.clearRect(0,0,300,300); var cx=150,cy=150,r=140,n=SEG.length,step=6.283/n;
+    for(var i=0;i<n;i++){ var a0=ang+i*step; ctx.fillStyle=SEG[i].c; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,a0,a0+step); ctx.closePath(); ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+      ctx.save(); ctx.translate(cx,cy); ctx.rotate(a0+step/2); ctx.fillStyle='#1a1030'; ctx.font='bold 22px Trebuchet MS'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(SEG[i].t,r*0.66,0); ctx.restore(); }
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(cx,cy,18,0,6.29); ctx.fill();
+    ctx.fillStyle='#ffd23f'; ctx.beginPath(); ctx.moveTo(cx,4); ctx.lineTo(cx-14,-16); ctx.lineTo(cx+14,-16); ctx.closePath(); ctx.fill(); }
+  function loop(){ if(spinning){ ang+=vel; vel*=0.982; if(vel<0.002){ spinning=false; award(); } draw(); requestAnimationFrame(loop); } }
+  function award(){ var n=SEG.length,step=6.283/n; var pointer=(-Math.PI/2 - ang)%6.283; if(pointer<0)pointer+=6.283; var idx=Math.floor(pointer/step)%n; var seg=SEG[idx]; var c=getC()+seg.v; setC(c); document.getElementById('coins').textContent=c; document.getElementById('msg').textContent='🎉 You won '+seg.v+' 💰!'; document.getElementById('spin').disabled=false; beep(880,0.15); }
+  document.getElementById('spin').onclick=function(){ if(spinning)return; spinning=true; this.disabled=true; document.getElementById('msg').textContent='Spinning...'; vel=0.35+Math.random()*0.25; beep(400,0.1); requestAnimationFrame(loop); };
+  var ac; function beep(f,d){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),gg=ac.createGain(); o.frequency.value=f; o.type='square'; o.connect(gg); gg.connect(ac.destination); gg.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  draw();
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration - shows a gold badge + confetti on win/finish */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function hookText(el){ if(!el)return; var was=false; new MutationObserver(function(){ var t=(el.textContent||'').trim(); if(t&&!was){ was=true; celebrate(); } else if(!t){ was=false; } }).observe(el,{childList:true,characterData:true,subtree:true}); }
+  function init(){ hookVisible(document.getElementById('over')); hookText(document.getElementById('win')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+
+</body></html>

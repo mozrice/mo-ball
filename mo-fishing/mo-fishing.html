@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Fishing</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0a5a8a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:rgba(5,40,70,.7);}
+  #obox{background:#fff;color:#222;border-radius:18px;padding:26px 30px;text-align:center;max-width:80%;}
+  #obox h1{color:#0a7ab0;margin:0 0 6px;}
+  #go{margin-top:14px;border:none;background:#0a9ad0;color:#fff;font-family:inherit;font-weight:900;font-size:20px;padding:12px 28px;border-radius:14px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div id="over"><div id="obox"><h1>🎣 MO Fishing</h1><div id="omsg">Tap to drop the hook.<br>Catch fish before time runs out!</div><button id="go">GO FISH</button></div></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  var playing=false, score=0, best=+(localStorage.getItem('moFishBest')||0), timeLeft=0;
+  var boatX=0, hook={y:0,down:false,fish:null}, fishes=[], t=0;
+  function reset(){ score=0; timeLeft=45*60; fishes=[]; hook={y:0,down:false,fish:null}; t=0; for(var i=0;i<7;i++)addFish(); }
+  function addFish(){ var sz=0.7+Math.random()*0.9; fishes.push({x:Math.random()*W, y:H*(0.42+Math.random()*0.5), v:(Math.random()<0.5?1:-1)*(0.6+Math.random()*1.6), s:sz, col:['#e0803a','#e0439a','#7bcf7b','#ffd23f','#5ad0ff'][Math.floor(Math.random()*5)], pts:Math.round(sz*5)}); }
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function beep(f,d){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.08)); }
+  function fish(fx,fy,s,col,dir){ x.save(); x.translate(fx,fy); x.scale(dir,1); x.fillStyle=col; x.beginPath(); x.ellipse(0,0,16*s,9*s,0,0,7); x.fill(); x.beginPath(); x.moveTo(14*s,0); x.lineTo(24*s,-8*s); x.lineTo(24*s,8*s); x.fill(); x.fillStyle='#fff'; x.beginPath(); x.arc(-8*s,-2*s,3*s,0,7); x.fill(); x.fillStyle='#111'; x.beginPath(); x.arc(-9*s,-2*s,1.4*s,0,7); x.fill(); x.restore(); }
+  function rr(a,b,c,d,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+c,b,a+c,b+d,r); x.arcTo(a+c,b+d,a,b+d,r); x.arcTo(a,b+d,a,b,r); x.arcTo(a,b,a+c,b,r); x.closePath(); }
+  function loop(){ t++;
+    var waterY=H*0.32;
+    var g=x.createLinearGradient(0,0,0,waterY); g.addColorStop(0,'#8fd0ff'); g.addColorStop(1,'#cfeeff'); x.fillStyle=g; x.fillRect(0,0,W,waterY);
+    x.fillStyle='#ffe07a'; x.beginPath(); x.arc(W*0.82,H*0.1,W*0.05,0,7); x.fill();
+    var wg=x.createLinearGradient(0,waterY,0,H); wg.addColorStop(0,'#2a90c8'); wg.addColorStop(1,'#0a4a7a'); x.fillStyle=wg; x.fillRect(0,waterY,W,H-waterY);
+    // boat
+    boatX=W/2; x.fillStyle='#8a4a2a'; rr(boatX-50,waterY-18,100,20,6); x.fill(); x.fillStyle='#e2342f'; rr(boatX-40,waterY-16,80,8,4); x.fill();
+    x.save(); x.translate(boatX-2,waterY-52); x.fillStyle='#f4c9a0'; x.beginPath(); x.arc(0,0,13,0,7); x.fill(); x.fillStyle='#333'; x.fillRect(-13,-16,26,10); x.fillStyle='#e2342f'; x.font='900 8px Trebuchet MS'; x.textAlign='center'; x.fillText('MO',0,3); x.restore();
+    // fish move
+    for(var i=0;i<fishes.length;i++){ var f=fishes[i]; f.x+=f.v; if(f.x<-30){f.x=W+30;} if(f.x>W+30){f.x=-30;} if(!(hook.fish===f))fish(f.x,f.y,f.s,f.col,f.v<0?-1:1); }
+    // hook line
+    var hx=boatX+40;
+    if(hook.down){ hook.y+=6; if(hook.y>H-20){ hook.down=false; } }
+    else if(hook.fish){ hook.y-=7; if(hook.y<=waterY-10){ score+=hook.fish.pts; beep(1000); var idx=fishes.indexOf(hook.fish); if(idx>=0)fishes.splice(idx,1); addFish(); hook.fish=null; hook.y=0; } }
+    else if(hook.y>0){ hook.y-=7; if(hook.y<0)hook.y=0; }
+    if(hook.y>0){ x.strokeStyle='#eee'; x.lineWidth=2; x.beginPath(); x.moveTo(hx,waterY-8); x.lineTo(hx,waterY+hook.y); x.stroke(); x.fillStyle='#ccc'; x.beginPath(); x.arc(hx,waterY+hook.y,5,0,7); x.fill();
+      if(hook.down && !hook.fish){ for(var j=0;j<fishes.length;j++){ var ff=fishes[j]; if(Math.hypot(ff.x-hx,ff.y-(waterY+hook.y))<18*ff.s+8){ hook.fish=ff; hook.down=false; beep(700); break; } } }
+      if(hook.fish){ hook.fish.x=hx; hook.fish.y=waterY+hook.y; fish(hx,waterY+hook.y,hook.fish.s,hook.fish.col,1); }
+    }
+    if(playing){ timeLeft--; if(timeLeft<=0){ playing=false; over(); } }
+    x.fillStyle='#fff'; x.font='900 '+Math.round(W*0.06)+'px Trebuchet MS'; x.textAlign='left'; x.fillText('🐟 '+score, 14, 40);
+    x.textAlign='right'; x.font='900 '+Math.round(W*0.055)+'px Trebuchet MS'; x.fillText('⏱ '+Math.ceil(timeLeft/60), W-14, 40);
+    requestAnimationFrame(loop);
+  }
+  function over(){ beep(200,0.3); if(score>best){ best=score; try{localStorage.setItem('moFishBest',score);}catch(e){} }
+    document.getElementById('omsg').innerHTML='You caught <b>'+score+'</b> points!<br>Best: '+best; document.getElementById('go').textContent='FISH AGAIN'; document.getElementById('over').style.display='flex'; }
+  document.getElementById('go').addEventListener('click',function(){ reset(); playing=true; document.getElementById('over').style.display='none'; });
+  cv.addEventListener('pointerdown',function(){ if(!playing)return; if(!hook.down && !hook.fish && hook.y<8){ hook.down=true; hook.y=1; beep(500); } });
+  document.getElementById('over').style.display='flex'; reset(); loop();
+})();
+</script>
+</body></html>

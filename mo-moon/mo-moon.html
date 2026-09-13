@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO MOON BASE</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0a0a1e;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0007;}
+  .pill{background:#0008;border-radius:20px;padding:6px 14px;font-size:17px;}
+  .key{position:fixed;bottom:22px;width:80px;height:80px;border-radius:50%;background:#ffffff22;border:3px solid #ffffff66;display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;}
+  #lft{left:16px;} #rgt{left:108px;}
+  #up{right:16px;width:100px;height:100px;background:linear-gradient(#ff9f43,#e0453a);border:none;font-weight:bold;font-size:18px;}
+  .key:active{transform:translateY(3px);}
+  #hint{position:fixed;bottom:128px;left:0;right:0;text-align:center;font-size:14px;color:#cde;pointer-events:none;text-shadow:0 1px 2px #000;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#0a0a1ed8;text-align:center;}
+  #over h1{font-size:36px;margin:0 0 6px;color:#7bd9ff;} #over p{font-size:20px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#43c6ff,#1a8fd6);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #0e5a8a;font-family:inherit;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill" id="phaseP">🚀 LAND</div>
+  <div class="pill">💎 <span id="crys">0</span></div>
+</div>
+<div class="key" id="lft">◀</div>
+<div class="key" id="rgt">▶</div>
+<button class="key" id="up">▲</button>
+<div id="hint">Hold ▲ to fire thrusters • land softly on the 🟩 pad!</div>
+<div id="over"><h1 id="ot">💥 CRASH!</h1><p id="os"></p><button class="btn" id="again">Try Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1,SURF=0;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); SURF=H*0.78; }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  var phase, rocket, padX, padW, crys, stars, worldX, speed, crystals, nextCrystal, buggyY, buggyVy, buggyAir, running, nowv=0;
+  var L=false,R=false,U=false;
+  function reset(){ phase='land'; rocket={x:W*0.5,y:80,vx:0,vy:0}; padX=W*(0.3+Math.random()*0.5); padW=70; crys=0; running=true;
+    stars=[]; for(var i=0;i<70;i++) stars.push({x:Math.random()*W,y:Math.random()*SURF,r:Math.random()*1.6+0.4});
+    worldX=0; speed=0; crystals=[]; nextCrystal=W; buggyY=0; buggyVy=0; buggyAir=false;
+    document.getElementById('over').style.display='none'; document.getElementById('phaseP').textContent='🚀 LAND'; document.getElementById('crys').textContent='0';
+    document.getElementById('hint').textContent='Hold ▲ to fire thrusters • land softly on the 🟩 pad!'; }
+  function hold(el,set){ el.addEventListener('touchstart',function(e){set(true);e.preventDefault();},{passive:false}); el.addEventListener('touchend',function(e){set(false);e.preventDefault();},{passive:false}); el.addEventListener('mousedown',function(){set(true);}); el.addEventListener('mouseup',function(){set(false);}); el.addEventListener('mouseleave',function(){set(false);}); }
+  hold(document.getElementById('lft'),function(v){L=v;}); hold(document.getElementById('rgt'),function(v){R=v;}); hold(document.getElementById('up'),function(v){U=v;});
+  addEventListener('keydown',function(e){ if(e.key==='ArrowLeft')L=true; if(e.key==='ArrowRight')R=true; if(e.key==='ArrowUp'||e.key===' ')U=true; });
+  addEventListener('keyup',function(e){ if(e.key==='ArrowLeft')L=false; if(e.key==='ArrowRight')R=false; if(e.key==='ArrowUp'||e.key===' ')U=false; });
+  document.getElementById('again').onclick=reset;
+  function terrainY(wx){ return SURF + Math.sin(wx*0.006)*24 + Math.sin(wx*0.017+2)*10; }
+  function crash(){ running=false; document.getElementById('ot').textContent='💥 CRASH!'; document.getElementById('os').innerHTML='Land softer next time! Come down slow. 🚀'; document.getElementById('over').style.display='flex'; beep(160,0.3,'sawtooth',0.09); }
+  function landed(){ phase='drive'; document.getElementById('phaseP').textContent='🚙 DRIVE'; document.getElementById('hint').textContent='Hold ▲ GAS to drive • grab 💎 crystals • don\'t flip!'; beep(600,0.12,'square',0.07); setTimeout(function(){beep(900,0.14,'square',0.06);},90); buggyY=terrainY(worldX+W*0.3)-20; }
+  function update(dt){
+    if(phase==='land'){ rocket.vy+=0.04*dt; if(U){ rocket.vy-=0.11*dt; } if(L)rocket.vx-=0.05*dt; if(R)rocket.vx+=0.05*dt; rocket.vx*=0.99;
+      rocket.x+=rocket.vx*dt; rocket.y+=rocket.vy*dt; rocket.x=Math.max(20,Math.min(W-20,rocket.x));
+      if(rocket.y<24){ rocket.y=24; if(rocket.vy<0) rocket.vy=0; }
+      if(rocket.y>=SURF-20){ rocket.y=SURF-20; if(Math.abs(rocket.x-padX)<padW/2 && rocket.vy<3 && Math.abs(rocket.vx)<2){ landed(); } else { crash(); } }
+    } else if(phase==='drive'){
+      if(U) speed+=0.14*dt; else speed-=0.08*dt; speed=Math.max(0,Math.min(7,speed)); worldX+=speed*dt;
+      var bx=worldX+W*0.3; var ground=terrainY(bx)-20;
+      if(!buggyAir){ buggyY=ground; if(U && speed>4 && Math.random()<0.02){} }
+      // simple: buggy sticks to ground
+      buggyY=ground;
+      if(worldX+W>nextCrystal){ crystals.push({x:nextCrystal+W*0.3, y:terrainY(nextCrystal+W*0.3)-50}); nextCrystal+=140+Math.random()*160; }
+      for(var i=crystals.length-1;i>=0;i--){ var c=crystals[i]; if(c.x-worldX<-60){ crystals.splice(i,1); continue; }
+        if(Math.abs(c.x-bx)<30 && Math.abs(c.y-buggyY)<50){ crys++; document.getElementById('crys').textContent=crys; beep(800,0.08,'square',0.06); crystals.splice(i,1); } }
+    }
+  }
+  function render(){
+    ctx.fillStyle='#0a0a1e'; ctx.fillRect(0,0,W,H);
+    for(var i=0;i<stars.length;i++){ ctx.fillStyle='rgba(255,255,255,'+(0.4+Math.sin(nowv*0.003+i)*0.3)+')'; ctx.beginPath(); ctx.arc(stars[i].x,stars[i].y,stars[i].r,0,6.29); ctx.fill(); }
+    // earth in sky
+    ctx.fillStyle='#3a7ad0'; ctx.beginPath(); ctx.arc(W*0.85,70,26,0,6.29); ctx.fill(); ctx.fillStyle='#37b06a'; ctx.beginPath(); ctx.arc(W*0.83,66,9,0,6.29); ctx.fill();
+    if(phase==='land'){
+      ctx.fillStyle='#9a9aa8'; ctx.fillRect(0,SURF,W,H-SURF);
+      for(var c=0;c<6;c++){ ctx.fillStyle='#7a7a88'; ctx.beginPath(); ctx.ellipse((c*160+40),SURF+30,26,10,0,0,6.29); ctx.fill(); }
+      // pad
+      ctx.fillStyle='#37d06a'; ctx.fillRect(padX-padW/2,SURF-4,padW,8); ctx.fillStyle='#fff'; ctx.font='12px sans-serif'; ctx.textAlign='center'; ctx.fillText('LAND HERE',padX,SURF-12);
+      drawRocket(rocket.x,rocket.y,U);
+      // speed indicator
+      ctx.fillStyle=rocket.vy<3?'#37d06a':'#e0453a'; ctx.font='bold 14px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('Speed: '+Math.abs(rocket.vy).toFixed(1),W/2,H*0.12);
+    } else {
+      // moon terrain
+      ctx.fillStyle='#9a9aa8'; ctx.beginPath(); ctx.moveTo(0,H); for(var x=0;x<=W;x+=8){ ctx.lineTo(x,terrainY(worldX+x)); } ctx.lineTo(W,H); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='#c7c7d2'; ctx.lineWidth=3; ctx.beginPath(); for(var x2=0;x2<=W;x2+=8){ ctx.lineTo(x2,terrainY(worldX+x2)); } ctx.stroke();
+      // crystals
+      for(var i=0;i<crystals.length;i++){ var cc=crystals[i]; ctx.font='26px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('💎',cc.x-worldX,cc.y+Math.sin(nowv*0.005+i)*3); }
+      drawBuggy(W*0.3, buggyY, U);
+    }
+  }
+  function drawRocket(x,y,thrust){ ctx.save(); ctx.translate(x,y);
+    if(thrust){ ctx.fillStyle='rgba(255,160,0,0.8)'; ctx.beginPath(); ctx.moveTo(-6,18); ctx.lineTo(6,18); ctx.lineTo(0,34+Math.random()*10); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle='#e8eef5'; ctx.beginPath(); ctx.moveTo(0,-22); ctx.quadraticCurveTo(12,-6,10,18); ctx.lineTo(-10,18); ctx.quadraticCurveTo(-12,-6,0,-22); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#e0453a'; ctx.beginPath(); ctx.moveTo(10,10); ctx.lineTo(18,20); ctx.lineTo(10,18); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(-10,10); ctx.lineTo(-18,20); ctx.lineTo(-10,18); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#7bd9ff'; ctx.beginPath(); ctx.arc(0,-2,5,0,6.29); ctx.fill();
+    ctx.fillStyle='#12406b'; ctx.font='bold 7px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('MO',0,-2);
+    ctx.restore(); }
+  function drawBuggy(x,y,gas){ var slope=(terrainY(worldX+W*0.3+10)-terrainY(worldX+W*0.3-10))/20; ctx.save(); ctx.translate(x,y); ctx.rotate(Math.atan(slope));
+    ctx.fillStyle='#e0453a'; roundRect(-24,-10,48,14,4); ctx.fill(); ctx.fillStyle='#c0392b'; roundRect(-14,-22,20,14,4); ctx.fill();
+    ctx.fillStyle='#7bd9ff'; roundRect(-11,-19,14,9,3); ctx.fill();
+    ctx.fillStyle='#12406b'; ctx.font='bold 7px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('MO',-4,-14);
+    ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(-15,6,9,0,6.29); ctx.arc(15,6,9,0,6.29); ctx.fill(); ctx.fillStyle='#666'; ctx.beginPath(); ctx.arc(-15,6,4,0,6.29); ctx.arc(15,6,4,0,6.29); ctx.fill();
+    if(gas){ ctx.fillStyle='rgba(200,200,220,0.5)'; ctx.beginPath(); ctx.arc(-26,4,5,0,6.29); ctx.fill(); }
+    ctx.restore(); }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(running) update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>MO TRAIN CITY 3D</title>
+<style>
+  html,body { margin:0; height:100%; background:#0a1420; overflow:hidden; font-family:'Trebuchet MS',system-ui,sans-serif; }
+  #stage { position:absolute; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+  #hud { position:absolute; top:10px; left:12px; right:12px; z-index:3; display:flex; gap:10px; color:#fff; font-weight:bold; text-shadow:0 2px 3px #0009; pointer-events:none; }
+  #hud .pill { background:linear-gradient(#12324ecc,#0a2036cc); padding:6px 12px; border-radius:20px; border:1px solid #ffffff22; font-size:16px; }
+  #next { margin-left:auto; }
+  #gasBtn { position:absolute; right:18px; bottom:22px; z-index:4; width:96px; height:96px; border-radius:50%; border:none; font-size:17px; font-weight:900;
+    color:#06280f; background:linear-gradient(#43c07a,#227a4a); box-shadow:0 5px 0 #1f7544; cursor:pointer; }
+  #brakeBtn { position:absolute; left:18px; bottom:22px; z-index:4; width:96px; height:96px; border-radius:50%; border:none; font-size:16px; font-weight:900;
+    color:#3a0a0a; background:linear-gradient(#ff8a6a,#c0392b); box-shadow:0 5px 0 #832712; cursor:pointer; }
+  #gasBtn:active,#brakeBtn:active { transform:translateY(4px); }
+  #hornBtn { position:absolute; right:130px; bottom:40px; z-index:4; border:none; border-radius:16px; padding:12px 14px; font-size:18px; font-weight:bold;
+    background:linear-gradient(#24406a,#142542); color:#fff; box-shadow:0 3px 0 #0c1830; cursor:pointer; }
+  .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; z-index:6; background:#050d16cc; }
+  .overlay.hide { display:none; }
+  .card { background:#12324eee; border:3px solid #6cd0ff; border-radius:22px; padding:22px 26px; max-width:90%; color:#fff; box-shadow:0 20px 60px #000a; }
+  .card h1 { margin:0 0 6px; font-size:28px; color:#8fe3ff; }
+  .card p { margin:8px 0; line-height:1.35; }
+  .big { margin-top:14px; padding:14px 28px; font-size:20px; font-weight:bold; background:linear-gradient(#ffe07a,#f0b429); color:#5a3d00; border:none; border-radius:14px; box-shadow:0 4px 0 #b8922a; cursor:pointer; }
+  .big:active { transform:translateY(4px); box-shadow:0 1px 0 #b8922a; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hud">
+    <div class="pill" id="spd">0 mph</div>
+    <div class="pill" id="dist">🚉 0</div>
+    <div class="pill" id="next">Next: —</div>
+  </div>
+  <button id="brakeBtn">🛑 BRAKE</button>
+  <button id="hornBtn">📢</button>
+  <button id="gasBtn">⚡ GO</button>
+  <div class="overlay" id="startOv">
+    <div class="card">
+      <h1>🚆 MO TRAIN CITY 3D</h1>
+      <p>Drive Mo's train through the 3D city!</p>
+      <p>Hold <b>⚡ GO</b> to speed up, <b>🛑 BRAKE</b> to slow down.<br>Stop at the <b>stations</b> 🚉 (glide in slow!) to pick up passengers and score. 📢 for the horn.</p>
+      <button class="big" id="startBtn">▶ ALL ABOARD</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), ctx=cv.getContext("2d"), stage=document.getElementById("stage");
+  var DPR=Math.min(2, window.devicePixelRatio||1);
+  var W=0,H=0, horizon=0;
+  function resize(){ W=stage.clientWidth; H=stage.clientHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0); horizon=H*0.42; }
+  window.addEventListener("resize",resize); resize();
+
+  var AC=null; function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||"sine"; o.frequency.value=f; g.gain.value=v||0.05; o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1)); o.stop(a.currentTime+(d||0.1)+0.02); }
+  function hornSfx(){ beep(220,0.25,"sawtooth",0.09); setTimeout(function(){beep(165,0.3,"sawtooth",0.08);},150); }
+  function chime(){ beep(1050,0.14,"sine",0.08); setTimeout(function(){beep(1320,0.16,"sine",0.08);},150); }
+  function brakeS(){ beep(900,0.4,"sawtooth",0.04); }
+  var lastSay=0;
+  function say(t){ try{ if(window.speechSynthesis){ var u=new SpeechSynthesisUtterance(t); u.rate=0.98; u.pitch=1.04; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); } }catch(e){} }
+
+  var STATION_NAMES=["MO CENTRAL","HOOP PLAZA","MORGAN PARK","DUNK SQUARE","RICE STREET","BALL YARDS","FAMILY TOWN","SLAM CITY","BUZZER BAY","TIP-OFF TERMINAL"];
+  var SEG=200, ROADW=520, RAIL=150, DRAW=150;
+  var COLORS=["#7fa8d0","#8a94a0","#c98f5a","#9fb0a0","#d0a0b0","#b0a878","#88a0b8","#a08858"];
+
+  var mode="start";
+  var pos, speed, buildings, camX, nextStation, stationPos, stationName, stoppedAt, score, gasHeld, brakeHeld, msg, msgT, moWave;
+  function reset(){ pos=0; speed=0; camX=0; score=0; gasHeld=false; brakeHeld=false; stoppedAt=-1; msg=""; msgT=0; moWave=0;
+    buildings=[]; for(var i=0;i<40;i++){ spawnBuilding(SEG*(6+i*2), (i%2?1:-1)); }
+    nextStation=1; stationPos=SEG*22; stationName=STATION_NAMES[0];
+    updateHUD();
+  }
+  function spawnBuilding(z, side){ var t=Math.random(); var floors=2+Math.floor(Math.random()*9);
+    buildings.push({ z:z, side:side, wx:side*(RAIL+120+Math.random()*260), floors:floors, col:COLORS[Math.floor(Math.random()*COLORS.length)], w:70+Math.random()*60, kind: t<0.14?"tree": t<0.22?"lamp":"bldg" }); }
+  function updateHUD(){ document.getElementById("spd").textContent=Math.round(speed*0.7)+" mph";
+    document.getElementById("dist").textContent="🚉 "+score;
+    var d=Math.max(0,Math.round((stationPos-pos)/60)); document.getElementById("next").textContent="Next: "+stationName+" "+d+"m"; }
+
+  // input
+  function hold(el,set){ function on(e){ if(e.cancelable)e.preventDefault(); ac(); set(true); } function off(){ set(false); }
+    el.addEventListener("mousedown",on); el.addEventListener("touchstart",on,{passive:false});
+    el.addEventListener("mouseup",off); el.addEventListener("mouseleave",off); el.addEventListener("touchend",off); el.addEventListener("touchcancel",off); window.addEventListener("mouseup",off); }
+  hold(document.getElementById("gasBtn"),function(v){gasHeld=v;});
+  hold(document.getElementById("brakeBtn"),function(v){brakeHeld=v; if(v)brakeS();});
+  document.getElementById("hornBtn").onclick=function(){ ac(); hornSfx(); moWave=20; };
+  window.addEventListener("keydown",function(e){ if(e.code==="ArrowUp"||e.code==="KeyW"||e.code==="Space"){e.preventDefault();gasHeld=true;} if(e.code==="ArrowDown"||e.code==="KeyS")brakeHeld=true; });
+  window.addEventListener("keyup",function(e){ if(e.code==="ArrowUp"||e.code==="KeyW"||e.code==="Space")gasHeld=false; if(e.code==="ArrowDown"||e.code==="KeyS")brakeHeld=false; });
+  document.getElementById("startBtn").onclick=function(){ ac(); reset(); mode="drive"; document.getElementById("startOv").classList.add("hide"); say("All aboard! Next stop, "+stationName+"."); };
+
+  function setMsg(t){ msg=t; msgT=140; }
+
+  var last=0;
+  function frame(ts){ var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts;
+    if(mode==="drive") update(dt);
+    render(); requestAnimationFrame(frame);
+  }
+  function update(dt){
+    var target = gasHeld?16 : brakeHeld?0 : Math.max(0,speed-0.02*dt);
+    if(gasHeld) speed += (16-speed)*0.02*dt;
+    else if(brakeHeld) speed += (0-speed)*0.06*dt;
+    else speed += (0-speed)*0.006*dt;
+    if(speed<0.02)speed=0;
+    pos += speed*dt;
+    camX = Math.sin(pos*0.0009)*220;
+    if(moWave>0)moWave-=dt; if(msgT>0)msgT-=dt;
+    // recycle buildings that passed
+    for(var i=0;i<buildings.length;i++){ if(buildings[i].z - pos < -SEG){ buildings[i].z += SEG*80; buildings[i].side=(Math.random()<0.5?1:-1); buildings[i].wx=buildings[i].side*(RAIL+120+Math.random()*260); buildings[i].floors=2+Math.floor(Math.random()*9); buildings[i].col=COLORS[Math.floor(Math.random()*COLORS.length)]; buildings[i].w=70+Math.random()*60; buildings[i].kind=(Math.random()<0.16?"tree":Math.random()<0.24?"lamp":"bldg"); } }
+    // station logic
+    var d = stationPos - pos;
+    if(d < 620 && d > -120 && stoppedAt!==nextStation && speed<2.2){ stoppedAt=nextStation; score++; chime(); setMsg("🚉 Welcome to "+stationName+"! +1  🧑 passengers boarding"); say("Now arriving, "+stationName+". Doors opening."); }
+    if(d < -400){ // passed; schedule next
+      nextStation++; stationName=STATION_NAMES[(nextStation-1)%STATION_NAMES.length]; stationPos = pos + SEG*(18+Math.floor(Math.random()*8));
+      say("Next stop, "+stationName+".");
+    }
+    updateHUD();
+  }
+
+  // projection: nearer (small dz) -> lower & bigger
+  function proj(wx,wz){ var dz=wz-pos; if(dz<1)dz=1; var s=300/dz; return { x:W/2 + (wx-camX)*s, y:horizon + 205*s, s:s, dz:dz }; }
+
+  function render(){
+    // sky
+    var g=ctx.createLinearGradient(0,0,0,horizon); g.addColorStop(0,"#5fb0e8"); g.addColorStop(1,"#bfe6f5"); ctx.fillStyle=g; ctx.fillRect(0,0,W,horizon+2);
+    // sun
+    ctx.save(); ctx.globalCompositeOperation="lighter"; var sg=ctx.createRadialGradient(W*0.72,horizon*0.4,4,W*0.72,horizon*0.4,120); sg.addColorStop(0,"rgba(255,245,200,0.8)"); sg.addColorStop(1,"rgba(255,245,200,0)"); ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(W*0.72,horizon*0.4,120,0,7); ctx.fill(); ctx.restore();
+    // distant skyline silhouette
+    ctx.fillStyle="#8fb8cf"; var sky=-camX*0.3;
+    for(var b=-2;b<20;b++){ var bx=(b*70 + (sky))%(W+140)-70; var bh=20+((b*53)%5)*10; ctx.fillRect(bx, horizon-bh, 46, bh); }
+    // ground
+    ctx.fillStyle="#5aa85e"; ctx.fillRect(0,horizon,W,H-horizon);
+
+    // track segments far -> near
+    var base=Math.floor(pos/SEG);
+    for(var i=DRAW; i>=1; i--){
+      var wzN=(base+i-1)*SEG, wzF=(base+i)*SEG;
+      var pN=proj(0,wzN), pF=proj(0,wzF); if(pN.dz<=1) continue;
+      var bedN=ROADW*pN.s, bedF=ROADW*pF.s;
+      // grass strip
+      ctx.fillStyle=(i%2)?"#5aa85e":"#55a259"; ctx.fillRect(0,pF.y,W,pN.y-pF.y+1);
+      // gravel bed
+      ctx.fillStyle=(i%2)?"#6b7078":"#63686f";
+      quad(pN.x-bedN,pN.y, pN.x+bedN,pN.y, pF.x+bedF,pF.y, pF.x-bedF,pF.y);
+      // tie (sleeper)
+      var railN=RAIL*pN.s; ctx.fillStyle=(i%2)?"#6a4a2a":"#5c3f22"; ctx.fillRect(pN.x-railN*1.25, pN.y-3*pN.s, railN*2.5, Math.max(1,7*pN.s));
+      // rails
+      ctx.strokeStyle="#d0d4d8"; ctx.lineWidth=Math.max(1,3*pN.s);
+      line(pN.x-railN,pN.y, pF.x-RAIL*pF.s,pF.y); line(pN.x+railN,pN.y, pF.x+RAIL*pF.s,pF.y);
+    }
+
+    // buildings sorted far -> near
+    var bs=buildings.slice().sort(function(a,b){ return (b.z-pos)-(a.z-pos); });
+    for(var k=0;k<bs.length;k++) drawBuilding(bs[k]);
+
+    // station marker (platform + sign) at stationPos
+    drawStation();
+
+    // driver cab overlay
+    drawCab();
+
+    // message banner
+    if(msgT>0){ ctx.save(); ctx.globalAlpha=Math.min(1,msgT/25); ctx.fillStyle="#0a1830cc"; rr(W/2-Math.min(W*0.9,340)/2, H*0.16, Math.min(W*0.9,340),30,8); ctx.fill();
+      ctx.fillStyle="#ffe45c"; ctx.font="bold 15px 'Trebuchet MS',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(msg, W/2, H*0.16+15); ctx.restore(); }
+  }
+
+  function drawBuilding(o){ var dz=o.z-pos; if(dz<1||dz>DRAW*SEG) return; var p=proj(o.wx,o.z); var s=p.s;
+    if(o.kind==="tree"){ var th=42*s; ctx.fillStyle="#6a4a2a"; ctx.fillRect(p.x-2*s,p.y-th*0.4,4*s,th*0.4); ctx.fillStyle="#3f8f4a"; ctx.beginPath(); ctx.arc(p.x,p.y-th*0.55,th*0.4,0,7); ctx.fill(); return; }
+    if(o.kind==="lamp"){ var lh=70*s; ctx.strokeStyle="#444"; ctx.lineWidth=Math.max(1,3*s); ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x,p.y-lh); ctx.stroke(); ctx.fillStyle="#ffe9a0"; ctx.beginPath(); ctx.arc(p.x,p.y-lh,4*s,0,7); ctx.fill(); return; }
+    var bw=o.w*s, bh=o.floors*24*s;
+    var front=o.col, sideC=shade(o.col,0.7);
+    // side face (toward center)
+    var sdir = o.side>0? -1:1;
+    ctx.fillStyle=sideC; quad(p.x, p.y, p.x, p.y-bh, p.x+sdir*bw*0.4, p.y-bh-bw*0.12, p.x+sdir*bw*0.4, p.y-bw*0.12);
+    // front face
+    ctx.fillStyle=front; ctx.fillRect(p.x-bw/2, p.y-bh, bw, bh);
+    ctx.fillStyle="rgba(255,255,255,0.12)"; ctx.fillRect(p.x-bw/2, p.y-bh, bw, Math.max(1,bh*0.06));
+    // windows
+    ctx.fillStyle="#2f455e";
+    for(var fy=p.y-bh+8*s; fy<p.y-6*s; fy+=14*s){ for(var fx=p.x-bw/2+6*s; fx<p.x+bw/2-6*s; fx+=12*s){ ctx.fillStyle=(Math.random()<0.5||true)?( ((Math.floor(fx)+Math.floor(fy))%3===0)?"#ffe9a0":"#33506e"):"#33506e"; ctx.fillRect(fx,fy,7*s,8*s); } }
+    // roof line
+    ctx.fillStyle=shade(o.col,1.1); ctx.fillRect(p.x-bw/2,p.y-bh-3*s,bw,3*s);
+  }
+
+  function drawStation(){ var dz=stationPos-pos; if(dz<1||dz>DRAW*SEG) return; var p=proj(0,stationPos), s=p.s;
+    var archW=RAIL*3.7*s, archH=165*s, floorY=p.y+10*s;
+    // ---- INDOOR TRAIN-SHED HALL ----
+    // vault interior (dark) with arched top
+    ctx.fillStyle="#141d28";
+    ctx.beginPath(); ctx.moveTo(p.x-archW,floorY); ctx.lineTo(p.x-archW,p.y-archH*0.45); ctx.quadraticCurveTo(p.x,p.y-archH, p.x+archW,p.y-archH*0.45); ctx.lineTo(p.x+archW,floorY); ctx.closePath(); ctx.fill();
+    // roof ribs (girders)
+    ctx.strokeStyle="#2b3a4a"; ctx.lineWidth=Math.max(1,3*s);
+    for(var rib=-0.8;rib<=0.8;rib+=0.4){ ctx.beginPath(); ctx.moveTo(p.x+archW*rib, floorY); ctx.quadraticCurveTo(p.x+archW*rib*0.5, p.y-archH*0.9, p.x, p.y-archH*0.98); ctx.stroke(); }
+    // hanging ceiling lights
+    ctx.save(); ctx.globalCompositeOperation="lighter";
+    for(var lp=-0.6;lp<=0.6;lp+=0.3){ var lx=p.x+archW*lp, ly=p.y-archH*0.55; ctx.fillStyle="#fff6cc"; ctx.beginPath(); ctx.arc(lx,ly,3*s+1,0,7); ctx.fill(); var gg=ctx.createRadialGradient(lx,ly,1,lx,ly,26*s); gg.addColorStop(0,"rgba(255,246,204,0.35)"); gg.addColorStop(1,"rgba(255,246,204,0)"); ctx.fillStyle=gg; ctx.beginPath(); ctx.arc(lx,ly,26*s,0,7); ctx.fill(); }
+    ctx.restore();
+    // ---- back wall with glossy tiles ----
+    var bwW=archW*0.86, wallTop=p.y-archH*0.44, wallBot=p.y-4*s;
+    var wg=ctx.createLinearGradient(0,wallTop,0,wallBot); wg.addColorStop(0,"#f4f0e6"); wg.addColorStop(1,"#dcd6c6"); ctx.fillStyle=wg; ctx.fillRect(p.x-bwW,wallTop,bwW*2,wallBot-wallTop);
+    if(s>0.4){ ctx.strokeStyle="rgba(150,140,120,0.5)"; ctx.lineWidth=1;
+      for(var tyy=wallTop; tyy<wallBot; tyy+=13*s){ ctx.beginPath(); ctx.moveTo(p.x-bwW,tyy); ctx.lineTo(p.x+bwW,tyy); ctx.stroke(); }
+      for(var txx=p.x-bwW; txx<p.x+bwW; txx+=22*s){ ctx.beginPath(); ctx.moveTo(txx,wallTop); ctx.lineTo(txx,wallBot); ctx.stroke(); } }
+    // ---- big navy name sign with roundel ----
+    var bandY=p.y-archH*0.30, bandH=26*s;
+    ctx.fillStyle="#12305a"; rr(p.x-bwW*0.92,bandY,bwW*1.84,bandH,5*s); ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=Math.max(1,2*s); rr(p.x-bwW*0.92,bandY,bwW*1.84,bandH,5*s); ctx.stroke();
+    if(s>0.25){ var ro=p.x-bwW*0.78, rc=bandY+bandH/2; ctx.fillStyle="#e0453a"; ctx.beginPath(); ctx.arc(ro,rc,bandH*0.42,0,7); ctx.fill(); ctx.fillStyle="#12305a"; ctx.beginPath(); ctx.arc(ro,rc,bandH*0.26,0,7); ctx.fill(); }
+    ctx.fillStyle="#fff"; ctx.font="bold "+Math.max(8,Math.round(15*s))+"px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(stationName, p.x+bwW*0.06, bandY+bandH/2);
+    // ---- departures board (amber) + clock ----
+    if(s>0.45){ var dbx=p.x-bwW*0.6, dby=p.y-archH*0.14, dbw=bwW*0.62, dbh=30*s;
+      ctx.fillStyle="#0a0d06"; ctx.fillRect(dbx,dby,dbw,dbh); ctx.fillStyle="#ffb020"; ctx.font="bold "+Math.max(6,9*s)+"px 'Courier New',monospace"; ctx.textAlign="left"; ctx.textBaseline="middle";
+      ctx.fillText("DEPARTURES", dbx+4*s, dby+dbh*0.28); ctx.fillStyle="#ffd24a"; ctx.fillText("MO LINE   ON TIME", dbx+4*s, dby+dbh*0.68);
+      // clock
+      var clx=p.x+bwW*0.62, cly=p.y-archH*0.10, clr=13*s; ctx.fillStyle="#0f1622"; ctx.beginPath(); ctx.arc(clx,cly,clr+1,0,7); ctx.fill(); ctx.fillStyle="#f6f8fb"; ctx.beginPath(); ctx.arc(clx,cly,clr,0,7); ctx.fill();
+      var t=last/1000; ctx.strokeStyle="#233"; ctx.lineWidth=Math.max(1,2*s); ctx.beginPath(); ctx.moveTo(clx,cly); ctx.lineTo(clx+Math.sin(t*0.1)*clr*0.5,cly-Math.cos(t*0.1)*clr*0.5); ctx.stroke(); ctx.strokeStyle="#e0453a"; ctx.lineWidth=Math.max(1,1*s); ctx.beginPath(); ctx.moveTo(clx,cly); ctx.lineTo(clx+Math.sin(t)*clr*0.8,cly-Math.cos(t)*clr*0.8); ctx.stroke(); }
+    // ---- side columns ----
+    ctx.fillStyle="#c9c3b4"; ctx.fillRect(p.x-archW-3*s,p.y-archH*0.45,7*s,floorY-(p.y-archH*0.45)); ctx.fillRect(p.x+archW-4*s,p.y-archH*0.45,7*s,floorY-(p.y-archH*0.45));
+    // ---- platforms both sides (tiled + yellow edge) ----
+    var pfIn=RAIL*1.5*s, pfOut=RAIL*3.4*s, pfy=p.y-2*s, pfh=10*s;
+    [-1,1].forEach(function(sd){ var x0=p.x+sd*pfIn, x1=p.x+sd*pfOut, xa=Math.min(x0,x1), xw=Math.abs(x1-x0);
+      ctx.fillStyle="#cfc8ba"; ctx.fillRect(xa,pfy,xw,pfh); ctx.fillStyle="#b8b0a0"; ctx.fillRect(xa,pfy+pfh,xw,4*s);
+      ctx.fillStyle="#ffd93d"; ctx.fillRect(p.x+sd*pfIn - sd*2*s, pfy, 3*s, pfh);
+      // bench
+      if(s>0.4){ ctx.fillStyle="#6a5a44"; ctx.fillRect(x0+sd*8*s, pfy-6*s, 16*s, 3*s); }
+      // waiting passengers
+      if(s>0.3){ ctx.fillStyle="#33445a"; for(var w=0;w<3;w++){ var wx=x0+sd*(6*s+w*11*s); ctx.fillRect(wx,pfy-13*s,4*s,12*s); ctx.fillStyle="#f0c9a0"; ctx.fillRect(wx,pfy-17*s,4*s,4*s); ctx.fillStyle="#33445a"; } }
+    });
+    // warm ambient glow when close
+    if(dz<SEG*10){ ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.globalAlpha=Math.min(0.25,(SEG*10-dz)/(SEG*10)); var ag=ctx.createRadialGradient(p.x,p.y-archH*0.4,10,p.x,p.y-archH*0.4,archW*1.4); ag.addColorStop(0,"rgba(255,225,150,0.5)"); ag.addColorStop(1,"rgba(255,225,150,0)"); ctx.fillStyle=ag; ctx.fillRect(0,0,W,H); ctx.restore(); }
+  }
+
+  function drawCab(){
+    var cy=H*0.80;
+    // window frame / cab roof shadow
+    ctx.fillStyle="#182430"; ctx.fillRect(0,cy,W,H-cy);
+    ctx.fillStyle="#0e1822"; ctx.fillRect(0,cy-6,W,6);
+    // dashboard
+    ctx.fillStyle="#26323f"; rr(0,cy+6,W,H-cy,0); ctx.fill();
+    // speedometer
+    var mx=W*0.5, my=cy+ (H-cy)*0.5, mr=Math.min(46,(H-cy)*0.42);
+    ctx.fillStyle="#0f1a24"; ctx.beginPath(); ctx.arc(mx,my,mr+4,0,7); ctx.fill();
+    ctx.strokeStyle="#3a4a5a"; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(mx,my,mr,Math.PI*0.75,Math.PI*2.25); ctx.stroke();
+    var frac=Math.min(1,speed/16), ang=Math.PI*0.75+frac*Math.PI*1.5;
+    ctx.strokeStyle="#6cd0ff"; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(mx,my); ctx.lineTo(mx+Math.cos(ang)*mr*0.8,my+Math.sin(ang)*mr*0.8); ctx.stroke();
+    ctx.fillStyle="#fff"; ctx.font="bold 12px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(Math.round(speed*0.7)+" mph", mx, my+mr*0.62);
+    // GO/STOP light
+    ctx.fillStyle = speed>1? "#37c05a" : "#e0453a"; ctx.beginPath(); ctx.arc(W*0.16, my, 12,0,7); ctx.fill();
+    ctx.fillStyle="#0f1a24"; ctx.font="bold 10px Arial"; ctx.fillText(speed>1?"GO":"STOP", W*0.16, my+22);
+    // throttle lever
+    var tx=W*0.84, tt=cy+10, th=(H-cy)-20; ctx.fillStyle="#1a2632"; rr(tx-10,tt,20,th,6); ctx.fill();
+    var lev=tt+th*(1-frac); ctx.fillStyle=gasHeld?"#37c05a":"#c9a24a"; rr(tx-14,lev-6,28,12,5); ctx.fill();
+    // Mo peeking (captain hat)
+    ctx.save(); ctx.translate(W*0.5, cy-2);
+    ctx.fillStyle="#f0c9a0"; ctx.beginPath(); ctx.arc(0,-2,14,0,7); ctx.fill();
+    ctx.fillStyle="#2f4f7a"; ctx.beginPath(); ctx.ellipse(0,-12,18,7,0,0,7); ctx.fill(); ctx.fillStyle="#24406a"; ctx.beginPath(); ctx.arc(0,-16,12,Math.PI,0); ctx.fill(); ctx.fillStyle="#ffd93d"; ctx.fillRect(-6,-14,12,4);
+    ctx.fillStyle="#3a2418"; ctx.beginPath(); ctx.arc(-5,-2,2,0,7); ctx.arc(5,-2,2,0,7); ctx.fill();
+    ctx.strokeStyle="#b5533a"; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,2,5,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+    if(moWave>0){ ctx.strokeStyle="#f0c9a0"; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(14,2); ctx.lineTo(24,-8-Math.sin(last/60)*6); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  function shade(hex,f){ var n=parseInt(hex.slice(1),16),R=(n>>16)&255,G=(n>>8)&255,B=n&255; return "rgb("+Math.min(255,Math.round(R*f))+","+Math.min(255,Math.round(G*f))+","+Math.min(255,Math.round(B*f))+")"; }
+  function quad(x1,y1,x2,y2,x3,y3,x4,y4){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3); ctx.lineTo(x4,y4); ctx.closePath(); ctx.fill(); }
+  function line(x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
+  function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+  reset(); mode="start";
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

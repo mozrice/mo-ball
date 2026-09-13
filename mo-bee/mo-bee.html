@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO BEE GARDEN</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#8fd06a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#3a2a10;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none;font-weight:bold;}
+  .pill{background:#ffffffcc;border-radius:20px;padding:6px 14px;font-size:17px;color:#3a2a10;box-shadow:0 2px 0 #0001;}
+  #hint{position:fixed;bottom:14px;left:0;right:0;text-align:center;font-size:14px;color:#3a2a10;background:#ffffff99;padding:5px;pointer-events:none;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#8fd06ad8;text-align:center;}
+  #over h1{font-size:38px;margin:0 0 6px;color:#a5760a;} #over p{font-size:20px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#ffd23f,#e0a800);border:none;color:#3a2600;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #a87e00;font-family:inherit;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">🍯 <span id="honey">0</span></div>
+  <div class="pill">⏱️ <span id="time">60</span>s</div>
+  <div class="pill">🏆 <span id="best">0</span></div>
+</div>
+<div id="hint">Drag to fly the bee 🐝 onto flowers to collect nectar & make honey!</div>
+<div id="over"><h1 id="ot">🍯 BUZZ!</h1><p id="os"></p><button class="btn" id="again">Buzz Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  var best=+(localStorage.getItem('mobee_best')||0); document.getElementById('best').textContent=best;
+  var FL=['🌸','🌻','🌷','🌼','🏵️','🌺'];
+  var bee, flowers, butterflies, honey, timeLeft, running, pollen, sparks, wing, nowv=0;
+  function reset(){ bee={x:W/2,y:H/2,tx:W/2,ty:H/2}; flowers=[]; for(var i=0;i<9;i++) flowers.push(newFlower()); butterflies=[]; for(var b=0;b<3;b++) butterflies.push(newBfly());
+    honey=0; timeLeft=60; running=true; pollen=0; sparks=[]; wing=0;
+    document.getElementById('over').style.display='none'; document.getElementById('honey').textContent='0'; document.getElementById('time').textContent='60';
+    if(!reset._t){ reset._t=setInterval(function(){ if(running){ timeLeft--; document.getElementById('time').textContent=Math.max(0,timeLeft); if(timeLeft<=0) over(); } },1000); } }
+  function rnd(a,b){return a+Math.random()*(b-a);}
+  function newFlower(){ return {x:rnd(40,W-40),y:rnd(90,H-60),e:FL[Math.floor(Math.random()*FL.length)],nectar:true,cool:0,grow:0,ph:rnd(0,6)}; }
+  function newBfly(){ return {x:rnd(40,W-40),y:rnd(90,H-120),dir:rnd(0,6.28),e:['🦋','🐛'][Math.floor(Math.random()*2)]}; }
+  function pos(e){ var r=cv.getBoundingClientRect(); return {x:(e.touches?e.touches[0].clientX:e.clientX)-r.left,y:(e.touches?e.touches[0].clientY:e.clientY)-r.top}; }
+  function steer(e){ var p=pos(e); bee.tx=p.x; bee.ty=p.y; }
+  var down=false;
+  cv.addEventListener('mousedown',function(e){down=true;steer(e);}); cv.addEventListener('mousemove',function(e){if(down)steer(e);}); addEventListener('mouseup',function(){down=false;});
+  cv.addEventListener('touchstart',function(e){down=true;steer(e);e.preventDefault();},{passive:false}); cv.addEventListener('touchmove',function(e){steer(e);e.preventDefault();},{passive:false}); addEventListener('touchend',function(){down=false;});
+  document.getElementById('again').onclick=reset;
+  function over(){ running=false; if(honey>best){best=honey;localStorage.setItem('mobee_best',best);document.getElementById('best').textContent=best;}
+    document.getElementById('os').innerHTML='You made <b>'+honey+'</b> honey! 🍯<br>Best: <b>'+best+'</b>'; document.getElementById('over').style.display='flex'; }
+  function update(dt){
+    bee.x+=(bee.tx-bee.x)*0.18*dt; bee.y+=(bee.ty-bee.y)*0.18*dt; wing+=0.9*dt;
+    for(var i=0;i<flowers.length;i++){ var f=flowers[i]; f.ph+=0.05*dt; if(f.cool>0){ f.cool-=dt; if(f.cool<=0){ f.nectar=true; f.grow=0; } }
+      if(f.nectar && Math.hypot(f.x-bee.x,f.y-bee.y)<32){ var pts=(pollen>0)?2:1; honey+=pts; pollen=1; f.nectar=false; f.cool=180; f.grow=1;
+        document.getElementById('honey').textContent=honey; beep(500+Math.min(honey*4,400),0.08,'sine',0.06); for(var s=0;s<6;s++) sparks.push({x:f.x,y:f.y,vx:rnd(-2,2),vy:rnd(-2,0),t:1,e:pts>1?'✨':'🍯'}); } }
+    for(var b=0;b<butterflies.length;b++){ var bf=butterflies[b]; bf.dir+=rnd(-0.1,0.1)*dt; bf.x+=Math.cos(bf.dir)*0.8*dt; bf.y+=Math.sin(bf.dir)*0.8*dt;
+      if(bf.x<20||bf.x>W-20)bf.dir=Math.PI-bf.dir; if(bf.y<80||bf.y>H-40)bf.dir=-bf.dir;
+      if(Math.hypot(bf.x-bee.x,bf.y-bee.y)<28){ honey+=3; document.getElementById('honey').textContent=honey; beep(800,0.09,'square',0.06); for(var s2=0;s2<8;s2++) sparks.push({x:bf.x,y:bf.y,vx:rnd(-2.5,2.5),vy:rnd(-2.5,0),t:1,e:'⭐'}); bf.x=rnd(40,W-40); bf.y=rnd(90,H-120); } }
+    for(var k=sparks.length-1;k>=0;k--){ var sp=sparks[k]; sp.x+=sp.vx*dt; sp.y+=sp.vy*dt; sp.vy+=0.1*dt; sp.t-=0.03*dt; if(sp.t<=0)sparks.splice(k,1); }
+  }
+  function render(){
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#bfeaff'); g.addColorStop(0.4,'#a8e08a'); g.addColorStop(1,'#7bbf5a'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#fff4c0'; ctx.beginPath(); ctx.arc(W*0.85,60,26,0,6.29); ctx.fill();
+    // grass blades
+    ctx.strokeStyle='rgba(80,150,60,0.4)'; ctx.lineWidth=2; for(var i=0;i<40;i++){ var gx=(i*97)%W, gy=90+((i*53)%(H-120)); ctx.beginPath(); ctx.moveTo(gx,gy); ctx.lineTo(gx+3,gy-8); ctx.stroke(); }
+    // hive
+    ctx.font='36px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🍯',W-40,70);
+    // flowers
+    for(var f=0;f<flowers.length;f++){ var fl=flowers[f]; var sc=fl.nectar?1+Math.sin(fl.ph)*0.04:0.7; if(fl.grow>0){ sc=0.7+fl.grow*0.5; fl.grow-=0.01; }
+      ctx.font=(34*sc)+'px sans-serif'; ctx.globalAlpha=fl.nectar?1:0.5; ctx.fillText(fl.e,fl.x,fl.y); ctx.globalAlpha=1;
+      if(fl.nectar){ ctx.fillStyle='rgba(255,230,120,'+(0.3+0.2*Math.sin(nowv*0.006+f))+')'; ctx.beginPath(); ctx.arc(fl.x,fl.y,22,0,6.29); ctx.fill(); ctx.font=(34*sc)+'px sans-serif'; ctx.fillText(fl.e,fl.x,fl.y); } }
+    // butterflies
+    for(var b=0;b<butterflies.length;b++){ ctx.font='24px sans-serif'; ctx.fillText(butterflies[b].e,butterflies[b].x,butterflies[b].y); }
+    // sparks
+    for(var s=0;s<sparks.length;s++){ ctx.globalAlpha=Math.max(0,sparks[s].t); ctx.font='16px sans-serif'; ctx.fillText(sparks[s].e,sparks[s].x,sparks[s].y); ctx.globalAlpha=1; }
+    drawBee();
+  }
+  function drawBee(){ var x=bee.x,y=bee.y, tilt=Math.max(-0.3,Math.min(0.3,(bee.tx-bee.x)*0.02)); ctx.save(); ctx.translate(x,y); ctx.rotate(tilt);
+    // wings
+    ctx.fillStyle='rgba(255,255,255,0.7)'; var wf=Math.abs(Math.sin(wing))*6; ctx.beginPath(); ctx.ellipse(-4,-12-wf,10,6,-0.5,0,6.29); ctx.fill(); ctx.beginPath(); ctx.ellipse(4,-12-wf,10,6,0.5,0,6.29); ctx.fill();
+    // body
+    ctx.fillStyle='#ffd23f'; ctx.beginPath(); ctx.ellipse(0,0,16,13,0,0,6.29); ctx.fill();
+    ctx.fillStyle='#3a2a10'; ctx.fillRect(-10,-6,4,14); ctx.fillRect(-2,-8,4,17); ctx.fillRect(6,-6,4,14);
+    // face
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(12,-3,4,0,6.29); ctx.fill(); ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(13,-3,2,0,6.29); ctx.fill();
+    // MO
+    ctx.fillStyle='#12406b'; ctx.font='bold 8px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('MO',-2,1);
+    ctx.restore(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(running) update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

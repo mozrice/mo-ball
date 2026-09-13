@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Road Trip</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:#8fd0f0;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;position:absolute;inset:0;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;opacity:.95;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;text-shadow:0 1px 3px #0007;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:18px;font-weight:bold;color:#fff;pointer-events:none;text-shadow:0 1px 4px #000;z-index:4;}
+  #sub{position:fixed;top:34px;left:0;right:0;text-align:center;font-size:14px;font-weight:bold;color:#fff5c0;pointer-events:none;text-shadow:0 1px 3px #000;z-index:4;}
+  #tray{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:10px 8px;background:rgba(20,40,70,.82);border-top:3px solid #3a6a9a;z-index:6;}
+  .item{position:relative;font-size:29px;background:#eaf6ff;border:3px solid #bfe0ee;border-radius:15px;width:56px;height:56px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 0 #6a9abc;}
+  .item .lbl{position:absolute;bottom:-15px;left:0;right:0;text-align:center;font-size:9px;color:#eaf6ff;font-weight:bold;text-shadow:0 1px 2px #000;}
+  .item.done{opacity:.4;}
+  .item.done::after{content:'✓';position:absolute;top:-6px;right:-6px;background:#2ec46a;color:#fff;font-size:14px;font-weight:bold;width:21px;height:21px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+  .item:active{transform:translateY(3px);box-shadow:0 1px 0 #6a9abc;}
+  #start,#over{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8;text-align:center;padding:20px;}
+  #start{background:linear-gradient(#9fe0ff,#3a86c8);}
+  #start h1{font-size:26px;margin:0 0 6px;text-shadow:0 2px 4px #0006;} #start p{font-size:15px;margin:4px;max-width:330px;}
+  #start .big{font-size:58px;}
+  #over{background:#000a;display:none;}
+  #over h1{font-size:30px;color:#ffd23f;margin:0 0 6px;text-shadow:0 2px 0 #b47a1a;} #over p{font-size:17px;margin:3px;}
+  #start button,#over button{margin-top:16px;background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+  #start button:active,#over button:active{transform:translateY(3px);box-shadow:0 2px 0 #b4801a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">&#11013; Games</a>
+<div id="hud">🚗 <span id="n">0</span>/<span id="tot">0</span> packed</div>
+<div id="sub">Tap a thing — it packs into the car!</div>
+<canvas id="c"></canvas>
+<div id="tray"></div>
+<div id="start"><div class="big">🚗🏀</div><h1>MO Road Trip</h1><p>Pack the car for the big game! Tap each thing on the tray — snacks, the ball, and Arff too. Pack it ALL, then drive to the game!</p><button id="go">▶ START</button></div>
+<div id="over"><h1 id="ot">🎉 ROAD TRIP!</h1><p id="om"></p><button id="rs">▶ Pack Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener('resize',fit); fit();
+  var ITEMS=[
+    {e:'🧳',n:'Bags'},{e:'🎒',n:'Packs'},{e:'🏀',n:'Ball'},{e:'👟',n:'Shoes'},
+    {e:'🐶',n:'Arff'},{e:'🥪',n:'Snacks'},{e:'💧',n:'Water'},{e:'🍎',n:'Fruit'},
+    {e:'🧴',n:'Sun'},{e:'🕶️',n:'Shades'},{e:'🗺️',n:'Map'},{e:'⛱️',n:'Beach'},
+    {e:'🎮',n:'Games'},{e:'🧸',n:'Toy'}
+  ];
+  var used, running, flyers, sparks, tt, packed, glow, drive, dx, honk, jump;
+  var tray=document.getElementById('tray'); document.getElementById('tot').textContent=ITEMS.length;
+  function carPos(){ return {x:W*0.5+dx, y:H*0.50}; }
+  function carW(){ return Math.min(W*0.62, 330); }
+  function slot(i){ var cw=carW(); var per=Math.ceil(ITEMS.length/2); var row=Math.floor(i/per), col=i%per;
+    var span=cw*0.82; var x=-span/2 + (per>1?(col/(per-1)):0.5)*span; var y=-carW()*0.30 - row*carW()*0.16; return {ox:x, oy:y}; }
+  function buildTray(){ tray.innerHTML=''; ITEMS.forEach(function(it,i){ var b=document.createElement('button'); b.className='item'; b.innerHTML=it.e+'<span class="lbl">'+it.n+'</span>'; b.onclick=function(){ pack(i,b); }; it.btn=b; tray.appendChild(b); }); }
+  function reset(){ used=0; running=true; flyers=[]; sparks=[]; tt=0; packed=[]; glow=0; drive=false; dx=0; honk=0; jump=0;
+    ITEMS.forEach(function(it){ it.done=false; }); buildTray();
+    document.getElementById('n').textContent=0; document.getElementById('over').style.display='none'; document.getElementById('start').style.display='none'; document.getElementById('sub').textContent='👇 Tap a thing — it packs in!'; }
+  function pack(i,b){ if(!running||drive)return; var it=ITEMS[i]; if(it.done)return; it.done=true; b.classList.add('done'); used++; document.getElementById('n').textContent=used;
+    var r=b.getBoundingClientRect(), cr=cv.getBoundingClientRect(); var sx=r.left+r.width/2-cr.left, sy=r.top+r.height/2-cr.top; var cp=carPos(), sl=slot(i);
+    flyers.push({e:it.e,x:sx,y:sy,tx:cp.x+sl.ox,ty:cp.y+sl.oy,i:i,t:0}); beep(520+used*22,0.06);
+    document.getElementById('sub').textContent=it.n+' packed! '+(ITEMS.length-used)+' to go';
+    if(used>=ITEMS.length){ setTimeout(function(){ if(used>=ITEMS.length&&running&&!drive) go(); },650); } }
+  function land(fl){ packed.push({e:fl.e,ox:fl.tx-carPos().x,oy:fl.ty-carPos().y,sz:0}); glow=12; jump=8;
+    for(var i=0;i<9;i++)sparks.push({x:fl.tx,y:fl.ty,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6-1,life:22,c:['#ffe27a','#8fe0ff','#fff','#8fffcf'][i%4]}); }
+  function go(){ drive=true; honk=1; document.getElementById('sub').textContent='🚗💨 Beep beep! Off to the game!'; beep(300,0.18,'square'); setTimeout(function(){beep(240,0.2,'square');},180);
+    setTimeout(win, 1500); }
+  function win(){ running=false; document.getElementById('ot').innerHTML='🎉 GAME TIME! 🎉'; document.getElementById('om').textContent='All packed and off to the court — good luck, MO! 🏀🐶'; document.getElementById('sub').textContent='🏀 Let\'s play ball!';
+    document.getElementById('over').style.display='flex'; if(window.MO_MVP)window.MO_MVP(); }
+  function rr(x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function drawCar(cx,cy,s){ var jy=jump>0?(jump--,Math.sin((8-jump)/8*Math.PI)*-4):0;
+    ctx.save(); ctx.translate(cx,cy+jy);
+    // shadow
+    ctx.save(); ctx.globalAlpha=0.2; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(0,s*0.40,s*0.58,s*0.12,0,0,6.29); ctx.fill(); ctx.restore();
+    // body
+    ctx.fillStyle='#ff5a5a'; rr(-s*0.55,-s*0.10,s*1.10,s*0.42,s*0.12); ctx.fill();
+    // cabin
+    ctx.fillStyle='#e84a4a'; rr(-s*0.34,-s*0.34,s*0.62,s*0.28,s*0.10); ctx.fill();
+    // windows
+    ctx.fillStyle='#bfeaff'; rr(-s*0.30,-s*0.30,s*0.26,s*0.20,s*0.05); ctx.fill(); rr(0.01*s,-s*0.30,s*0.24,s*0.20,s*0.05); ctx.fill();
+    // riders
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font=(s*0.17)+'px sans-serif';
+    ctx.fillText('👦',-s*0.17,-s*0.20); ctx.fillText('🐶',s*0.12,-s*0.20);
+    // stripe
+    ctx.fillStyle='#ffd23f'; ctx.fillRect(-s*0.55,s*0.10,s*1.10,s*0.05);
+    // headlight
+    ctx.fillStyle='#fff6c0'; ctx.beginPath(); ctx.arc(s*0.52,s*0.02,s*0.05,0,6.29); ctx.fill();
+    // wheels (spin when driving)
+    var wr=s*0.15; drawWheel(-s*0.30,s*0.32,wr); drawWheel(s*0.32,s*0.32,wr);
+    ctx.restore();
+  }
+  function drawWheel(x,y,r){ ctx.save(); ctx.translate(x,y); ctx.rotate(drive?tt*8:0); ctx.fillStyle='#2a2a2a'; ctx.beginPath(); ctx.arc(0,0,r,0,6.29); ctx.fill(); ctx.fillStyle='#cfd6dd'; ctx.beginPath(); ctx.arc(0,0,r*0.5,0,6.29); ctx.fill(); ctx.strokeStyle='#8a949c'; ctx.lineWidth=2; for(var i=0;i<4;i++){ ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(i*1.57)*r*0.5,Math.sin(i*1.57)*r*0.5); ctx.stroke(); } ctx.restore(); }
+  function draw(){ tt+=0.05;
+    // sky
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#9fe0ff'); g.addColorStop(1,'#d8f2ff'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // sun + clouds
+    ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle='#fff2a0'; ctx.beginPath(); ctx.arc(W-44,46,20,0,6.29); ctx.fill();
+    ctx.globalAlpha=0.5; ctx.fillStyle='#fff'; var c1=(W*0.2 - tt*14)%(W+120); if(c1<-120)c1+=W+120; ctx.beginPath(); ctx.ellipse(c1,70,40,15,0,0,6.29); ctx.fill(); var c2=(W*0.7 - tt*9)%(W+120); if(c2<-120)c2+=W+120; ctx.beginPath(); ctx.ellipse(c2,52,30,12,0,0,6.29); ctx.fill(); ctx.restore();
+    // hills
+    ctx.fillStyle='#8fd07a'; ctx.beginPath(); ctx.moveTo(0,H*0.62); ctx.quadraticCurveTo(W*0.3,H*0.52,W*0.6,H*0.62); ctx.quadraticCurveTo(W*0.85,H*0.7,W,H*0.6); ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.fill();
+    // road
+    ctx.fillStyle='#5a5f6a'; ctx.fillRect(0,H*0.66,W,H*0.34);
+    ctx.strokeStyle='#ffd23f'; ctx.lineWidth=5; ctx.setLineDash([28,22]); ctx.lineDashOffset=-((drive?tt*60:tt*10)%50); ctx.beginPath(); ctx.moveTo(0,H*0.83); ctx.lineTo(W,H*0.83); ctx.stroke(); ctx.setLineDash([]);
+    var cp=carPos(), s=carW();
+    // glow
+    if(glow>0){ glow--; ctx.save(); ctx.globalAlpha=glow/12*0.5; ctx.strokeStyle='#fff6c0'; ctx.lineWidth=6; ctx.beginPath(); ctx.arc(cp.x,cp.y,s*0.6,0,6.29); ctx.stroke(); ctx.restore(); }
+    drawCar(cp.x,cp.y,s);
+    // packed items piled on roof
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    for(var p=0;p<packed.length;p++){ var k=packed[p]; if(k.sz<1)k.sz=Math.min(1,k.sz+0.14); ctx.font=(s*0.16*k.sz)+'px sans-serif'; ctx.fillText(k.e, cp.x+k.ox, cp.y+k.oy); }
+    // flyers
+    for(var fi=flyers.length-1;fi>=0;fi--){ var fl=flyers[fi]; fl.t+=0.06; fl.x+=(fl.tx-fl.x)*0.2; fl.y+=(fl.ty-fl.y)*0.2; ctx.font='30px sans-serif'; ctx.fillText(fl.e,fl.x,fl.y); if(Math.hypot(fl.tx-fl.x,fl.ty-fl.y)<7){ land(fl); flyers.splice(fi,1); } }
+    // driving off
+    if(drive){ dx+=6; if(honk>0)honk--; }
+    // sparks
+    for(var sp=sparks.length-1;sp>=0;sp--){ var q=sparks[sp]; q.x+=q.vx; q.y+=q.vy; q.vy+=0.12; q.life--; if(q.life<=0){sparks.splice(sp,1);continue;} ctx.globalAlpha=q.life/24; ctx.fillStyle=q.c; ctx.fillRect(q.x,q.y,3,3); ctx.globalAlpha=1; }
+    // exhaust puffs when driving
+    if(drive){ for(var e=0;e<2;e++){ ctx.globalAlpha=0.5; ctx.fillStyle='#e8e8e8'; ctx.beginPath(); ctx.arc(cp.x-s*0.6-e*14+Math.sin(tt*6+e)*3, cp.y+s*0.18, 7-e*2,0,6.29); ctx.fill(); ctx.globalAlpha=1; } }
+    // meter
+    var frac=ITEMS.length?used/ITEMS.length:0; var bw=W*0.55,bx=(W-bw)/2,by=76; ctx.save(); ctx.globalAlpha=0.92; ctx.fillStyle='rgba(0,0,0,0.32)'; ctx.fillRect(bx,by,bw,9); ctx.fillStyle='#ffd23f'; ctx.fillRect(bx,by,Math.max(0,bw*frac),9); ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1; ctx.strokeRect(bx,by,bw,9); ctx.restore();
+    requestAnimationFrame(draw); }
+  var ac; function beep(f,d,ty){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type=ty||'square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  document.getElementById('go').onclick=function(){ reset(); };
+  document.getElementById('rs').onclick=function(){ reset(); };
+  used=0; running=false; flyers=[]; sparks=[]; tt=0; packed=[]; glow=0; drive=false; dx=0; honk=0; jump=0; buildTray();
+  requestAnimationFrame(draw);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function init(){ hookVisible(document.getElementById('over')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+</body></html>

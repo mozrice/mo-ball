@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO BUZZER BEATER</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#20143a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0007;}
+  .pill{background:#0008;border-radius:20px;padding:6px 14px;font-size:17px;}
+  #clock{position:fixed;top:48px;left:0;right:0;text-align:center;font-size:54px;font-weight:bold;color:#ff5a5a;text-shadow:0 3px 0 #0008;pointer-events:none;}
+  #hint{position:fixed;bottom:14px;left:0;right:0;text-align:center;font-size:15px;color:#e7d6ff;pointer-events:none;text-shadow:0 1px 2px #000;}
+  #msg{position:fixed;top:42%;left:0;right:0;text-align:center;font-size:44px;font-weight:bold;color:#ffd23f;text-shadow:0 3px 0 #0008,0 0 20px #ffae00;pointer-events:none;opacity:0;transition:opacity .12s;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#20143add;text-align:center;}
+  #over h1{font-size:38px;margin:0 0 6px;color:#ffd23f;} #over p{font-size:20px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#ff9f43,#f0722a);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #b4541a;font-family:inherit;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">🏀 <span id="made">0</span></div>
+  <div class="pill" id="sit">DOWN BY 2!</div>
+  <div class="pill">🏆 <span id="best">0</span></div>
+</div>
+<div id="clock">5.0</div>
+<div id="msg"></div>
+<div id="hint">HOLD to fill the meter, RELEASE on GREEN 🟩 before the buzzer! 🏀</div>
+<div id="over"><h1 id="ot">🎉 CLUTCH!</h1><p id="os"></p><button class="btn" id="again">Next Shot</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1,GY=0,T=42,G=0.4;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); GY=H*0.8; }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  function cheer(){ beep(523,0.12,'square',0.06); setTimeout(function(){beep(659,0.12,'square',0.06);},90); setTimeout(function(){beep(784,0.2,'square',0.06);},180); }
+  var GC=0.84, GW=0.08;
+  var best=+(localStorage.getItem('mobuzz_best')||0); document.getElementById('best').textContent=best;
+  var ball, hoop, made, clock, clockMax, state, holding, meter, msgT, crowd, hoopVX, confetti, nowv=0;
+  function reset(full){ if(full){ made=0; } document.getElementById('made').textContent=made;
+    hoop={x:W/2,y:H*0.26,r:26}; hoopVX=(made>=2)?(0.7+made*0.2):0;
+    GW=Math.max(0.05,0.08-made*0.004);
+    clockMax=Math.max(2.2,5-made*0.3); clock=clockMax; state='ready'; holding=false; meter=0; msgT=0; confetti=[];
+    newBall();
+    crowd=[]; for(var i=0;i<70;i++) crowd.push({x:Math.random()*W,row:Math.floor(Math.random()*4),c:['#ff8a1e','#43c6ff','#ffd23f','#ff6ad5','#7bff9e'][Math.floor(Math.random()*5)],j:0});
+    document.getElementById('over').style.display='none'; document.getElementById('sit').textContent='DOWN BY 2!'; document.getElementById('clock').textContent=clock.toFixed(1); }
+  function newBall(){ ball={x:W/2,y:GY-16,vx:0,vy:0,flying:false,spin:0,frame:0,green:false}; }
+  function startHold(){ if(state!=='ready'||ball.flying||holding)return; holding=true; meter=0; }
+  function release(){ if(!holding)return; holding=false; doShoot(meter); }
+  function doShoot(m){ var perfectVy=(hoop.y-ball.y-0.5*G*T*T)/T; var off=m-GC; var pf=1+off*1.4; ball.vy=perfectVy*pf; ball.vx=(hoop.x-ball.x)/T; ball.flying=true; ball.frame=0; ball.green=Math.abs(off)<GW; state='shot'; beep(ball.green?520:300,0.1,'sine',0.05); }
+  cv.addEventListener('mousedown',startHold); addEventListener('mouseup',release);
+  cv.addEventListener('touchstart',function(e){startHold();e.preventDefault();},{passive:false}); addEventListener('touchend',release);
+  addEventListener('keydown',function(e){ if(e.key===' ')startHold(); }); addEventListener('keyup',function(e){ if(e.key===' ')release(); });
+  document.getElementById('again').onclick=function(){ reset(false); };
+  function showMsg(m,col){ var e=document.getElementById('msg'); e.textContent=m; e.style.color=col||'#ffd23f'; e.style.opacity=1; msgT=1; }
+  function win(){ state='done'; made++; document.getElementById('made').textContent=made; if(made>best){best=made;localStorage.setItem('mobuzz_best',best);document.getElementById('best').textContent=best;}
+    showMsg(ball.green?'🎉 BUZZER BEATER!':'🎉 CLUTCH!'); cheer(); for(var i=0;i<crowd.length;i++)crowd[i].j=1; for(var k=0;k<50;k++) confetti.push({x:Math.random()*W,y:H*0.3*Math.random(),vx:(Math.random()-0.5)*5,vy:-Math.random()*3,r:3+Math.random()*4,c:['#ffd23f','#ff6ad5','#43c6ff','#7bff9e'][Math.floor(Math.random()*4)],life:1});
+    setTimeout(function(){ reset(false); },1400); }
+  function fail(reason){ state='done'; document.getElementById('ot').textContent='😖 NO GOOD!'; document.getElementById('os').innerHTML=reason+'<br>You hit <b>'+made+'</b> buzzer beaters in a row!<br>Best streak: <b>'+best+'</b>'; document.getElementById('over').style.display='flex'; beep(160,0.3,'sawtooth',0.09);
+    made=0; document.getElementById('made').textContent='0'; }
+  function update(dt){
+    if(hoopVX){ hoop.x+=hoopVX*dt; if(hoop.x>W*0.74){hoop.x=W*0.74;hoopVX=-Math.abs(hoopVX);} if(hoop.x<W*0.26){hoop.x=W*0.26;hoopVX=Math.abs(hoopVX);} }
+    if(state==='ready'){ clock-=0.016*dt; document.getElementById('clock').textContent=Math.max(0,clock).toFixed(1); if(clock<=0){ document.getElementById('clock').textContent='0.0'; fail('⏰ Too slow — buzzer sounded!'); } }
+    if(holding){ meter+=0.028*dt; if(meter>=1){ meter=1; release(); } }
+    if(state==='shot'){ ball.frame+=dt; ball.x+=ball.vx*dt; ball.y+=ball.vy*dt; ball.vy+=G*dt; ball.spin+=0.3*dt;
+      if(ball.frame>=T){ if(ball.green||Math.abs(ball.y-hoop.y)<18){ win(); } else { fail('🏀 In and out — no good!'); } return; }
+      if(ball.y>GY+30){ fail('🏀 Missed the shot!'); } }
+    for(var i=0;i<crowd.length;i++){ if(crowd[i].j>0)crowd[i].j-=0.05*dt; }
+    for(var c=confetti.length-1;c>=0;c--){ var f=confetti[c]; f.x+=f.vx*dt; f.y+=f.vy*dt; f.vy+=0.25*dt; f.life-=0.012*dt; if(f.life<=0)confetti.splice(c,1); }
+    if(msgT>0){ msgT-=0.012*dt; if(msgT<=0)document.getElementById('msg').style.opacity=0; }
+  }
+  function render(){
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#3a2470'); g.addColorStop(1,'#1a1030'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#12103a'; ctx.fillRect(0,0,W,H*0.2);
+    for(var i=0;i<crowd.length;i++){ var c=crowd[i]; var y=16+c.row*16-(c.j>0?c.j*6:0); ctx.fillStyle=c.c; ctx.beginPath(); ctx.arc(c.x,y,4,0,6.29); ctx.fill(); }
+    ctx.fillStyle='#d0904e'; ctx.fillRect(0,GY,W,H-GY); ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(hoop.x,GY,Math.min(W*0.42,GY-hoop.y-10),Math.PI,6.29,false); ctx.stroke();
+    ctx.fillStyle='#8a94a0'; ctx.fillRect(hoop.x-4,hoop.y-46,8,-30);
+    ctx.fillStyle='#eef3f7'; ctx.fillRect(hoop.x-30,hoop.y-46,60,10); ctx.strokeStyle='#c0392b'; ctx.lineWidth=3; ctx.strokeRect(hoop.x-30,hoop.y-46,60,10);
+    ctx.strokeStyle='#ff7b00'; ctx.lineWidth=5; ctx.beginPath(); ctx.ellipse(hoop.x,hoop.y,hoop.r,8,0,0,6.29); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=1.5; for(var n=0;n<7;n++){ var an=n/7*6.28; ctx.beginPath(); ctx.moveTo(hoop.x+Math.cos(an)*hoop.r,hoop.y+Math.sin(an)*8); ctx.lineTo(hoop.x+Math.cos(an)*hoop.r*0.5,hoop.y+22); ctx.stroke(); }
+    drawBall(ball.x,ball.y); draw2K();
+    for(var c2=0;c2<confetti.length;c2++){ var f=confetti[c2]; ctx.save(); ctx.globalAlpha=Math.max(0,f.life); ctx.fillStyle=f.c; ctx.translate(f.x,f.y); ctx.rotate(f.x*0.05); ctx.fillRect(-f.r/2,-f.r/2,f.r,f.r*0.6); ctx.restore(); }
+  }
+  function draw2K(){ if(state!=='ready')return;
+    var mx=ball.x+30, my=ball.y-140, mh=150, mw=18;
+    ctx.fillStyle='#0009'; roundRect(mx,my,mw,mh,9); ctx.fill();
+    var gy1=my+mh*(1-(GC+GW)), gy2=my+mh*(1-(GC-GW)); ctx.fillStyle='#37d06a'; ctx.fillRect(mx+2,gy1,mw-4,gy2-gy1);
+    ctx.fillStyle=holding?'#ffd23f':'#888'; ctx.fillRect(mx+2,my+mh*(1-meter),mw-4,mh*meter);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; roundRect(mx,my,mw,mh,9); ctx.stroke();
+    if(!holding){ ctx.fillStyle='#fff'; ctx.font='bold 11px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('HOLD',mx+mw/2,my+mh+16); } }
+  function drawBall(x,y){ var r=15; ctx.save(); ctx.translate(x,y); ctx.rotate(ball.spin);
+    var grd=ctx.createRadialGradient(-r*0.3,-r*0.3,r*0.2,0,0,r); grd.addColorStop(0,'#ffb15c'); grd.addColorStop(1,'#e0701f'); ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(0,0,r,0,6.29); ctx.fill();
+    ctx.strokeStyle='#7a3d10'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,r,0,6.29); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-r,0); ctx.lineTo(r,0); ctx.moveTo(0,-r); ctx.lineTo(0,r); ctx.stroke(); ctx.restore(); }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; update(dt); render(); requestAnimationFrame(loop); }
+  reset(true); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

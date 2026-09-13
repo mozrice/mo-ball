@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Mo Soccer</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; overflow:hidden; background:#2f8f3a;
+    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif; color:#fff;
+    user-select:none; -webkit-user-select:none; touch-action:none; }
+  #stage { position:fixed; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:absolute; top:8px; left:0; right:0; z-index:3; pointer-events:none; text-align:center; }
+  #board { display:inline-block; background:#0c2a12cc; border:2px solid #ffffff55; border-radius:12px; padding:5px 16px; font-weight:bold; font-size:22px; }
+  #board .b { color:#7fd0ff; } #board .r { color:#ff8a8a; } #clock { font-size:13px; color:#dfffe0; }
+  #kickBtn { position:absolute; bottom:18px; right:18px; z-index:4; width:88px; height:88px; border-radius:50%;
+    border:none; font-size:18px; font-weight:bold; color:#08243a; background:#ffd93d; box-shadow:0 5px 0 #b8922a; cursor:pointer; }
+  #kickBtn:active { transform:translateY(4px); box-shadow:0 1px 0 #b8922a; }
+  .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; z-index:6; background:#0a2a0f66; }
+  .overlay.hide { display:none; }
+  .card { background:#0e3218ee; border:3px solid #ffd93d; border-radius:22px; padding:24px 28px; max-width:90%; }
+  .card h1 { margin:0 0 6px; font-size:30px; color:#ffd93d; text-shadow:0 3px 0 #5a4a1a; }
+  .card p { margin:8px 0; font-size:16px; color:#eaffea; }
+  .big { margin-top:14px; padding:14px 28px; font-size:20px; font-weight:bold; background:#ffd93d; color:#4a3d00;
+    border:none; border-radius:16px; cursor:pointer; box-shadow:0 5px 0 #b8922a; }
+  .big:active { transform:translateY(4px); box-shadow:0 1px 0 #b8922a; }
+  .hint { font-size:14px; color:#cfeecf; margin-top:10px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hud"><div id="board"><span class="b">MO </span><span id="ps">0</span> — <span id="cs">0</span><span class="r"> CPU</span><div id="clock">0:00</div></div></div>
+  <button id="kickBtn">⚽ KICK</button>
+
+  <div class="overlay" id="startOv">
+    <div class="card">
+      <h1>⚽ MO SOCCER</h1>
+      <p>Dribble the ball and score on the red team!</p>
+      <p>Move Morgan (blue) — <b>first to 5 goals wins.</b></p>
+      <button class="big" id="playBtn">▶ KICK OFF</button>
+      <div class="hint">Move: drag, arrow keys, or WASD.<br>Press <b>KICK</b> (or Space) to shoot hard at the goal.</div>
+    </div>
+  </div>
+  <div class="overlay hide" id="overOv">
+    <div class="card">
+      <h1 id="overTitle">YOU WIN! 🏆</h1>
+      <p id="overP">5 — 3</p>
+      <button class="big" id="againBtn">↻ PLAY AGAIN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), ctx=cv.getContext("2d"), stage=document.getElementById("stage");
+  var DPR=Math.max(1,Math.min(3,window.devicePixelRatio||1));
+  var W=0,H=0, PAD=16, goalH=0;
+  function resize(){ W=stage.clientWidth; H=stage.clientHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0); goalH=Math.max(110,H*0.32); }
+  window.addEventListener("resize",resize); resize();
+
+  var AC=null; function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain();
+    o.type=t||"triangle"; o.frequency.value=f; g.gain.value=v||0.09; o.connect(g); g.connect(a.destination);
+    var n=a.currentTime; o.start(n); g.gain.exponentialRampToValueAtTime(0.0001,n+(d||0.12)); o.stop(n+(d||0.12)+0.02); }
+  function kickSfx(){ beep(300,0.06,"square",0.09); setTimeout(function(){beep(520,0.08,"square",0.07);},40); }
+  function goalSfx(){ beep(660,0.1,"square",0.1); setTimeout(function(){beep(880,0.1,"square",0.1);},110); setTimeout(function(){beep(1180,0.16,"square",0.1);},220); }
+  function whistle(){ beep(1200,0.12,"square",0.08); setTimeout(function(){beep(1200,0.12,"square",0.08);},150); }
+
+  var mode="start", state="play"; // play, celebrate, over
+  var you, cpu, gk1, gk2, ball, ps, cs, clock, celT, goalText;
+
+  function reset(){
+    you={x:W*0.3,y:H/2,vx:0,vy:0,r:18};
+    cpu={x:W*0.7,y:H/2,vx:0,vy:0,r:18};
+    gk1={x:PAD+22,y:H/2,r:16};   // your goalie (left)
+    gk2={x:W-PAD-22,y:H/2,r:16}; // cpu goalie (right)
+    ball={x:W/2,y:H/2,vx:0,vy:0,r:11};
+    ps=0; cs=0; clock=0; state="play"; celT=0; updateBoard();
+  }
+  function kickoff(dir){ you.x=W*0.3; you.y=H/2; cpu.x=W*0.7; cpu.y=H/2; ball.x=W/2; ball.y=H/2; ball.vx=0; ball.vy=0; }
+  function updateBoard(){ document.getElementById("ps").textContent=ps; document.getElementById("cs").textContent=cs;
+    var m=Math.floor(clock/60), s=Math.floor(clock%60); document.getElementById("clock").textContent=m+":"+(s<10?"0":"")+s; }
+
+  // input
+  var keys={}, pointer=null;
+  window.addEventListener("keydown",function(e){ keys[e.code]=true; if(e.code==="Space"){ e.preventDefault(); doKick(); }
+    if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code)>=0) e.preventDefault(); });
+  window.addEventListener("keyup",function(e){ keys[e.code]=false; });
+  function pp(e){ var r=cv.getBoundingClientRect(); var t=e.touches&&e.touches[0]?e.touches[0]:e; return {x:t.clientX-r.left,y:t.clientY-r.top}; }
+  stage.addEventListener("mousedown",function(e){ ac(); pointer=pp(e); });
+  stage.addEventListener("mousemove",function(e){ if(pointer) pointer=pp(e); });
+  window.addEventListener("mouseup",function(){ pointer=null; });
+  stage.addEventListener("touchstart",function(e){ ac(); pointer=pp(e); },{passive:true});
+  stage.addEventListener("touchmove",function(e){ pointer=pp(e); },{passive:true});
+  window.addEventListener("touchend",function(){ pointer=null; });
+  document.getElementById("kickBtn").addEventListener("click",function(e){ e.preventDefault(); doKick(); });
+  document.getElementById("kickBtn").addEventListener("touchstart",function(e){ e.preventDefault(); ac(); doKick(); },{passive:false});
+
+  document.getElementById("playBtn").onclick=start; document.getElementById("againBtn").onclick=start;
+  function start(){ ac(); reset(); mode="play"; whistle(); document.getElementById("startOv").classList.add("hide"); document.getElementById("overOv").classList.add("hide"); }
+  function gameOver(youWon){ mode="over"; state="over"; whistle();
+    document.getElementById("overTitle").textContent=youWon?"YOU WIN! 🏆":"CPU WINS!";
+    document.getElementById("overP").textContent=ps+" — "+cs;
+    document.getElementById("overOv").classList.remove("hide"); }
+
+  function doKick(){ if(mode!=="play"||state!=="play") return; var dx=ball.x-you.x, dy=ball.y-you.y, d=Math.hypot(dx,dy);
+    if(d < you.r+ball.r+26){ var tgx=W-PAD, tgy=H/2; var ax=tgx-ball.x, ay=tgy-ball.y, ad=Math.hypot(ax,ay);
+      var pw=Math.hypot(you.vx,you.vy); ball.vx=ax/ad*11 + you.vx*0.5; ball.vy=ay/ad*11 + you.vy*0.5 + (dy)*0.05; kickSfx(); } }
+
+  var last=0;
+  function frame(ts){ var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(mode!=="start" && mode!=="over") update(dt); render(); requestAnimationFrame(frame); }
+
+  function update(dt){
+    if(state==="celebrate"){ celT-=dt; if(celT<=0){ state="play"; kickoff(); } return; }
+    clock += dt/60; updateBoard();
+    // your movement
+    var mvx=0,mvy=0;
+    if(keys["ArrowLeft"]||keys["KeyA"])mvx-=1; if(keys["ArrowRight"]||keys["KeyD"])mvx+=1;
+    if(keys["ArrowUp"]||keys["KeyW"])mvy-=1; if(keys["ArrowDown"]||keys["KeyS"])mvy+=1;
+    if(pointer){ var dx=pointer.x-you.x, dy=pointer.y-you.y, d=Math.hypot(dx,dy)||1; if(d>4){ mvx=dx/d; mvy=dy/d; } }
+    var sp=3.4*dt; you.vx=mvx*sp; you.vy=mvy*sp; you.x+=you.vx; you.y+=you.vy;
+    clampPlayer(you);
+    // cpu AI: get behind ball (on right side of ball relative to your goal at left)
+    var tx=ball.x+22, ty=ball.y + (ball.y<cpu.y?-6:6); // stand to the right of ball to push left
+    if(cpu.x < ball.x) { tx=ball.x+26; } // push from right
+    var cdx=tx-cpu.x, cdy=ty-cpu.y, cd=Math.hypot(cdx,cdy)||1; var csp=2.6*dt;
+    cpu.vx=cdx/cd*csp; cpu.vy=cdy/cd*csp; cpu.x+=cpu.vx; cpu.y+=cpu.vy; clampPlayer(cpu);
+    // cpu kick toward your goal when close
+    var cbx=ball.x-cpu.x, cby=ball.y-cpu.y, cbd=Math.hypot(cbx,cby);
+    if(cbd<cpu.r+ball.r+8){ var gx=PAD, gy=H/2; var ax=gx-ball.x, ay=gy-ball.y, ad=Math.hypot(ax,ay)||1;
+      ball.vx += ax/ad*0.55; ball.vy += ay/ad*0.55; }
+    // goalies track ball vertically when ball on their half
+    var gyTarget1 = ball.x<W*0.45? ball.y : H/2; gk1.y += (clamp(gyTarget1,H/2-goalH/2,H/2+goalH/2)-gk1.y)*0.12*dt;
+    var gyTarget2 = ball.x>W*0.55? ball.y : H/2; gk2.y += (clamp(gyTarget2,H/2-goalH/2,H/2+goalH/2)-gk2.y)*0.12*dt;
+
+    // ball physics
+    ball.x+=ball.vx*dt; ball.y+=ball.vy*dt; ball.vx*=Math.pow(0.985,dt); ball.vy*=Math.pow(0.985,dt);
+    if(Math.abs(ball.vx)<0.02)ball.vx=0; if(Math.abs(ball.vy)<0.02)ball.vy=0;
+    // top/bottom walls
+    if(ball.y<PAD+ball.r){ ball.y=PAD+ball.r; ball.vy*=-0.8; } if(ball.y>H-PAD-ball.r){ ball.y=H-PAD-ball.r; ball.vy*=-0.8; }
+    // left/right walls except goal mouth
+    var inMouth = ball.y>H/2-goalH/2 && ball.y<H/2+goalH/2;
+    if(ball.x<PAD+ball.r){ if(inMouth){ if(ball.x<PAD-2){ scored(false); return; } } else { ball.x=PAD+ball.r; ball.vx*=-0.8; } }
+    if(ball.x>W-PAD-ball.r){ if(inMouth){ if(ball.x>W-PAD+2){ scored(true); return; } } else { ball.x=W-PAD-ball.r; ball.vx*=-0.8; } }
+
+    // player-ball dribble/kick on contact
+    contact(you,1); contact(cpu,1);
+    // goalie blocks
+    gkBlock(gk1); gkBlock(gk2);
+  }
+  function contact(pl){ var dx=ball.x-pl.x, dy=ball.y-pl.y, d=Math.hypot(dx,dy); var min=pl.r+ball.r;
+    if(d<min && d>0){ var nx=dx/d, ny=dy/d; ball.x=pl.x+nx*min; ball.y=pl.y+ny*min;
+      ball.vx=ball.vx*0.4 + nx*3.2 + pl.vx*0.8; ball.vy=ball.vy*0.4 + ny*3.2 + pl.vy*0.8; } }
+  function gkBlock(gk){ var dx=ball.x-gk.x, dy=ball.y-gk.y, d=Math.hypot(dx,dy); var min=gk.r+ball.r;
+    if(d<min && d>0){ var nx=dx/d, ny=dy/d; ball.x=gk.x+nx*min; ball.y=gk.y+ny*min; ball.vx=nx*Math.max(4,Math.abs(ball.vx)); ball.vy=ny*Math.max(2,Math.abs(ball.vy))*0.6 + ny*2; kickSfx(); } }
+  function clampPlayer(p){ p.x=clamp(p.x,PAD+p.r,W-PAD-p.r); p.y=clamp(p.y,PAD+p.r,H-PAD-p.r); }
+  function clamp(v,a,b){ return v<a?a:v>b?b:v; }
+
+  function scored(youScored){ if(youScored) ps++; else cs++; goalSfx(); goalText=youScored?"GOAL! ⚽":"CPU SCORES"; updateBoard();
+    if(ps>=5){ gameOver(true); return; } if(cs>=5){ gameOver(false); return; } state="celebrate"; celT=70; }
+
+  // ---------- render ----------
+  function render(){
+    // pitch
+    for(var s=0;s<10;s++){ ctx.fillStyle=s%2? "#2f8f3a":"#33983e"; ctx.fillRect(0,s*H/10,W,H/10); }
+    ctx.strokeStyle="#ffffffaa"; ctx.lineWidth=3;
+    ctx.strokeRect(PAD,PAD,W-PAD*2,H-PAD*2);
+    ctx.beginPath(); ctx.moveTo(W/2,PAD); ctx.lineTo(W/2,H-PAD); ctx.stroke();
+    ctx.beginPath(); ctx.arc(W/2,H/2,Math.min(W,H)*0.12,0,7); ctx.stroke();
+    // penalty boxes
+    var pbH=goalH+60; ctx.strokeRect(PAD, H/2-pbH/2, W*0.13, pbH); ctx.strokeRect(W-PAD-W*0.13, H/2-pbH/2, W*0.13, pbH);
+    // goals
+    drawGoal(0); drawGoal(1);
+    // goalies
+    drawGoalie(gk1,"#2f7fc0"); drawGoalie(gk2,"#e0453a");
+    // players
+    drawPlayer(cpu,"#e0453a",false); drawPlayer(you,"#2f7fc0",true);
+    // ball
+    drawBall();
+    if(state==="celebrate"){ ctx.fillStyle="#00000055"; ctx.fillRect(0,0,W,H); ctx.fillStyle="#ffd93d"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.font="bold "+Math.round(Math.min(W,H)*0.11)+"px 'Trebuchet MS',sans-serif"; ctx.fillText(goalText,W/2,H/2); }
+  }
+  function drawGoal(right){ var x=right? W-PAD : PAD; var y0=H/2-goalH/2, y1=H/2+goalH/2;
+    ctx.strokeStyle="#fff"; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(x,y0); ctx.lineTo(x,y1); ctx.stroke();
+    // net
+    ctx.strokeStyle="#ffffff55"; ctx.lineWidth=1; var dir=right?1:-1;
+    for(var i=0;i<=6;i++){ var yy=y0+(y1-y0)*i/6; ctx.beginPath(); ctx.moveTo(x,yy); ctx.lineTo(x+dir*14,yy); ctx.stroke(); }
+    for(var j=0;j<3;j++){ ctx.beginPath(); ctx.moveTo(x+dir*(4+j*5),y0); ctx.lineTo(x+dir*(4+j*5),y1); ctx.stroke(); } }
+  function drawGoalie(gk,col){ ctx.fillStyle="#00000033"; ctx.beginPath(); ctx.ellipse(gk.x,gk.y+gk.r*0.7,gk.r*0.9,gk.r*0.35,0,0,7); ctx.fill();
+    ctx.fillStyle="#ffd93d"; ctx.beginPath(); ctx.arc(gk.x,gk.y,gk.r,0,7); ctx.fill(); ctx.fillStyle="#e8b98f"; ctx.beginPath(); ctx.arc(gk.x,gk.y-2,gk.r*0.5,0,7); ctx.fill(); }
+  function drawPlayer(p,col,isYou){ ctx.fillStyle="#00000033"; ctx.beginPath(); ctx.ellipse(p.x,p.y+p.r*0.75,p.r,p.r*0.35,0,0,7); ctx.fill();
+    ctx.fillStyle=col; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill();
+    ctx.fillStyle="#e8b98f"; ctx.beginPath(); ctx.arc(p.x,p.y-2,p.r*0.55,0,7); ctx.fill();
+    ctx.fillStyle="#3a2312"; ctx.beginPath(); ctx.arc(p.x,p.y-p.r*0.35,p.r*0.55,Math.PI,0); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.font="bold "+Math.round(p.r*0.7)+"px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(isYou?"1":"X",p.x,p.y+p.r*0.55); }
+  function drawBall(){ ctx.save(); ctx.translate(ball.x,ball.y);
+    ctx.fillStyle="#00000033"; ctx.beginPath(); ctx.ellipse(0,ball.r*0.8,ball.r,ball.r*0.35,0,0,7); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(0,0,ball.r,0,7); ctx.fill(); ctx.strokeStyle="#333"; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.fillStyle="#222"; ctx.beginPath(); ctx.arc(0,0,ball.r*0.36,0,7); ctx.fill();
+    for(var i=0;i<5;i++){ var a=i/5*7; ctx.beginPath(); ctx.arc(Math.cos(a)*ball.r*0.7,Math.sin(a)*ball.r*0.7,ball.r*0.14,0,7); ctx.fill(); } ctx.restore(); }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+  reset(); mode="start";
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

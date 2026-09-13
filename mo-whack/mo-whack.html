@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Whack-a-Mole</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:#2a6a2a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:20px;font-weight:bold;color:#ffd23f;pointer-events:none;}
+  a.back{position:fixed;top:8px;left:10px;color:#dfffdf;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;}
+  #over{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:#0008;}
+  #over h1{font-size:32px;color:#ffd23f;margin:0 0 6px;} button{background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:20px;padding:14px 28px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">⬅ Games</a>
+<div id="hud">🔨 <span id="sc">0</span> &nbsp; ⏱️<span id="t">30</span>s &nbsp; 🏆<span id="hi">0</span></div>
+<canvas id="c"></canvas>
+<div id="over"><h1>🔨 TIME!</h1><p>Score <span id="fin">0</span> • Best <span id="best">0</span></p><button id="rs">▶ Play Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); layout(); }
+  window.addEventListener('resize',fit);
+  var HK='moWhackHi'; function getHi(){ try{return +localStorage.getItem(HK)||0;}catch(e){return 0;} } function setHi(v){ try{localStorage.setItem(HK,v);}catch(e){} }
+  var holes,score,time,running,last,upT;
+  function layout(){ holes=[]; var cols=3,rows=3,mw=W*0.8,mh=H*0.6,ox=W*0.1,oy=H*0.28; for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){ holes.push({x:ox+mw*(c+0.5)/cols,y:oy+mh*(r+0.5)/rows,up:0,bomb:false}); } }
+  function reset(){ layout(); score=0; time=30; running=true; last=0; upT=0; document.getElementById('sc').textContent=0; document.getElementById('t').textContent=30; document.getElementById('over').style.display='none'; }
+  document.getElementById('hi').textContent=getHi();
+  function tap(e){ if(!running)return; var t0=e.changedTouches?e.changedTouches[0]:e; var r=cv.getBoundingClientRect(); var x=t0.clientX-r.left,y=t0.clientY-r.top;
+    for(var i=0;i<holes.length;i++){ var h=holes[i]; if(h.up>0&&Math.hypot(h.x-x,h.y-y)<44){ if(h.bomb){ time=Math.max(0,time-3); flash=8; } else { score++; document.getElementById('sc').textContent=score; } h.up=0; beep(h.bomb?150:700,0.08); break; } } }
+  cv.addEventListener('touchstart',function(e){tap(e);e.preventDefault();},{passive:false});
+  cv.addEventListener('mousedown',function(e){tap(e);});
+  var flash=0;
+  function loop(ts){ if(!running)return; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts;
+    time-=dt/60; if(time<=0){ time=0; over(); } document.getElementById('t').textContent=Math.ceil(time);
+    for(var i=0;i<holes.length;i++){ if(holes[i].up>0)holes[i].up-=dt; }
+    upT-=dt; if(upT<=0){ upT=Math.max(18,42-score); var free=holes.filter(function(h){return h.up<=0;}); if(free.length){ var h=free[Math.floor(Math.random()*free.length)]; h.up=40+Math.random()*30; h.bomb=Math.random()<0.18; } }
+    if(flash>0)flash--; draw(); requestAnimationFrame(loop); }
+  function draw(){ ctx.fillStyle='#2a6a2a'; ctx.fillRect(0,0,W,H); if(flash>0){ ctx.fillStyle='rgba(224,69,58,'+(flash/16)+')'; ctx.fillRect(0,0,W,H); }
+    for(var i=0;i<holes.length;i++){ var h=holes[i]; ctx.fillStyle='#3a2a1a'; ctx.beginPath(); ctx.ellipse(h.x,h.y+18,42,16,0,0,6.29); ctx.fill(); if(h.up>0){ ctx.font='44px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(h.bomb?'💣':'🐹',h.x,h.y); } }
+    ctx.font='16px Trebuchet MS'; ctx.fillStyle='#dfffdf'; ctx.textAlign='center'; ctx.fillText('👆 Bonk the 🐹 — avoid 💣!',W/2,H*0.2); }
+  function over(){ running=false; if(score>getHi()){ setHi(score); } document.getElementById('hi').textContent=getHi(); document.getElementById('fin').textContent=score; document.getElementById('best').textContent=getHi(); document.getElementById('over').style.display='flex'; }
+  var ac; function beep(f,d){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  document.getElementById('rs').onclick=function(){ reset(); requestAnimationFrame(loop); };
+  fit(); reset(); requestAnimationFrame(loop);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration - shows a gold badge + confetti on win/finish */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function hookText(el){ if(!el)return; var was=false; new MutationObserver(function(){ var t=(el.textContent||'').trim(); if(t&&!was){ was=true; celebrate(); } else if(!t){ was=false; } }).observe(el,{childList:true,characterData:true,subtree:true}); }
+  function init(){ hookVisible(document.getElementById('over')); hookText(document.getElementById('win')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+
+</body></html>

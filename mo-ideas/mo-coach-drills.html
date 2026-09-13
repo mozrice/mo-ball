@@ -1,0 +1,499 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>MO COACH DRILLS</title>
+<style>
+html,body{margin:0;height:100%;background:#12203a;overflow:hidden;
+  font-family:'Segoe UI',Arial,sans-serif;-webkit-user-select:none;user-select:none;touch-action:manipulation;}
+#wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+canvas{background:#0e1830;display:block;box-shadow:0 10px 40px rgba(0,0,0,.6);border-radius:10px;}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<script>
+(function(){
+var cv=document.getElementById('cv'), cx=cv.getContext('2d');
+var LOGW=440, LOGH=640;
+var HD=Math.max(2,Math.min(4,Math.floor((window.devicePixelRatio||1)*2)));
+cv.width=LOGW*HD; cv.height=LOGH*HD;
+cx.setTransform(HD,0,0,HD,0,0);
+
+function fitScreen(){
+  var vw=window.innerWidth, vh=window.innerHeight;
+  var s=Math.min(vw/LOGW, vh/LOGH);
+  cv.style.width=(LOGW*s)+'px'; cv.style.height=(LOGH*s)+'px';
+}
+window.addEventListener('resize',fitScreen); fitScreen();
+
+// ---- input ----
+function pos(e){
+  var r=cv.getBoundingClientRect();
+  var t=e.touches?e.touches[0]:e;
+  return { x:(t.clientX-r.left)*(LOGW/r.width), y:(t.clientY-r.top)*(LOGH/r.height) };
+}
+
+// ---- sound ----
+var AC=null;
+function ac(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } return AC; }
+function beep(freq,dur,typ,vol){
+  var a=ac(); if(!a)return;
+  var o=a.createOscillator(), g=a.createGain();
+  o.type=typ||'square'; o.frequency.value=freq;
+  g.gain.value=vol||0.15; o.connect(g); g.connect(a.destination);
+  var t=a.currentTime; o.start(t);
+  g.gain.setValueAtTime(g.gain.value,t);
+  g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  o.stop(t+dur);
+}
+function whistle(){ beep(1600,0.12,'square',0.12); setTimeout(function(){beep(1900,0.14,'square',0.12);},90); }
+function swish(){ beep(700,0.08,'sine',0.14); setTimeout(function(){beep(520,0.12,'sine',0.12);},70); }
+function buzz(){ beep(120,0.3,'sawtooth',0.16); }
+function pop(){ beep(420,0.06,'square',0.12); }
+// simple beat loop
+var beatOn=false, beatStep=0, beatTimer=null;
+function startBeat(){
+  if(beatOn)return; beatOn=true;
+  beatTimer=setInterval(function(){
+    var a=ac(); if(!a)return;
+    var s=beatStep%8;
+    if(s===0||s===4){ // kick
+      var o=a.createOscillator(),g=a.createGain();
+      o.frequency.value=110; o.type='sine'; g.gain.value=0.18;
+      o.connect(g);g.connect(a.destination); var t=a.currentTime;
+      o.frequency.setValueAtTime(110,t); o.frequency.exponentialRampToValueAtTime(40,t+0.12);
+      o.start(t); g.gain.exponentialRampToValueAtTime(0.001,t+0.14); o.stop(t+0.15);
+    }
+    if(s===2||s===6){ // snare (noise)
+      var n=a.createBufferSource(), b=a.createBuffer(1,800,a.sampleRate), d=b.getChannelData(0);
+      for(var i=0;i<800;i++)d[i]=(Math.random()*2-1)*(1-i/800);
+      n.buffer=b; var g2=a.createGain(); g2.gain.value=0.12; n.connect(g2); g2.connect(a.destination); n.start();
+    }
+    beatStep++;
+  },170);
+}
+function stopBeat(){ beatOn=false; if(beatTimer)clearInterval(beatTimer); beatTimer=null; }
+
+// ---- scene machine ----
+var scene='menu', g={};
+var S={};
+function go(name){ scene=name; g={}; if(S[name]&&S[name].init)S[name].init(); }
+
+// ---- progress / levels ----
+var LEVELS={};
+function loadLv(){ try{LEVELS=JSON.parse(localStorage.getItem('mocoach_lv')||'{}');}catch(e){LEVELS={};} }
+function saveLv(){ try{localStorage.setItem('mocoach_lv',JSON.stringify(LEVELS));}catch(e){} }
+loadLv();
+function addStar(drill){ LEVELS[drill]=(LEVELS[drill]||0)+1; saveLv(); }
+function totalStars(){ var t=0; for(var k in LEVELS)t+=LEVELS[k]; return t; }
+
+// ---- players ----
+var TEAM=[
+  {n:'Mo', c:'#ff8c1a', s:'#5a3410'},
+  {n:'Arff', c:'#f2f2f2', s:'#c9c9c9'},
+  {n:'Meow', c:'#f4b93a', s:'#8a5a10'},
+  {n:'Hop', c:'#f6c9d6', s:'#c98ea0'}
+];
+
+// draw a cute round player head
+function drawPlayer(x,y,r,who,bounce){
+  bounce=bounce||0;
+  var yy=y-bounce;
+  // body
+  cx.fillStyle=who.c;
+  cx.beginPath(); cx.arc(x,yy,r,0,7); cx.fill();
+  cx.strokeStyle=who.s; cx.lineWidth=r*0.14; cx.stroke();
+  // eyes
+  cx.fillStyle='#20334f';
+  cx.beginPath(); cx.arc(x-r*0.32,yy-r*0.1,r*0.14,0,7); cx.fill();
+  cx.beginPath(); cx.arc(x+r*0.32,yy-r*0.1,r*0.14,0,7); cx.fill();
+  // smile
+  cx.strokeStyle='#20334f'; cx.lineWidth=r*0.1; cx.lineCap='round';
+  cx.beginPath(); cx.arc(x,yy+r*0.12,r*0.4,0.15*Math.PI,0.85*Math.PI); cx.stroke();
+  // ears / marks
+  if(who.n==='Arff'){ // floppy ears
+    cx.fillStyle=who.s;
+    cx.beginPath(); cx.ellipse(x-r*0.9,yy-r*0.2,r*0.3,r*0.55,0.3,0,7); cx.fill();
+    cx.beginPath(); cx.ellipse(x+r*0.9,yy-r*0.2,r*0.3,r*0.55,-0.3,0,7); cx.fill();
+  } else if(who.n==='Meow'){ // cat ears
+    cx.fillStyle=who.c;
+    cx.beginPath(); cx.moveTo(x-r*0.7,yy-r*0.6); cx.lineTo(x-r*0.35,yy-r*1.15); cx.lineTo(x-r*0.05,yy-r*0.7); cx.fill();
+    cx.beginPath(); cx.moveTo(x+r*0.7,yy-r*0.6); cx.lineTo(x+r*0.35,yy-r*1.15); cx.lineTo(x+r*0.05,yy-r*0.7); cx.fill();
+  } else if(who.n==='Hop'){ // bunny ears
+    cx.fillStyle=who.c;
+    cx.beginPath(); cx.ellipse(x-r*0.4,yy-r*1.2,r*0.22,r*0.7,0.1,0,7); cx.fill();
+    cx.beginPath(); cx.ellipse(x+r*0.4,yy-r*1.2,r*0.22,r*0.7,-0.1,0,7); cx.fill();
+  } else if(who.n==='Mo'){ // headband
+    cx.fillStyle='#e23b3b';
+    cx.fillRect(x-r,yy-r*0.85,r*2,r*0.32);
+  }
+}
+
+// draw hoop
+function drawHoop(x,y,sc){
+  sc=sc||1;
+  cx.save(); cx.translate(x,y); cx.scale(sc,sc);
+  // pole
+  cx.fillStyle='#5b6b86'; cx.fillRect(-4,0,8,60);
+  // board
+  cx.fillStyle='#eef3fb'; cx.strokeStyle='#3a4a66'; cx.lineWidth=3;
+  cx.fillRect(-34,-46,68,44); cx.strokeRect(-34,-46,68,44);
+  cx.strokeRect(-14,-30,28,20);
+  // rim
+  cx.strokeStyle='#ff6a2b'; cx.lineWidth=5;
+  cx.beginPath(); cx.moveTo(-22,-2); cx.lineTo(22,-2); cx.stroke();
+  // net
+  cx.strokeStyle='#cfd8e8'; cx.lineWidth=1.5;
+  for(var i=0;i<6;i++){ var t=-20+i*8; cx.beginPath(); cx.moveTo(t,-2); cx.lineTo(t*0.5,16); cx.stroke(); }
+  cx.restore();
+}
+
+function ball(x,y,r){
+  cx.fillStyle='#ff8a3d'; cx.beginPath(); cx.arc(x,y,r,0,7); cx.fill();
+  cx.strokeStyle='#7a3a12'; cx.lineWidth=1.6;
+  cx.beginPath(); cx.arc(x,y,r,0,7); cx.stroke();
+  cx.beginPath(); cx.moveTo(x-r,y); cx.lineTo(x+r,y); cx.stroke();
+  cx.beginPath(); cx.moveTo(x,y-r); cx.lineTo(x,y+r); cx.stroke();
+  cx.beginPath(); cx.arc(x-r,y,r*1.4,-0.7,0.7); cx.stroke();
+  cx.beginPath(); cx.arc(x+r,y,r*1.4,Math.PI-0.7,Math.PI+0.7); cx.stroke();
+}
+
+// ---- court background ----
+function court(){
+  var gr=cx.createLinearGradient(0,0,0,LOGH);
+  gr.addColorStop(0,'#1a2c4d'); gr.addColorStop(1,'#0e1830');
+  cx.fillStyle=gr; cx.fillRect(0,0,LOGW,LOGH);
+  // floor
+  cx.fillStyle='#c98a4a'; cx.fillRect(0,LOGH-120,LOGW,120);
+  cx.fillStyle='#b87a3c'; cx.fillRect(0,LOGH-120,LOGW,6);
+  cx.strokeStyle='#e0a860'; cx.lineWidth=2;
+  cx.beginPath(); cx.arc(LOGW/2,LOGH-40,60,Math.PI,0); cx.stroke();
+}
+
+// button helper
+function btn(x,y,w,h,label,col,tcol,fs){
+  cx.fillStyle=col||'#ff8c1a';
+  rr(x,y,w,h,14); cx.fill();
+  cx.fillStyle='rgba(255,255,255,.15)'; rr(x,y,w,h*0.5,14); cx.fill();
+  cx.fillStyle=tcol||'#fff'; cx.font='bold '+(fs||22)+'px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle';
+  cx.fillText(label,x+w/2,y+h/2);
+  return {x:x,y:y,w:w,h:h};
+}
+function rr(x,y,w,h,r){
+  cx.beginPath();
+  cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r);
+  cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath();
+}
+function hit(b,p){ return b&&p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h; }
+
+// ============ MENU ============
+var DRILLS=[
+  {k:'dribble', n:'Dribble Drill', col:'#ff8c1a', d:'Tap on the beat!'},
+  {k:'pass',    n:'Passing Drill', col:'#3fa9f5', d:'Pass to the open one!'},
+  {k:'shoot',   n:'Shooting Drill',col:'#5ac85a', d:'Power meter — swish!'},
+  {k:'defense', n:'Defense Drill', col:'#c86bf0', d:'Slide & steal!'},
+  {k:'layup',   n:'Layup Lines',   col:'#ff5a7a', d:'Time your layup!'}
+];
+var menuBtns=[];
+S.menu={
+  draw:function(){
+    court();
+    // banner
+    cx.fillStyle='#ffcf33'; rr(24,26,LOGW-48,72,18); cx.fill();
+    cx.fillStyle='#12203a'; cx.font='900 34px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle';
+    cx.fillText('MO COACH DRILLS',LOGW/2,54);
+    cx.font='bold 15px Segoe UI'; cx.fillStyle='#7a5a00';
+    cx.fillText('⭐ '+totalStars()+' stars  ·  Coach Mo',LOGW/2,82);
+    // drill cards
+    menuBtns=[];
+    var y=120, ch=64, gap=10;
+    for(var i=0;i<DRILLS.length;i++){
+      var d=DRILLS[i];
+      cx.fillStyle=d.col; rr(28,y,LOGW-56,ch,14); cx.fill();
+      cx.fillStyle='rgba(255,255,255,.18)'; rr(28,y,LOGW-56,ch*0.45,14); cx.fill();
+      // star pips
+      var st=LEVELS[d.k]||0;
+      cx.fillStyle='#fff'; cx.font='bold 21px Segoe UI'; cx.textAlign='left'; cx.textBaseline='middle';
+      cx.fillText(d.n,48,y+24);
+      cx.font='13px Segoe UI'; cx.fillStyle='rgba(255,255,255,.9)';
+      cx.fillText(d.d,48,y+46);
+      cx.textAlign='right'; cx.font='bold 18px Segoe UI'; cx.fillStyle='#fff';
+      cx.fillText('⭐'+st,LOGW-42,y+32);
+      menuBtns.push({x:28,y:y,w:LOGW-56,h:ch,k:d.k});
+      y+=ch+gap;
+    }
+    // team row
+    cx.textAlign='center';
+    for(var j=0;j<TEAM.length;j++){
+      drawPlayer(70+j*100,LOGH-58,26,TEAM[j],0);
+      cx.fillStyle='#fff'; cx.font='bold 13px Segoe UI'; cx.textBaseline='middle';
+      cx.fillText(TEAM[j].n,70+j*100,LOGH-20);
+    }
+  },
+  tap:function(p){
+    for(var i=0;i<menuBtns.length;i++){
+      if(hit(menuBtns[i],p)){ whistle(); go(menuBtns[i].k); return; }
+    }
+  }
+};
+
+// backboard corner "back" button used in drills
+function backBtn(){ return btn(14,14,74,40,'← Menu','#33507a','#fff',16); }
+
+// ============ DRIBBLE DRILL ============
+// tap the ball each time it hits the floor (on the beat)
+S.dribble={
+  init:function(){ g.by=200; g.vy=0; g.down=true; g.score=0; g.miss=0; g.win=false; g.window=false; g.t=0; startBeat(); },
+  draw:function(){
+    court(); g.t++;
+    // physics-ish bounce
+    var floor=LOGH-140;
+    g.vy+=0.9; g.by+=g.vy;
+    if(g.by>=floor){ g.by=floor; g.vy=-15; if(!g.window){ g.window=true; setTimeout(function(){g.window=false;},180);} }
+    // player dribbling
+    drawPlayer(LOGW/2,floor-8,30,TEAM[0], (g.by<floor-60?6:0));
+    ball(LOGW/2, g.by, 15);
+    // title
+    cx.fillStyle='#fff'; cx.font='900 26px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle';
+    cx.fillText('DRIBBLE DRILL',LOGW/2,40);
+    cx.font='bold 18px Segoe UI'; cx.fillStyle='#ffcf33';
+    cx.fillText('Tap when the ball is DOWN!',LOGW/2,70);
+    cx.fillStyle='#fff'; cx.font='bold 20px Segoe UI';
+    cx.fillText('Good: '+g.score+'   Miss: '+g.miss,LOGW/2,98);
+    // tap zone glow when down
+    if(g.by>floor-40){ cx.fillStyle='rgba(90,200,90,.25)'; cx.beginPath(); cx.arc(LOGW/2,floor,60,0,7); cx.fill(); }
+    // big tap button
+    g.btn=btn(LOGW/2-110,LOGH-70,220,52,'TAP','#ff8c1a','#fff',26);
+    g.back=backBtn();
+    if(g.win){ banner('⭐ Nice dribbling!'); }
+  },
+  tap:function(p){
+    if(hit(g.back,p)){ stopBeat(); go('menu'); return; }
+    if(g.win){ stopBeat(); go('menu'); return; }
+    if(hit(g.btn,p)||true){
+      var floor=LOGH-140;
+      if(g.by>floor-45){ g.score++; pop(); if(g.score>=8){ g.win=true; addStar('dribble'); swish(); stopBeat(); } }
+      else { g.miss++; beep(160,0.1,'sawtooth',0.1); }
+    }
+  }
+};
+
+// ============ PASSING DRILL ============
+// three teammates appear, one is "open" (highlighted) — tap the open one
+function passNext(){
+  g.open=Math.floor(Math.random()*3);
+  g.spots=[{x:90,y:230},{x:220,y:180},{x:350,y:230}];
+  g.pass=false;
+}
+S.pass={
+  init:function(){ g.score=0; g.round=0; g.win=false; passNext(); },
+  draw:function(){
+    court();
+    cx.fillStyle='#fff'; cx.font='900 26px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle';
+    cx.fillText('PASSING DRILL',LOGW/2,40);
+    cx.font='bold 17px Segoe UI'; cx.fillStyle='#ffcf33';
+    cx.fillText('Pass to the GLOWING open player!',LOGW/2,68);
+    cx.fillStyle='#fff'; cx.font='bold 20px Segoe UI';
+    cx.fillText('Passes: '+g.score+' / 6',LOGW/2,94);
+    // passer (Mo) at bottom
+    drawPlayer(LOGW/2,LOGH-150,28,TEAM[0],0);
+    // teammates
+    g.tar=[];
+    for(var i=0;i<3;i++){
+      var s=g.spots[i], who=TEAM[i+1];
+      if(i===g.open){ cx.fillStyle='rgba(255,220,60,.35)'; cx.beginPath(); cx.arc(s.x,s.y,44,0,7); cx.fill(); }
+      drawPlayer(s.x,s.y,26,who,0);
+      g.tar.push({x:s.x-30,y:s.y-30,w:60,h:60,i:i});
+    }
+    g.back=backBtn();
+    if(g.win) banner('⭐ Great passing!');
+  },
+  tap:function(p){
+    if(hit(g.back,p)){ go('menu'); return; }
+    if(g.win){ go('menu'); return; }
+    for(var i=0;i<g.tar.length;i++){
+      if(hit(g.tar[i],p)){
+        if(g.tar[i].i===g.open){ g.score++; swish(); if(g.score>=6){ g.win=true; addStar('pass'); } else passNext(); }
+        else { buzz(); }
+        return;
+      }
+    }
+  }
+};
+
+// ============ SHOOTING DRILL ============
+// power meter — stop it in the green zone to swish
+S.shoot={
+  init:function(){ g.pw=0; g.dir=1; g.score=0; g.shots=0; g.win=false; g.msg=''; g.flyt=0; startBeat(); },
+  draw:function(){
+    court();
+    if(g.flyt<=0){ g.pw+=g.dir*2.4; if(g.pw>=100){g.pw=100;g.dir=-1;} if(g.pw<=0){g.pw=0;g.dir=1;} }
+    cx.fillStyle='#fff'; cx.font='900 26px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle';
+    cx.fillText('SHOOTING DRILL',LOGW/2,40);
+    cx.font='bold 17px Segoe UI'; cx.fillStyle='#ffcf33';
+    cx.fillText('Stop the bar in the GREEN!',LOGW/2,66);
+    cx.fillStyle='#fff'; cx.font='bold 20px Segoe UI';
+    cx.fillText('Swish: '+g.score+' / 5',LOGW/2,92);
+    // hoop
+    drawHoop(LOGW-70,150,1.1);
+    // shooter
+    drawPlayer(90,LOGH-160,28,TEAM[0],0);
+    // flying ball anim
+    if(g.flyt>0){
+      g.flyt--;
+      var t=1-g.flyt/40;
+      var bx=90+(LOGW-160)*t, by=(LOGH-170)+ (150-(LOGH-170))*t - Math.sin(t*Math.PI)*120;
+      ball(bx,by,14);
+      if(g.flyt===0){ if(g.made){ swish(); g.score++; g.msg='SWISH!'; if(g.score>=5){g.win=true;addStar('shoot');stopBeat();} } else { buzz(); g.msg='Miss!'; } }
+    }
+    // power bar
+    var bx=60,by=LOGH-110,bw=LOGW-120,bh=30;
+    cx.fillStyle='#22344f'; rr(bx,by,bw,bh,8); cx.fill();
+    // green zone 62-84
+    cx.fillStyle='#3fbf5a'; cx.fillRect(bx+bw*0.62,by,bw*0.22,bh);
+    // fill
+    cx.fillStyle='#ff8c1a'; rr(bx,by,bw*(g.pw/100),bh,8); cx.fill();
+    cx.strokeStyle='#fff'; cx.lineWidth=3; cx.strokeRect(bx+bw*(g.pw/100)-1,by-4,3,bh+8);
+    if(g.msg){ cx.fillStyle=g.made?'#5ac85a':'#ff6a6a'; cx.font='900 30px Segoe UI'; cx.fillText(g.msg,LOGW/2,LOGH-160); }
+    g.btn=btn(LOGW/2-100,LOGH-64,200,48,'SHOOT!','#5ac85a','#fff',24);
+    g.back=backBtn();
+    if(g.win) banner('⭐ Sharp shooter!');
+  },
+  tap:function(p){
+    if(hit(g.back,p)){ stopBeat(); go('menu'); return; }
+    if(g.win){ stopBeat(); go('menu'); return; }
+    if(g.flyt>0) return;
+    if(hit(g.btn,p)){
+      g.shots++;
+      g.made=(g.pw>=62&&g.pw<=84);
+      g.flyt=40; g.msg='';
+    }
+  }
+};
+
+// ============ DEFENSE DRILL ============
+// an attacker moves left/right, keep your defender in front, tap STEAL when lined up
+S.defense={
+  init:function(){ g.ax=220; g.adir=1; g.dx=220; g.score=0; g.win=false; g.t=0; g.flash=0; },
+  draw:function(){
+    court(); g.t++;
+    // attacker moves
+    g.ax+=g.adir*(2+g.score*0.4); if(g.ax>360){g.ax=360;g.adir=-1;} if(g.ax<80){g.ax=80;g.adir=1;}
+    if(g.t%50===0&&Math.random()<0.5)g.adir*=-1;
+    cx.fillStyle='#fff'; cx.font='900 26px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle';
+    cx.fillText('DEFENSE DRILL',LOGW/2,40);
+    cx.font='bold 16px Segoe UI'; cx.fillStyle='#ffcf33';
+    cx.fillText('Slide under the ball, then STEAL!',LOGW/2,66);
+    cx.fillStyle='#fff'; cx.font='bold 20px Segoe UI';
+    cx.fillText('Steals: '+g.score+' / 5',LOGW/2,92);
+    // attacker (team poop = purple rival)
+    var rival={n:'X',c:'#8a4fbf',s:'#5a2f80'};
+    drawPlayer(g.ax,220,28,rival,0);
+    ball(g.ax,258,13);
+    // defender follows toward finger via move buttons OR drag
+    drawPlayer(g.dx,320,28,TEAM[0],0);
+    // aligned glow
+    var aligned=Math.abs(g.dx-g.ax)<26;
+    if(aligned){ cx.strokeStyle='rgba(90,200,90,.9)'; cx.lineWidth=4; cx.beginPath(); cx.arc(g.dx,320,40,0,7); cx.stroke(); }
+    if(g.flash>0){ g.flash--; cx.fillStyle='rgba(255,255,90,.4)'; cx.beginPath(); cx.arc(g.ax,240,50,0,7); cx.fill(); }
+    // controls
+    g.left=btn(24,LOGH-84,90,60,'◀','#3fa9f5','#fff',34);
+    g.right=btn(LOGW-114,LOGH-84,90,60,'▶','#3fa9f5','#fff',34);
+    g.steal=btn(LOGW/2-70,LOGH-84,140,60,'STEAL',aligned?'#5ac85a':'#a06a2a','#fff',24);
+    g.aligned=aligned;
+    g.back=backBtn();
+    if(g.win) banner('⭐ Lockdown defense!');
+  },
+  tap:function(p){
+    if(hit(g.back,p)){ go('menu'); return; }
+    if(g.win){ go('menu'); return; }
+    if(hit(g.left,p)){ g.dx=Math.max(80,g.dx-34); pop(); }
+    else if(hit(g.right,p)){ g.dx=Math.min(360,g.dx+34); pop(); }
+    else if(hit(g.steal,p)){
+      if(g.aligned){ g.score++; swish(); g.flash=12; if(g.score>=5){g.win=true;addStar('defense');} }
+      else { buzz(); }
+    }
+  }
+};
+
+// ============ LAYUP LINES ============
+// a runner moves toward the hoop; tap LAYUP when in the sweet spot
+S.layup={
+  init:function(){ g.rx=40; g.score=0; g.win=false; g.rolling=true; g.flyt=0; startBeat(); },
+  draw:function(){
+    court();
+    cx.fillStyle='#fff'; cx.font='900 26px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle';
+    cx.fillText('LAYUP LINES',LOGW/2,40);
+    cx.font='bold 16px Segoe UI'; cx.fillStyle='#ffcf33';
+    cx.fillText('Tap LAYUP in the green box!',LOGW/2,66);
+    cx.fillStyle='#fff'; cx.font='bold 20px Segoe UI';
+    cx.fillText('Layups: '+g.score+' / 5',LOGW/2,92);
+    drawHoop(LOGW-64,150,1.1);
+    // sweet spot box
+    var sz1=LOGW-190, sz2=LOGW-130;
+    cx.fillStyle='rgba(90,200,90,.22)'; cx.fillRect(sz1,LOGH-210,sz2-sz1,150);
+    cx.strokeStyle='#5ac85a'; cx.lineWidth=2; cx.strokeRect(sz1,LOGH-210,sz2-sz1,150);
+    // runner
+    if(g.rolling){ g.rx+=3.4; if(g.rx>LOGW-40){ g.rx=40; } }
+    var ry=LOGH-150;
+    if(g.flyt>0){
+      g.flyt--; var t=1-g.flyt/28;
+      var bx=g.lx+((LOGW-70)-g.lx)*t, by=ry-30 + (150-(ry-30))*t - Math.sin(t*Math.PI)*90;
+      ball(bx,by,13);
+      if(g.flyt===0){ if(g.made){swish();g.score++; if(g.score>=5){g.win=true;addStar('layup');stopBeat();}} else buzz(); }
+    } else {
+      drawPlayer(g.rx,ry,26,TEAM[0], (Math.floor(g.rx/20)%2?6:0));
+      ball(g.rx+18,ry+10,12);
+    }
+    g.btn=btn(LOGW/2-100,LOGH-52,200,44,'LAYUP!','#ff5a7a','#fff',24);
+    g.back=backBtn();
+    g.sz1=sz1; g.sz2=sz2;
+    if(g.win) banner('⭐ Easy layup!');
+  },
+  tap:function(p){
+    if(hit(g.back,p)){ stopBeat(); go('menu'); return; }
+    if(g.win){ stopBeat(); go('menu'); return; }
+    if(g.flyt>0) return;
+    if(hit(g.btn,p)){
+      g.made=(g.rx>=g.sz1&&g.rx<=g.sz2);
+      g.lx=g.rx; g.flyt=28; g.rolling=false;
+      setTimeout(function(){ if(scene==='layup'){g.rx=40;g.rolling=true;} },600);
+    }
+  }
+};
+
+// ---- win banner ----
+function banner(txt){
+  cx.fillStyle='rgba(10,20,40,.75)'; cx.fillRect(0,LOGH/2-70,LOGW,140);
+  cx.fillStyle='#ffcf33'; cx.font='900 32px Segoe UI'; cx.textAlign='center'; cx.textBaseline='middle';
+  cx.fillText(txt,LOGW/2,LOGH/2-15);
+  cx.fillStyle='#fff'; cx.font='bold 18px Segoe UI';
+  cx.fillText('Tap to go back to menu',LOGW/2,LOGH/2+25);
+}
+
+// ---- main loop ----
+function loop(){
+  cx.setTransform(HD,0,0,HD,0,0);
+  cx.clearRect(0,0,LOGW,LOGH);
+  var s=S[scene];
+  if(s&&s.draw)s.draw();
+  requestAnimationFrame(loop);
+}
+if(S.menu.init)S.menu.init();
+loop();
+
+// ---- tap dispatch ----
+cv.addEventListener('pointerdown',function(e){
+  e.preventDefault();
+  ac(); // unlock audio
+  var p=pos(e);
+  var s=S[scene];
+  if(s&&s.tap)s.tap(p);
+},{passive:false});
+
+})();
+</script>
+</body>
+</html>

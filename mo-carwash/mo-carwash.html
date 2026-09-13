@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Car Wash</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:#123a52;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;opacity:.9;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;text-shadow:0 1px 3px #000;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:18px;font-weight:bold;color:#fff;pointer-events:none;text-shadow:0 1px 4px #000;}
+  #sub{position:fixed;top:34px;left:0;right:0;text-align:center;font-size:14px;font-weight:bold;color:#ffe08a;pointer-events:none;text-shadow:0 1px 3px #000;}
+  #start,#over{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8;text-align:center;padding:20px;}
+  #start{background:linear-gradient(#8fd0f0,#3a90c0);}
+  #start h1{font-size:26px;margin:0 0 6px;text-shadow:0 2px 4px #0006;} #start p{font-size:15px;margin:4px;max-width:330px;}
+  #start .big{font-size:60px;}
+  #over{background:#000a;display:none;}
+  #over h1{font-size:30px;color:#ffd23f;margin:0 0 6px;text-shadow:0 2px 0 #b47a1a;} #over p{font-size:17px;margin:3px;}
+  #start button,#over button{margin-top:16px;background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+  #start button:active,#over button:active{transform:translateY(3px);box-shadow:0 2px 0 #b4801a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">&#11013; Games</a>
+<div id="hud">🚗 <span id="wash">0</span>/<span id="goal">8</span> washed &nbsp; 🏆 <span id="hi">0</span></div>
+<div id="sub">Scrub off all the dirt to make the car shine!</div>
+<canvas id="c"></canvas>
+<div id="start"><div class="big">🚗🧼</div><h1>MO Car Wash</h1><p>Dirty cars need a wash! Rub off all the mud spots to make each car sparkle. Wash 8 cars to be MVP!</p><button id="go">▶ WASH</button></div>
+<div id="over"><h1 id="otitle">🎉 SHINY!</h1><p id="omsg"></p><button id="rs">▶ Play Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener('resize',fit); fit();
+  var GOAL=8, HK='moCarWashHi';
+  function getHi(){ try{return +localStorage.getItem(HK)||0;}catch(e){return 0;} } function setHi(v){ try{localStorage.setItem(HK,v);}catch(e){} }
+  var COLORS=[0xff5a5a,'#ff9a3a','#ffd23f','#5ad14a','#4aa0ff','#b06aff','#ff6ad5'];
+  var washed, car, dirt, running, drive, shineT, pops, tt, best;
+  best=getHi(); document.getElementById('hi').textContent=best; document.getElementById('goal').textContent=GOAL;
+  function carBox(){ var cw=Math.min(W*0.72,360), ch=cw*0.5; return {cx:W*0.5, cy:H*0.52, w:cw, h:ch}; }
+  function newCar(){ var b=carBox(); car={color:COLORS[Math.floor(Math.random()*COLORS.length)%COLORS.length], x:-b.w}; drive='in'; shineT=0;
+    dirt=[]; var n=5+Math.min(6,washed); var b2=carBox(); for(var i=0;i<n;i++){ dirt.push({ dx:(Math.random()-0.5)*0.8, dy:(Math.random()-0.5)*0.55, r:14+Math.random()*10, rub:0, need:1+(Math.random()<0.4?1:0), gone:false }); }
+    document.getElementById('sub').textContent='🧼 Rub off the '+dirt.length+' mud spots!';
+  }
+  function reset(){ washed=0; running=true; pops=[]; tt=0; document.getElementById('wash').textContent=0; document.getElementById('over').style.display='none'; document.getElementById('start').style.display='none'; newCar(); }
+  function pop(x,y,txt,col){ pops.push({x:x,y:y,txt:txt,col:col,life:30}); }
+  function tap(e){ if(!running||drive!=='wash')return; var t0=e.changedTouches?e.changedTouches[0]:e; var r=cv.getBoundingClientRect(); var x=t0.clientX-r.left,y=t0.clientY-r.top; var b=carBox(); var hit=false;
+    for(var i=0;i<dirt.length;i++){ var d=dirt[i]; if(d.gone)continue; var dx=b.cx+d.dx*b.w, dy=b.cy+d.dy*b.h; if(Math.hypot(dx-x,dy-y)<d.r+14){ d.rub++; hit=true; bub(dx,dy); beep(300+d.rub*120,0.04,'square'); if(d.rub>=d.need){ d.gone=true; pop(dx,dy,'✨','#bfefff'); } break; } }
+    if(hit){ if(dirt.every(function(d){return d.gone;})){ carClean(); } } }
+  var bubbles=[];
+  function bub(x,y){ for(var i=0;i<6;i++)bubbles.push({x:x,y:y,vx:(Math.random()-0.5)*3,vy:-1-Math.random()*2,life:24,r:3+Math.random()*4}); }
+  function carClean(){ drive='shine'; shineT=26; beep(880,0.1); setTimeout(function(){beep(1180,0.1);},110); washed++; document.getElementById('wash').textContent=washed; if(washed>best){best=washed;setHi(best);document.getElementById('hi').textContent=best;} document.getElementById('sub').textContent='✨ Sparkly clean!'; }
+  cv.addEventListener('touchstart',function(e){ tap(e); e.preventDefault(); },{passive:false});
+  cv.addEventListener('mousedown',function(e){ tap(e); });
+  function drawCar(b,color,shine){
+    // shadow
+    ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(b.cx,b.cy+b.h*0.5,b.w*0.48,b.h*0.13,0,0,6.29); ctx.fill();
+    var x=b.cx-b.w/2, y=b.cy-b.h/2;
+    // body
+    var col=(typeof color==='number')?('#'+color.toString(16)):color;
+    ctx.fillStyle=col; rr(x,y+b.h*0.32,b.w,b.h*0.5,b.h*0.16); ctx.fill();
+    // cabin
+    ctx.fillStyle=col; rr(x+b.w*0.22,y+b.h*0.02,b.w*0.5,b.h*0.42,b.h*0.14); ctx.fill();
+    // windows
+    ctx.fillStyle='#bfe6f5'; rr(x+b.w*0.27,y+b.h*0.08,b.w*0.18,b.h*0.26,6); ctx.fill(); rr(x+b.w*0.5,y+b.h*0.08,b.w*0.18,b.h*0.26,6); ctx.fill();
+    // wheels
+    ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(x+b.w*0.28,y+b.h*0.86,b.h*0.16,0,6.29); ctx.arc(x+b.w*0.72,y+b.h*0.86,b.h*0.16,0,6.29); ctx.fill();
+    ctx.fillStyle='#aaa'; ctx.beginPath(); ctx.arc(x+b.w*0.28,y+b.h*0.86,b.h*0.07,0,6.29); ctx.arc(x+b.w*0.72,y+b.h*0.86,b.h*0.07,0,6.29); ctx.fill();
+    // headlight
+    ctx.fillStyle='#fff6c0'; ctx.beginPath(); ctx.arc(x+b.w*0.96,y+b.h*0.5,b.h*0.06,0,6.29); ctx.fill();
+    if(shine>0){ ctx.strokeStyle='rgba(255,255,255,'+(shine/26)+')'; ctx.lineWidth=3; for(var s=0;s<3;s++){ var sx=x+b.w*(0.3+s*0.25), sy=y+b.h*0.1; ctx.beginPath(); ctx.moveTo(sx-8,sy-8); ctx.lineTo(sx+8,sy+8); ctx.moveTo(sx+8,sy-8); ctx.lineTo(sx-8,sy+8); ctx.stroke(); } }
+  }
+  function rr(x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function draw(){ tt+=0.05;
+    // wash bay
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#2a6a8a'); g.addColorStop(1,'#123a52'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#0e2c3e'; ctx.fillRect(0,H*0.66,W,H*0.34);
+    ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=2; for(var wx=0;wx<W;wx+=40){ ctx.beginPath(); ctx.moveTo(wx,0); ctx.lineTo(wx,H*0.66); ctx.stroke(); }
+    var b=carBox();
+    // car drive in/out
+    if(drive==='in'){ car.x+=(b.cx-b.w-car.x)*0.0; car.x+= (0-car.x)*0.12; if(Math.abs(car.x)<3){ car.x=0; drive='wash'; } }
+    else if(drive==='shine'){ shineT--; if(shineT<=0){ drive='out'; } }
+    else if(drive==='out'){ car.x+=14; if(car.x>W){ if(washed>=GOAL){ win(); } else { newCar(); } } }
+    ctx.save(); ctx.translate(car.x,0);
+    drawCar(b,car.color, drive==='shine'?shineT:0);
+    // dirt
+    if(drive==='wash'||drive==='in'){ for(var i=0;i<dirt.length;i++){ var d=dirt[i]; if(d.gone)continue; var dx=b.cx+d.dx*b.w, dy=b.cy+d.dy*b.h; ctx.fillStyle=(d.rub>0&&d.need>1)?'rgba(120,80,40,0.7)':'#6b4a28'; ctx.beginPath(); ctx.arc(dx,dy,d.r,0,6.29); ctx.fill(); ctx.fillStyle='rgba(60,40,20,0.6)'; ctx.beginPath(); ctx.arc(dx-d.r*0.3,dy-d.r*0.2,d.r*0.4,0,6.29); ctx.arc(dx+d.r*0.35,dy+d.r*0.15,d.r*0.3,0,6.29); ctx.fill(); } }
+    ctx.restore();
+    // bubbles
+    for(var i2=bubbles.length-1;i2>=0;i2--){ var bu=bubbles[i2]; bu.x+=bu.vx; bu.y+=bu.vy; bu.vy+=0.05; bu.life--; if(bu.life<=0){bubbles.splice(i2,1);continue;} ctx.globalAlpha=bu.life/24; ctx.fillStyle='#eaffff'; ctx.beginPath(); ctx.arc(bu.x,bu.y,bu.r,0,6.29); ctx.fill(); ctx.globalAlpha=1; }
+    // pops
+    for(var p=pops.length-1;p>=0;p--){ var pp=pops[p]; pp.y-=1; pp.life--; if(pp.life<=0){pops.splice(p,1);continue;} ctx.globalAlpha=Math.min(1,pp.life/20); ctx.fillStyle=pp.col; ctx.font='bold 20px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText(pp.txt,pp.x,pp.y); ctx.globalAlpha=1; }
+    requestAnimationFrame(draw);
+  }
+  function win(){ running=false; document.getElementById('otitle').innerHTML='🎉 CAR WASH STAR! 🎉'; document.getElementById('omsg').textContent='You washed '+washed+' shiny cars! Best: '+best; document.getElementById('over').style.display='flex'; if(window.MO_MVP)window.MO_MVP(); }
+  var ac; function beep(f,d,ty){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type=ty||'square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  document.getElementById('go').onclick=function(){ reset(); };
+  document.getElementById('rs').onclick=function(){ reset(); };
+  washed=0; running=false; pops=[]; bubbles=[]; tt=0; car={color:COLORS[0],x:0}; drive='wait'; dirt=[]; shineT=0;
+  requestAnimationFrame(draw);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration - shows a gold badge + confetti on win/finish */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function hookText(el){ if(!el)return; var was=false; new MutationObserver(function(){ var t=(el.textContent||'').trim(); if(t&&!was){ was=true; celebrate(); } else if(!t){ was=false; } }).observe(el,{childList:true,characterData:true,subtree:true}); }
+  function init(){ hookVisible(document.getElementById('over')); hookText(document.getElementById('win')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+
+</body></html>

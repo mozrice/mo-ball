@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Mini-Golf Builder</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:#1a3a1a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  a.back{position:fixed;top:8px;left:10px;color:#cfeecf;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:17px;font-weight:bold;color:#ffd23f;pointer-events:none;}
+  #tools{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:6px;flex-wrap:wrap;padding:8px;background:#0a1a0add;}
+  .tool{font-size:22px;background:#264a26;border:2px solid #3a6a3a;border-radius:12px;padding:6px 9px;font-family:inherit;color:#fff;}
+  .tool.sel{border-color:#ffd23f;background:#4a5a2a;}
+  .act{font-size:14px;font-weight:bold;background:#1a9a5a;border:none;border-radius:12px;padding:8px 10px;color:#fff;font-family:inherit;}
+  #reset{background:#e0662a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">⬅ Games</a>
+<div id="hud">⛳ Build a golf hole! &nbsp; 🏌️<span id="strokes">0</span> strokes</div>
+<canvas id="c"></canvas>
+<div id="tools">
+  <button class="tool sel" data-t="wall">🧱</button>
+  <button class="tool" data-t="hole">🕳️</button>
+  <button class="tool" data-t="tee">🏁</button>
+  <button class="tool" data-t="erase">🧽</button>
+  <button class="act" id="reset">↺ Reset Ball</button>
+  <button class="act" id="clear">🧹</button>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); if(!hole.set){ hole={x:W*0.8,y:H*0.3,set:true}; tee={x:W*0.2,y:H*0.7}; resetBall(); } }
+  window.addEventListener('resize',fit);
+  var walls=[], hole={set:false}, tee={x:0,y:0}, ball={x:0,y:0,vx:0,vy:0,moving:false}, tool='wall', strokes=0, won=false, aim=null;
+  function resetBall(){ ball.x=tee.x; ball.y=tee.y; ball.vx=0; ball.vy=0; ball.moving=false; won=false; strokes=0; document.getElementById('strokes').textContent=0; }
+  var tools=document.querySelectorAll('.tool'); for(var i=0;i<tools.length;i++){ (function(b){ b.onclick=function(){ for(var j=0;j<tools.length;j++)tools[j].classList.remove('sel'); b.classList.add('sel'); tool=b.dataset.t; }; })(tools[i]); }
+  function down(e){ var t0=e.changedTouches?e.changedTouches[0]:e; var r=cv.getBoundingClientRect(); var x=t0.clientX-r.left,y=t0.clientY-r.top; if(y>H-64)return;
+    if(tool==='wall'){ walls.push({x:x,y:y,r:16}); return; }
+    if(tool==='hole'){ hole.x=x; hole.y=y; hole.set=true; return; }
+    if(tool==='tee'){ tee.x=x; tee.y=y; resetBall(); return; }
+    if(tool==='erase'){ for(var i=walls.length-1;i>=0;i--){ if(Math.hypot(walls[i].x-x,walls[i].y-y)<20){ walls.splice(i,1); return; } } return; }
+  }
+  var dragging=false;
+  function startAim(e){ if(tool!=='wall'&&tool!=='hole'&&tool!=='tee'&&tool!=='erase')return; }
+  cv.addEventListener('touchstart',function(e){ var t0=e.changedTouches[0]; var r=cv.getBoundingClientRect(); var x=t0.clientX-r.left,y=t0.clientY-r.top; if(y<=H-64&&!ball.moving&&Math.hypot(ball.x-x,ball.y-y)<40&&!won){ dragging=true; aim={x:x,y:y}; } else { down(e); } e.preventDefault(); },{passive:false});
+  cv.addEventListener('touchmove',function(e){ if(dragging){ var t0=e.changedTouches[0]; var r=cv.getBoundingClientRect(); aim={x:t0.clientX-r.left,y:t0.clientY-r.top}; e.preventDefault(); } },{passive:false});
+  cv.addEventListener('touchend',function(e){ if(dragging){ shoot(); dragging=false; } e.preventDefault(); },{passive:false});
+  cv.addEventListener('mousedown',function(e){ var r=cv.getBoundingClientRect(); var x=e.clientX-r.left,y=e.clientY-r.top; if(y<=H-64&&!ball.moving&&Math.hypot(ball.x-x,ball.y-y)<40&&!won){ dragging=true; aim={x:x,y:y}; } else { down(e); } });
+  cv.addEventListener('mousemove',function(e){ if(dragging){ var r=cv.getBoundingClientRect(); aim={x:e.clientX-r.left,y:e.clientY-r.top}; } });
+  cv.addEventListener('mouseup',function(){ if(dragging){ shoot(); dragging=false; } });
+  function shoot(){ if(!aim)return; var dx=ball.x-aim.x, dy=ball.y-aim.y; ball.vx=dx*0.16; ball.vy=dy*0.16; ball.moving=true; strokes++; document.getElementById('strokes').textContent=strokes; aim=null; beep(400,0.08); }
+  document.getElementById('reset').onclick=resetBall;
+  document.getElementById('clear').onclick=function(){ walls=[]; };
+  function loop(){ if(ball.moving){ ball.x+=ball.vx; ball.y+=ball.vy; ball.vx*=0.98; ball.vy*=0.98;
+      if(ball.x<10){ball.x=10;ball.vx*=-0.7;} if(ball.x>W-10){ball.x=W-10;ball.vx*=-0.7;} if(ball.y<10){ball.y=10;ball.vy*=-0.7;} if(ball.y>H-70){ball.y=H-70;ball.vy*=-0.7;}
+      for(var i=0;i<walls.length;i++){ var wl=walls[i]; var d=Math.hypot(ball.x-wl.x,ball.y-wl.y); if(d<wl.r+8){ var nx=(ball.x-wl.x)/d,ny=(ball.y-wl.y)/d; ball.x=wl.x+nx*(wl.r+8); ball.y=wl.y+ny*(wl.r+8); var dot=ball.vx*nx+ball.vy*ny; ball.vx-=2*dot*nx; ball.vy-=2*dot*ny; ball.vx*=0.8; ball.vy*=0.8; beep(300,0.04); } }
+      if(hole.set&&Math.hypot(ball.x-hole.x,ball.y-hole.y)<16){ won=true; ball.moving=false; ball.vx=ball.vy=0; ball.x=hole.x; ball.y=hole.y; for(var s=0;s<10;s++)burst.push({x:hole.x,y:hole.y,vx:(Math.random()-0.5)*7,vy:-Math.random()*6,life:28}); beep(820,0.15); setTimeout(function(){beep(1000,0.15);},120); }
+      if(Math.hypot(ball.vx,ball.vy)<0.15){ ball.moving=false; ball.vx=ball.vy=0; } }
+    for(var b=burst.length-1;b>=0;b--){ var p=burst[b]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.3; p.life--; if(p.life<=0)burst.splice(b,1); }
+    draw(); requestAnimationFrame(loop); }
+  var burst=[];
+  function draw(){ ctx.fillStyle='#2f7a3f'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#256a33'; for(var s=0;s<H;s+=28)ctx.fillRect(0,s,W,14);
+    if(hole.set){ ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(hole.x,hole.y,14,0,6.29); ctx.fill(); ctx.font='22px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🚩',hole.x+10,hole.y-14); }
+    ctx.font='20px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🏁',tee.x,tee.y+22);
+    for(var i=0;i<walls.length;i++){ ctx.fillStyle='#a05a2a'; ctx.beginPath(); ctx.arc(walls[i].x,walls[i].y,walls[i].r,0,6.29); ctx.fill(); ctx.strokeStyle='#6a3a1a'; ctx.lineWidth=2; ctx.stroke(); }
+    if(aim&&dragging){ ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(ball.x,ball.y); ctx.lineTo(ball.x+(ball.x-aim.x),ball.y+(ball.y-aim.y)); ctx.stroke(); }
+    ctx.font='20px sans-serif'; ctx.fillText('⚪',ball.x,ball.y);
+    if(won){ ctx.fillStyle='#ffd23f'; ctx.font='bold 30px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('⛳ HOLE IN '+strokes+'! 🎉',W/2,H*0.5); }
+    for(var b=0;b<burst.length;b++){ ctx.globalAlpha=burst[b].life/28; ctx.fillStyle='#ffd23f'; ctx.fillRect(burst[b].x-3,burst[b].y-3,6,6); ctx.globalAlpha=1; }
+    ctx.fillStyle='#fff9'; ctx.font='12px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('👆 Place 🕳️ hole & 🧱 walls • drag the ⚪ ball back and release to putt!',W/2,H-72); }
+  var ac; function beep(f,d){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),gg=ac.createGain(); o.frequency.value=f; o.type='square'; o.connect(gg); gg.connect(ac.destination); gg.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  fit(); requestAnimationFrame(loop);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration - shows a gold badge + confetti on win/finish */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function hookText(el){ if(!el)return; var was=false; new MutationObserver(function(){ var t=(el.textContent||'').trim(); if(t&&!was){ was=true; celebrate(); } else if(!t){ was=false; } }).observe(el,{childList:true,characterData:true,subtree:true}); }
+  function init(){ hookVisible(document.getElementById('over')); hookText(document.getElementById('win')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+
+</body></html>

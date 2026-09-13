@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Tower Defense</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#3a6a3a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:rgba(20,50,20,.7);}
+  #obox{background:#fff;color:#222;border-radius:18px;padding:26px 30px;text-align:center;max-width:80%;}
+  #obox h1{color:#3a8a3a;margin:0 0 6px;}
+  #go{margin-top:14px;border:none;background:#3a8a3a;color:#fff;font-family:inherit;font-weight:900;font-size:20px;padding:12px 28px;border-radius:14px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div id="over"><div id="obox"><h1>🏰 MO Tower Defense</h1><div id="omsg">Tap the grass to place a guard 🏹 (10 coins).<br>Stop the monsters reaching the castle!</div><button id="go">DEFEND</button></div></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); buildPath(); }
+  addEventListener('resize',resize);
+  var playing=false, coins=60, hp=10, wave=0, best=+(localStorage.getItem('moTDBest')||0);
+  var path=[], towers=[], enemies=[], shots=[], t=0, spawnLeft=0, spawnT=0, betweenT=0;
+  function buildPath(){ path=[ {x:0,y:H*0.2},{x:W*0.8,y:H*0.2},{x:W*0.8,y:H*0.42},{x:W*0.15,y:H*0.42},{x:W*0.15,y:H*0.64},{x:W*0.85,y:H*0.64},{x:W*0.85,y:H*0.86},{x:W,y:H*0.86} ]; }
+  resize();
+  function reset(){ coins=60; hp=10; wave=0; towers=[]; enemies=[]; shots=[]; nextWave(); }
+  function nextWave(){ wave++; spawnLeft=4+wave*2; spawnT=0; betweenT=0; }
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function beep(f,d){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.06)); }
+  function spawnEnemy(){ enemies.push({seg:0,t:0,px:1.1+wave*0.12,hp:3+wave,max:3+wave}); }
+  function posOnPath(seg,tt){ var a=path[seg], b=path[seg+1]; return {x:a.x+(b.x-a.x)*tt, y:a.y+(b.y-a.y)*tt}; }
+  function onPath(px,py){ for(var i=0;i<path.length-1;i++){ var a=path[i],b=path[i+1]; var dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy); var tproj=((px-a.x)*dx+(py-a.y)*dy)/(len*len); tproj=Math.max(0,Math.min(1,tproj)); var cx=a.x+dx*tproj,cy=a.y+dy*tproj; if(Math.hypot(px-cx,py-cy)<38)return true; } return false; }
+  function loop(){ t++;
+    x.fillStyle='#4a8a3a'; x.fillRect(0,0,W,H);
+    // path
+    x.strokeStyle='#c8a86a'; x.lineWidth=48; x.lineCap='round'; x.lineJoin='round'; x.beginPath(); x.moveTo(path[0].x,path[0].y); for(var i=1;i<path.length;i++)x.lineTo(path[i].x,path[i].y); x.stroke();
+    x.strokeStyle='#b89858'; x.lineWidth=40; x.stroke();
+    // castle
+    var end=path[path.length-1]; x.fillStyle='#9aa'; x.fillRect(end.x-46,end.y-34,44,68); x.fillStyle='#7a8a9a'; for(var m=0;m<3;m++)x.fillRect(end.x-46+m*15,end.y-42,10,10); x.fillStyle='#e2342f'; x.fillRect(end.x-30,end.y-14,14,20); x.font='16px serif'; x.fillText('🏰',end.x-40,end.y+6);
+    if(playing){ // spawn logic
+      if(spawnLeft>0){ spawnT--; if(spawnT<=0){ spawnEnemy(); spawnLeft--; spawnT=Math.max(24,50-wave*2); } }
+      else if(enemies.length===0){ betweenT++; if(betweenT>90){ coins+=20; nextWave(); } }
+      // enemies move
+      for(var i=enemies.length-1;i>=0;i--){ var e=enemies[i]; var a=path[e.seg],b=path[e.seg+1]; if(!b){ enemies.splice(i,1); continue; } var segLen=Math.hypot(b.x-a.x,b.y-a.y)||1; e.t+=e.px/segLen; while(e.t>=1){ e.t-=1; e.seg++; if(e.seg>=path.length-1){ enemies.splice(i,1); hp--; beep(180); if(hp<=0){ playing=false; over(); } break; } } }
+      // towers shoot
+      for(var i=0;i<towers.length;i++){ var tw=towers[i]; tw.cd--; if(tw.cd<=0){ var tgt=null,td=tw.range; for(var j=0;j<enemies.length;j++){ var ep=posOnPath(enemies[j].seg,enemies[j].t); var d=Math.hypot(ep.x-tw.x,ep.y-tw.y); if(d<td){ td=d; tgt=enemies[j]; } } if(tgt){ var ep=posOnPath(tgt.seg,tgt.t); shots.push({x:tw.x,y:tw.y,tx:ep.x,ty:ep.y,tgt:tgt}); tw.cd=32; beep(880); } } }
+      // shots
+      for(var i=shots.length-1;i>=0;i--){ var s=shots[i]; var ep=posOnPath(s.tgt.seg,s.tgt.t); var dx=ep.x-s.x,dy=ep.y-s.y,d=Math.hypot(dx,dy); if(d<12){ s.tgt.hp--; if(s.tgt.hp<=0){ var idx=enemies.indexOf(s.tgt); if(idx>=0){ enemies.splice(idx,1); coins+=5; beep(1200); } } shots.splice(i,1); continue; } s.x+=dx/d*10; s.y+=dy/d*10; }
+    }
+    // draw enemies
+    for(var i=0;i<enemies.length;i++){ var e=enemies[i]; var pp=posOnPath(e.seg,e.t); x.save(); x.translate(pp.x,pp.y); x.fillStyle='#8a4ac0'; x.beginPath(); x.arc(0,0,14,0,7); x.fill(); x.fillStyle='#fff'; x.beginPath(); x.arc(-5,-3,4,0,7); x.arc(5,-3,4,0,7); x.fill(); x.fillStyle='#111'; x.beginPath(); x.arc(-5,-3,2,0,7); x.arc(5,-3,2,0,7); x.fill();
+      x.fillStyle='#000'; x.fillRect(-14,-22,28,5); x.fillStyle='#3ad05a'; x.fillRect(-14,-22,28*(e.hp/e.max),5); x.restore(); }
+    // draw towers
+    for(var i=0;i<towers.length;i++){ var tw=towers[i]; x.fillStyle='#6a4a2a'; x.fillRect(tw.x-12,tw.y-6,24,20); x.fillStyle='#8a6a3a'; x.beginPath(); x.moveTo(tw.x-16,tw.y-6); x.lineTo(tw.x,tw.y-24); x.lineTo(tw.x+16,tw.y-6); x.fill(); x.fillStyle='#e2342f'; x.font='900 12px Trebuchet MS'; x.textAlign='center'; x.fillText('🏹',tw.x,tw.y+8); }
+    // shots
+    for(var i=0;i<shots.length;i++){ x.fillStyle='#ffd23f'; x.beginPath(); x.arc(shots[i].x,shots[i].y,5,0,7); x.fill(); }
+    // HUD
+    x.fillStyle='#fff'; x.font='900 '+Math.round(W*0.05)+'px Trebuchet MS'; x.textAlign='left'; x.strokeStyle='#2a4a2a'; x.lineWidth=3;
+    x.strokeText('🪙 '+coins,14,42); x.fillText('🪙 '+coins,14,42);
+    x.textAlign='center'; x.strokeText('❤️ '+hp,W/2,42); x.fillText('❤️ '+hp,W/2,42);
+    x.textAlign='right'; x.strokeText('Wave '+wave,W-14,42); x.fillText('Wave '+wave,W-14,42);
+    requestAnimationFrame(loop);
+  }
+  function over(){ beep(160,0.4); var sc=wave; if(sc>best){ best=sc; try{localStorage.setItem('moTDBest',sc);}catch(e){} }
+    document.getElementById('omsg').innerHTML='You reached <b>wave '+wave+'</b>!<br>Best: '+best; document.getElementById('go').textContent='DEFEND AGAIN'; document.getElementById('over').style.display='flex'; }
+  document.getElementById('go').addEventListener('click',function(){ reset(); playing=true; document.getElementById('over').style.display='none'; });
+  cv.addEventListener('pointerdown',function(e){ if(!playing)return; var px=e.clientX,py=e.clientY; if(py<60)return; if(coins<10)return; if(onPath(px,py))return; for(var i=0;i<towers.length;i++)if(Math.hypot(towers[i].x-px,towers[i].y-py)<40)return; towers.push({x:px,y:py,range:W*0.22,cd:0}); coins-=10; beep(900); });
+  reset(); playing=false; document.getElementById('over').style.display='flex'; loop();
+})();
+</script>
+</body></html>

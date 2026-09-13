@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO FOOTBALL MVP</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#123018;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:8px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0007;}
+  .pill{background:#0008;border-radius:20px;padding:6px 12px;font-size:16px;}
+  #hint{position:fixed;bottom:14px;left:0;right:0;text-align:center;font-size:15px;color:#d6ffd8;pointer-events:none;text-shadow:0 1px 2px #000;}
+  #msg{position:fixed;top:38%;left:0;right:0;text-align:center;font-size:38px;font-weight:bold;color:#ffd23f;text-shadow:0 3px 0 #0008,0 0 18px #ffae00;pointer-events:none;opacity:0;transition:opacity .12s;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#123018dd;text-align:center;padding:20px;}
+  #over h1{font-size:34px;margin:0 0 6px;color:#ffd23f;} #over p{font-size:19px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#7bd13a,#4a9a1a);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #367a12;font-family:inherit;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">🏈 <span id="td">0</span> TD</div>
+  <div class="pill">⏱️ <span id="time">45</span>s</div>
+  <div class="pill">🏆 <span id="best">0</span></div>
+</div>
+<div id="msg"></div>
+<div id="hint">HOLD to power up your throw, RELEASE on GREEN 🟩 to hit the running receiver! 🏈</div>
+<div id="over"><h1 id="ot">🏈</h1><p id="os"></p><button class="btn" id="again">Throw Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1,QBY=0,T=40,G=0.4;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); QBY=H*0.82; }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  var GC=0.82, GW=0.09;
+  var best=+(localStorage.getItem('mofootball_best')||0); document.getElementById('best').textContent=best;
+  var qb, wr, ball, td, timeLeft, running, holding, meter, msgT, nowv=0;
+  function reset(){ qb={x:W/2}; td=0; timeLeft=45; running=true; holding=false; meter=0; msgT=0; newPlay();
+    document.getElementById('over').style.display='none'; document.getElementById('td').textContent='0'; document.getElementById('time').textContent='45';
+    if(!reset._t){ reset._t=setInterval(function(){ if(running){ timeLeft--; document.getElementById('time').textContent=Math.max(0,timeLeft); if(timeLeft<=0) over(); } },1000); } }
+  function newPlay(){ var fromLeft=Math.random()<0.5; wr={x:fromLeft?W*0.1:W*0.9, y:H*(0.22+Math.random()*0.22), vx:(fromLeft?1:-1)*(1.2+Math.random()*1.3), caught:false}; ball={x:qb.x,y:QBY-14,vx:0,vy:0,flying:false,frame:0,spin:0}; }
+  function startHold(){ if(!running||ball.flying||holding)return; holding=true; meter=0; }
+  function release(){ if(!holding)return; holding=false; throwBall(meter); }
+  function throwBall(m){ // aim at predicted WR spot
+    var tx=wr.x+wr.vx*T, ty=wr.y; var off=m-GC; var pf=1+off*1.0;
+    var perfectVy=(ty-ball.y-0.5*G*T*T)/T; ball.vy=perfectVy*pf; ball.vx=(tx-ball.x)/T*pf; ball.flying=true; ball.frame=0; ball._green=Math.abs(off)<GW; ball._tx=tx; ball._ty=ty; beep(ball._green?520:300,0.1,'sine',0.05); }
+  cv.addEventListener('mousedown',startHold); addEventListener('mouseup',release);
+  cv.addEventListener('touchstart',function(e){startHold();e.preventDefault();},{passive:false}); addEventListener('touchend',release);
+  addEventListener('keydown',function(e){ if(e.key===' ')startHold(); }); addEventListener('keyup',function(e){ if(e.key===' ')release(); });
+  document.getElementById('again').onclick=reset;
+  function showMsg(m,col){ var e=document.getElementById('msg'); e.textContent=m; e.style.color=col||'#ffd23f'; e.style.opacity=1; msgT=1.2; }
+  function result(caught){ if(caught){ td++; document.getElementById('td').textContent=td; showMsg('🏈 TOUCHDOWN! 🎉','#7bff9e'); beep(660,0.12,'square',0.06); setTimeout(function(){beep(784,0.15,'square',0.06);},110); }
+    else { showMsg('❌ Incomplete!','#ff6a6a'); beep(160,0.15,'sawtooth',0.05); }
+    setTimeout(function(){ if(running) newPlay(); },700); }
+  function over(){ running=false; if(td>best){best=td;localStorage.setItem('mofootball_best',best);document.getElementById('best').textContent=best;}
+    document.getElementById('ot').textContent=td>=8?'🏆 MVP QB!':td>=5?'🔥 STAR!':'💪 NICE ARM'; document.getElementById('os').innerHTML='You threw <b>'+td+'</b> touchdowns!<br>Best: <b>'+best+'</b>'; document.getElementById('over').style.display='flex'; }
+  function update(dt){
+    if(!wr.caught){ wr.x+=wr.vx*dt; wr.y+=Math.sin(nowv*0.005)*0.4*dt; if(wr.x<W*0.05||wr.x>W*0.95) wr.vx*=-1; }
+    if(holding){ meter+=0.02*dt; if(meter>=1){ meter=1; release(); } }
+    if(ball.flying){ ball.frame+=dt; ball.x+=ball.vx*dt; ball.y+=ball.vy*dt; ball.vy+=G*dt; ball.spin+=0.4*dt;
+      // catch check
+      if(Math.hypot(ball.x-wr.x,ball.y-wr.y)<32 && ball.frame>6){ wr.caught=true; ball.flying=false; result(true); return; }
+      if(ball.frame>=T+6 || ball.y>QBY+20){ ball.flying=false; result(false); return; } }
+    if(msgT>0){ msgT-=0.014*dt; if(msgT<=0)document.getElementById('msg').style.opacity=0; }
+  }
+  function render(){
+    ctx.fillStyle='#1e7a3a'; ctx.fillRect(0,0,W,H);
+    // yard lines
+    ctx.strokeStyle='#ffffff33'; ctx.lineWidth=2; for(var y=H*0.1;y<H;y+=H*0.12){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    // end zone
+    ctx.fillStyle='#1560a8'; ctx.fillRect(0,0,W,H*0.1); ctx.fillStyle='#fff'; ctx.font='bold 18px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('★ END ZONE ★',W/2,H*0.06);
+    // receiver
+    drawGuy(wr.x,wr.y,'#ffd23f','WR');
+    // QB
+    drawGuy(qb.x,QBY,'#1a6fd0','MO');
+    // ball
+    if(!ball.flying){ ctx.save(); ctx.translate(qb.x,QBY-14); drawFootball(); ctx.restore(); }
+    else { ctx.save(); ctx.translate(ball.x,ball.y); ctx.rotate(ball.spin); drawFootball(); ctx.restore(); }
+    draw2K();
+  }
+  function drawFootball(){ ctx.fillStyle='#8a4a1e'; ctx.beginPath(); ctx.ellipse(0,0,12,7,0,0,6.29); ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(-5,0); ctx.lineTo(5,0); ctx.stroke(); for(var i=-3;i<=3;i+=2){ ctx.beginPath(); ctx.moveTo(i,-2); ctx.lineTo(i,2); ctx.stroke(); } }
+  function drawGuy(x,y,col,label){ ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle=col; roundRect(-13,-16,26,30,8); ctx.fill();
+    ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(0,-24,10,0,6.29); ctx.fill(); ctx.fillStyle='#2a2a3a'; ctx.beginPath(); ctx.arc(0,-27,10,Math.PI,6.29); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(label,0,-1); ctx.restore(); }
+  function draw2K(){ if(ball.flying)return;
+    var mx=qb.x+30, my=QBY-150, mh=140, mw=18;
+    ctx.fillStyle='#0009'; roundRect(mx,my,mw,mh,9); ctx.fill();
+    var gy1=my+mh*(1-(GC+GW)), gy2=my+mh*(1-(GC-GW)); ctx.fillStyle='#37d06a'; ctx.fillRect(mx+2,gy1,mw-4,gy2-gy1);
+    ctx.fillStyle=holding?'#ffd23f':'#888'; ctx.fillRect(mx+2,my+mh*(1-meter),mw-4,mh*meter);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; roundRect(mx,my,mw,mh,9); ctx.stroke();
+    if(!holding){ ctx.fillStyle='#fff'; ctx.font='bold 11px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('HOLD',mx+mw/2,my+mh+16); } }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(running) update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

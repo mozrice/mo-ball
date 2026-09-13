@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO HOME RUN DERBY</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0e2340;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:8px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0007;}
+  .pill{background:#0008;border-radius:20px;padding:6px 12px;font-size:16px;}
+  #hint{position:fixed;bottom:120px;left:0;right:0;text-align:center;font-size:14px;color:#cfe0ff;background:#0005;padding:5px;pointer-events:none;}
+  #swing{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);width:70%;height:88px;border-radius:20px;background:linear-gradient(#ff9f43,#f0722a);border:none;color:#fff;font-weight:bold;font-size:24px;font-family:inherit;box-shadow:0 5px 0 #b4541a;}
+  #swing:active{filter:brightness(1.2);}
+  #msg{position:fixed;top:34%;left:0;right:0;text-align:center;font-size:40px;font-weight:bold;color:#ffd23f;text-shadow:0 3px 0 #0008,0 0 18px #ffae00;pointer-events:none;opacity:0;transition:opacity .12s;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#0e2340dd;text-align:center;padding:20px;}
+  #over h1{font-size:34px;margin:0 0 6px;color:#ffd23f;} #over p{font-size:19px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#43c6ff,#2a8ff0);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #1a5bb4;font-family:inherit;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">💥 <span id="hr">0</span> HR</div>
+  <div class="pill">⚾ Pitch <span id="pn">1</span>/10</div>
+  <div class="pill">🏆 <span id="best">0</span></div>
+</div>
+<div id="hint">Watch the pitch — TAP SWING right as the ball reaches the plate to crush a homer! 💥</div>
+<button id="swing">🏏 SWING</button>
+<div id="msg"></div>
+<div id="over"><h1 id="ot">⚾</h1><p id="os"></p><button class="btn" id="again">Swing Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1,PLATE=0;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); PLATE=H*0.72; }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  var PITCHES=10;
+  var best=+(localStorage.getItem('mohomerun_best')||0); document.getElementById('best').textContent=best;
+  var pitch, pn, hr, running, msgT, hits, swung, nowv=0;
+  function reset(){ pn=0; hr=0; running=true; msgT=0; hits=[]; newPitch();
+    document.getElementById('over').style.display='none'; upd(); }
+  function upd(){ document.getElementById('hr').textContent=hr; document.getElementById('pn').textContent=(pn+1); }
+  function newPitch(){ swung=false; pitch={y:H*0.2, x:W*0.5+(Math.random()-0.5)*W*0.1, speed:2.6+pn*0.18+Math.random()*0.6, done:false}; }
+  function swing(){ if(!running||swung||pitch.done)return; swung=true;
+    var d=Math.abs(pitch.y-PLATE); // timing quality
+    if(d<14){ // perfect - homer
+      var dist=1-d/14; hr++; launch(1); beep(180,0.05,'square',0.06); setTimeout(function(){beep(120,0.2,'sawtooth',0.05);},40); showMsg('💥 HOME RUN!','#7bff9e'); }
+    else if(d<40){ launch(0.5); showMsg('🟡 Base hit!','#ffd23f'); beep(300,0.08,'square',0.05); }
+    else { showMsg('💨 Whiff!','#ff6a6a'); beep(160,0.12,'sawtooth',0.05); }
+    pitch.done=true; upd(); nextPitch(); }
+  function launch(power){ hits.push({x:pitch.x,y:PLATE, vx:(Math.random()-0.4)*8, vy:-10-power*8, life:1}); }
+  function nextPitch(){ pn++; if(pn>=PITCHES){ setTimeout(over,900); return; } setTimeout(function(){ if(running) newPitch(); },700); }
+  var sb=document.getElementById('swing'); sb.addEventListener('touchstart',function(e){swing();e.preventDefault();},{passive:false}); sb.addEventListener('mousedown',swing);
+  cv.addEventListener('touchstart',function(e){swing();e.preventDefault();},{passive:false}); cv.addEventListener('mousedown',swing);
+  addEventListener('keydown',function(e){ if(e.key===' ')swing(); });
+  document.getElementById('again').onclick=reset;
+  function showMsg(m,col){ var e=document.getElementById('msg'); e.textContent=m; e.style.color=col||'#ffd23f'; e.style.opacity=1; msgT=1.2; }
+  function over(){ running=false; if(hr>best){best=hr;localStorage.setItem('mohomerun_best',best);document.getElementById('best').textContent=best;}
+    document.getElementById('ot').textContent=hr>=8?'🏆 DERBY MVP!':hr>=5?'💥 SLUGGER!':'💪 NICE CUTS'; document.getElementById('os').innerHTML='You smashed <b>'+hr+'</b> home runs!<br>Best: <b>'+best+'</b>'; document.getElementById('over').style.display='flex'; }
+  function update(dt){
+    if(pitch && !pitch.done){ pitch.y+=pitch.speed*dt; if(pitch.y>PLATE+50){ pitch.done=true; if(!swung){ showMsg('⚾ Strike!','#ff6a6a'); beep(200,0.1,'sawtooth',0.04); } nextPitch(); } }
+    for(var i=hits.length-1;i>=0;i--){ var h=hits[i]; h.x+=h.vx*dt; h.y+=h.vy*dt; h.vy+=0.25*dt; h.life-=0.006*dt; if(h.life<=0||h.y>H)hits.splice(i,1); }
+    if(msgT>0){ msgT-=0.014*dt; if(msgT<=0)document.getElementById('msg').style.opacity=0; }
+  }
+  function render(){
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#2a5a9a'); g.addColorStop(0.55,'#3a7a3a'); g.addColorStop(1,'#8a5a2a'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // outfield wall + stands
+    ctx.fillStyle='#1a4a8a'; ctx.fillRect(0,H*0.12,W,H*0.08); ctx.fillStyle='#ffd23f'; ctx.font='bold 13px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('★ MO PARK ★ HIT IT HERE ★',W/2,H*0.17);
+    // pitcher mound
+    ctx.fillStyle='#9a6a3a'; ctx.beginPath(); ctx.ellipse(W/2,H*0.2,40,14,0,0,6.29); ctx.fill();
+    // plate
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.moveTo(W/2-16,PLATE+6); ctx.lineTo(W/2+16,PLATE+6); ctx.lineTo(W/2+12,PLATE+18); ctx.lineTo(W/2-12,PLATE+18); ctx.closePath(); ctx.fill();
+    // timing ring at plate
+    ctx.strokeStyle='#ffffff55'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(W/2,PLATE,20,0,6.29); ctx.stroke();
+    // batter
+    ctx.save(); ctx.translate(W/2-40,PLATE); ctx.fillStyle='#1a6fd0'; roundRect(-13,-18,26,32,8); ctx.fill(); ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(0,-26,10,0,6.29); ctx.fill();
+    var bang=swung&&msgT>0.9; ctx.strokeStyle='#c98a44'; ctx.lineWidth=6; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(6,-8); ctx.lineTo(bang?34:20,bang?-30:-2); ctx.stroke(); ctx.restore();
+    // pitch ball
+    if(pitch && !pitch.done){ var r=6+ (pitch.y/H)*8; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(pitch.x,pitch.y,r,0,6.29); ctx.fill(); ctx.strokeStyle='#e05a5a'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(pitch.x,pitch.y,r,0.5,2); ctx.stroke(); }
+    // hit balls flying
+    for(var i=0;i<hits.length;i++){ var h=hits[i]; ctx.globalAlpha=Math.max(0,h.life); ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(h.x,h.y,7,0,6.29); ctx.fill(); ctx.globalAlpha=1; }
+  }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(running) update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

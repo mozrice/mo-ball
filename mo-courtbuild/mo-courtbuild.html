@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Court Builder</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:#12203a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  a.back{position:fixed;top:8px;left:10px;color:#bcd0ea;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:18px;font-weight:bold;color:#ffd23f;pointer-events:none;}
+  #tools{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:6px;flex-wrap:wrap;padding:8px;background:#0a1224dd;}
+  .tool{font-size:24px;background:#26325a;border:2px solid #3a4a7a;border-radius:12px;padding:6px 10px;font-family:inherit;color:#fff;}
+  .tool.sel{border-color:#ffd23f;background:#3a4a2a;}
+  .act{font-size:15px;font-weight:bold;background:#1a9a5a;border:none;border-radius:12px;padding:8px 12px;color:#fff;font-family:inherit;}
+  #shoot{background:#e0662a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">⬅ Games</a>
+<div id="hud">🏀 Build your court! &nbsp; 🏀<span id="made">0</span></div>
+<canvas id="c"></canvas>
+<div id="tools">
+  <button class="tool sel" data-t="hoop">🏀</button>
+  <button class="tool" data-t="player">🧍</button>
+  <button class="tool" data-t="cone">🚧</button>
+  <button class="tool" data-t="star">⭐</button>
+  <button class="tool" data-t="tree">🌳</button>
+  <button class="tool" data-t="erase">🧽</button>
+  <button class="act" id="floor">🎨 Floor</button>
+  <button class="act" id="shoot">🏀 SHOOT!</button>
+  <button class="act" id="clear">🧹</button>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener('resize',fit); fit();
+  var items=[], tool='hoop', floors=['#c8863a','#3a7a4a','#3a5a9a','#8a3a5a','#6a4a8a'], fi=0, made=0;
+  var EMO={hoop:'🏀',player:'🧍',cone:'🚧',star:'⭐',tree:'🌳'};
+  var tools=document.querySelectorAll('.tool'); for(var i=0;i<tools.length;i++){ (function(b){ b.onclick=function(){ for(var j=0;j<tools.length;j++)tools[j].classList.remove('sel'); b.classList.add('sel'); tool=b.dataset.t; }; })(tools[i]); }
+  function place(e){ var t0=e.changedTouches?e.changedTouches[0]:e; var r=cv.getBoundingClientRect(); var x=t0.clientX-r.left,y=t0.clientY-r.top; if(y>H-70)return;
+    if(tool==='erase'){ for(var i=items.length-1;i>=0;i--){ if(Math.hypot(items[i].x-x,items[i].y-y)<26){ items.splice(i,1); break; } } }
+    else { items.push({x:x,y:y,e:EMO[tool],t:tool}); } }
+  cv.addEventListener('touchstart',function(e){place(e);e.preventDefault();},{passive:false});
+  cv.addEventListener('mousedown',function(e){place(e);});
+  var ball=null;
+  document.getElementById('shoot').onclick=function(){ var hoop=null; for(var i=0;i<items.length;i++)if(items[i].t==='hoop'){ hoop=items[i]; break; } if(!hoop){ hoop={x:W/2,y:H*0.2}; } ball={x:W/2,y:H-100,tx:hoop.x,ty:hoop.y,t:0}; beep(400,0.1); };
+  document.getElementById('clear').onclick=function(){ items=[]; };
+  document.getElementById('floor').onclick=function(){ fi=(fi+1)%floors.length; };
+  function loop(){ if(ball){ ball.t+=0.03; if(ball.t>=1){ made++; document.getElementById('made').textContent=made; for(var s=0;s<6;s++)burst.push({x:ball.tx,y:ball.ty,vx:(Math.random()-0.5)*6,vy:-Math.random()*5,life:24,c:'#ffd23f'}); beep(820,0.12); ball=null; } }
+    for(var i=burst.length-1;i>=0;i--){ var p=burst[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.3; p.life--; if(p.life<=0)burst.splice(i,1); }
+    draw(); requestAnimationFrame(loop); }
+  var burst=[];
+  function draw(){ ctx.fillStyle=floors[fi]; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.strokeRect(12,12,W-24,H-24); ctx.beginPath(); ctx.moveTo(12,H/2); ctx.lineTo(W-12,H/2); ctx.stroke(); ctx.beginPath(); ctx.arc(W/2,H/2,40,0,6.29); ctx.stroke();
+    for(var i=0;i<items.length;i++){ var it=items[i]; if(it.t==='hoop'){ ctx.font='16px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle='#fff'; ctx.fillText('🔲',it.x,it.y-14); } ctx.font='30px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(it.e,it.x,it.y); }
+    if(ball){ var e=ball.t, x=ball.x+(ball.tx-ball.x)*e, y=ball.y+(ball.ty-ball.y)*e - Math.sin(e*Math.PI)*120; ctx.font='28px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🏀',x,y); }
+    for(var b=0;b<burst.length;b++){ ctx.globalAlpha=burst[b].life/24; ctx.fillStyle=burst[b].c; ctx.fillRect(burst[b].x-3,burst[b].y-3,6,6); ctx.globalAlpha=1; }
+    ctx.fillStyle='#fff9'; ctx.font='13px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('👆 Pick a tool below, tap to place • add a 🏀 hoop then SHOOT!',W/2,H-78); }
+  var ac; function beep(f,d){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  // start with a hoop
+  items.push({x:W/2,y:H*0.16,e:'🏀',t:'hoop'});
+  requestAnimationFrame(loop);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration - shows a gold badge + confetti on win/finish */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
+  function hookText(el){ if(!el)return; var was=false; new MutationObserver(function(){ var t=(el.textContent||'').trim(); if(t&&!was){ was=true; celebrate(); } else if(!t){ was=false; } }).observe(el,{childList:true,characterData:true,subtree:true}); }
+  function init(){ hookVisible(document.getElementById('over')); hookText(document.getElementById('win')); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+
+</body></html>

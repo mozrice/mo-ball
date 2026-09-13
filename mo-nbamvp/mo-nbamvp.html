@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO NBA MVP</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:#20242e;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  a.back{position:fixed;top:8px;left:10px;color:#cfe0ff;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:18px;font-weight:bold;color:#ffd23f;pointer-events:none;}
+  #rank{position:fixed;top:42px;left:0;right:0;text-align:center;font-size:15px;font-weight:bold;color:#7bd0ff;pointer-events:none;}
+  #msg{position:fixed;top:H;left:0;right:0;}
+  #shoot{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ff9f43,#e0451a);border:none;color:#fff;font-weight:bold;font-size:24px;box-shadow:0 6px 0 #a03010;z-index:6;}
+  #shoot:active{transform:translateX(-50%) translateY(4px);}
+  #over{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:#0009;z-index:7;}
+  #over h1{font-size:30px;color:#ffd23f;margin:0 0 6px;} #over button{background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:20px;padding:14px 28px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">⬅ Games</a>
+<div id="hud">🏀 <span id="pts">0</span> pts &nbsp; 🔥<span id="streak">0</span> &nbsp; ⏱️<span id="t">60</span></div>
+<div id="rank">🏀 ROOKIE</div>
+<canvas id="c"></canvas>
+<button id="shoot">SHOOT</button>
+<div id="over"><h1>🏀 GAME OVER</h1><p id="fmsg"></p><button id="rs">▶ Play Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener('resize',fit); fit();
+  var HK='moNbaMvpHi'; function getHi(){ try{return +localStorage.getItem(HK)||0;}catch(e){return 0;} } function setHi(v){ try{localStorage.setItem(HK,v);}catch(e){} }
+  var RANKS=[[0,'🏀 ROOKIE'],[10,'⭐ STARTER'],[24,'🌟 STAR'],[40,'🔥 ALL-STAR'],[60,'👑 MVP!']];
+  var pts,streak,time,running,last,shooterX,dist,three,meter,dir,ideal,tol,state,ball,msg,msgT,reachedMVP;
+  function rankFor(p){ var r=RANKS[0][1]; for(var i=0;i<RANKS.length;i++)if(p>=RANKS[i][0])r=RANKS[i][1]; return r; }
+  function reset(){ pts=0; streak=0; time=60; running=true; last=0; state='aim'; ball=null; msg=''; msgT=0; reachedMVP=false; document.getElementById('pts').textContent=0; document.getElementById('streak').textContent=0; document.getElementById('t').textContent=60; document.getElementById('rank').textContent=RANKS[0][1]; document.getElementById('over').style.display='none'; newShot(); }
+  function newShot(){ shooterX=W*0.2+Math.random()*W*0.6; dist=Math.abs(shooterX-W/2)/(W/2); three=dist>0.55; ideal=0.45+dist*0.4; tol=0.12-dist*0.03; meter=0; dir=1; state='aim'; ball=null; }
+  function shoot(){ if(state!=='aim'||!running)return; var diff=Math.abs(meter-ideal); var make=diff<tol; var swish=diff<tol*0.4; state='shoot'; var hoopX=W/2, hoopY=H*0.20; ball={x:shooterX,y:H*0.72,tx:hoopX,ty:hoopY,t:0,make:make,swish:swish};
+    if(make){ var add=three?3:2; if(swish){ streak++; } else streak=Math.max(1,streak); var mult=1+Math.floor(streak/3); pts+=add*mult; document.getElementById('pts').textContent=pts; document.getElementById('streak').textContent=streak; msg=(three?'🎯 THREE! ':'🏀 SCORE! ')+'+'+(add*mult)+(swish?' SWISH!':''); msgT=70; beep(700,0.09); setTimeout(function(){beep(950,0.1);},80); var nr=rankFor(pts); document.getElementById('rank').textContent=nr; if(pts>=60&&!reachedMVP){ reachedMVP=true; msg='👑 YOU ARE THE MVP! 👑'; if(window.MO_MVP)window.MO_MVP(); } }
+    else { streak=0; document.getElementById('streak').textContent=0; msg='❌ Missed!'; msgT=60; beep(200,0.12); } }
+  document.getElementById('shoot').addEventListener('touchstart',function(e){shoot();e.preventDefault();},{passive:false});
+  document.getElementById('shoot').addEventListener('mousedown',function(){shoot();});
+  window.addEventListener('keydown',function(e){ if(e.key===' '){ shoot(); e.preventDefault(); } });
+  function loop(ts){ if(!running)return; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts;
+    time-=dt/60; if(time<=0){ time=0; over(); } document.getElementById('t').textContent=Math.ceil(time);
+    if(state==='aim'){ meter+=dir*0.018*dt; if(meter>1){meter=1;dir=-1;} if(meter<0){meter=0;dir=1;} }
+    if(state==='shoot'&&ball){ ball.t+=0.04*dt; var e=Math.min(1,ball.t); ball.cx=ball.x+(ball.tx-ball.x)*e; ball.cy=ball.y+(ball.ty-ball.y)*e-Math.sin(e*Math.PI)*H*0.32; if(!ball.make&&e>0.6){ ball.cx+=Math.sin(e*20)*2; } if(e>=1){ state='aim'; setTimeout(newShot,250); } }
+    if(msgT>0)msgT--; draw(); requestAnimationFrame(loop); }
+  function draw(){ var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#2a3350'); g.addColorStop(1,'#20242e'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#c8863a'; ctx.fillRect(0,H*0.78,W,H*0.22); ctx.strokeStyle='#fff8'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(W/2,H*0.78,W*0.42,Math.PI,0); ctx.stroke();
+    // hoop
+    var hx=W/2,hy=H*0.20; ctx.fillStyle='#eee'; ctx.fillRect(hx-46,hy-52,92,42); ctx.strokeStyle='#e0451a'; ctx.lineWidth=3; ctx.strokeRect(hx-18,hy-30,36,22);
+    ctx.strokeStyle='#ff5a1a'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(hx-30,hy); ctx.lineTo(hx+30,hy); ctx.stroke();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; for(var nx=-26;nx<=26;nx+=8){ ctx.beginPath(); ctx.moveTo(hx+nx,hy); ctx.lineTo(hx+nx*0.5,hy+22); ctx.stroke(); }
+    // power meter (right side)
+    var mx=W-34, my0=H*0.30, mh=H*0.34; ctx.fillStyle='#0006'; ctx.fillRect(mx-12,my0,24,mh);
+    ctx.fillStyle='#7bff9e'; ctx.fillRect(mx-12,my0+(1-(ideal+tol))*mh,24,(2*tol)*mh); // target zone
+    ctx.fillStyle='#ffd23f'; ctx.fillRect(mx-16,my0+(1-meter)*mh-2,32,4); // marker
+    ctx.fillStyle='#cfe0ff'; ctx.font='11px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('POWER',mx,my0-8); ctx.fillText('🟩=aim',mx,my0+mh+16);
+    // ball flying
+    if(state==='shoot'&&ball){ ctx.font='26px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🏀',ball.cx,ball.cy); }
+    else { ctx.font='24px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🏀',shooterX,H*0.72); }
+    // shooter
+    ctx.font='36px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🧑‍🦱',shooterX,H*0.72+2);
+    if(three){ ctx.fillStyle='#ffd23f'; ctx.font='bold 13px Trebuchet MS'; ctx.fillText('⭐ 3-POINTER!',shooterX,H*0.72+40); }
+    if(msgT>0){ ctx.fillStyle='#ffd23f'; ctx.font='bold 26px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText(msg,W/2,H*0.46); } }
+  function over(){ running=false; if(pts>getHi()){ setHi(pts); } document.getElementById('fmsg').textContent='You scored '+pts+' points — '+rankFor(pts)+'! Best: '+Math.max(pts,getHi()); document.getElementById('over').querySelector('h1').textContent=pts>=60?'👑 MVP SEASON!':'🏀 GAME OVER'; document.getElementById('over').style.display='flex'; }
+  var ac; function beep(f,d){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  document.getElementById('rs').onclick=function(){ reset(); requestAnimationFrame(loop); };
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:30%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function init(){ var over=document.getElementById('over'); if(!over)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(over).display!=='none'; if(vis&&!was){ was=true; var h=document.getElementById('over').querySelector('h1'); if(h&&/MVP/.test(h.textContent))celebrate(); } else if(!vis){ was=false; } }).observe(over,{attributes:true,attributeFilter:['style','class']}); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+</body></html>

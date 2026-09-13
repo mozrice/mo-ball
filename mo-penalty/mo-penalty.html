@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>MO SOCCER MVP</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d5c2a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;top:10px;left:0;right:0;display:flex;justify-content:center;gap:8px;pointer-events:none;font-weight:bold;text-shadow:0 2px 0 #0007;}
+  .pill{background:#0008;border-radius:20px;padding:6px 12px;font-size:16px;}
+  #hint{position:fixed;bottom:14px;left:0;right:0;text-align:center;font-size:15px;color:#d6ffd8;pointer-events:none;text-shadow:0 1px 2px #000;}
+  #msg{position:fixed;top:36%;left:0;right:0;text-align:center;font-size:38px;font-weight:bold;color:#ffd23f;text-shadow:0 3px 0 #0008,0 0 18px #ffae00;pointer-events:none;opacity:0;transition:opacity .12s;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:#0d5c2add;text-align:center;padding:20px;}
+  #over h1{font-size:34px;margin:0 0 6px;color:#ffd23f;} #over p{font-size:19px;margin:4px;}
+  .btn{margin-top:16px;background:linear-gradient(#2ad17a,#1a9a5a);border:none;color:#fff;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #127a44;font-family:inherit;}
+  .aim{position:fixed;bottom:24px;height:80px;width:30%;border-radius:18px;border:3px solid #ffffff77;display:flex;align-items:center;justify-content:center;font-size:32px;background:#0004;color:#fff;}
+  #al{left:3%;} #ar{right:3%;}
+  #kick{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);width:30%;height:80px;border-radius:18px;background:linear-gradient(#ff9f43,#f0722a);border:none;color:#fff;font-weight:bold;font-size:17px;font-family:inherit;}
+  .aim:active,#kick:active{filter:brightness(1.2);}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="pill">⚽ <span id="goals">0</span></div>
+  <div class="pill">🎯 Kick <span id="kn">1</span>/8</div>
+  <div class="pill">🏆 <span id="best">0</span></div>
+</div>
+<div id="msg"></div>
+<div id="hint">◀ ▶ aim the target, HOLD KICK & release on GREEN 🟩 — beat the keeper! ⚽</div>
+<div class="aim" id="al">◀</div>
+<button id="kick">🦶 HOLD KICK</button>
+<div class="aim" id="ar">▶</div>
+<div id="over"><h1 id="ot">⚽</h1><p id="os"></p><button class="btn" id="again">Kick Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  var W=0,H=0,DPR=1,BY=0,T=34,G=0.35;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); BY=H*0.8; }
+  addEventListener('resize',resize); resize();
+  function beep(f,d,t,v){ try{var a=beep.ac||(beep.ac=new (window.AudioContext||window.webkitAudioContext)());var o=a.createOscillator(),g=a.createGain();o.type=t||'sine';o.frequency.value=f;g.gain.value=v||0.06;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1));o.stop(a.currentTime+(d||0.1)+0.02);}catch(e){} }
+  var GC=0.82, GW=0.09, KICKS=8;
+  var best=+(localStorage.getItem('mopenalty_best')||0); document.getElementById('best').textContent=best;
+  var goal, ball, keeper, aimX, kn, goals, running, holding, meter, msgT, L, R, nowv=0;
+  function reset(){ goal={x:W/2,y:H*0.34,w:W*0.5,h:H*0.16}; kn=0; goals=0; running=true; holding=false; meter=0; msgT=0; L=R=false; newKick();
+    document.getElementById('over').style.display='none'; upd(); }
+  function upd(){ document.getElementById('goals').textContent=goals; document.getElementById('kn').textContent=(kn+1); }
+  function newKick(){ aimX=W/2; ball={x:W/2,y:BY-14,vx:0,vy:0,flying:false,frame:0,spin:0}; keeper={x:W/2, dir:(Math.random()<0.5?-1:1), committed:false, dive:0}; }
+  function startHold(){ if(!running||ball.flying||holding)return; holding=true; meter=0; }
+  function release(){ if(!holding)return; holding=false; kick(meter); }
+  function kick(m){ var off=m-GC; var pf=1+off*0.8; var tx=aimX, ty=goal.y+goal.h*0.4;
+    ball.vx=(tx-ball.x)/T*pf; var perfectVy=(ty-ball.y-0.5*G*T*T)/T; ball.vy=perfectVy*pf; ball.flying=true; ball.frame=0; ball._green=Math.abs(off)<GW; ball._tx=tx;
+    keeper.committed=true; keeper.target=goal.x + keeper.dir*goal.w*0.32; beep(ball._green?520:300,0.1,'sine',0.05); }
+  function hold(el,set){ el.addEventListener('touchstart',function(e){set(true);e.preventDefault();},{passive:false}); el.addEventListener('touchend',function(e){set(false);e.preventDefault();},{passive:false}); el.addEventListener('mousedown',function(){set(true);}); el.addEventListener('mouseup',function(){set(false);}); el.addEventListener('mouseleave',function(){set(false);}); }
+  hold(document.getElementById('al'),function(v){L=v;}); hold(document.getElementById('ar'),function(v){R=v;});
+  var kb=document.getElementById('kick'); kb.addEventListener('touchstart',function(e){startHold();e.preventDefault();},{passive:false}); kb.addEventListener('touchend',function(e){release();e.preventDefault();},{passive:false}); kb.addEventListener('mousedown',startHold); kb.addEventListener('mouseup',release);
+  addEventListener('keydown',function(e){ if(e.key==='ArrowLeft')L=true; if(e.key==='ArrowRight')R=true; if(e.key===' ')startHold(); });
+  addEventListener('keyup',function(e){ if(e.key==='ArrowLeft')L=false; if(e.key==='ArrowRight')R=false; if(e.key===' ')release(); });
+  document.getElementById('again').onclick=reset;
+  function showMsg(m,col){ var e=document.getElementById('msg'); e.textContent=m; e.style.color=col||'#ffd23f'; e.style.opacity=1; msgT=1.2; }
+  function result(scored){ if(scored){ goals++; showMsg('⚽ GOOOAL! 🎉','#7bff9e'); beep(660,0.12,'square',0.06); } else { showMsg('🧤 SAVED!','#ff6a6a'); beep(200,0.15,'sawtooth',0.05); }
+    upd(); kn++; if(kn>=KICKS){ setTimeout(over,700); return; } setTimeout(function(){ if(running) newKick(); },700); }
+  function over(){ running=false; if(goals>best){best=goals;localStorage.setItem('mopenalty_best',best);document.getElementById('best').textContent=best;}
+    document.getElementById('ot').textContent=goals>=7?'🏆 MVP STRIKER!':goals>=5?'🔥 SHARP SHOOTER!':'💪 KEEP KICKING'; document.getElementById('os').innerHTML='You scored <b>'+goals+'</b> of '+KICKS+'!<br>Best: <b>'+best+'</b>'; document.getElementById('over').style.display='flex'; }
+  function update(dt){
+    if(!ball.flying){ if(L)aimX-=5*dt; if(R)aimX+=5*dt; aimX=Math.max(goal.x-goal.w*0.44,Math.min(goal.x+goal.w*0.44,aimX)); ball.x=W/2; }
+    if(holding){ meter+=0.02*dt; if(meter>=1){ meter=1; release(); } }
+    // keeper dive animation
+    if(keeper.committed){ keeper.x+=(keeper.target-keeper.x)*0.15*dt; keeper.dive=Math.min(1,keeper.dive+0.06*dt); }
+    if(ball.flying){ ball.frame+=dt; ball.x+=ball.vx*dt; ball.y+=ball.vy*dt; ball.vy+=G*dt; ball.spin+=0.4*dt;
+      if(ball.frame>=T){ // reached goal plane
+        var saved=Math.abs(ball.x-keeper.x)<goal.w*0.13; var onTarget=Math.abs(ball.x-goal.x)<goal.w*0.46 && ball.y>goal.y-10 && ball.y<goal.y+goal.h+20;
+        ball.flying=false; result(onTarget && !saved); return; } }
+    if(msgT>0){ msgT-=0.014*dt; if(msgT<=0)document.getElementById('msg').style.opacity=0; }
+  }
+  function render(){
+    ctx.fillStyle='#1a7a3a'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#178036'; for(var s=0;s<8;s+=2){ ctx.fillRect(0,H*0.4+s*H*0.075,W,H*0.075); }
+    // goal
+    ctx.fillStyle='#0006'; ctx.fillRect(goal.x-goal.w/2,goal.y,goal.w,goal.h);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=6; ctx.strokeRect(goal.x-goal.w/2,goal.y,goal.w,goal.h);
+    ctx.strokeStyle='#ffffff44'; ctx.lineWidth=1; for(var x=goal.x-goal.w/2;x<goal.x+goal.w/2;x+=14){ ctx.beginPath(); ctx.moveTo(x,goal.y); ctx.lineTo(x,goal.y+goal.h); ctx.stroke(); } for(var y=goal.y;y<goal.y+goal.h;y+=14){ ctx.beginPath(); ctx.moveTo(goal.x-goal.w/2,y); ctx.lineTo(goal.x+goal.w/2,y); ctx.stroke(); }
+    // keeper
+    ctx.save(); ctx.translate(keeper.x,goal.y+goal.h-14); ctx.rotate((keeper.x-goal.x)/goal.w*1.2);
+    ctx.fillStyle='#ffd23f'; roundRect(-14,-20,28,34,8); ctx.fill(); ctx.fillStyle='#f6c48a'; ctx.beginPath(); ctx.arc(0,-28,10,0,6.29); ctx.fill();
+    if(keeper.committed){ ctx.strokeStyle='#ffd23f'; ctx.lineWidth=6; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-12,-8); ctx.lineTo(-26,-16*keeper.dive-8); ctx.moveTo(12,-8); ctx.lineTo(26,-16*keeper.dive-8); ctx.stroke(); }
+    ctx.restore();
+    // aim target
+    if(!ball.flying){ ctx.strokeStyle='#ffd23f'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(aimX,goal.y+goal.h*0.4,16,0,6.29); ctx.stroke(); ctx.beginPath(); ctx.moveTo(aimX-22,goal.y+goal.h*0.4); ctx.lineTo(aimX+22,goal.y+goal.h*0.4); ctx.moveTo(aimX,goal.y+goal.h*0.4-22); ctx.lineTo(aimX,goal.y+goal.h*0.4+22); ctx.stroke(); }
+    // ball
+    ctx.save(); ctx.translate(ball.x,ball.y); ctx.rotate(ball.spin); ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(0,0,12,0,6.29); ctx.fill(); ctx.fillStyle='#111'; for(var p=0;p<5;p++){ var a=p/5*6.28+ball.spin*0.2; ctx.beginPath(); ctx.arc(Math.cos(a)*5,Math.sin(a)*5,2.4,0,6.29); ctx.fill(); } ctx.restore();
+    draw2K();
+  }
+  function draw2K(){ if(ball.flying)return;
+    var mx=W/2+34, my=BY-150, mh=140, mw=18;
+    ctx.fillStyle='#0009'; roundRect(mx,my,mw,mh,9); ctx.fill();
+    var gy1=my+mh*(1-(GC+GW)), gy2=my+mh*(1-(GC-GW)); ctx.fillStyle='#37d06a'; ctx.fillRect(mx+2,gy1,mw-4,gy2-gy1);
+    ctx.fillStyle=holding?'#ffd23f':'#888'; ctx.fillRect(mx+2,my+mh*(1-meter),mw-4,mh*meter);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; roundRect(mx,my,mw,mh,9); ctx.stroke();
+    if(!holding){ ctx.fillStyle='#fff'; ctx.font='bold 11px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('HOLD',mx+mw/2,my+mh+16); } }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  var last=0;
+  function loop(ts){ nowv=ts; if(!last)last=ts; var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(running) update(dt); render(); requestAnimationFrame(loop); }
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

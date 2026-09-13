@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO 8-Ball Pool</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:#12281a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
+  canvas{display:block;width:100%;height:100%;}
+  a.back{position:fixed;top:8px;left:10px;color:#cfeecf;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:19px;font-weight:bold;color:#ffd23f;pointer-events:none;}
+  #tip{position:fixed;bottom:14px;left:0;right:0;text-align:center;color:#cfeecf;font-size:15px;pointer-events:none;}
+  #over{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:#0009;z-index:7;}
+  #over h1{font-size:30px;color:#ffd23f;margin:0 0 6px;} #over button{background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:20px;padding:14px 28px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+</style></head>
+<body>
+<a class="back" href="../games.html">⬅ Games</a>
+<div id="hud">🎱 Sunk <span id="sunk">0</span>/7 &nbsp; 🎯 Shots <span id="shots">0</span> &nbsp; 🏆<span id="hi">0</span></div>
+<canvas id="c"></canvas>
+<div id="tip">👆 Drag back from the white ball and let go to shoot!</div>
+<div id="over"><h1>🎱 YOU CLEARED THE TABLE!</h1><p id="fmsg"></p><button id="rs">▶ Play Again</button></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
+  function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); layout(); }
+  window.addEventListener('resize',fit);
+  var HK='mo8ballHi'; function getHi(){ try{return +localStorage.getItem(HK)||99;}catch(e){return 99;} } function setHi(v){ try{localStorage.setItem(HK,v);}catch(e){} }
+  var R, rail, pockets, balls, cue, shots, sunk, aim, dragging, moving;
+  var COL=['#ffd23f','#2a6ff0','#e0453a','#a24aff','#ff8a2a','#2ad17a','#8a4a2a','#111111'];
+  document.getElementById('hi').textContent=getHi()===99?'-':getHi();
+  function layout(){ rail=Math.max(18,W*0.05); R=Math.max(10,Math.min(W,H)*0.028); var pr=R*1.8;
+    pockets=[{x:rail,y:rail},{x:W/2,y:rail-2},{x:W-rail,y:rail},{x:rail,y:H-rail},{x:W/2,y:H-rail+2},{x:W-rail,y:H-rail}];
+    for(var i=0;i<pockets.length;i++)pockets[i].r=pr;
+    if(!balls)newRack();
+  }
+  function newRack(){ balls=[]; var cx=W/2, cy=H*0.30, gap=R*2.05; var rows=[[0],[1,2],[3,4,5],[6,7]]; var idx=0;
+    for(var r=0;r<rows.length;r++){ for(var k=0;k<rows[r].length;k++){ var n=rows[r][k]; var x=cx+(k-(rows[r].length-1)/2)*gap; var y=cy+r*gap*0.9; balls.push({x:x,y:y,vx:0,vy:0,c:COL[n],n:n+1,live:true}); } }
+    cue={x:W/2,y:H*0.74,vx:0,vy:0,cue:true,live:true};
+    shots=0; sunk=0; document.getElementById('shots').textContent=0; document.getElementById('sunk').textContent=0; document.getElementById('over').style.display='none'; aim=null; dragging=false; moving=false; }
+  function reset(){ layout(); newRack(); }
+  function pt(e){ var t=e.changedTouches?e.changedTouches[0]:e; var r=cv.getBoundingClientRect(); return {x:t.clientX-r.left,y:t.clientY-r.top}; }
+  function down(e){ if(moving||!cue.live)return; dragging=true; aim=pt(e); }
+  function mv(e){ if(dragging)aim=pt(e); }
+  function up(e){ if(!dragging)return; dragging=false; var a=pt(e); var dx=cue.x-a.x, dy=cue.y-a.y; var d=Math.hypot(dx,dy); if(d<8){ aim=null; return; } var power=Math.min(1,d/220); cue.vx=dx/d*power*22; cue.vy=dy/d*power*22; shots++; document.getElementById('shots').textContent=shots; aim=null; moving=true; beep(300,0.06); }
+  cv.addEventListener('touchstart',function(e){down(e);e.preventDefault();},{passive:false});
+  cv.addEventListener('touchmove',function(e){mv(e);e.preventDefault();},{passive:false});
+  cv.addEventListener('touchend',function(e){up(e);e.preventDefault();},{passive:false});
+  cv.addEventListener('mousedown',function(e){down(e);});
+  cv.addEventListener('mousemove',function(e){mv(e);});
+  cv.addEventListener('mouseup',function(e){up(e);});
+  function allBalls(){ var a=[]; if(cue.live)a.push(cue); for(var i=0;i<balls.length;i++)if(balls[i].live)a.push(balls[i]); return a; }
+  function step(){ var list=allBalls();
+    for(var i=0;i<list.length;i++){ var b=list[i]; b.x+=b.vx; b.y+=b.vy; b.vx*=0.985; b.vy*=0.985; if(Math.abs(b.vx)<0.04)b.vx=0; if(Math.abs(b.vy)<0.04)b.vy=0;
+      if(b.x<rail+R){b.x=rail+R;b.vx=Math.abs(b.vx)*0.7;} if(b.x>W-rail-R){b.x=W-rail-R;b.vx=-Math.abs(b.vx)*0.7;}
+      if(b.y<rail+R){b.y=rail+R;b.vy=Math.abs(b.vy)*0.7;} if(b.y>H-rail-R){b.y=H-rail-R;b.vy=-Math.abs(b.vy)*0.7;}
+    }
+    // collisions
+    for(var i=0;i<list.length;i++)for(var j=i+1;j<list.length;j++){ var a=list[i],c=list[j]; var dx=c.x-a.x,dy=c.y-a.y,d=Math.hypot(dx,dy); if(d>0&&d<2*R){ var nx=dx/d,ny=dy/d; var overlap=2*R-d; a.x-=nx*overlap/2; a.y-=ny*overlap/2; c.x+=nx*overlap/2; c.y+=ny*overlap/2; var p=(a.vx-c.vx)*nx+(a.vy-c.vy)*ny; if(p>0){ a.vx-=p*nx; a.vy-=p*ny; c.vx+=p*nx; c.vy+=p*ny; if(p>3)beep(500,0.03); } } }
+    // pockets
+    for(var i=0;i<list.length;i++){ var b=list[i]; for(var pk=0;pk<pockets.length;pk++){ if(Math.hypot(b.x-pockets[pk].x,b.y-pockets[pk].y)<pockets[pk].r*0.7){ if(b.cue){ b.live=false; b.vx=b.vy=0; setTimeout(function(){ cue.x=W/2; cue.y=H*0.74; cue.vx=cue.vy=0; cue.live=true; },500); beep(180,0.15); } else { b.live=false; b.vx=b.vy=0; sunk++; document.getElementById('sunk').textContent=sunk; beep(760,0.1); if(sunk>=7)win(); } } } }
+    moving=false; for(var i=0;i<list.length;i++)if(Math.abs(list[i].vx)>0.05||Math.abs(list[i].vy)>0.05)moving=true;
+  }
+  function loop(){ if(moving)step(); draw(); requestAnimationFrame(loop); }
+  function draw(){ ctx.fillStyle='#12281a'; ctx.fillRect(0,0,W,H);
+    // rails
+    ctx.fillStyle='#6a3a1a'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#1a7a3a'; ctx.fillRect(rail-R,rail-R,W-2*(rail-R),H-2*(rail-R));
+    ctx.fillStyle='#158030'; ctx.fillRect(rail,rail,W-2*rail,H-2*rail);
+    for(var pk=0;pk<pockets.length;pk++){ ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(pockets[pk].x,pockets[pk].y,pockets[pk].r*0.7,0,6.29); ctx.fill(); }
+    var list=allBalls();
+    for(var i=0;i<list.length;i++){ var b=list[i]; ctx.beginPath(); ctx.arc(b.x,b.y,R,0,6.29); ctx.fillStyle=b.cue?'#fff':b.c; ctx.fill(); ctx.strokeStyle='#0006'; ctx.lineWidth=1.5; ctx.stroke();
+      if(!b.cue){ ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(b.x,b.y,R*0.5,0,6.29); ctx.fill(); ctx.fillStyle='#000'; ctx.font='bold '+Math.round(R*0.7)+'px Trebuchet MS'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(b.n,b.x,b.y); }
+      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(b.x-R*0.3,b.y-R*0.3,R*0.22,0,6.29); ctx.fill(); }
+    // aim line
+    if(aim&&dragging&&cue.live){ var dx=cue.x-aim.x, dy=cue.y-aim.y, d=Math.hypot(dx,dy); if(d>4){ ctx.strokeStyle='#ffffffcc'; ctx.lineWidth=3; ctx.setLineDash([10,8]); ctx.beginPath(); ctx.moveTo(cue.x,cue.y); ctx.lineTo(cue.x+dx/d*Math.min(d,300),cue.y+dy/d*Math.min(d,300)); ctx.stroke(); ctx.setLineDash([]);
+      // power
+      ctx.strokeStyle='#ffd23f'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(cue.x,cue.y); ctx.lineTo(aim.x,aim.y); ctx.stroke(); } }
+  }
+  function win(){ var best=getHi(); if(shots<best||best===99){ setHi(shots); } document.getElementById('hi').textContent=getHi(); document.getElementById('fmsg').textContent='Cleared in '+shots+' shots! Best: '+getHi(); document.getElementById('over').style.display='flex'; }
+  var ac; function beep(f,d){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+  document.getElementById('rs').onclick=function(){ newRack(); };
+  fit(); requestAnimationFrame(loop);
+})();
+</script>
+<script>
+/* MO MVP SUPERSTAR celebration */
+(function(){
+  var busy=false;
+  function celebrate(){ if(busy)return; busy=true;
+    var b=document.createElement('div'); b.textContent='⭐ MVP SUPERSTAR! ⭐';
+    b.style.cssText='position:fixed;left:0;right:0;top:30%;text-align:center;z-index:99999;font-family:Trebuchet MS,system-ui,sans-serif;font-weight:bold;font-size:30px;color:#fff;text-shadow:0 2px 0 #b47a1a,0 0 20px #ffd23f;pointer-events:none;transition:opacity .5s;';
+    document.body.appendChild(b);
+    var cvs=document.createElement('canvas'); cvs.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;'; document.body.appendChild(cvs);
+    var x=cvs.getContext('2d'); cvs.width=innerWidth; cvs.height=innerHeight;
+    var P=[],C=['#ff5a5a','#ffd23f','#7bff9e','#43c6ff','#ff6ad5','#b06aff'];
+    for(var i=0;i<90;i++)P.push({x:Math.random()*cvs.width,y:-20-Math.random()*cvs.height*0.5,vx:(Math.random()-0.5)*3,vy:2+Math.random()*5,c:C[i%C.length],s:5+Math.random()*7,r:Math.random()*6.28});
+    var fr=0; (function anim(){ x.clearRect(0,0,cvs.width,cvs.height); for(var i=0;i<P.length;i++){ var p=P[i]; p.x+=p.vx; p.y+=p.vy; p.r+=0.12; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); } fr++; if(fr<150)requestAnimationFrame(anim); else { if(cvs.parentNode)cvs.parentNode.removeChild(cvs); } })();
+    try{ var a=new (window.AudioContext||window.webkitAudioContext)(); [660,880,990,1180].forEach(function(f,i){ var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f; o.type='square'; o.connect(g); g.connect(a.destination); g.gain.value=0.05; o.start(a.currentTime+i*0.11); o.stop(a.currentTime+i*0.11+0.12); }); }catch(e){}
+    setTimeout(function(){ b.style.opacity='0'; setTimeout(function(){ if(b.parentNode)b.parentNode.removeChild(b); busy=false; },600); },1900);
+  }
+  window.MO_MVP=celebrate;
+  function init(){ var over=document.getElementById('over'); if(!over)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(over).display!=='none'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(over,{attributes:true,attributeFilter:['style','class']}); }
+  if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+</body></html>

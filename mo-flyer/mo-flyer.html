@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Mo Flyer</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html,body { margin:0; height:100%; overflow:hidden; background:#8fd3f4;
+    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif; color:#0a2a3a;
+    user-select:none; -webkit-user-select:none; touch-action:none; }
+  #stage { position:fixed; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:absolute; top:10px; left:12px; right:12px; display:flex; align-items:center;
+    gap:10px; font-weight:bold; z-index:3; pointer-events:none; text-shadow:0 2px 3px #0003; }
+  #score { font-size:26px; color:#fff; }
+  #best { font-size:15px; color:#eaffff; }
+  #hearts { margin-left:auto; font-size:24px; letter-spacing:2px; }
+  #boostWrap { position:absolute; left:12px; bottom:12px; width:150px; height:14px; background:#ffffff55;
+    border-radius:8px; overflow:hidden; z-index:3; border:2px solid #ffffff88; }
+  #boost { height:100%; width:0%; background:linear-gradient(90deg,#ffd93d,#ff7a3c); }
+  .overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; text-align:center; z-index:5; background:#0a2a3a55; color:#fff; }
+  .overlay.hide { display:none; }
+  .card { background:#0e2f45ee; border:3px solid #7fdfff; border-radius:22px; padding:26px 30px; max-width:86%; }
+  .card h1 { margin:0 0 6px; font-size:34px; color:#ffd93d; text-shadow:0 3px 0 #a5701a; letter-spacing:1px; }
+  .card p { margin:8px 0; font-size:17px; color:#dff4ff; }
+  .big { display:inline-block; margin-top:14px; padding:16px 30px; font-size:22px; font-weight:bold;
+    background:#ffd93d; color:#5a3d00; border:none; border-radius:16px; cursor:pointer; box-shadow:0 5px 0 #b8922a; }
+  .big:active { transform:translateY(4px); box-shadow:0 1px 0 #b8922a; }
+  .hintrow { font-size:15px; color:#bfe8ff; margin-top:10px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hud">
+    <div id="score">0</div>
+    <div id="best">Best 0</div>
+    <div id="hearts">❤️❤️❤️</div>
+  </div>
+  <div id="boostWrap"><div id="boost"></div></div>
+
+  <div class="overlay" id="startOv">
+    <div class="card">
+      <h1>✈️ MO FLYER</h1>
+      <p>Fly Morgan's plane through the sky!</p>
+      <p>Grab 🪙 coins &amp; ⭐ stars, fly through 🔵 rings,<br>and dodge 🐦 birds and ⛈️ storm clouds.</p>
+      <button class="big" id="playBtn">▶ PLAY</button>
+      <div class="hintrow">Hold / tap anywhere (or press Space) to fly UP.<br>Let go to glide down.</div>
+    </div>
+  </div>
+
+  <div class="overlay hide" id="overOv">
+    <div class="card">
+      <h1 id="overTitle">GAME OVER</h1>
+      <p id="overScore">Score: 0</p>
+      <p id="overBest">Best: 0</p>
+      <button class="big" id="retryBtn">↻ FLY AGAIN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), ctx=cv.getContext("2d"), stage=document.getElementById("stage");
+  var DPR=Math.max(1,Math.min(3,window.devicePixelRatio||1));
+  var W=0,H=0;
+  function resize(){ W=stage.clientWidth; H=stage.clientHeight;
+    cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0); }
+  window.addEventListener("resize",resize); resize();
+
+  // audio
+  var AC=null; function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain();
+    o.type=t||"triangle"; o.frequency.value=f; g.gain.value=v||0.1; o.connect(g); g.connect(a.destination);
+    var n=a.currentTime; o.start(n); g.gain.exponentialRampToValueAtTime(0.0001,n+(d||0.12)); o.stop(n+(d||0.12)+0.02); }
+  function coinSfx(){ beep(880,0.06,"square",0.09); setTimeout(function(){beep(1320,0.09,"square",0.09);},55); }
+  function starSfx(){ beep(660,0.08,"triangle",0.1); setTimeout(function(){beep(990,0.08,"triangle",0.1);},70); setTimeout(function(){beep(1320,0.12,"triangle",0.1);},140); }
+  function hitSfx(){ beep(200,0.18,"sawtooth",0.12); }
+  function overSfx(){ beep(400,0.15,"sine",0.12); setTimeout(function(){beep(300,0.15,"sine",0.12);},150); setTimeout(function(){beep(200,0.25,"sine",0.12);},300); }
+
+  // state
+  var mode="start"; // start, play, over
+  var plane, coins, stars, rings, birds, storms, clouds, hills, puffs, trail;
+  var score, best, hearts, speed, spawnT, inv, boost, boosting, boostT, dist;
+  best=parseInt(localStorage.getItem("moFlyerBest")||"0",10)||0;
+  document.getElementById("best").textContent="Best "+best;
+
+  function reset(){
+    plane={ x:W*0.26, y:H*0.5, vy:0, r:0 };
+    coins=[]; stars=[]; rings=[]; birds=[]; storms=[]; puffs=[]; trail=[];
+    clouds=[]; hills=[];
+    for(var i=0;i<6;i++) clouds.push({ x:Math.random()*W, y:Math.random()*H*0.6, s:0.6+Math.random()*0.9, sp:0.2+Math.random()*0.3 });
+    for(var j=0;j<5;j++) hills.push({ x:j*W*0.35, h:H*(0.12+Math.random()*0.12) });
+    score=0; hearts=3; speed=3.2; spawnT=0; inv=0; boost=0; boosting=false; boostT=0; dist=0;
+    updateHud();
+  }
+  function updateHud(){
+    document.getElementById("score").textContent=score;
+    document.getElementById("hearts").textContent="❤️".repeat(Math.max(0,hearts))+"🖤".repeat(Math.max(0,3-hearts));
+    document.getElementById("boost").style.width=Math.min(100,boost)+"%";
+  }
+
+  // input
+  var thrust=false;
+  function press(e){ if(e&&e.preventDefault)e.preventDefault(); ac();
+    if(mode==="play") thrust=true; }
+  function release(){ thrust=false; }
+  stage.addEventListener("mousedown",press); window.addEventListener("mouseup",release);
+  stage.addEventListener("touchstart",press,{passive:false}); window.addEventListener("touchend",release);
+  window.addEventListener("keydown",function(e){ if(e.code==="Space"||e.code==="ArrowUp"){ e.preventDefault(); if(mode==="play")thrust=true; else if(mode==="start")startGame(); else if(mode==="over")startGame(); } });
+  window.addEventListener("keyup",function(e){ if(e.code==="Space"||e.code==="ArrowUp") thrust=false; });
+
+  document.getElementById("playBtn").onclick=function(){ startGame(); };
+  document.getElementById("retryBtn").onclick=function(){ startGame(); };
+
+  function startGame(){ ac(); reset(); mode="play";
+    document.getElementById("startOv").classList.add("hide");
+    document.getElementById("overOv").classList.add("hide"); }
+
+  function gameOver(){ mode="over"; overSfx();
+    if(score>best){ best=score; localStorage.setItem("moFlyerBest",""+best); document.getElementById("best").textContent="Best "+best; }
+    document.getElementById("overTitle").textContent = score>=best&&score>0 ? "NEW BEST!" : "GAME OVER";
+    document.getElementById("overScore").textContent="Score: "+score;
+    document.getElementById("overBest").textContent="Best: "+best;
+    document.getElementById("overOv").classList.remove("hide"); }
+
+  // spawn
+  function spawn(){
+    var r=Math.random();
+    var y=H*(0.15+Math.random()*0.6);
+    if(r<0.4) coins.push({ x:W+30, y:y, got:false });
+    else if(r<0.55) stars.push({ x:W+30, y:y, got:false, ph:Math.random()*6 });
+    else if(r<0.7) rings.push({ x:W+40, y:y, passed:false });
+    else if(r<0.88) birds.push({ x:W+30, y:y, ph:Math.random()*6, fy:y });
+    else storms.push({ x:W+40, y:H*(0.1+Math.random()*0.55) });
+    // sometimes a coin arc
+    if(Math.random()<0.4){ var cy=y; for(var k=1;k<=4;k++) coins.push({ x:W+30+k*34, y:cy-Math.sin(k*0.6)*40, got:false }); }
+  }
+
+  function circHit(ax,ay,ar,bx,by,br){ var dx=ax-bx,dy=ay-by; return dx*dx+dy*dy<(ar+br)*(ar+br); }
+
+  var last=0;
+  function frame(ts){
+    var dt=Math.min(2.5,((ts-last)/16.67)||1); last=ts;
+    if(mode==="play") update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  function update(dt){
+    dist+=speed*dt;
+    score = Math.floor(dist/20);
+    speed = 3.2 + Math.min(4.5, dist/2600);
+    // plane physics
+    var grav=0.42, lift=-0.95;
+    plane.vy += grav*dt;
+    if(thrust||boosting) plane.vy += lift*dt;
+    plane.vy=Math.max(-9,Math.min(11,plane.vy));
+    plane.y += plane.vy*dt;
+    plane.r = Math.max(-0.5,Math.min(0.6, plane.vy*0.05));
+    // bounds
+    if(plane.y<24){ plane.y=24; plane.vy=0; }
+    if(plane.y>H-24){ plane.y=H-24; plane.vy=0; if(mode==="play") hurt(true); }
+    // trail
+    if((thrust||boosting) && Math.random()<0.6) trail.push({ x:plane.x-18, y:plane.y+6, life:1, s:6+Math.random()*4 });
+    for(var t=trail.length-1;t>=0;t--){ var tr=trail[t]; tr.x-=speed*dt; tr.life-=0.04*dt; tr.s+=0.3*dt; if(tr.life<=0) trail.splice(t,1); }
+
+    // boost logic
+    if(boosting){ boostT-=dt; if(boostT<=0){ boosting=false; } }
+    if(boost>=100 && !boosting){ boosting=true; boostT=90; boost=0; starSfx(); }
+
+    if(inv>0) inv-=dt;
+
+    // spawn
+    spawnT-=dt; if(spawnT<=0){ spawn(); spawnT=42 - Math.min(22,dist/700); }
+
+    var sp=speed*dt;
+    // parallax
+    for(var c=0;c<clouds.length;c++){ var cl=clouds[c]; cl.x-=cl.sp*sp; if(cl.x<-120){ cl.x=W+80; cl.y=Math.random()*H*0.6; cl.s=0.6+Math.random()*0.9; } }
+    for(var hI=0;hI<hills.length;hI++){ hills[hI].x-=sp*0.5; if(hills[hI].x<-W*0.35){ hills[hI].x+=hills.length*W*0.35; hills[hI].h=H*(0.12+Math.random()*0.12); } }
+
+    // coins
+    for(var i=coins.length-1;i>=0;i--){ var co=coins[i]; co.x-=sp;
+      if(!co.got && circHit(plane.x,plane.y,16,co.x,co.y,12)){ co.got=true; score+=1; boost=Math.min(100,boost+8); coinSfx();
+        for(var pp=0;pp<6;pp++) puffs.push({x:co.x,y:co.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:1,col:"#ffd93d"});
+        coins.splice(i,1); continue; }
+      if(co.x<-30) coins.splice(i,1); }
+    // stars
+    for(var s2=stars.length-1;s2>=0;s2--){ var st=stars[s2]; st.x-=sp;
+      if(!st.got && circHit(plane.x,plane.y,18,st.x,st.y,15)){ st.got=true; score+=10; boost=Math.min(100,boost+25); starSfx();
+        for(var q=0;q<12;q++) puffs.push({x:st.x,y:st.y,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,life:1,col:"#7fefff"});
+        stars.splice(s2,1); continue; }
+      if(st.x<-30) stars.splice(s2,1); }
+    // rings
+    for(var r2=rings.length-1;r2>=0;r2--){ var rg=rings[r2]; rg.x-=sp;
+      if(!rg.passed && rg.x<plane.x){ rg.passed=true;
+        if(Math.abs(plane.y-rg.y)<34){ score+=5; boost=Math.min(100,boost+15); starSfx(); }
+      }
+      if(rg.x<-50) rings.splice(r2,1); }
+    // birds
+    for(var b=birds.length-1;b>=0;b--){ var bd=birds[b]; bd.x-=sp*1.15; bd.ph+=0.2*dt; bd.y=bd.fy+Math.sin(bd.ph)*12;
+      if(inv<=0 && !boosting && circHit(plane.x,plane.y,15,bd.x,bd.y,13)){ birds.splice(b,1); hurt(false); continue; }
+      if(boosting && circHit(plane.x,plane.y,20,bd.x,bd.y,13)){ birds.splice(b,1); score+=2; for(var z=0;z<8;z++) puffs.push({x:bd.x,y:bd.y,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,life:1,col:"#ffffff"}); continue; }
+      if(bd.x<-40) birds.splice(b,1); }
+    // storms
+    for(var s3=storms.length-1;s3>=0;s3--){ var sm=storms[s3]; sm.x-=sp;
+      if(inv<=0 && !boosting && circHit(plane.x,plane.y,15,sm.x,sm.y,22)){ storms.splice(s3,1); hurt(false); continue; }
+      if(sm.x<-60) storms.splice(s3,1); }
+
+    // puffs
+    for(var pf=puffs.length-1;pf>=0;pf--){ var p=puffs[pf]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=0.05*dt; if(p.life<=0) puffs.splice(pf,1); }
+
+    updateHud();
+  }
+
+  function hurt(fromGround){
+    if(inv>0) return;
+    hearts--; inv=60; hitSfx();
+    plane.vy=-4;
+    for(var i=0;i<14;i++) puffs.push({x:plane.x,y:plane.y,vx:(Math.random()-0.5)*7,vy:(Math.random()-0.5)*7,life:1,col:"#ff6a4a"});
+    updateHud();
+    if(hearts<=0) gameOver();
+  }
+
+  // ---------- render ----------
+  function render(){
+    // sky
+    var g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#5ec5f0"); g.addColorStop(0.6,"#9bdcf5"); g.addColorStop(1,"#d8f3ff");
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // sun
+    ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle="#fff3b0";
+    ctx.beginPath(); ctx.arc(W*0.82,H*0.2,42,0,7); ctx.fill();
+    ctx.globalAlpha=0.25; ctx.beginPath(); ctx.arc(W*0.82,H*0.2,64,0,7); ctx.fill(); ctx.restore();
+    // hills
+    for(var hI=0;hI<hills.length;hI++){ var hl=hills[hI];
+      ctx.fillStyle="#8ed08a"; ctx.beginPath();
+      ctx.moveTo(hl.x-10,H); ctx.quadraticCurveTo(hl.x+W*0.175, H-hl.h, hl.x+W*0.35+10, H); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle="#7cc47a"; ctx.fillRect(0,H-10,W,10);
+    // clouds (back)
+    for(var c=0;c<clouds.length;c++) drawCloud(clouds[c].x,clouds[c].y,clouds[c].s,"#ffffffcc");
+
+    // rings
+    for(var r=0;r<rings.length;r++){ var rg=rings[r];
+      ctx.strokeStyle=rg.passed?"#9fe0a0":"#5ac0ff"; ctx.lineWidth=8;
+      ctx.beginPath(); ctx.arc(rg.x,rg.y,30,0,7); ctx.stroke();
+      ctx.strokeStyle="#ffffff88"; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(rg.x,rg.y,30,0,7); ctx.stroke(); }
+    // coins
+    for(var i=0;i<coins.length;i++){ var co=coins[i]; drawCoin(co.x,co.y); }
+    // stars
+    for(var s=0;s<stars.length;s++){ var st=stars[s]; drawStar(st.x,st.y,13,now()); }
+    // storms
+    for(var s3=0;s3<storms.length;s3++){ drawStorm(storms[s3].x,storms[s3].y); }
+    // birds
+    for(var b=0;b<birds.length;b++){ drawBird(birds[b].x,birds[b].y,birds[b].ph); }
+    // trail
+    for(var t=0;t<trail.length;t++){ var tr=trail[t]; ctx.save(); ctx.globalAlpha=Math.max(0,tr.life)*0.6;
+      ctx.fillStyle=boosting?"#ffd93d":"#ffffff"; ctx.beginPath(); ctx.arc(tr.x,tr.y,tr.s,0,7); ctx.fill(); ctx.restore(); }
+    // plane
+    if(mode!=="start") drawPlane();
+    // puffs
+    for(var pf=0;pf<puffs.length;pf++){ var p=puffs[pf]; ctx.save(); ctx.globalAlpha=Math.max(0,p.life);
+      ctx.fillStyle=p.col; ctx.beginPath(); ctx.arc(p.x,p.y,3,0,7); ctx.fill(); ctx.restore(); }
+    // boost flash
+    if(boosting){ ctx.save(); ctx.globalAlpha=0.12+0.06*Math.sin(now()*10); ctx.fillStyle="#ffd93d"; ctx.fillRect(0,0,W,H); ctx.restore(); }
+  }
+  function now(){ return last/1000; }
+
+  function drawCloud(x,y,s,col){ ctx.save(); ctx.fillStyle=col; ctx.translate(x,y); ctx.scale(s,s);
+    ctx.beginPath(); ctx.arc(0,0,18,0,7); ctx.arc(20,4,15,0,7); ctx.arc(-20,4,15,0,7); ctx.arc(0,10,20,0,7); ctx.fill(); ctx.restore(); }
+  function drawCoin(x,y){ ctx.save(); ctx.translate(x,y); var w=Math.abs(Math.sin(now()*5+x))*8+6;
+    ctx.fillStyle="#ffcf33"; ctx.beginPath(); ctx.ellipse(0,0,w,12,0,0,7); ctx.fill();
+    ctx.strokeStyle="#c99a1f"; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle="#fff3b0"; ctx.font="bold 12px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; if(w>9) ctx.fillText("$",0,1); ctx.restore(); }
+  function drawStar(x,y,r,t){ ctx.save(); ctx.translate(x,y); ctx.rotate(Math.sin(t*2+x)*0.2); ctx.fillStyle="#7fefff"; ctx.strokeStyle="#2aa7c8"; ctx.lineWidth=2;
+    ctx.beginPath(); for(var i=0;i<5;i++){ var a=-Math.PI/2+i*2*Math.PI/5; ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r); var a2=a+Math.PI/5; ctx.lineTo(Math.cos(a2)*r*0.45,Math.sin(a2)*r*0.45); }
+    ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
+  function drawStorm(x,y){ ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle="#5a6472"; ctx.beginPath(); ctx.arc(0,0,20,0,7); ctx.arc(22,6,16,0,7); ctx.arc(-22,6,16,0,7); ctx.arc(0,12,24,0,7); ctx.fill();
+    ctx.fillStyle="#455060"; ctx.beginPath(); ctx.arc(6,10,18,0,7); ctx.fill();
+    ctx.fillStyle="#ffe14a"; ctx.beginPath(); ctx.moveTo(-4,14); ctx.lineTo(4,14); ctx.lineTo(-2,26); ctx.lineTo(8,26); ctx.lineTo(-6,44); ctx.lineTo(0,28); ctx.lineTo(-8,28); ctx.closePath(); ctx.fill(); ctx.restore(); }
+  function drawBird(x,y,ph){ ctx.save(); ctx.translate(x,y); ctx.strokeStyle="#3a3f4a"; ctx.lineWidth=4; ctx.lineCap="round";
+    var w=Math.sin(ph)*10; ctx.beginPath(); ctx.moveTo(-14,w); ctx.quadraticCurveTo(0,-8,0,0); ctx.moveTo(14,w); ctx.quadraticCurveTo(0,-8,0,0); ctx.stroke();
+    ctx.fillStyle="#5a3a2a"; ctx.beginPath(); ctx.arc(0,0,4,0,7); ctx.fill();
+    ctx.fillStyle="#ff9f43"; ctx.beginPath(); ctx.moveTo(3,-1); ctx.lineTo(9,1); ctx.lineTo(3,3); ctx.closePath(); ctx.fill(); ctx.restore(); }
+
+  function drawPlane(){
+    ctx.save(); ctx.translate(plane.x,plane.y); ctx.rotate(plane.r);
+    if(inv>0 && Math.floor(now()*20)%2===0) ctx.globalAlpha=0.4;
+    // tail
+    ctx.fillStyle="#e0453a"; ctx.beginPath(); ctx.moveTo(-20,-2); ctx.lineTo(-30,-16); ctx.lineTo(-16,-4); ctx.closePath(); ctx.fill();
+    // body
+    ctx.fillStyle="#f2f5fb"; ctx.strokeStyle="#c3ccda"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.ellipse(0,0,24,12,0,0,7); ctx.fill(); ctx.stroke();
+    // stripe
+    ctx.fillStyle="#e0453a"; ctx.fillRect(-6,-2,20,4);
+    // wing
+    ctx.fillStyle="#4aa3e0"; ctx.beginPath(); ctx.moveTo(-4,4); ctx.lineTo(14,20); ctx.lineTo(2,6); ctx.closePath(); ctx.fill();
+    // cockpit + Morgan
+    ctx.fillStyle="#bfe8ff"; ctx.beginPath(); ctx.arc(6,-4,7,0,7); ctx.fill();
+    ctx.fillStyle="#e8b98f"; ctx.beginPath(); ctx.arc(6,-5,4,0,7); ctx.fill();
+    ctx.fillStyle="#3a2312"; ctx.beginPath(); ctx.arc(6,-7,4,Math.PI,0); ctx.fill();
+    // propeller
+    ctx.strokeStyle="#2a2f38"; ctx.lineWidth=3; var pr=Math.sin(now()*40)*10+12;
+    ctx.beginPath(); ctx.moveTo(24,-pr); ctx.lineTo(24,pr); ctx.stroke();
+    ctx.fillStyle="#2a2f38"; ctx.beginPath(); ctx.arc(24,0,3,0,7); ctx.fill();
+    ctx.restore();
+  }
+
+  reset();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Bricks</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#101830;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  #over{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:rgba(10,16,40,.72);}
+  #obox{background:#fff;color:#222;border-radius:18px;padding:26px 30px;text-align:center;max-width:80%;}
+  #obox h1{color:#3aa0e0;margin:0 0 6px;}
+  #go{margin-top:14px;border:none;background:#3aa0e0;color:#fff;font-family:inherit;font-weight:900;font-size:20px;padding:12px 28px;border-radius:14px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div id="over"><div id="obox"><h1>🧱 MO Bricks</h1><div id="omsg">Slide to move the paddle.<br>Bounce the ball, smash all the bricks!</div><button id="go">START</button></div></div>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+  var playing=false, score=0, lives=3, level=1, best=+(localStorage.getItem('moBricksBest')||0);
+  var pad, ball, bricks=[], COLS=6;
+  var COL=['#e2342f','#e0803a','#e0b040','#7bcf7b','#3aa0e0','#b06ae0'];
+  function makeBricks(){ bricks=[]; var rows=4+Math.min(3,level-1); var bw=(W-20)/COLS, bh=H*0.035; for(var r=0;r<rows;r++)for(var c=0;c<COLS;c++){ bricks.push({x:10+c*bw,y:H*0.14+r*(bh+6),w:bw-6,h:bh,c:COL[r%COL.length],alive:true}); } }
+  function reset(){ score=0; lives=3; level=1; pad={x:W/2,w:W*0.26}; makeBricks(); launch(); }
+  function launch(){ ball={x:pad.x,y:H*0.82,vx:(Math.random()<0.5?-1:1)*4,vy:-6,r:Math.max(7,W*0.018)}; }
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function beep(f,d){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type='square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.06)); }
+  function loop(){
+    x.fillStyle='#101830'; x.fillRect(0,0,W,H);
+    var py=H*0.88;
+    if(playing){ ball.x+=ball.vx; ball.y+=ball.vy;
+      if(ball.x<ball.r){ball.x=ball.r;ball.vx*=-1;beep(500);} if(ball.x>W-ball.r){ball.x=W-ball.r;ball.vx*=-1;beep(500);} if(ball.y<ball.r+60){ball.y=ball.r+60;ball.vy*=-1;beep(500);}
+      // paddle
+      if(ball.y+ball.r>py && ball.y<py+16 && ball.x>pad.x-pad.w/2 && ball.x<pad.x+pad.w/2 && ball.vy>0){ ball.vy=-Math.abs(ball.vy); ball.vx=(ball.x-pad.x)/(pad.w/2)*6; beep(700); }
+      // bricks
+      for(var i=0;i<bricks.length;i++){ var b=bricks[i]; if(!b.alive)continue; if(ball.x>b.x-ball.r&&ball.x<b.x+b.w+ball.r&&ball.y>b.y-ball.r&&ball.y<b.y+b.h+ball.r){ b.alive=false; score+=10; beep(900); ball.vy*=-1; break; } }
+      if(bricks.every(function(b){return !b.alive;})){ level++; makeBricks(); launch(); }
+      if(ball.y>H+20){ lives--; beep(200); if(lives<=0){ playing=false; over(); } else launch(); }
+    } else { ball.x=pad.x; }
+    // bricks draw
+    for(var i=0;i<bricks.length;i++){ var b=bricks[i]; if(!b.alive)continue; x.fillStyle=b.c; rr(b.x,b.y,b.w,b.h,5); x.fill(); x.fillStyle='rgba(255,255,255,0.25)'; rr(b.x,b.y,b.w,b.h*0.4,5); x.fill(); }
+    // paddle
+    x.fillStyle='#e2342f'; rr(pad.x-pad.w/2,py,pad.w,14,7); x.fill(); x.fillStyle='#fff'; x.font='900 11px Trebuchet MS'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('MO',pad.x,py+7); x.textBaseline='alphabetic';
+    // ball
+    x.fillStyle='#ffd23f'; x.beginPath(); x.arc(ball.x,ball.y,ball.r,0,7); x.fill();
+    x.fillStyle='#fff'; x.font='900 '+Math.round(W*0.055)+'px Trebuchet MS'; x.textAlign='left'; x.fillText('🧱 '+score, 14, 40);
+    x.textAlign='center'; x.fillText('❤️'.repeat(Math.max(0,lives)), W/2, 40);
+    x.textAlign='right'; x.font='900 '+Math.round(W*0.04)+'px Trebuchet MS'; x.fillText('Lv '+level, W-14, 36);
+    requestAnimationFrame(loop);
+  }
+  function rr(a,b,c,d,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+c,b,a+c,b+d,r); x.arcTo(a+c,b+d,a,b+d,r); x.arcTo(a,b+d,a,b,r); x.arcTo(a,b,a+c,b,r); x.closePath(); }
+  function over(){ beep(160,0.3); if(score>best){ best=score; try{localStorage.setItem('moBricksBest',score);}catch(e){} }
+    document.getElementById('omsg').innerHTML='You smashed <b>'+score+'</b>!<br>Best: '+best; document.getElementById('go').textContent='PLAY AGAIN'; document.getElementById('over').style.display='flex'; }
+  document.getElementById('go').addEventListener('click',function(){ reset(); playing=true; document.getElementById('over').style.display='none'; });
+  var down=false; function setX(cx){ pad.x=Math.max(pad.w/2,Math.min(W-pad.w/2,cx)); }
+  cv.addEventListener('pointerdown',function(e){ down=true; setX(e.clientX); }); cv.addEventListener('pointermove',function(e){ if(down)setX(e.clientX); }); addEventListener('pointerup',function(){ down=false; });
+  reset(); playing=false; document.getElementById('over').style.display='flex'; loop();
+})();
+</script>
+</body></html>
