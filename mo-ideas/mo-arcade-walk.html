@@ -14,6 +14,13 @@
  #playBtn{display:none;pointer-events:auto;position:absolute;bottom:24%;left:50%;transform:translateX(-50%);font:inherit;font-weight:bold;font-size:17px;padding:14px 26px;border-radius:999px;border:none;background:#6bd18a;color:#06280f;box-shadow:0 5px 0 #3a8f56;cursor:pointer;letter-spacing:1px;}
  #playBtn:active{transform:translate(-50%,3px);}
  #gf{position:fixed;inset:0;width:100%;height:100%;border:0;display:none;z-index:20;background:#0c0620;}
+ #searchBtn{position:fixed;top:8px;right:10px;z-index:15;pointer-events:auto;font:inherit;font-weight:bold;font-size:13px;padding:8px 14px;border-radius:999px;border:none;background:#7fd0ff;color:#08303f;box-shadow:0 4px 0 #3f7f9f;cursor:pointer;}
+ #searchOv{display:none;position:fixed;inset:0;z-index:30;background:rgba(8,4,22,.95);flex-direction:column;align-items:center;padding:18px;}
+ #searchInput{width:min(92vw,420px);font:inherit;font-size:18px;padding:12px 16px;border-radius:14px;border:2px solid #7fd0ff;background:#1a1030;color:#fff;outline:none;}
+ #searchList{width:min(92vw,420px);flex:1;overflow:auto;margin-top:10px;}
+ .sr{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;font-size:16px;font-weight:bold;padding:11px 12px;border:none;border-bottom:1px solid rgba(255,255,255,.12);background:transparent;color:#fff;cursor:pointer;}
+ .sr .se{font-size:24px;} .sr:active{background:rgba(255,255,255,.1);}
+ #searchClose{margin-top:8px;font:inherit;font-weight:bold;padding:9px 18px;border-radius:999px;border:none;background:#e0785a;color:#fff;box-shadow:0 4px 0 #a84e34;cursor:pointer;}
  #exitBtn{display:none;position:fixed;top:8px;left:10px;z-index:25;font:inherit;font-weight:bold;font-size:13px;padding:8px 14px;border-radius:999px;border:none;background:#e0785a;color:#fff;box-shadow:0 4px 0 #a84e34;cursor:pointer;text-transform:uppercase;}
 </style>
 </head>
@@ -26,6 +33,8 @@
 </div>
 <iframe id="gf" src="about:blank"></iframe>
 <button id="exitBtn">◀ Arcade</button>
+<button id="searchBtn">🔎 Search</button>
+<div id="searchOv"><input id="searchInput" placeholder="Search games..." autocomplete="off"><div id="searchList"></div><button id="searchClose">Close</button></div>
 <script>
 var cv=document.getElementById('cv'), cx=cv.getContext('2d'), W=0,H=0;
 function resize(){ W=cv.width=window.innerWidth; H=cv.height=window.innerHeight; } window.addEventListener('resize',resize); resize();
@@ -33,7 +42,7 @@ var playBtn=document.getElementById('playBtn'), hint=document.getElementById('hi
 
 
 // ===== world (big room, camera follows Mo) =====
-var Wld=900, Hld=1860;
+var Wld=900, Hld=2680;
 var COLR=['#ff8b2c','#6bd18a','#e0568a','#7fd0ff','#ffd23f','#c79cff'];
 var LIST=[
  ['Arff Hoops','🏀','mo-arff-arcade.html#baller'],['Arff Kick','⚽','mo-arff-arcade.html#kick'],['Bone Claw','🦴','mo-arff-arcade.html#claw'],
@@ -41,11 +50,13 @@ var LIST=[
  ['Feed Arff','🍖','mo-arff-arcade.html#feed'],['Bubble Pop','🫧','mo-arff-arcade.html#bubble'],['Whack Squirrel','🐿️','mo-arff-arcade.html#whack'],
  ['Memory Match','🃏','mo-arff-arcade.html#memory'],['Copy Paw','🎵','mo-arff-arcade.html#copy'],['Bone Sling','🎯','mo-arff-arcade.html#sling'],
  ['Bone Stack','🦴','mo-arff-arcade.html#stack'],['Balloon Darts','🎈','mo-arff-arcade.html#darts'],['Fast Paws','⚡','mo-arff-arcade.html#reaction'],
- ['MO Hotel','🏨','mo-hotel.html'],['MO Subway','🚇','mo-subway.html'],['MO Decorate','🛋️','mo-decorate.html'],['MO Playhouse','🏠','mo-playhouse.html'],['Arff School','🎓','mo-arff-school.html']
+ ['MO Hotel','🏨','mo-hotel.html',1],['MO Subway','🚇','mo-subway.html',1],['MO Decorate','🛋️','mo-decorate.html',1],['MO Playhouse','🏠','mo-playhouse.html',1],['Arff School','🎓','mo-arff-school.html',1],
+ ['MO Fix & Flip','🔨','mo-fix-flip-3d.html'],['MO City','🏙️','mo-city-3d.html'],['MO House','🏡','mo-house-3d.html'],['MO Driving','🚗','mo-driving.html'],['MO Move','📦','mo-move.html'],
+ ['MO Party','🎉','mo-party.html'],['MO Pig Homes','🐷','mo-pig-homes.html'],['MO Stay','🛏️','mo-stay.html'],['MO Wedding','💒','mo-wedding.html'],['MO Rover','🐕','mo-rover.html']
 ];
-var COLS=[180,450,720], ROWS=[190,440,690,940,1190,1440,1690];
-var CABS=LIST.map(function(g,i){ return {name:g[0],e:g[1],url:g[2],x:COLS[i%3],y:ROWS[(i/3)|0],col:COLR[i%6],big:(i>=15)}; });
-var mo={x:450,y:1790}, arff={x:410,y:1810};
+var COLS=[180,450,720]; var ROWS=[]; for(var _r=0;_r<10;_r++)ROWS.push(190+_r*250);
+var CABS=LIST.map(function(g,i){ return {name:g[0],e:g[1],url:g[2],x:COLS[i%3],y:ROWS[(i/3)|0],col:COLR[i%6],big:!!g[3]}; });
+var mo={x:450,y:2560}, arff={x:410,y:2580};
 var joy={active:false,cx:0,cy:0,dx:0,dy:0,id:-1};
 var nearCab=null, camX=0, camY=0;
 
@@ -58,6 +69,12 @@ cv.addEventListener('pointercancel',function(){ joy.active=false; joy.dx=joy.dy=
 playBtn.onclick=function(){ if(!nearCab)return; openGame(nearCab); };
 exitBtn.onclick=function(){ gf.style.display='none'; exitBtn.style.display='none'; gf.src='about:blank'; };
 function openGame(cab){ gf.src=cab.url; gf.style.display='block'; exitBtn.style.display='block'; }
+// ===== search =====
+var searchBtn=document.getElementById('searchBtn'), searchOv=document.getElementById('searchOv'), searchInput=document.getElementById('searchInput'), searchList=document.getElementById('searchList');
+function buildSearch(q){ q=(q||'').toLowerCase(); searchList.innerHTML=''; CABS.forEach(function(c){ if(q&&c.name.toLowerCase().indexOf(q)<0)return; var b=document.createElement('button'); b.className='sr'; b.innerHTML='<span class="se">'+c.e+'</span><span>'+c.name+(c.big?' ⭐':'')+'</span>'; b.onclick=function(){ searchOv.style.display='none'; mo.x=c.x; mo.y=Math.min(Hld-70,c.y+150); openGame(c); }; searchList.appendChild(b); }); }
+searchBtn.onclick=function(){ searchOv.style.display='flex'; searchInput.value=''; buildSearch(''); searchInput.focus(); };
+searchInput.addEventListener('input',function(){ buildSearch(searchInput.value); });
+document.getElementById('searchClose').onclick=function(){ searchOv.style.display='none'; };
 
 function update(){
  if(joy.active){ var d=Math.hypot(joy.dx,joy.dy); if(d>8){ var sp=Math.min(1,d/60)*6; mo.x=Math.max(60,Math.min(Wld-60,mo.x+joy.dx/d*sp)); mo.y=Math.max(120,Math.min(Hld-70,mo.y+joy.dy/d*sp)); } }
