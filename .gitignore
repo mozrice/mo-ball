@@ -5,3 +5,7 @@ desktop.ini
 *.tmp
 _to_delete/
 .claude/
+
+# backup copy that lives inside this folder - do NOT publish it
+# (it has its own hidden .git which breaks the website build)
+kid-code/
