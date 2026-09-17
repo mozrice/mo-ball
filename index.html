@@ -1,94 +1,637 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Coach Mo Games</title>
+<title>Coach Mo Games — All 500+ Games!</title>
+<meta name="description" content="All of Morgan's games in one place.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0e1424">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
 <style>
- *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
- html,body{margin:0;min-height:100%;font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;
-  background:radial-gradient(120% 80% at 50% 0%,#3a1a6a 0%,#1c0e38 55%,#0c0620 100%);color:#fff;}
- #wrap{max-width:640px;margin:0 auto;padding:26px 16px 50px;}
- header{text-align:center;margin-bottom:18px;}
- .ball{font-size:52px;filter:drop-shadow(0 4px 6px rgba(0,0,0,.4));}
- h1{margin:6px 0 2px;font-size:34px;letter-spacing:3px;text-transform:uppercase;text-shadow:0 0 12px #ff9e3a,0 0 26px #e05aff;}
- .tag{color:#e6c8ff;font-size:14px;margin:0;}
- .row{display:grid;gap:14px;}
- .hero{grid-template-columns:1fr;margin-bottom:16px;}
- .big{border-radius:22px;padding:22px 16px;text-decoration:none;color:#160a2e;display:flex;align-items:center;gap:14px;
-  box-shadow:0 8px 0 rgba(0,0,0,.35),0 0 30px rgba(255,255,255,.08);transition:transform .08s;}
- .big:active{transform:translateY(4px);box-shadow:0 3px 0 rgba(0,0,0,.35);}
- .big .be{font-size:52px;}
- .big .bt{flex:1;}
- .big .bn{font-size:22px;font-weight:bold;letter-spacing:1px;display:block;}
- .big .bd{font-size:13px;opacity:.85;}
- .sect{color:#c9a6ff;font-size:13px;letter-spacing:2px;text-transform:uppercase;margin:20px 4px 8px;}
- .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
- a.card{text-decoration:none;color:#160a2e;border-radius:16px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;text-align:center;
-  box-shadow:0 6px 0 rgba(0,0,0,.32);transition:transform .08s;}
- a.card:active{transform:translateY(4px);box-shadow:0 2px 0 rgba(0,0,0,.32);}
- a.card .ce{font-size:34px;}
- a.card .cn{font-size:14px;font-weight:bold;margin-top:4px;}
- a.card .cd{font-size:11px;opacity:.8;line-height:1.2;margin-top:2px;}
- footer{text-align:center;color:#8a7ab0;font-size:12px;margin-top:26px;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;min-height:100%;background:radial-gradient(1200px 800px at 50% -10%, #26355a, #0a0f1e 70%);font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;}
+  header{position:sticky;top:0;z-index:20;text-align:center;padding:14px 12px 10px;background:linear-gradient(#0a0f1eF2,#0a0f1eCC);backdrop-filter:blur(8px);border-bottom:1px solid #ffffff16;}
+  header h1{margin:0;font-size:30px;letter-spacing:1px;color:#ffcf5a;text-shadow:0 3px 0 #0008;}
+  header p{margin:4px 0 9px;color:#bcd0ea;font-size:13px;}
+  .bar{display:flex;gap:8px;justify-content:center;align-items:center;}
+  #search{width:min(520px,80%);padding:12px 16px;border-radius:30px;border:2px solid #3a4a7a;background:#111a2e;color:#fff;font-size:16px;font-family:inherit;outline:none;box-shadow:0 4px 14px #0005 inset;}
+  #search:focus{border-color:#ffcf5a;}
+  #rand{font-size:20px;background:linear-gradient(#ffe07a,#f0b429);border:none;border-radius:50%;width:46px;height:46px;cursor:pointer;box-shadow:0 4px 0 #a06a00;}
+  #rand:active{transform:translateY(3px);box-shadow:0 1px 0 #a06a00;}
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 6px 2px;max-width:100%;scrollbar-width:none;justify-content:flex-start;}
+  .chips::-webkit-scrollbar{display:none;}
+  .chip{white-space:nowrap;flex:0 0 auto;font-family:inherit;font-size:13px;font-weight:bold;color:#cfe0ff;background:#18233c;border:2px solid #2e3f66;border-radius:20px;padding:7px 13px;cursor:pointer;}
+  .chip.on{color:#3a2a00;background:linear-gradient(#ffe07a,#f0b429);border-color:#f0b429;}
+  #sections{max-width:1040px;margin:0 auto;padding:6px 16px 50px;}
+  section.cat{margin:20px 0 6px;}
+  section.cat h2{font-size:19px;color:#ffe6a3;margin:0 0 12px;border-left:5px solid #ffcf5a;padding:2px 0 2px 10px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;}
+  a.card{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;
+    background:linear-gradient(#ffffff,#dbe6f5);border-radius:16px;padding:16px 8px;min-height:114px;box-shadow:0 5px 0 #0006, 0 8px 20px #0006;transition:transform .1s, box-shadow .1s;}
+  @media(hover:hover){a.card:hover{transform:translateY(-3px);box-shadow:0 8px 0 #0006, 0 14px 26px #0007;}}
+  a.card:active{transform:translateY(4px);box-shadow:0 1px 0 #0006, 0 4px 12px #0006;}
+  a.card .emo{font-size:42px;line-height:1;filter:drop-shadow(0 2px 2px #0003);}
+  a.card .name{margin-top:9px;font-weight:bold;font-size:14px;text-align:center;color:#16233c;line-height:1.15;}
+  a.card .tag{position:absolute;top:7px;right:7px;background:#e0453a;color:#fff;font-size:9px;font-weight:bold;padding:3px 7px;border-radius:20px;letter-spacing:.5px;}
+  a.card .fav{position:absolute;top:5px;left:6px;background:none;border:none;font-size:19px;line-height:1;color:#f0b429;cursor:pointer;padding:2px;}
+  a.card.big{background:linear-gradient(#ffe07a,#f0b429);box-shadow:0 5px 0 #a06a00, 0 8px 20px #0006;}
+  #noresult{display:none;text-align:center;color:#9fb2d4;padding:40px;font-size:16px;}
+  footer{text-align:center;color:#8ea4c4;font-size:12px;padding:0 0 30px;}
 </style>
 </head>
 <body>
-<div id="wrap">
- <header>
-   <div class="ball">🏀</div>
-   <h1>Coach Mo Games</h1>
-   <p class="tag">🐾 Play Arff's games and all of Mo's games! 🏀</p>
- </header>
-
- <div class="row hero">
-   <a class="big" href="mo-2k26.html" style="background:linear-gradient(135deg,#3aa0ff,#8b5ae0);">
-     <span class="be">🎮</span>
-     <span class="bt"><span class="bn">MO 2K26</span><span class="bd">Free PlayStation — buy, play &amp; sell games + MO Overtime song!</span></span>
-   </a>
-   <a class="big" href="mo-sports.html" style="background:linear-gradient(135deg,#5aa0e0,#39d06a);">
-     <span class="be">🏆</span>
-     <span class="bt"><span class="bn">MO Sports</span><span class="bd">NBA Playoffs — pick your team (East/West), 4 rounds, MyTeam &amp; Song Maker!</span></span>
-   </a>
-   <a class="big" href="mo-ball.html" style="background:linear-gradient(135deg,#ff9e3a,#e0563b);">
-     <span class="be">🏀</span>
-     <span class="bt"><span class="bn">MOBALL</span><span class="bd">Mo &amp; Arff vs OKC — shoot, green light, slow-mo overtime!</span></span>
-   </a>
-   <a class="big" href="mo-arff-arcade.html" style="background:linear-gradient(135deg,#ffe58a,#ff9e3a);">
-     <span class="be">🐶</span>
-     <span class="bt"><span class="bn">Arff Arcade</span><span class="bd">15 tap &amp; drag games — win tickets &amp; prizes!</span></span>
-   </a>
-   <a class="big" href="mo-arcade.html" style="background:linear-gradient(135deg,#a0e0ff,#5aa0e0);">
-     <span class="be">🕹️</span>
-     <span class="bt"><span class="bn">MO Arcade</span><span class="bd">All of Mo's big 3D games in one menu</span></span>
-   </a>
- </div>
-
- <div class="sect">⭐ Play these big games</div>
- <div class="grid" id="pro"></div>
-
- <div class="sect">🐾 Arff Arcade games</div>
- <div class="grid" id="arfflist"></div>
-
- <footer>Made by Coach Mo 🏀🐾</footer>
-</div>
+  <header>
+    <h1>🏀 MO ARCADE</h1>
+    <p id="count"></p>
+    <div class="bar"><input id="search" placeholder="🔍 Search games..." autocomplete="off"><button id="rand" title="Surprise me!">🎲</button></div>
+    <div id="chips" class="chips"></div>
+  </header>
+  <div id="sections"></div>
+  <div id="noresult">No games found — try another word! 🔍</div>
+  <footer>MO ARCADE • v163 • made by Morgan 🎮</footer>
 <script>
-var PRO=[
- ['🏨','MO Hotel','Run the hotel, ride the elevator','mo-hotel.html','linear-gradient(135deg,#ffb0d0,#e05a9a)'],
- ['🚇','MO Subway','Drive &amp; run the subway','mo-subway.html','linear-gradient(135deg,#8fd6ff,#3a9ad0)'],
- ['🛋️','MO Decorate','Build &amp; decorate rooms','mo-decorate.html','linear-gradient(135deg,#b0ffd0,#39c46a)'],
- ['🏠','MO Playhouse','Build your playhouse','mo-playhouse.html','linear-gradient(135deg,#ffd08a,#e0863a)']
-];
-var ARFF=[
- ['🏀','Arff Hoops'],['⚽','Arff Kick'],['🦴','Bone Claw'],['🎳','Skee-Ball'],
- ['🐾','Tap-a-Paw'],['🎡','Prize Wheel'],['🍖','Feed Arff'],['🫧','Bubble Pop'],
- ['🐿️','Whack Squirrel'],['🃏','Memory Match'],['🎵','Copy Paw'],['🎯','Bone Sling'],
- ['🦴','Bone Stack'],['🎈','Balloon Darts'],['⚡','Fast Paws']
-];
-var pro=document.getElementById('pro');
-PRO.forEach(function(g){ var a=document.createElement('a'); a.className='card'; a.href=g[3]; a.style.background=g[4]; a.innerHTML='<span class="ce">'+g[0]+'</span><span class="cn">'+g[1]+'</span><span class="cd">'+g[2]+'</span>'; pro.appendChild(a); });
-var al=document.getElementById('arfflist');
-ARFF.forEach(function(g){ var a=document.createElement('a'); a.className='card'; a.href='mo-arff-arcade.html'; a.style.background='linear-gradient(135deg,#c79cff,#8b5ae0)'; a.innerHTML='<span class="ce">'+g[0]+'</span><span class="cn">'+g[1]+'</span>'; al.appendChild(a); });
+  var GAMES=[
+    {u:"mo-500.html", e:"🎮", n:"⭐ MO 500 — All Games in One!", big:1, tag:"NEW"},
+    {u:"mo-ball.html", e:"🏀", n:"⭐ MOBALL — dunks, 3s & RAP", big:1, tag:"NEW"},
+    {u:"mo-sports.html", e:"🏆", n:"⭐ MO Sports — NBA Playoffs", big:1, tag:"NEW"},
+    {u:"mo-2k26.html", e:"🎮", n:"⭐ MO 2K26", big:1, tag:"NEW"},
+    {u:"mo-city-3d.html", e:"🌆", n:"⭐ MO City 3D", big:1, tag:"NEW"},
+    {u:"mo-subway.html", e:"🚇", n:"⭐ MO Subway", big:1, tag:"NEW"},
+    {u:"mo-arff-arcade.html", e:"🐾", n:"⭐ Arff Arcade", big:1, tag:"NEW"},
+    {u:"mo-arcade-walk.html", e:"🚶", n:"⭐ Walk the Arcade", big:1, tag:"NEW"},
+
+    {u:"mo-arffmeow/mo-arffmeow.html", e:"🐕", n:"🐕🐱 Family Home", big:1, tag:"NEW"},
+    {u:"mo-work/mo-work.html", e:"🧰", n:"🧰 MO WORK", big:1, tag:"NEW"},
+    {u:"mo-pinball/mo-pinball.html", e:"🏀", n:"🏀 Hoops Pinball", big:1, tag:"NEW"},
+    {u:"mo-arff/mo-arff.html", e:"🐕", n:"🐕 ARFF!", big:1, tag:"NEW"},
+    {u:"mo-random/mo-random.html", e:"🎲", n:"🎲 Arff Game Maker", big:1, tag:"NEW"},
+    {u:"mo-arff-ads/mo-arff-ads.html", e:"📺", n:"📺 MO Arff Ads", big:1, tag:"NEW"},
+    {u:"mo-housedesign/mo-housedesign.html", e:"🏠", n:"🏠 Family House Designer", big:1, tag:"NEW"},
+    {u:"mo-bigday/mo-bigday.html", e:"🚗", n:"🚗 Mo's Big Day", big:1, tag:"NEW"},
+    {u:"mo-tennis/mo-tennis.html", e:"🎾", n:"🎾 Tennis", tag:"NEW"},
+    {u:"mo-crosswalk/mo-crosswalk.html", e:"🚦", n:"🚶 Crosswalk", tag:"NEW"},
+    {u:"mo-subwayride/mo-subwayride.html", e:"🚇", n:"🚶 Subway Ride", tag:"NEW"},
+    {u:"mo-catchbus/mo-catchbus.html", e:"🚌", n:"🚶 Catch the Bus", tag:"NEW"},
+    {u:"mo-findaddress/mo-findaddress.html", e:"🗺️", n:"🚶 Find the Address", tag:"NEW"},
+    {u:"mo-hailtaxi/mo-hailtaxi.html", e:"🚕", n:"🚶 Hail a Taxi", tag:"NEW"},
+    {u:"mo-grocerystore/mo-grocerystore.html", e:"🛒", n:"🚶 Grocery Store", tag:"NEW"},
+    {u:"mo-gobank/mo-gobank.html", e:"🏦", n:"🚶 Go to the Bank", tag:"NEW"},
+    {u:"mo-postoffice/mo-postoffice.html", e:"📮", n:"🚶 Post Office", tag:"NEW"},
+    {u:"mo-coffeeshop/mo-coffeeshop.html", e:"☕", n:"🚶 Coffee Shop", tag:"NEW"},
+    {u:"mo-haircut/mo-haircut.html", e:"💇", n:"🚶 Haircut", tag:"NEW"},
+    {u:"mo-doctorvisit/mo-doctorvisit.html", e:"🏥", n:"🚶 Doctor Visit", tag:"NEW"},
+    {u:"mo-librarywalk/mo-librarywalk.html", e:"📚", n:"🚶 Library", tag:"NEW"},
+    {u:"mo-thepark/mo-thepark.html", e:"🌳", n:"🚶 The Park", tag:"NEW"},
+    {u:"mo-streetfair/mo-streetfair.html", e:"🎡", n:"🚶 Street Fair", tag:"NEW"},
+    {u:"mo-sightseeing/mo-sightseeing.html", e:"📸", n:"🚶 Sightseeing", tag:"NEW"},
+    {u:"mo-findlunch/mo-findlunch.html", e:"🍕", n:"🚶 Find Lunch", tag:"NEW"},
+    {u:"mo-movietheater/mo-movietheater.html", e:"🎬", n:"🚶 Movie Theater", tag:"NEW"},
+    {u:"mo-apartmentbldg/mo-apartmentbldg.html", e:"🛗", n:"🚶 Apartment Building", tag:"NEW"},
+    {u:"mo-recyclecorner/mo-recyclecorner.html", e:"♻️", n:"🚶 Recycle Corner", tag:"NEW"},
+    {u:"mo-walkthedog/mo-walkthedog.html", e:"🐕", n:"🚶 Walk the Dog", tag:"NEW"},
+    {u:"mo-litterpatrol/mo-litterpatrol.html", e:"🚮", n:"🚶 Litter Patrol", tag:"NEW"},
+    {u:"mo-behelper/mo-behelper.html", e:"🙋", n:"🚶 Be a Helper", tag:"NEW"},
+    {u:"mo-gamemodes/mo-gamemodes.html", e:"🎮", n:"🕹️ GAME MODES", big:1, tag:"NEW"},
+    {u:"mo-party/mo-party.html", e:"🎉", n:"Party Mode (2-9)", big:1, tag:"NEW"},
+    {u:"mo-runner/mo-runner.html", e:"🏃", n:"Endless Runner", tag:"NEW"},
+    {u:"mo-tiltball/mo-tiltball.html", e:"⚖️", n:"Tilt Ball", tag:"NEW"},
+    {u:"mo-traceit/mo-traceit.html", e:"✏️", n:"Trace It", tag:"NEW"},
+    {u:"mo-fishingcast/mo-fishingcast.html", e:"🎣", n:"Fishing Cast", tag:"NEW"},
+    {u:"mo-matchconnect/mo-matchconnect.html", e:"🔗", n:"Match Connect", tag:"NEW"},
+    {u:"mo-rocketlaunch/mo-rocketlaunch.html", e:"🚀", n:"Rocket Launch", tag:"NEW"},
+    {u:"mo-foodtruck/mo-foodtruck.html", e:"🍔", n:"Food Truck Rush", tag:"NEW"},
+    {u:"mo-aquariumfeed/mo-aquariumfeed.html", e:"🐠", n:"Aquarium Feed", tag:"NEW"},
+    {u:"mo-carnival/mo-carnival.html", e:"🎯", n:"Carnival Shots", tag:"NEW"},
+    {u:"mo-spacemission/mo-spacemission.html", e:"🚀", n:"MO Space Mission", tag:"NEW"},
+    {u:"mo-dragonquest/mo-dragonquest.html", e:"🐉", n:"MO Dragon Quest", tag:"NEW"},
+    {u:"mo-world/mo-world.html", e:"🌍", n:"MO World Adventure", tag:"NEW"},
+    {u:"mo-kart/mo-kart.html", e:"🏎️", n:"MO Kart Champions", tag:"NEW"},
+    {u:"mo-platform/mo-platform.html", e:"🕹️", n:"MO Platform Land", tag:"NEW"},
+    {u:"mo-towerdef/mo-towerdef.html", e:"🏰", n:"MO Tower Defense", tag:"NEW"},
+    {u:"mo-snake/mo-snake.html", e:"🐍", n:"MO Snake", tag:"NEW"},
+    {u:"mo-bricks/mo-bricks.html", e:"🧱", n:"MO Bricks", tag:"NEW"},
+    {u:"mo-fruitslice/mo-fruitslice.html", e:"🍉", n:"MO Fruit Slice", tag:"NEW"},
+    {u:"mo-tycoon/mo-tycoon.html", e:"🏙️", n:"MO Tycoon", tag:"NEW"},
+    {u:"mo-alien/mo-alien.html", e:"🛸", n:"MO Alien", tag:"NEW"},
+    {u:"mo-islandhop/mo-islandhop.html", e:"🏝️", n:"MO Island Tap", tag:"NEW"},
+    {u:"mo-music/mo-music.html", e:"🎸", n:"MO Music", tag:"NEW"},
+    {u:"mo-superhero/mo-superhero.html", e:"🦸", n:"MO Super Hero", tag:"NEW"},
+    {u:"mo-castlejump/mo-castlejump.html", e:"🏰", n:"MO Castle Climb", tag:"NEW"},
+    {u:"mo-dinoworld/mo-dinoworld.html", e:"🦖", n:"MO Dino Catch", tag:"NEW"},
+    {u:"mo-ocean/mo-ocean.html", e:"🌊", n:"MO Ocean Dive", tag:"NEW"},
+    {u:"mo-diner/mo-diner.html", e:"🍔", n:"MO Diner", tag:"NEW"},
+    {u:"mo-dragonfly/mo-dragonfly.html", e:"🐉", n:"MO Dragon Fly", tag:"NEW"},
+    {u:"mo-racer/mo-racer.html", e:"🏎️", n:"MO Racer", tag:"NEW"},
+    {u:"mo-space/mo-space.html", e:"🚀", n:"MO Space", tag:"NEW"},
+    {u:"mo-fishcatch/mo-fishcatch.html", e:"🎣", n:"MO Fishing Catch", tag:"NEW"},
+    {u:"mo-ninjajump/mo-ninjajump.html", e:"🥷", n:"MO Ninja Jump", tag:"NEW"},
+    {u:"mo-miner/mo-miner.html", e:"⛏️", n:"MO Miner", tag:"NEW"},
+    {u:"mo-peppa/mo-peppa.html", e:"🐷", n:"MO Peppa Puddles", tag:"NEW"},
+    {u:"mo-3dcity/mo-3dcity.html", e:"🏙️", n:"MO 3D City", tag:"NEW"},
+    {u:"mo-northamerica/mo-northamerica.html", e:"✈️", n:"MO Fly & Live", tag:"NEW"},
+    {u:"mo-3devent/mo-3devent.html", e:"🌟", n:"MO 3D Event 🏀", tag:"NEW"},
+    {u:"mo-myteam/mo-myteam.html", e:"🃏", n:"MO MyTEAM", tag:"NEW"},
+    {u:"mo-bigtrip/mo-bigtrip.html", e:"✈️", n:"MO Big Trip", tag:"NEW"},
+    {u:"mo-arffhotel/mo-arffhotel.html", e:"🐶", n:"MO Arff Hotel", tag:"NEW"},
+    {u:"mo-arffpark/mo-arffpark.html", e:"🎾", n:"MO Arff Dog Park", tag:"NEW"},
+    {u:"mo-arffgroom/mo-arffgroom.html", e:"✂️", n:"MO Arff Grooming", tag:"NEW"},
+    {u:"mo-arffbday/mo-arffbday.html", e:"🎂", n:"MO Arff Birthday", tag:"NEW"},
+    {u:"mo-arffbeach/mo-arffbeach.html", e:"🏖️", n:"MO Arff Beach Day", tag:"NEW"},
+    {u:"mo-arffcamp/mo-arffcamp.html", e:"⛺", n:"MO Arff Camping", tag:"NEW"},
+    {u:"mo-arffgarden/mo-arffgarden.html", e:"🌻", n:"MO Arff Garden", tag:"NEW"},
+    {u:"mo-arffschool/mo-arffschool.html", e:"📚", n:"MO Arff School", tag:"NEW"},
+    {u:"mo-arffart/mo-arffart.html", e:"🎨", n:"MO Arff Art Studio", tag:"NEW"},
+    {u:"mo-hotel/mo-hotel.html", e:"🏨", n:"MO Hotel", tag:"NEW"},
+    {u:"mo-tripmap/mo-tripmap.html", e:"🗺️", n:"MO Trip Map", tag:"NEW"},
+    {u:"mo-roadtrip/mo-roadtrip.html", e:"🚗", n:"MO Road Trip", tag:"NEW"},
+    {u:"mo-themepark/mo-themepark.html", e:"🎡", n:"MO Theme Park", tag:"NEW"},
+    {u:"mo-airport/mo-airport.html", e:"✈️", n:"MO Airport", tag:"NEW"},
+    {u:"mo-farm2/mo-farm2.html", e:"🚜", n:"MO Farm Build", tag:"NEW"},
+    {u:"mo-aquarium2/mo-aquarium2.html", e:"🐠", n:"MO Aquarium Build", tag:"NEW"},
+    {u:"mo-museum/mo-museum.html", e:"🏛️", n:"MO Museum", tag:"NEW"},
+    {u:"mo-stadium2/mo-stadium2.html", e:"🏟️", n:"MO Stadium", tag:"NEW"},
+    {u:"mo-lighthouse/mo-lighthouse.html", e:"🗼", n:"MO Lighthouse", tag:"NEW"},
+    {u:"mo-pirateship/mo-pirateship.html", e:"🏴‍☠️", n:"MO Pirate Ship", tag:"NEW"},
+    {u:"mo-logcabin/mo-logcabin.html", e:"🛖", n:"MO Log Cabin", tag:"NEW"},
+    {u:"mo-cupcake/mo-cupcake.html", e:"🧁", n:"MO Cupcake Shop", tag:"NEW"},
+    {u:"mo-hotdog/mo-hotdog.html", e:"🌭", n:"MO Hot Dog Cart", tag:"NEW"},
+    {u:"mo-popcorn/mo-popcorn.html", e:"🍿", n:"MO Popcorn Machine", tag:"NEW"},
+    {u:"mo-cookiebake/mo-cookiebake.html", e:"🍪", n:"MO Cookie Bake", tag:"NEW"},
+    {u:"mo-halloween/mo-halloween.html", e:"🎃", n:"MO Halloween House", tag:"NEW"},
+    {u:"mo-christmas/mo-christmas.html", e:"🎄", n:"MO Christmas Workshop", tag:"NEW"},
+    {u:"mo-kittencafe/mo-kittencafe.html", e:"🐱", n:"MO Kitten Café", tag:"NEW"},
+    {u:"mo-horseranch/mo-horseranch.html", e:"🐴", n:"MO Horse Ranch", tag:"NEW"},
+    {u:"mo-arffmail/mo-arffmail.html", e:"📬", n:"MO Arff Mail Route", tag:"NEW"},
+    {u:"mo-arfffire/mo-arfffire.html", e:"🚒", n:"MO Arff Firefighter", tag:"NEW"},
+    {u:"mo-arffastro/mo-arffastro.html", e:"🚀", n:"MO Arff Astronaut", tag:"NEW"},
+    {u:"mo-arffchef/mo-arffchef.html", e:"👨‍🍳", n:"MO Arff Chef", tag:"NEW"},
+    {u:"mo-arfffarm/mo-arfffarm.html", e:"🌾", n:"MO Arff Farmer", tag:"NEW"},
+    {u:"mo-arffdoc/mo-arffdoc.html", e:"🩺", n:"MO Arff Doctor", tag:"NEW"},
+    {u:"mo-helirescue/mo-helirescue.html", e:"🚁", n:"MO Helicopter Rescue", tag:"NEW"},
+    {u:"mo-sub/mo-sub.html", e:"🤿", n:"MO Underwater Sub", tag:"NEW"},
+    {u:"mo-ninjarun/mo-ninjarun.html", e:"🥷", n:"MO Ninja Run", tag:"NEW"},
+    {u:"mo-ghostescape/mo-ghostescape.html", e:"👻", n:"MO Ghost Escape", tag:"NEW"},
+    {u:"mo-meteordodge/mo-meteordodge.html", e:"☄️", n:"MO Meteor Dodge", tag:"NEW"},
+    {u:"mo-rainbowroad/mo-rainbowroad.html", e:"🌈", n:"MO Rainbow Road", tag:"NEW"},
+
+    {u:"mo-arffracer/mo-arffracer.html", e:"🛵", n:"MO Arff Racer (DRAG!)", big:1, tag:"NEW"},
+
+    {u:"mo-fortbuild/mo-fortbuild.html", e:"🏰", n:"MO Fort Build", tag:"NEW"},
+    {u:"mo-treehousefort/mo-treehousefort.html", e:"🌳", n:"MO Treehouse Fort", tag:"NEW"},
+    {u:"mo-waterslide/mo-waterslide.html", e:"🛝", n:"MO Water Slide Park", tag:"NEW"},
+    {u:"mo-legobuild/mo-legobuild.html", e:"🧱", n:"MO Block Build", tag:"NEW"},
+    {u:"mo-icecreamtruck/mo-icecreamtruck.html", e:"🚚", n:"MO Ice Cream Truck", tag:"NEW"},
+    {u:"mo-dinopark2/mo-dinopark2.html", e:"🦕", n:"MO Dino Park", tag:"NEW"},
+    {u:"mo-spacestation/mo-spacestation.html", e:"🛰️", n:"MO Space Station", tag:"NEW"},
+    {u:"mo-lemonade/mo-lemonade.html", e:"🍋", n:"MO Lemonade Stand", tag:"NEW"},
+    {u:"mo-gardengrow/mo-gardengrow.html", e:"🌻", n:"MO Garden Grow", tag:"NEW"},
+    {u:"mo-campsite/mo-campsite.html", e:"🏕️", n:"MO Campsite", tag:"NEW"},
+    {u:"mo-dogwash/mo-dogwash.html", e:"🐶", n:"MO Dog Wash", tag:"NEW"},
+    {u:"mo-fixitrobot/mo-fixitrobot.html", e:"🤖", n:"MO Fix-It Robot", tag:"NEW"},
+    {u:"mo-beachclean/mo-beachclean.html", e:"🏖️", n:"MO Beach Cleanup", tag:"NEW"},
+    {u:"mo-fishtank/mo-fishtank.html", e:"🐠", n:"MO Fish Tank Clean", tag:"NEW"},
+    {u:"mo-messyroom/mo-messyroom.html", e:"🧹", n:"MO Messy Room", tag:"NEW"},
+    {u:"mo-sushi/mo-sushi.html", e:"🍣", n:"MO Sushi Maker", tag:"NEW"},
+    {u:"mo-donutdec/mo-donutdec.html", e:"🍩", n:"MO Donut Decorator", tag:"NEW"},
+    {u:"mo-taco/mo-taco.html", e:"🌮", n:"MO Taco Stand", tag:"NEW"},
+    {u:"mo-pancake/mo-pancake.html", e:"🥞", n:"MO Pancake Stack", tag:"NEW"},
+    {u:"mo-smoothie/mo-smoothie.html", e:"🥤", n:"MO Smoothie Blender", tag:"NEW"},
+    {u:"mo-arffdetective/mo-arffdetective.html", e:"🕵️", n:"MO Arff Detective", tag:"NEW"},
+    {u:"mo-zipline/mo-zipline.html", e:"🧗", n:"MO Zipline", tag:"NEW"},
+    {u:"mo-jetpack/mo-jetpack.html", e:"🚀", n:"MO Jetpack Fly", tag:"NEW"},
+    {u:"mo-balloon/mo-balloon.html", e:"🎈", n:"MO Hot Air Balloon", tag:"NEW"},
+    {u:"mo-mazerun/mo-mazerun.html", e:"🏃", n:"MO Maze Runner", tag:"NEW"},
+    {u:"mo-lavajump/mo-lavajump.html", e:"🌋", n:"MO Lava Jump", tag:"NEW"},
+    {u:"mo-parkour/mo-parkour.html", e:"🏃", n:"MO Rooftop Parkour", tag:"NEW"},
+    {u:"mo-arffsky/mo-arffsky.html", e:"🪂", n:"MO Arff Skydiving", tag:"NEW"},
+    {u:"mo-arffspace/mo-arffspace.html", e:"🚀", n:"MO Arff Space Trip", tag:"NEW"},
+    {u:"mo-arfffish/mo-arfffish.html", e:"🎣", n:"MO Arff Fishing", tag:"NEW"},
+    {u:"mo-arffpizza/mo-arffpizza.html", e:"🛵", n:"MO Arff Pizza Delivery", tag:"NEW"},
+
+    {u:"mo-coaster/mo-coaster.html", e:"🎢", n:"MO Roller Coaster", tag:"NEW"},
+    {u:"mo-volcano/mo-volcano.html", e:"🌋", n:"MO Volcano Build", tag:"NEW"},
+    {u:"mo-robotbuild2/mo-robotbuild2.html", e:"🤖", n:"MO Robot Build", tag:"NEW"},
+    {u:"mo-rocketbuild/mo-rocketbuild.html", e:"🚀", n:"MO Rocket Build", tag:"NEW"},
+    {u:"mo-sandcastle/mo-sandcastle.html", e:"🏖️", n:"MO Sandcastle", tag:"NEW"},
+    {u:"mo-pizzabuild/mo-pizzabuild.html", e:"🍕", n:"MO Pizza Build", tag:"NEW"},
+    {u:"mo-arffbath/mo-arffbath.html", e:"🛁", n:"MO Arff Bath", tag:"NEW"},
+    {u:"mo-arfftreats/mo-arfftreats.html", e:"🦴", n:"MO Arff Treats", tag:"NEW"},
+    {u:"mo-skateboard/mo-skateboard.html", e:"🛹", n:"MO Skateboard", tag:"NEW"},
+    {u:"mo-bmx/mo-bmx.html", e:"🚲", n:"MO BMX Jumps", tag:"NEW"},
+    {u:"mo-swimrace2/mo-swimrace2.html", e:"🏊", n:"MO Swimming Race", tag:"NEW"},
+    {u:"mo-climb2/mo-climb2.html", e:"🧗", n:"MO Rock Climbing", tag:"NEW"},
+    {u:"mo-gymnastics/mo-gymnastics.html", e:"🤸", n:"MO Gymnastics", tag:"NEW"},
+    {u:"mo-racecar/mo-racecar.html", e:"🏎️", n:"MO Race Car", tag:"NEW"},
+    {u:"mo-trampoline2/mo-trampoline2.html", e:"🤸", n:"MO Trampoline", tag:"NEW"},
+    {u:"mo-gokart/mo-gokart.html", e:"🏁", n:"MO Go-Kart Race", tag:"NEW"},
+    {u:"mo-arffobstacle/mo-arffobstacle.html", e:"🐕", n:"MO Arff Obstacle", tag:"NEW"},
+
+    {u:"mo-megabuild/mo-megabuild.html", e:"🏢", n:"MO Mega Build 3D", big:1, tag:"NEW"},
+    {u:"mo-carwash/mo-carwash.html", e:"🚗", n:"MO Car Wash", big:1, tag:"NEW"},
+    {u:"hoop-shot.html", e:"🏀", n:"Hoop Shot", big:1},
+    {u:"hoop-shot-3d.html", e:"🏀", n:"Hoop Shot 3D", big:1},
+    {u:"mo-2k26/mo-2k26.html", e:"🏀", n:"MO 2K26 ALL-IN-ONE", big:1, tag:"NEW"},
+    {u:"mo-home/mo-home.html", e:"🏠", n:"MO Home World", big:1, tag:"NEW"},
+    {u:"mo-underground/mo-underground.html", e:"🏠", n:"Underground House", big:1, tag:"NEW"},
+    {u:"mo-buildtown/mo-buildtown.html", e:"🏗️", n:"MO Build Town 3D", big:1, tag:"NEW"},
+    {u:"mo-cleanbuild/mo-cleanbuild.html", e:"🏊", n:"MO Pool Build (Arff)", big:1, tag:"NEW"},
+    {u:"mo-soundtrack/mo-soundtrack.html", e:"🎧", n:"MO Soundtrack Studio", big:1, tag:"NEW"},
+    {u:"mo-dogdonut/mo-dogdonut.html", e:"🍩", n:"Dog Doughnut Shop", tag:"NEW"},
+    {u:"mo-dogbeach/mo-dogbeach.html", e:"🏖️", n:"Dog Beach", tag:"NEW"},
+    {u:"mo-dogbirthday/mo-dogbirthday.html", e:"🎂", n:"Dog Birthday", tag:"NEW"},
+    {u:"mo-dogschool/mo-dogschool.html", e:"🎓", n:"Puppy School", tag:"NEW"},
+    {u:"mo-dogfarm/mo-dogfarm.html", e:"🚜", n:"Dog Farm", tag:"NEW"},
+    {u:"mo-dogcamping/mo-dogcamping.html", e:"⛺", n:"Dog Camping", tag:"NEW"},
+    {u:"mo-dogspace/mo-dogspace.html", e:"🚀", n:"Space Dog", tag:"NEW"},
+    {u:"mo-doghero/mo-doghero.html", e:"🦸", n:"Super Dog", tag:"NEW"},
+    {u:"mo-dogfashion/mo-dogfashion.html", e:"👗", n:"Dog Fashion", tag:"NEW"},
+    {u:"mo-dogpool/mo-dogpool.html", e:"🏊", n:"Dog Pool Party", tag:"NEW"},
+    {u:"mo-dogchef/mo-dogchef.html", e:"🧑‍🍳", n:"Dog Chef", tag:"NEW"},
+    {u:"mo-dogcircus/mo-dogcircus.html", e:"🎪", n:"Dog Circus", tag:"NEW"},
+    {u:"mo-dogcastle/mo-dogcastle.html", e:"🏰", n:"Royal Dog", tag:"NEW"},
+    {u:"mo-dogrescue/mo-dogrescue.html", e:"🚒", n:"Dog Rescue", tag:"NEW"},
+    {u:"mo-dogtrain/mo-dogtrain.html", e:"🚂", n:"Dog Train Ride", tag:"NEW"},
+    {u:"mo-superrun/mo-superrun.html", e:"🏃", n:"MO SUPER RUN", big:1, tag:"NEW"},
+    {u:"mo-minihoop/mo-minihoop.html", e:"🏀", n:"Mini Hoop 3D", big:1, tag:"NEW"},
+    {u:"mo-dodgeball/mo-dodgeball.html", e:"🏃", n:"Dodgeball", tag:"NEW"},
+    {u:"mo-bowling/mo-bowling.html", e:"🎳", n:"Bowling", tag:"NEW"},
+    {u:"mo-butterfly/mo-butterfly.html", e:"🦋", n:"Butterfly Catch", tag:"NEW"},
+    {u:"mo-burger/mo-burger.html", e:"🍔", n:"Burger Builder", tag:"NEW"},
+    {u:"mo-memory/mo-memory.html", e:"🧠", n:"Memory Match", tag:"NEW"},
+    {u:"mo-maze/mo-maze.html", e:"🧩", n:"Maze Runner", tag:"NEW"},
+    {u:"mo-monster/mo-monster.html", e:"🛻", n:"Monster Truck", tag:"NEW"},
+    {u:"mo-donut/mo-donut.html", e:"🍩", n:"Doughnut Drive-Thru", tag:"NEW"},
+    {u:"mo-flappy/mo-flappy.html", e:"🐤", n:"Flappy MO", tag:"NEW"},
+    {u:"mo-whack/mo-whack.html", e:"🔨", n:"Whack-a-Mole", tag:"NEW"},
+    {u:"mo-fruit/mo-fruit.html", e:"🍉", n:"Fruit Slice", tag:"NEW"},
+    {u:"mo-egg/mo-egg.html", e:"🥚", n:"Egg Catch", tag:"NEW"},
+    {u:"mo-stack/mo-stack.html", e:"🧱", n:"Stack Blocks", tag:"NEW"},
+    {u:"mo-rocket/mo-rocket.html", e:"🚀", n:"Rocket Dodge", tag:"NEW"},
+    {u:"mo-balloonpop/mo-balloonpop.html", e:"🎈", n:"Balloon Pop", tag:"NEW"},
+    {u:"mo-fishing/mo-fishing.html", e:"🎣", n:"Fishing Frenzy", tag:"NEW"},
+    {u:"mo-beat/mo-beat.html", e:"🎵", n:"Tap the Beat", tag:"NEW"},
+    {u:"mo-pizzarush/mo-pizzarush.html", e:"🍕", n:"Pizza Topping Rush", tag:"NEW"},
+    {u:"mo-trampoline/mo-trampoline.html", e:"🤸", n:"Trampoline Bounce", tag:"NEW"},
+    {u:"mo-color/mo-color.html", e:"🎨", n:"Color Match", tag:"NEW"},
+    {u:"mo-wheel/mo-wheel.html", e:"🎡", n:"Prize Wheel", tag:"NEW"},
+    {u:"mo-beatmaker/mo-beatmaker.html", e:"🥁", n:"Beat Maker", tag:"NEW"},
+    {u:"mo-courtbuild/mo-courtbuild.html", e:"🏀", n:"Court Builder", tag:"NEW"},
+    {u:"mo-stadiumbuild/mo-stadiumbuild.html", e:"🏟️", n:"Stadium Builder", tag:"NEW"},
+    {u:"mo-skatepark/mo-skatepark.html", e:"🛹", n:"Skate Park Builder", tag:"NEW"},
+    {u:"mo-minigolf/mo-minigolf.html", e:"⛳", n:"Mini-Golf Builder", tag:"NEW"},
+    {u:"mo-carbuild/mo-carbuild.html", e:"🚗", n:"Car Builder", tag:"NEW"},
+    {u:"mo-citybuild/mo-citybuild.html", e:"🏙️", n:"City Builder", tag:"NEW"},
+    {u:"mo-zoobuild/mo-zoobuild.html", e:"🦁", n:"Zoo Builder", tag:"NEW"},
+    {u:"mo-farmbuild/mo-farmbuild.html", e:"🚜", n:"Farm Builder", tag:"NEW"},
+    {u:"mo-aquarium/mo-aquarium.html", e:"🐠", n:"Aquarium Builder", tag:"NEW"},
+    {u:"mo-parkbuild/mo-parkbuild.html", e:"🎢", n:"Theme Park Builder", tag:"NEW"},
+    {u:"mo-pixelart/mo-pixelart.html", e:"🎨", n:"Pixel Art", tag:"NEW"},
+    {u:"mo-castlebuild/mo-castlebuild.html", e:"🏰", n:"Castle Builder", tag:"NEW"},
+    {u:"mo-dreamhouse/mo-dreamhouse.html", e:"🏠", n:"Dream House", tag:"NEW"},
+    {u:"mo-swimrace/mo-swimrace.html", e:"🏊", n:"Swim Race", tag:"NEW"},
+    {u:"mo-surf2/mo-surf2.html", e:"🏄", n:"MO Surf", tag:"NEW"},
+    {u:"mo-jetski/mo-jetski.html", e:"🚤", n:"Jet Ski", tag:"NEW"},
+    {u:"mo-pearldive/mo-pearldive.html", e:"🤿", n:"Pearl Dive", tag:"NEW"},
+    {u:"mo-waterballoon/mo-waterballoon.html", e:"💦", n:"Water Balloon Toss", tag:"NEW"},
+    {u:"mo-beachbuild/mo-beachbuild.html", e:"🏖️", n:"Beach Builder", tag:"NEW"},
+    {u:"mo-waterpark/mo-waterpark.html", e:"🛝", n:"Water Park Builder", tag:"NEW"},
+    {u:"mo-oceanbuild/mo-oceanbuild.html", e:"🐋", n:"Ocean World", tag:"NEW"},
+    {u:"mo-piratecove/mo-piratecove.html", e:"🏴‍☠️", n:"Pirate Cove", tag:"NEW"},
+    {u:"mo-mermaid/mo-mermaid.html", e:"🧜‍♀️", n:"Mermaid Lagoon", tag:"NEW"},
+    {u:"mo-harbor/mo-harbor.html", e:"⚓", n:"Boat Harbor", tag:"NEW"},
+    {u:"mo-baseball/mo-baseball.html", e:"⚾", n:"Home Run Derby", tag:"NEW"},
+    {u:"mo-soccershoot/mo-soccershoot.html", e:"⚽", n:"Soccer Shootout", tag:"NEW"},
+    {u:"mo-spacebuild/mo-spacebuild.html", e:"🛰️", n:"Space Station", tag:"NEW"},
+    {u:"mo-fairygarden/mo-fairygarden.html", e:"🧚", n:"Fairy Garden", tag:"NEW"},
+    {u:"mo-dinopark/mo-dinopark.html", e:"🦕", n:"Dino Park", tag:"NEW"},
+    {u:"mo-candyfactory/mo-candyfactory.html", e:"🍬", n:"Candy Factory", tag:"NEW"},
+    {u:"mo-icecreamshop/mo-icecreamshop.html", e:"🍦", n:"Ice Cream Shop", tag:"NEW"},
+    {u:"mo-pizzashop/mo-pizzashop.html", e:"🍕", n:"Pizza Restaurant", tag:"NEW"},
+    {u:"mo-robotbuild/mo-robotbuild.html", e:"🤖", n:"Robot Builder", tag:"NEW"},
+    {u:"mo-wizardlab/mo-wizardlab.html", e:"🧪", n:"Potion Lab", tag:"NEW"},
+    {u:"mo-petshop/mo-petshop.html", e:"🐶", n:"Pet Shop", tag:"NEW"},
+    {u:"mo-artstudio/mo-artstudio.html", e:"🎨", n:"Art Studio", tag:"NEW"},
+    {u:"mo-8ball/mo-8ball.html", e:"🎱", n:"8-Ball Pool", tag:"NEW"},
+    {u:"mo-nbamvp/mo-nbamvp.html", e:"🏀", n:"NBA MVP", tag:"NEW"},
+    {u:"mo-playhousebuild/mo-playhousebuild.html", e:"🏠", n:"Playhouse Builder", tag:"NEW"},
+    {u:"mo-hardware/mo-hardware.html", e:"🔨", n:"Hardware Store", tag:"NEW"},
+    {u:"mo-homedesign/mo-homedesign.html", e:"🛋️", n:"Home Design", tag:"NEW"},
+    {u:"mo-fixit/mo-fixit.html", e:"🔧", n:"Fix-It House", tag:"NEW"},
+    {u:"mo-catcafe/mo-catcafe.html", e:"🐱", n:"Cat Cafe", tag:"NEW"},
+    {u:"mo-cathouse/mo-cathouse.html", e:"🐈", n:"Cat Tower", tag:"NEW"},
+    {u:"mo-kittennursery/mo-kittennursery.html", e:"🐾", n:"Kitten Nursery", tag:"NEW"},
+    {u:"mo-catpark/mo-catpark.html", e:"🌳", n:"Cat Playground", tag:"NEW"},
+    {u:"mo-jungle/mo-jungle.html", e:"🦁", n:"Jungle Safari", tag:"NEW"},
+    {u:"mo-birdaviary/mo-birdaviary.html", e:"🦜", n:"Bird Aviary", tag:"NEW"},
+    {u:"mo-butterflygarden/mo-butterflygarden.html", e:"🦋", n:"Butterfly Garden", tag:"NEW"},
+    {u:"mo-2k/mo-2k.html", e:"🎮", n:"MO 2K26 (5v5)", big:1, tag:"NEW"},
+    {u:"mo-mycareer/mo-mycareer.html", e:"👑", n:"MyCareer 2K26", big:1, tag:"NEW"},
+    {u:"mo-aroundworld/mo-aroundworld.html", e:"🌍", n:"Around the World", tag:"MVP"},
+    {u:"mo-freethrow/mo-freethrow.html", e:"🎯", n:"Free Throw", tag:"MVP"},
+    {u:"mo-fastbreak/mo-fastbreak.html", e:"⚡", n:"Fast Break", tag:"MVP"},
+    {u:"mo-knockout/mo-knockout.html", e:"🥊", n:"Knockout OT", tag:"MVP"},
+    {u:"mo-qb/mo-qb.html", e:"🏈", n:"Football MVP", tag:"MVP"},
+    {u:"mo-penalty/mo-penalty.html", e:"⚽", n:"Soccer MVP", tag:"MVP"},
+    {u:"mo-homerun/mo-homerun.html", e:"⚾", n:"Home Run Derby", tag:"MVP"},
+    {u:"mo-buzzer/mo-buzzer.html", e:"⏱️", n:"Buzzer Beater", tag:"MVP"},
+    {u:"mo-3point/mo-3point.html", e:"🎯", n:"3-Point Contest", tag:"MVP"},
+    {u:"mo-popashot/mo-popashot.html", e:"🔥", n:"Pop-A-Shot", tag:"MVP"},
+    {u:"mo-halfcourt/mo-halfcourt.html", e:"🏀", n:"Half-Court Hero", tag:"MVP"},
+    {u:"mo-streetball/mo-streetball.html", e:"🏙️", n:"Streetball 1v1", tag:"MVP"},
+    {u:"mo-championship/mo-championship.html", e:"🏆", n:"Championship Run", tag:"MVP"},
+    {u:"mo-mvpcareer/mo-mvpcareer.html", e:"👑", n:"MVP Career", tag:"MVP"},
+    {u:"mo-allstar/mo-allstar.html", e:"🔨", n:"All-Star Dunk", tag:"MVP"},
+    {u:"mo-ankle/mo-ankle.html", e:"💨", n:"Ankle Breaker", tag:"MVP"},
+    {u:"mo-lockdown/mo-lockdown.html", e:"🛡️", n:"Lockdown D", tag:"MVP"},
+    {u:"mo-pixel/mo-pixel.html", e:"🎨", n:"Pixel Art", tag:"NEW"},
+    {u:"mo-moon/mo-moon.html", e:"🚀", n:"Moon Base", tag:"NEW"},
+    {u:"mo-dino/mo-dino.html", e:"🦖", n:"Dino Dig", tag:"NEW"},
+    {u:"mo-bee/mo-bee.html", e:"🐝", n:"Bee Garden", tag:"NEW"},
+    {u:"mo-surf/mo-surf.html", e:"🏄", n:"Mo Surf", tag:"NEW"},
+    {u:"mo-rockband/mo-rockband.html", e:"🎸", n:"Rock Band", tag:"NEW"},
+    {u:"mo-climb/mo-climb.html", e:"🧗", n:"Mo Climb", tag:"NEW"},
+    {u:"mo-grocery/mo-grocery.html", e:"🛒", n:"Grocery Dash", tag:"NEW"},
+    {u:"mo-train/mo-train.html", e:"🚂", n:"Train Builder", tag:"NEW"},
+    {u:"mo-park/mo-park.html", e:"🎢", n:"Theme Park", tag:"NEW"},
+    {u:"mo-petdragon/mo-petdragon.html", e:"🐲", n:"Pet Dragon", tag:"NEW"},
+    {u:"mo-dunk/mo-dunk.html", e:"🏀", n:"Dunk Contest", tag:"NEW"},
+    {u:"mo-petrace/mo-petrace.html", e:"🐶", n:"Pet Race", tag:"NEW"},
+    {u:"mo-ninja/mo-ninja.html", e:"🥷", n:"Ninja Run", tag:"NEW"},
+    {u:"mo-lava/mo-lava.html", e:"🌋", n:"Lava Floor", tag:"NEW"},
+    {u:"mo-pizza/mo-pizza.html", e:"🍕", n:"Pizza Delivery", tag:"NEW"},
+    {u:"mo-dragon/mo-dragon.html", e:"🐉", n:"Dragon Rider", tag:"NEW"},
+    {u:"mo-hero/mo-hero.html", e:"🦸", n:"Superhero City", tag:"NEW"},
+    {u:"mo-castle/mo-castle.html", e:"🏰", n:"Castle Defense", tag:"NEW"},
+    {u:"mo-chopper/mo-chopper.html", e:"🚁", n:"Rescue Chopper", tag:"NEW"},
+    {u:"mo-fishing/mo-fishing.html", e:"🎣", n:"Mo Fishing", tag:"NEW"},
+    {u:"mo-icecream/mo-icecream.html", e:"🍦", n:"Ice Cream Shop", tag:"NEW"},
+    {u:"mo-stadium/mo-stadium.html", e:"🏟️", n:"Mo Stadium", tag:"NEW"},
+    {u:"mo-island/mo-island.html", e:"🏝️", n:"Island Survival", tag:"NEW"},
+    {u:"mo-stunt-3d/mo-stunt-3d.html", e:"🏎️", n:"Stunt Racing", tag:"NEW"},
+    {u:"mo-arena-3d/mo-arena-3d.html", e:"🏀", n:"Basketball Arena 3D", tag:"NEW"},
+    {u:"mo-kart-3d/mo-kart-3d.html", e:"🏎️", n:"Kart Racing 3D", tag:"NEW"},
+    {u:"mo-shark/mo-shark.html", e:"🛟", n:"Mo Raft", tag:"NEW"},
+    {u:"mo-city-walk-3d/mo-city-walk-3d.html", e:"🏙️", n:"Mo City 3D", tag:"NEW"},
+    {u:"mo-hoop-builder/mo-hoop-builder.html", e:"🏀", n:"Hoop Builder", tag:"NEW"},
+    {u:"mo-draw/mo-draw.html", e:"🎨", n:"Mo Draw", tag:"NEW"},
+    {u:"mo-subway/mo-subway.html", e:"🚇", n:"Mo Subway"},
+    {u:"mo-court-build/mo-court-build.html", e:"🏀", n:"Court Builder"},
+    {u:"mo-1on1/mo-1on1.html", e:"🤾", n:"Mo 1-on-1"},
+    {u:"mo-football/mo-football.html", e:"🏈", n:"Mo Football"},
+    {u:"mo-soccer/mo-soccer.html", e:"⚽", n:"Mo Soccer"},
+    {u:"mo-swim/mo-swim.html", e:"🏊", n:"Mo Swim"},
+    {u:"mo-drive/mo-drive.html", e:"🚗", n:"Mo Drive"},
+    {u:"mo-plane-3d/mo-plane-3d.html", e:"✈️", n:"Mo Plane 3D"},
+    {u:"mo-flyer/mo-flyer.html", e:"🛩️", n:"Mo Flyer"},
+    {u:"mo-boat-3d/mo-boat-3d.html", e:"⛵", n:"Mo Boat 3D"},
+    {u:"mo-bus-3d/mo-bus-3d.html", e:"🚌", n:"Mo Bus 3D"},
+    {u:"mo-train-city-3d/mo-train-city-3d.html", e:"🚆", n:"Mo Train City"},
+    {u:"mo-city-3d/mo-city-3d.html", e:"🌆", n:"Mo City 3D (old)"},
+    {u:"mo-city-open/mo-city-open.html", e:"🗺️", n:"Mo City Open"},
+    {u:"mohouse-build/mohouse-build.html", e:"🏠", n:"House Builder"},
+    {u:"mo-build/mo-build.html", e:"🧱", n:"Mo Build"},
+    {u:"mo-chef/mo-chef.html", e:"👨‍🍳", n:"Mo Chef"},
+    {u:"mo-garden/mo-garden.html", e:"🌻", n:"Mo Garden"},
+    {u:"mo-jigsaw/mo-jigsaw.html", e:"🧩", n:"Mo Jigsaw"},
+    {u:"mo-sling/mo-sling.html", e:"🎯", n:"Mo Sling"},
+    {u:"mo-stars/mo-stars.html", e:"⭐", n:"Mo Stars"},
+    {u:"mo-crowd/mo-crowd.html", e:"👥", n:"Mo Crowd"},
+    {u:"mo/mo.html", e:"🟠", n:"Mo"},
+    {u:"mo-arffskateboardrail/mo-arffskateboardrail.html", e:"🛹", n:"Arff Skate Rail", tag:"NEW"},
+    {u:"mo-arffparkourclimb/mo-arffparkourclimb.html", e:"🏃", n:"Arff Parkour Climb", tag:"NEW"},
+    {u:"mo-arffropeswing/mo-arffropeswing.html", e:"🪢", n:"Arff Rope Swing", tag:"NEW"},
+    {u:"mo-arffcliffdive/mo-arffcliffdive.html", e:"🏊", n:"Arff Cliff Dive", tag:"NEW"},
+    {u:"mo-arffmotocross/mo-arffmotocross.html", e:"🏍️", n:"Arff Motocross", tag:"NEW"},
+    {u:"mo-arffjetski/mo-arffjetski.html", e:"🏎️", n:"Arff Jet Ski", tag:"NEW"},
+    {u:"mo-arffwakeboard/mo-arffwakeboard.html", e:"🏄", n:"Arff Wakeboard", tag:"NEW"},
+    {u:"mo-arffkayak/mo-arffkayak.html", e:"🛶", n:"Arff Kayak", tag:"NEW"},
+    {u:"mo-arffcliffwaterjump/mo-arffcliffwaterjump.html", e:"💦", n:"Arff Cliff Jump", tag:"NEW"},
+    {u:"mo-arffdiving/mo-arffdiving.html", e:"🤿", n:"Arff Diving", tag:"NEW"},
+    {u:"mo-arffsurfboard/mo-arffsurfboard.html", e:"🏄", n:"Arff Surfboard", tag:"NEW"},
+    {u:"mo-arffkungfu/mo-arffkungfu.html", e:"🥋", n:"Arff Kung Fu", tag:"NEW"},
+    {u:"mo-arfftaekwondo/mo-arfftaekwondo.html", e:"🥋", n:"Arff Taekwondo", tag:"NEW"},
+    {u:"mo-arffkarate/mo-arffkarate.html", e:"🥋", n:"Arff Karate", tag:"NEW"},
+    {u:"mo-arffsumo/mo-arffsumo.html", e:"🤼", n:"Arff Sumo", tag:"NEW"},
+    {u:"mo-arffswordfight/mo-arffswordfight.html", e:"⚔️", n:"Arff Sword Fight", tag:"NEW"},
+    {u:"mo-arffninjaStar/mo-arffninjaStar.html", e:"⭐", n:"Arff Ninja Star", tag:"NEW"},
+    {u:"mo-arffhorserace/mo-arffhorserace.html", e:"🐴", n:"Arff Horse Race", tag:"NEW"},
+    {u:"mo-arffcamelrace/mo-arffcamelrace.html", e:"🐫", n:"Arff Camel Race", tag:"NEW"},
+    {u:"mo-arffbullride/mo-arffbullride.html", e:"🐂", n:"Arff Bull Ride", tag:"NEW"},
+    {u:"mo-arffbirdrace/mo-arffbirdrace.html", e:"🐦", n:"Arff Bird Race", tag:"NEW"},
+    {u:"mo-arfftargetshooting/mo-arfftargetshooting.html", e:"🎯", n:"Arff Target", tag:"NEW"},
+    {u:"mo-arffknifeThrow/mo-arffknifeThrow.html", e:"🔪", n:"Arff Knife", tag:"NEW"},
+    {u:"mo-arfflasershooting/mo-arfflasershooting.html", e:"🔫", n:"Arff Laser", tag:"NEW"},
+    {u:"mo-arfftrapshooting/mo-arfftrapshooting.html", e:"🎯", n:"Arff Trap", tag:"NEW"},
+    {u:"mo-arffcrossbowchallenge/mo-arffcrossbowchallenge.html", e:"🏹", n:"Arff Crossbow", tag:"NEW"},
+    {u:"mo-arffmarksman/mo-arffmarksman.html", e:"🎯", n:"Arff Marksman", tag:"NEW"},
+    {u:"mo-familybasketball/mo-familybasketball.html", e:"🏀", n:"Family Basketball", tag:"NEW"},
+    {u:"mo-familyrelayrace/mo-familyrelayrace.html", e:"🏃", n:"Family Relay Race", tag:"NEW"},
+    {u:"mo-familysoccer/mo-familysoccer.html", e:"⚽", n:"Family Soccer", tag:"NEW"},
+    {u:"mo-familybowling/mo-familybowling.html", e:"🎳", n:"Family Bowling", tag:"NEW"},
+    {u:"mo-familytennis/mo-familytennis.html", e:"🎾", n:"Family Tennis", tag:"NEW"},
+    {u:"mo-familyvolleyball/mo-familyvolleyball.html", e:"🏐", n:"Family Volleyball", tag:"NEW"},
+    {u:"mo-familybaseball/mo-familybaseball.html", e:"⚾", n:"Family Baseball", tag:"NEW"},
+    {u:"mo-familyhockey/mo-familyhockey.html", e:"🏒", n:"Family Hockey", tag:"NEW"},
+    {u:"mo-familytreasure/mo-familytreasure.html", e:"💎", n:"Family Treasure Hunt", tag:"NEW"},
+    {u:"mo-familyescaperoom/mo-familyescaperoom.html", e:"🚪", n:"Family Escape Room", tag:"NEW"},
+    {u:"mo-familypuzzle/mo-familypuzzle.html", e:"🧩", n:"Family Puzzle", tag:"NEW"},
+    {u:"mo-familyscavenger/mo-familyscavenger.html", e:"🔍", n:"Family Scavenger", tag:"NEW"},
+    {u:"mo-familymystery/mo-familymystery.html", e:"🔎", n:"Family Mystery", tag:"NEW"},
+    {u:"mo-familyjungle/mo-familyjungle.html", e:"🌴", n:"Family Jungle", tag:"NEW"},
+    {u:"mo-familyspace/mo-familyspace.html", e:"🚀", n:"Family Space", tag:"NEW"},
+    {u:"mo-familyocean/mo-familyocean.html", e:"🌊", n:"Family Ocean", tag:"NEW"},
+    {u:"mo-familyobstacle/mo-familyobstacle.html", e:"🏃", n:"Family Obstacle", tag:"NEW"},
+    {u:"mo-familycooking/mo-familycooking.html", e:"👨‍🍳", n:"Family Cooking", tag:"NEW"},
+    {u:"mo-familytalentshow/mo-familytalentshow.html", e:"🎤", n:"Family Talent Show", tag:"NEW"},
+    {u:"mo-familykaraoke/mo-familykaraoke.html", e:"🎤", n:"Family Karaoke", tag:"NEW"},
+    {u:"mo-familydanceoff/mo-familydanceoff.html", e:"💃", n:"Family Dance Off", tag:"NEW"},
+    {u:"mo-familytrivia/mo-familytrivia.html", e:"🧠", n:"Family Trivia", tag:"NEW"},
+    {u:"mo-familybuilding/mo-familybuilding.html", e:"🧱", n:"Family Building", tag:"NEW"},
+    {u:"mo-familyart/mo-familyart.html", e:"🎨", n:"Family Art", tag:"NEW"},
+    {u:"mo-familyrescue/mo-familyrescue.html", e:"🚨", n:"Family Rescue", tag:"NEW"},
+    {u:"mo-familyfort/mo-familyfort.html", e:"🏰", n:"Family Fort", tag:"NEW"},
+    {u:"mo-familysaveworld/mo-familysaveworld.html", e:"🌍", n:"Family Save World", tag:"NEW"},
+    {u:"mo-familymonsters/mo-familymonsters.html", e:"👹", n:"Family Monsters", tag:"NEW"},
+    {u:"mo-familytreasuredef/mo-familytreasuredef.html", e:"🛡️", n:"Family Treasure Def", tag:"NEW"},
+    {u:"mo-familytimemachine/mo-familytimemachine.html", e:"⏰", n:"Family Time Machine", tag:"NEW"},
+    {u:"mo-familycharades/mo-familycharades.html", e:"🎭", n:"Family Charades", tag:"NEW"},
+    {u:"mo-familypictionary/mo-familypictionary.html", e:"🖼️", n:"Family Pictionary", tag:"NEW"},
+    {u:"mo-familyrhyme/mo-familyrhyme.html", e:"📝", n:"Family Rhyme", tag:"NEW"},
+    {u:"mo-familystorytime/mo-familystorytime.html", e:"📚", n:"Family Story Time", tag:"NEW"},
+    {u:"mo-familyjokebattle/mo-familyjokebattle.html", e:"😂", n:"Family Joke Battle", tag:"NEW"},
+    {u:"mo-familyriddle/mo-familyriddle.html", e:"🤔", n:"Family Riddle", tag:"NEW"},
+    {u:"mo-familymemory/mo-familymemory.html", e:"🧠", n:"Family Memory", tag:"NEW"},
+    {u:"mo-familyspotdiff/mo-familyspotdiff.html", e:"🔍", n:"Family Spot Diff", tag:"NEW"},
+    {u:"mo-cityplanner/mo-cityplanner.html", e:"🏗️", n:"City Planner", tag:"NEW"},
+    {u:"mo-skyscraper/mo-skyscraper.html", e:"🏢", n:"Skyline Builder", tag:"NEW"},
+    {u:"mo-trafficcontrol/mo-trafficcontrol.html", e:"🚦", n:"Traffic Control", tag:"NEW"},
+    {u:"mo-citymayor/mo-citymayor.html", e:"👨‍⚖️", n:"City Mayor", tag:"NEW"},
+    {u:"mo-businesstycoon/mo-businesstycoon.html", e:"💼", n:"Business Tycoon", tag:"NEW"},
+    {u:"mo-taxidriver/mo-taxidriver.html", e:"🚕", n:"Taxi Driver", tag:"NEW"},
+    {u:"mo-delivery/mo-delivery.html", e:"📦", n:"City Delivery", tag:"NEW"},
+    {u:"mo-pizzacity/mo-pizzacity.html", e:"🍕", n:"Pizza City", tag:"NEW"},
+    {u:"mo-busdriver/mo-busdriver.html", e:"🚌", n:"Bus Driver", tag:"NEW"},
+    {u:"mo-trashcollector/mo-trashcollector.html", e:"🗑️", n:"Trash Collector", tag:"NEW"},
+    {u:"mo-citypolice/mo-citypolice.html", e:"🚔", n:"City Police", tag:"NEW"},
+    {u:"mo-firefighter/mo-firefighter.html", e:"🚒", n:"City Firefighter", tag:"NEW"},
+    {u:"mo-cityrepair/mo-cityrepair.html", e:"🔧", n:"City Repair", tag:"NEW"},
+    {u:"mo-citygardener/mo-citygardener.html", e:"🌻", n:"City Gardener", tag:"NEW"},
+    {u:"mo-streetcleaner/mo-streetcleaner.html", e:"🧹", n:"Street Cleaner", tag:"NEW"},
+    {u:"mo-cityracing/mo-cityracing.html", e:"🏎️", n:"City Racing", tag:"NEW"},
+    {u:"mo-deliveryrace/mo-deliveryrace.html", e:"🏁", n:"Delivery Race", tag:"NEW"},
+    {u:"mo-policechase/mo-policechase.html", e:"👮", n:"Police Chase", tag:"NEW"},
+    {u:"mo-rooftopstunts/mo-rooftopstunts.html", e:"🏃", n:"Rooftop Stunts", tag:"NEW"},
+    {u:"mo-cityescape/mo-cityescape.html", e:"💨", n:"City Escape", tag:"NEW"},
+    {u:"mo-citycitizens/mo-citycitizens.html", e:"👥", n:"City Citizens", tag:"NEW"},
+    {u:"mo-cityschool/mo-cityschool.html", e:"🏫", n:"City School", tag:"NEW"},
+    {u:"mo-cityhospital/mo-cityhospital.html", e:"🏥", n:"City Hospital", tag:"NEW"},
+    {u:"mo-citylibrary/mo-citylibrary.html", e:"📖", n:"City Library", tag:"NEW"},
+    {u:"mo-parkmanager/mo-parkmanager.html", e:"🎡", n:"Park Manager", tag:"NEW"},
+    {u:"mo-treasurehunt/mo-treasurehunt.html", e:"💎", n:"Treasure Hunt", tag:"NEW"},
+    {u:"mo-citymysteries/mo-citymysteries.html", e:"🔎", n:"City Mysteries", tag:"NEW"},
+    {u:"mo-photohunt/mo-photohunt.html", e:"📸", n:"Photo Hunt", tag:"NEW"},
+    {u:"mo-citymaze/mo-citymaze.html", e:"🌀", n:"City Maze", tag:"NEW"},
+    {u:"mo-hiddenlocs/mo-hiddenlocs.html", e:"🔑", n:"Hidden Locations", tag:"NEW"},
+    {u:"mo-arffcitytour/mo-arffcitytour.html", e:"🐕", n:"Arff City Tour", tag:"NEW"},
+    {u:"mo-arffdelivery/mo-arffdelivery.html", e:"🚚", n:"Arff Delivery", tag:"NEW"},
+    {u:"mo-arffchase/mo-arffchase.html", e:"🐕", n:"Arff Chase", tag:"NEW"},
+    {u:"mo-arfffirefighter/mo-arfffirefighter.html", e:"🚒", n:"Arff Firefighter", tag:"NEW"},
+    {u:"mo-arffpolice/mo-arffpolice.html", e:"👮", n:"Arff Police", tag:"NEW"},
+
+    {u:"mo-meandmommy-cooking/mo-meandmommy-cooking.html", e:"👨‍🍳", n:"Me & Mommy Cooking", tag:"NEW"},
+    {u:"mo-meandmommy-dance/mo-meandmommy-dance.html", e:"💃", n:"Me & Mommy Dance", tag:"NEW"},
+    {u:"mo-meandmommy-build/mo-meandmommy-build.html", e:"🏠", n:"Me & Mommy Build", tag:"NEW"},
+    {u:"mo-meandmommy-garden/mo-meandmommy-garden.html", e:"🌻", n:"Me & Mommy Garden", tag:"NEW"},
+    {u:"mo-meandmommy-treasure/mo-meandmommy-treasure.html", e:"💎", n:"Me & Mommy Treasure", tag:"NEW"},
+    {u:"mo-meandmommy-photo/mo-meandmommy-photo.html", e:"📸", n:"Me & Mommy Photos", tag:"NEW"},
+    {u:"mo-meandmommy-shopping/mo-meandmommy-shopping.html", e:"🛒", n:"Me & Mommy Shopping", tag:"NEW"},
+    {u:"mo-meandmommy-bakery/mo-meandmommy-bakery.html", e:"🧁", n:"Me & Mommy Bakery", tag:"NEW"},
+    {u:"mo-meandmommy-puzzle/mo-meandmommy-puzzle.html", e:"🧩", n:"Me & Mommy Puzzle", tag:"NEW"},
+    {u:"mo-meandmommy-music/mo-meandmommy-music.html", e:"🎵", n:"Me & Mommy Music", tag:"NEW"},
+    {u:"mo-meandmommy-basketball/mo-meandmommy-basketball.html", e:"🏀", n:"Me vs Mommy Basketball", tag:"NEW"},
+    {u:"mo-meandmommy-bowling/mo-meandmommy-bowling.html", e:"🎳", n:"Me vs Mommy Bowling", tag:"NEW"},
+    {u:"mo-meandmommy-freezedance/mo-meandmommy-freezedance.html", e:"💃", n:"Me vs Mommy Freeze Dance", tag:"NEW"},
+    {u:"mo-meandmommy-trivia/mo-meandmommy-trivia.html", e:"🧠", n:"Me vs Mommy Trivia", tag:"NEW"},
+    {u:"mo-meandmommy-marble/mo-meandmommy-marble.html", e:"🔵", n:"Me vs Mommy Marble", tag:"NEW"},
+    {u:"mo-meandmommy-memory/mo-meandmommy-memory.html", e:"🎴", n:"Me vs Mommy Memory", tag:"NEW"},
+    {u:"mo-meandmommy-racing/mo-meandmommy-racing.html", e:"🏎️", n:"Me vs Mommy Racing", tag:"NEW"},
+    {u:"mo-meandmommy-slingshot/mo-meandmommy-slingshot.html", e:"🎯", n:"Me vs Mommy Slingshot", tag:"NEW"},
+    {u:"mo-meandmommy-catch/mo-meandmommy-catch.html", e:"🤾", n:"Me vs Mommy Catch", tag:"NEW"},
+    {u:"mo-meandmommy-wordbattle/mo-meandmommy-wordbattle.html", e:"📝", n:"Me vs Mommy Words", tag:"NEW"},
+    {u:"mo-meandmommy-timetravel/mo-meandmommy-timetravel.html", e:"⏰", n:"Me & Mommy Time Travel", tag:"NEW"},
+    {u:"mo-meandmommy-mystery/mo-meandmommy-mystery.html", e:"🏚️", n:"Me & Mommy Mystery", tag:"NEW"},
+    {u:"mo-meandmommy-safari/mo-meandmommy-safari.html", e:"🦁", n:"Me & Mommy Safari", tag:"NEW"},
+    {u:"mo-meandmommy-space/mo-meandmommy-space.html", e:"🚀", n:"Me & Mommy Space", tag:"NEW"},
+    {u:"mo-meandmommy-superhero/mo-meandmommy-superhero.html", e:"🦸", n:"Me & Mommy Superhero", tag:"NEW"},
+    {u:"mo-meandmommy-camping/mo-meandmommy-camping.html", e:"⛺", n:"Me & Mommy Camping", tag:"NEW"},
+    {u:"mo-meandmommy-beach/mo-meandmommy-beach.html", e:"🏖️", n:"Me & Mommy Beach", tag:"NEW"},
+    {u:"mo-meandmommy-picnic/mo-meandmommy-picnic.html", e:"🧺", n:"Me & Mommy Picnic", tag:"NEW"},
+    {u:"mo-meandmommy-themepark/mo-meandmommy-themepark.html", e:"🎡", n:"Me & Mommy Theme Park", tag:"NEW"},
+    {u:"mo-meandmommy-movienight/mo-meandmommy-movienight.html", e:"🎬", n:"Me & Mommy Movie Night", tag:"NEW"},
+
+    {u:"mo-swipeslice/mo-swipeslice.html", e:"🍉", n:"Swipe Slice", tag:"NEW"},
+    {u:"mo-dunkstop/mo-dunkstop.html", e:"🏀", n:"MO Dunk Stop", tag:"NEW"},
+    {u:"mo-dunkcontest/mo-dunkcontest.html", e:"🏀", n:"MO Dunk Contest", tag:"NEW"},
+    {u:"mo-rowcontest/mo-rowcontest.html", e:"🚣", n:"Row Contest", tag:"NEW"},
+    {u:"mo-dragcontest/mo-dragcontest.html", e:"🏎️", n:"Drag Race Contest", tag:"NEW"},
+    {u:"mo-rocketcontest/mo-rocketcontest.html", e:"🚀", n:"Rocket Landing Contest", tag:"NEW"},
+    {u:"mo-taxicontest/mo-taxicontest.html", e:"🚕", n:"Taxi Contest", tag:"NEW"},
+    {u:"mo-horsecontest/mo-horsecontest.html", e:"🏇", n:"Gallop Contest", tag:"NEW"},
+    {u:"mo-bmxcontest/mo-bmxcontest.html", e:"🚲", n:"BMX Contest", tag:"NEW"},
+    {u:"mo-jetskicontest/mo-jetskicontest.html", e:"🚤", n:"Jet Ski Contest", tag:"NEW"},
+    {u:"mo-arffcontest/mo-arffcontest.html", e:"🐕", n:"Arff Dash Contest", tag:"NEW"},
+    {u:"mo-truckcontest/mo-truckcontest.html", e:"🚚", n:"Truck Contest", tag:"NEW"},
+    {u:"mo-runcontest/mo-runcontest.html", e:"🏃", n:"Run Contest", tag:"NEW"},
+    {u:"mo-rowboat/mo-rowboat.html", e:"🚣", n:"Row the Boat", tag:"NEW"},
+    {u:"mo-dragstop/mo-dragstop.html", e:"🏎️", n:"Drag Race Stop", tag:"NEW"},
+    {u:"mo-rocketland/mo-rocketland.html", e:"🚀", n:"Rocket Landing", tag:"NEW"},
+    {u:"mo-taxistop/mo-taxistop.html", e:"🚕", n:"Taxi Stop", tag:"NEW"},
+    {u:"mo-horsestop/mo-horsestop.html", e:"🏇", n:"Gallop Stop", tag:"NEW"},
+    {u:"mo-bmxstop/mo-bmxstop.html", e:"🚲", n:"BMX Stop", tag:"NEW"},
+    {u:"mo-jetskistop/mo-jetskistop.html", e:"🚤", n:"Jet Ski Stop", tag:"NEW"},
+    {u:"mo-arffdash/mo-arffdash.html", e:"🐕", n:"Arff Dash Stop", tag:"NEW"},
+    {u:"mo-truckstop/mo-truckstop.html", e:"🚚", n:"Truck Stop", tag:"NEW"},
+    {u:"mo-runstop/mo-runstop.html", e:"🏃", n:"Run & Stop", tag:"NEW"},
+    {u:"mo-whackcritter/mo-whackcritter.html", e:"🔨", n:"Whack Critters", tag:"NEW"},
+    {u:"mo-flappyfly/mo-flappyfly.html", e:"🐤", n:"Flappy Fly", tag:"NEW"},
+    {u:"mo-laneracer/mo-laneracer.html", e:"🏎️", n:"Lane Racer 3D", tag:"NEW"},
+    {u:"mo-dragmaze/mo-dragmaze.html", e:"🔵", n:"Drag Maze", tag:"NEW"},
+    {u:"mo-colormemory/mo-colormemory.html", e:"🎵", n:"Color Memory", tag:"NEW"},,
+
+    {u:"mo-mailcarrier/mo-mailcarrier.html", e:"📬", n:"Mail Carrier", tag:"NEW"},
+    {u:"mo-garbageroute/mo-garbageroute.html", e:"🚛", n:"Garbage Route", tag:"NEW"},
+    {u:"mo-busdriverjob/mo-busdriverjob.html", e:"🚌", n:"Bus Driver Job", tag:"NEW"},
+    {u:"mo-subwayconductor/mo-subwayconductor.html", e:"🚇", n:"Subway Conductor", tag:"NEW"},
+    {u:"mo-potholecrew/mo-potholecrew.html", e:"🛠️", n:"Pothole Crew", tag:"NEW"},
+    {u:"mo-craneop/mo-craneop.html", e:"🏗️", n:"Crane Operator", tag:"NEW"},
+    {u:"mo-electrician/mo-electrician.html", e:"⚡", n:"City Electrician", tag:"NEW"},
+    {u:"mo-towtruck/mo-towtruck.html", e:"🚛", n:"Tow Truck", tag:"NEW"},
+    {u:"mo-paramedic/mo-paramedic.html", e:"🚑", n:"Paramedic Rush", tag:"NEW"},
+    {u:"mo-groceryrun/mo-groceryrun.html", e:"🛒", n:"Grocery Run", tag:"NEW"},
+    {u:"mo-bankteller/mo-bankteller.html", e:"🏦", n:"Bank Teller", tag:"NEW"},
+    {u:"mo-barista/mo-barista.html", e:"☕", n:"City Barista", tag:"NEW"},
+    {u:"mo-fooddelivery/mo-fooddelivery.html", e:"🍕", n:"Food Delivery", tag:"NEW"},
+    {u:"mo-parking/mo-parking.html", e:"🅿️", n:"Parallel Parking", tag:"NEW"},
+    {u:"mo-crossingguard/mo-crossingguard.html", e:"🛑", n:"Crossing Guard", tag:"NEW"},
+    {u:"mo-laundromat/mo-laundromat.html", e:"🧺", n:"Laundromat", tag:"NEW"},
+    {u:"mo-trafficlights/mo-trafficlights.html", e:"🚦", n:"Traffic Lights", tag:"NEW"},
+    {u:"mo-recyclesorter/mo-recyclesorter.html", e:"♻️", n:"Recycle Sorter", tag:"NEW"},
+    {u:"mo-subwaymap/mo-subwaymap.html", e:"🗺️", n:"Subway Map", tag:"NEW"}
+  ];
+  var CATS=[
+   {t:'🧊 3D Games', kw:['3d','megabuild','buildtown','underground','minihoop','arena']},
+   {t:'🏀 Basketball', kw:['hoop','mo-2k','dunk','3point','freethrow','nbamvp','streetball','buzzer','knockout','halfcourt','popashot','aroundworld','ankle','fastbreak','lockdown','championship','mycareer','mvpcareer','8ball','bowling','baseball','soccer','dodgeball','football','homerun','penalty','qb']},
+   {t:'🏗️ Build & Make', kw:['build','fort','cabin','igloo','lighthouse','pirate','castle','tower','museum','stadium','airport','themepark','lego','robot','rocket','sandcastle','snowfort','coaster','volcano','spacestation','space','lemonade','garden','campsite','waterslide','treehouse','harbor','city','park','farm','zoo','playhouse','hardware','dream','house','court','ranch','aquarium','mermaid','ocean','wizard','fairy','butterfly','bird','stack']},
+   {t:'🐶 Arff & Dogs', kw:['arff','dog','puppy','kitten','cat','pet','horse']},
+   {t:'🏃 Action & Racing', kw:['racer','race','run','jump','fly','jetpack','balloon','zipline','surf','ski','skate','bmx','gokart','sled','trampoline','ninja','ghost','meteor','rainbow','maze','parkour','lava','helirescue','sub','climb','gymnastics','swim','jetski','rocket','flappy','whack','pearl']},
+   {t:'🍔 Food', kw:['pizza','taco','sushi','donut','pancake','smoothie','cupcake','hotdog','popcorn','cookie','burger','icecream','egg','fruit']},
+   {t:'🧹 Clean & Fix', kw:['clean','wash','fixit','messy','fishtank']},
+   {t:'🎵 Music & Fun', kw:['soundtrack','beat','music','color','paint','pixel','art','memory','wheel','balloonpop','snowball','monster']}
+  ];
+  function catOf(x){ if(x.big) return '⭐ Featured'; var s=(x.u+' '+x.n).toLowerCase(); for(var i=0;i<CATS.length;i++){ var c=CATS[i]; for(var k=0;k<c.kw.length;k++){ if(s.indexOf(c.kw[k])>=0) return c.t; } } return '🎮 More Games'; }
+  var ORDER=['⭐ Featured','🧊 3D Games','🏀 Basketball','🏗️ Build & Make','🐶 Arff & Dogs','🏃 Action & Racing','🍔 Food','🧹 Clean & Fix','🎵 Music & Fun','🎮 More Games'];
+  var byUrl={}; GAMES.forEach(function(x){ byUrl[x.u]=x; });
+  var groups={}; GAMES.forEach(function(x){ var c=catOf(x); (groups[c]=groups[c]||[]).push(x); });
+  function getFavs(){ try{return JSON.parse(localStorage.getItem('moFavs')||'[]');}catch(e){return [];} }
+  function setFavs(a){ try{localStorage.setItem('moFavs',JSON.stringify(a));}catch(e){} }
+  var favs=getFavs();
+  function isFav(u){ return favs.indexOf(u)>=0; }
+  function toggleFav(u){ var i=favs.indexOf(u); if(i>=0)favs.splice(i,1); else favs.push(u); setFavs(favs); renderFavs(); refreshStars(); apply(); }
+  function makeCard(x){ var a=document.createElement('a'); a.href=x.u; a.className='card'+(x.big?' big':''); a.dataset.u=x.u; a.dataset.n=x.n.toLowerCase();
+    a.innerHTML=(x.tag?'<span class="tag">'+x.tag+'</span>':'')+'<button class="fav">'+(isFav(x.u)?'★':'☆')+'</button><span class="emo">'+x.e+'</span><span class="name">'+x.n+'</span>';
+    var fb=a.querySelector('.fav'); fb.dataset.u=x.u; fb.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); toggleFav(x.u); });
+    return a; }
+  var root=document.getElementById('sections');
+  var favSec=document.createElement('section'); favSec.className='cat'; favSec.id='favsec';
+  var favH=document.createElement('h2'); favSec.appendChild(favH);
+  var favGrid=document.createElement('div'); favGrid.className='grid'; favSec.appendChild(favGrid); root.appendChild(favSec);
+  function renderFavs(){ favGrid.innerHTML=''; var list=favs.map(function(u){return byUrl[u];}).filter(Boolean); favSec.style.display=list.length?'':'none'; favH.textContent='⭐ My Favorites ('+list.length+')'; list.forEach(function(x){ favGrid.appendChild(makeCard(x)); }); }
+  ORDER.forEach(function(name){ var list=groups[name]; if(!list||!list.length)return; var sec=document.createElement('section'); sec.className='cat'; sec.dataset.cat=name;
+    var h=document.createElement('h2'); h.textContent=name+' ('+list.length+')'; sec.appendChild(h);
+    var g=document.createElement('div'); g.className='grid'; list.forEach(function(x){ g.appendChild(makeCard(x)); }); sec.appendChild(g); root.appendChild(sec); });
+  renderFavs();
+  var present=ORDER.filter(function(n){return groups[n]&&groups[n].length;});
+  var chipsEl=document.getElementById('chips'); var activeCat='All';
+  function addChip(label){ var b=document.createElement('button'); b.className='chip'+(label==='All'?' on':''); b.textContent=label; b.addEventListener('click',function(){ activeCat=label; var cs=document.querySelectorAll('.chip'); for(var i=0;i<cs.length;i++)cs[i].classList.toggle('on',cs[i].textContent===label); window.scrollTo(0,0); apply(); }); chipsEl.appendChild(b); }
+  addChip('All'); present.forEach(function(n){ addChip(n); });
+  function refreshStars(){ var fs=document.querySelectorAll('.fav'); for(var i=0;i<fs.length;i++){ fs[i].textContent=isFav(fs[i].dataset.u)?'★':'☆'; } }
+  var box=document.getElementById('search'); var nores=document.getElementById('noresult');
+  function apply(){ var q=box.value.toLowerCase().trim(); var shown=0; var secs=document.querySelectorAll('#sections section.cat');
+    for(var s=0;s<secs.length;s++){ var sec=secs[s]; var isFavSec=(sec.id==='favsec'); var cards=sec.querySelectorAll('a.card'); var any=false;
+      for(var i=0;i<cards.length;i++){ var a=cards[i]; var catOk=isFavSec||activeCat==='All'||sec.dataset.cat===activeCat; var ok=catOk&&(!q||a.dataset.n.indexOf(q)>=0); a.style.display=ok?'':'none'; if(ok){any=true; if(!isFavSec)shown++;} }
+      sec.style.display=(any && (!isFavSec||favs.length))?'':'none';
+    }
+    nores.style.display=shown?'none':'block';
+  }
+  box.addEventListener('input',function(){ if(box.value){ activeCat='All'; var cs=document.querySelectorAll('.chip'); for(var i=0;i<cs.length;i++)cs[i].classList.toggle('on',cs[i].textContent==='All'); } apply(); });
+  document.getElementById('count').textContent=GAMES.length+' games — tap one to play!';
+  document.getElementById('rand').addEventListener('click',function(){ var x=GAMES[Math.floor(Math.random()*GAMES.length)]; if(x)location.href=x.u; });
+  
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
+  }
 </script>
 </body>
 </html>
