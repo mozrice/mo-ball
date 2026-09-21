@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>MO City Life</title>
+<style>
+ *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+ html,body{margin:0;height:100%;overflow:hidden;font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;background:#0c0620;color:#fff;}
+ #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#8fbfe0;}
+ canvas{touch-action:none;display:block;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<script>
+(function(){
+var cv=document.getElementById('cv'), cx=cv.getContext('2d');
+var W=400,H=640, DPR=Math.min(window.devicePixelRatio||1,2), scale=1;
+function fit(){ var ww=window.innerWidth, wh=window.innerHeight; scale=Math.min(ww/W,wh/H); cv.style.width=(W*scale)+'px'; cv.style.height=(H*scale)+'px'; cv.width=W*DPR; cv.height=H*DPR; cx.setTransform(DPR,0,0,DPR,0,0); }
+window.addEventListener('resize',fit); fit();
+function clamp(v,a,b){return v<a?a:v>b?b:v;}
+function rr(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
+function emoji(ch,x,y,sz){ cx.font=(sz||30)+'px serif'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(ch,x,y); cx.textBaseline='alphabetic'; }
+function d(a,b){ return Math.hypot(a.x-b.x,a.y-b.y); }
+function rnd(n){ var x=Math.sin(n*99.37+11.7)*43758.5453; return x-Math.floor(x); }
+var AC=null; function ac(){ if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} return AC; }
+function bp(f,dd,t,v){ var a=ac(); if(!a)return; if(a.state==='suspended')a.resume(); var o=a.createOscillator(),g=a.createGain(); o.type=t||'sine'; o.frequency.setValueAtTime(f,a.currentTime); g.gain.setValueAtTime(v||0.16,a.currentTime); g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+(dd||0.12)); o.connect(g);g.connect(a.destination); o.start(); o.stop(a.currentTime+(dd||0.12)+0.02); }
+function cash(){ bp(880,0.08,'triangle',0.15); setTimeout(function(){bp(1250,0.1,'triangle',0.14);},60); }
+function ding(){ bp(1050,0.06,'triangle',0.12); }
+function yum(){ bp(600,0.09,'sine',0.13); setTimeout(function(){bp(820,0.09,'sine',0.11);},70); }
+function snore(){ bp(300,0.2,'sine',0.1); setTimeout(function(){bp(360,0.2,'sine',0.09);},220); }
+function swish(){ bp(760,0.08,'sine',0.12); setTimeout(function(){bp(1050,0.08,'sine',0.11);},50); }
+function nope(){ bp(200,0.09,'square',0.09); }
+
+var JB={x:70,y:H-64,r:50}, AB={x:W-58,y:H-58,r:46}, BB={x:W-120,y:H-102,r:36};
+var joyId=null,joyX=0,joyY=0,aId=null,bId=null,aPulse=0;
+function inC(p,c){ return Math.hypot(p.x-c.x,p.y-c.y)<=c.r+10; }
+function inR(p,r){ return p.x>=r.x && p.x<=r.x+r.w && p.y>=r.y && p.y<=r.y+r.h; }
+function pt(e){ var r=cv.getBoundingClientRect(); var t=e.touches?e.touches[0]:e; return {x:(t.clientX-r.left)/scale,y:(t.clientY-r.top)/scale}; }
+cv.addEventListener('pointerdown',function(e){ if(ac()&&ac().state==='suspended')ac().resume(); var p=pt(e);
+  if(screen==='title'){ if(inR(p,PLAYBTN)){ screen='play'; ding(); } return; }
+  if(goalsOpen){ if(inR(p,GCLOSE)){ goalsOpen=false; } else { gsId=e.pointerId; gsLastY=p.y; } return; }
+  if(inR(p,GCHIP)){ goalsOpen=true; return; }
+  if(order&&order.ready){ var fsx=order.x-camX; if(Math.hypot(p.x-fsx,p.y-order.y)<30){ foodId=e.pointerId; order.drag=true; return; } }
+  if(inC(p,BB)){ if(driving){ driving=false; mo.y=ROAD_B+16; showMsg('Parked 🅿️'); } else if(onRoad()){ driving=true; myCarCol=CARCOLS[(Math.random()*CARCOLS.length)|0]; whoosh(); showMsg('Driving! Zoom to a new street 🚗'); } else { bId=e.pointerId; } return; }
+  if(inC(p,AB)){ aId=e.pointerId; aPulse=0.2; act(); return; }
+  if(joyId===null && p.x<W*0.62 && p.y>H*0.40){ joyId=e.pointerId; joyX=p.x; joyY=p.y; } });
+cv.addEventListener('pointermove',function(e){ if(e.pointerId===joyId){ var p=pt(e); joyX=p.x; joyY=p.y; } else if(e.pointerId===foodId && order){ var p=pt(e); order.x=p.x+camX; order.y=clamp(p.y,GY-90,GB); } else if(e.pointerId===gsId){ var p=pt(e); goalsScroll=clamp(goalsScroll+(gsLastY-p.y),0,gsMax()); gsLastY=p.y; } });
+function endPtr(e){ if(e.pointerId===joyId)joyId=null; if(e.pointerId===aId)aId=null; if(e.pointerId===bId)bId=null; if(e.pointerId===gsId)gsId=null;
+  if(e.pointerId===foodId){ foodId=null; if(order&&order.ready){ if(Math.hypot(order.x-mo.x,order.y-(mo.y-14))<50){ energy=clamp(energy+16,0,100); hunger=clamp(hunger+45,0,100); yum(); pop(mo.x,mo.y-30,'😋'); showMsg('Yum! Full belly 🍔'); order=null; } else { order.drag=false; } } } }
+window.addEventListener('pointerup',endPtr); window.addEventListener('pointercancel',endPtr);
+function jv(){ if(joyId===null)return {x:0,y:0}; var dx=clamp(joyX-JB.x,-JB.r,JB.r)/JB.r, dy=clamp(joyY-JB.y,-JB.r,JB.r)/JB.r; var m=Math.hypot(dx,dy); if(m<0.14)return{x:0,y:0}; return {x:dx,y:dy}; }
+
+var GY=250, GB=H-150; // street band (screen y)
+var ROAD_Y=GY+42, ROAD_B=GY+118; // road region (screen y)
+var CARCOLS=['#e0563b','#3a7ac0','#ffd23f','#7ab86a','#e08a2f','#9a5ad0','#e0e0e0','#3a3f49'];
+var cars=[]; (function(){ for(var i=0;i<8;i++){ var lane=i%2; cars.push({x:i*120, lane:lane, sp:60+Math.random()*50, col:CARCOLS[(Math.random()*CARCOLS.length)|0]}); } })();
+var SP=132, X0=60;      // building spacing + first building world x
+var mo={x:W/2,y:H-200,step:0}; // mo.x is WORLD x (endless)
+var camX=0;
+var coins=0, energy=100, day=1, cd=0;
+var person={x:mo.x+320,y:GY+16,bob:0}, companion=null, baby=null, trail=[];
+var order=null, foodId=null, driving=false, myCarCol='#e0563b', lastdir=1;
+var hunger=100, hygiene=100, fun=100, rent=10;
+function onRoad(){ return mo.y>=ROAD_Y-4 && mo.y<=ROAD_B+4; }
+var ownedBiz=[], bizIncome=0, won=false;
+var dog=null, dogNPC={x:mo.x+560,y:GY+16,bob:0};
+var earned=0, works=0, buys=0, homeUps=0, activities=0, blocksSeen=0, goalsN=0, lastGoal='', lastGoalT=0, evalCd=0;
+function fanfare(){ [0,120,240,400,560,720].forEach(function(t,i){ setTimeout(function(){bp([660,830,990,1320,1580,1980][i],0.18,'triangle',0.16);},t); }); }
+var GOAL500=["Save up 🪙50 coins", "Save up 🪙100 coins", "Save up 🪙150 coins", "Save up 🪙200 coins", "Save up 🪙300 coins", "Save up 🪙400 coins", "Save up 🪙500 coins", "Save up 🪙750 coins", "Save up 🪙1000 coins", "Save up 🪙1500 coins", "Save up 🪙2000 coins", "Save up 🪙3000 coins", "Save up 🪙5000 coins", "Save up 🪙10000 coins", "Get a job as a chef and earn coins", "Get a job as a doctor and earn coins", "Get a job as a teacher and earn coins", "Get a job as a builder and earn coins", "Get a job as a pilot and earn coins", "Get a job as a firefighter and earn coins", "Get a job as a artist and earn coins", "Get a job as a coder and earn coins", "Get a job as a vet and earn coins", "Get a job as a baker and earn coins", "Get a job as a banker and earn coins", "Get a job as a bus driver and earn coins", "Get a job as a mail carrier and earn coins", "Get a job as a police officer and earn coins", "Get a job as a farmer and earn coins", "Get a job as a dentist and earn coins", "Get a job as a scientist and earn coins", "Get a job as a DJ and earn coins", "Get a job as a plumber and earn coins", "Get a job as a astronaut and earn coins", "Get a job as a zookeeper and earn coins", "Get a job as a lifeguard and earn coins", "Get a job as a librarian and earn coins", "Get a job as a barber and earn coins", "Get a job as a ice cream maker and earn coins", "Get a job as a pizza maker and earn coins", "Get a job as a train driver and earn coins", "Get a job as a painter and earn coins", "Get a job as a gardener and earn coins", "Get a job as a nurse and earn coins", "Work 3 days in a row without missing", "Work 5 days in a row without missing", "Work 7 days in a row without missing", "Work 10 days in a row without missing", "Work 14 days in a row without missing", "Work 30 days in a row without missing", "Open your own pizza shop", "Open your own ice cream stand", "Open your own toy store", "Open your own gym", "Open your own cafe", "Open your own bakery", "Open your own bank", "Open your own hotel", "Open your own movie theater", "Open your own arcade", "Open your own barber shop", "Open your own flower shop", "Open your own book store", "Open your own clothes shop", "Open your own car wash", "Open your own candy shop", "Open your own burger joint", "Open your own donut shop", "Open your own music store", "Open your own game store", "Get a raise at your job", "Win the lottery ticket", "Become the richest person in the city", "Buy a tiny house", "Buy a cozy house", "Buy a big house", "Buy a tall house", "Buy a fancy house", "Buy a giant house", "Buy a brick house", "Buy a glass house", "Buy a modern house", "Buy a mansion house", "Buy a penthouse house", "Buy a treehouse house", "Buy a castle-like house", "Buy a rainbow house", "Buy a dream house", "Decorate your home with a big sofa", "Decorate your home with a huge TV", "Decorate your home with a comfy bed", "Decorate your home with a soft rug", "Decorate your home with lots of plants", "Decorate your home with cool wall art", "Decorate your home with a bright lamp", "Decorate your home with bunk beds", "Decorate your home with a tall bookshelf", "Decorate your home with a fish tank", "Decorate your home with a game console", "Decorate your home with a piano", "Decorate your home with a basketball hoop", "Decorate your home with string lights", "Decorate your home with a fireplace", "Decorate your home with a chandelier", "Decorate your home with a beanbag chair", "Decorate your home with a mini fridge", "Add a kitchen to your house", "Add a bedroom to your house", "Add a bathroom to your house", "Add a playroom to your house", "Add a garage to your house", "Add an attic to your house", "Add a basement to your house", "Add a balcony to your house", "Add a garden to your house", "Add a pool to your house", "Add a home gym to your house", "Add a movie room to your house", "Add a music room to your house", "Add an art studio to your house", "Paint your house your favorite color", "Get a mailbox with your address on it", "Upgrade to a house with more floors", "Find a friend to live with", "Welcome a baby into the family", "Grow your family to 2 kids", "Grow your family to 3 kids", "Grow your family to 4 kids", "Grow your family to 5 kids", "Grow your family to 6 kids", "Teach the baby to walk", "Teach the baby to talk", "Teach the baby to wave", "Teach the baby to clap", "Teach the baby to play", "Teach the baby to eat", "Teach the baby to sleep by itself", "Teach the baby to say Mo", "Teach the baby to laugh", "Teach the baby to crawl", "Take the whole family to the park", "Take the whole family to the movies", "Take the whole family to the ice cream shop", "Take the whole family to the pizza place", "Take the whole family to the gym", "Take the whole family to the museum", "Take the whole family to the library", "Take the whole family to the beach", "Take the whole family to the zoo", "Take the whole family to the toy store", "Take the whole family to the bakery", "Take the whole family to the court", "Grow the baby into a kid", "Have a family movie night at home", "Throw a birthday party for the baby", "Push the baby in a stroller around the block", "Take a family photo in front of your house", "Make friends with a neighbor", "Invite a friend over for dinner", "Add a hospital to the city", "Add a fire station to the city", "Add a police station to the city", "Add a school to the city", "Add a university to the city", "Add a train station to the city", "Add a airport to the city", "Add a subway stop to the city", "Add a bus stop to the city", "Add a gas station to the city", "Add a car dealership to the city", "Add a pet shop to the city", "Add a aquarium to the city", "Add a planetarium to the city", "Add a water park to the city", "Add a amusement park to the city", "Add a skate park to the city", "Add a soccer field to the city", "Add a baseball field to the city", "Add a swimming pool to the city", "Add a stadium to the city", "Add a concert hall to the city", "Add a theater to the city", "Add a art gallery to the city", "Add a science center to the city", "Add a zoo to the city", "Add a farm to the city", "Add a garden center to the city", "Add a hardware store to the city", "Add a supermarket to the city", "Add a farmers market to the city", "Add a food truck to the city", "Add a taco stand to the city", "Add a sushi bar to the city", "Add a noodle shop to the city", "Add a smoothie bar to the city", "Add a coffee cart to the city", "Add a donut truck to the city", "Add a cupcake shop to the city", "Add a pretzel stand to the city", "Add a hot dog cart to the city", "Add a gym to the city", "Add a yoga studio to the city", "Add a dance studio to the city", "Add a karate dojo to the city", "Add a climbing wall to the city", "Add a bowling alley to the city", "Add a laser tag to the city", "Add a mini golf to the city", "Add a go-kart track to the city", "Add a arcade to the city", "Add a cinema to the city", "Add a library to the city", "Add a bookstore to the city", "Add a comic shop to the city", "Add a toy store to the city", "Add a candy store to the city", "Add a game shop to the city", "Add a music shop to the city", "Add a record store to the city", "Add a barber to the city", "Add a hair salon to the city", "Add a nail salon to the city", "Add a spa to the city", "Add a dentist office to the city", "Add a eye doctor to the city", "Add a pharmacy to the city", "Add a post office to the city", "Add a bank to the city", "Add a ATM to the city", "Add a city hall to the city", "Add a courthouse to the city", "Add a church to the city", "Add a temple to the city", "Add a lighthouse to the city", "Add a windmill to the city", "Add a clock tower to the city", "Add a fountain plaza to the city", "Add a dog park to the city", "Add a picnic area to the city", "Add a campground to the city", "Add a marina to the city", "Add a ferry dock to the city", "Add a pier to the city", "Add a boardwalk to the city", "Add a carousel to the city", "Add a ferris wheel to the city", "Add a roller coaster to the city", "Deliver 3 pizzas around town", "Deliver 5 pizzas around town", "Deliver 10 pizzas around town", "Deliver 20 pizzas around town", "Deliver 50 pizzas around town", "Put out 3 fires with the fire truck", "Put out 5 fires with the fire truck", "Put out 10 fires with the fire truck", "Put out 20 fires with the fire truck", "Feed 3 hungry animals at the zoo", "Feed 5 hungry animals at the zoo", "Feed 10 hungry animals at the zoo", "Feed 20 hungry animals at the zoo", "Catch 3 fish at the pond", "Catch 5 fish at the pond", "Catch 10 fish at the pond", "Catch 25 fish at the pond", "Score 3 baskets at the court", "Score 5 baskets at the court", "Score 10 baskets at the court", "Score 25 baskets at the court", "Score 50 baskets at the court", "Collect 10 stars around the city", "Collect 25 stars around the city", "Collect 50 stars around the city", "Collect 100 stars around the city", "Collect 250 stars around the city", "Visit 5 different streets", "Visit 10 different streets", "Visit 20 different streets", "Visit 50 different streets", "Drive to house number 1000", "Drive to house number 2500", "Drive to house number 5000", "Drive to house number 7777", "Drive to house number 9999", "Help an old neighbor carry groceries", "Return a lost puppy to its owner", "Find the hidden golden coin", "Water every plant on the street", "Clean up litter on your block", "Deliver mail to 5 houses", "Unlock and drive a red car", "Unlock and drive a blue car", "Unlock and drive a sports car", "Unlock and drive a pickup truck", "Unlock and drive a school bus", "Unlock and drive a city bus", "Unlock and drive a taxi", "Unlock and drive a delivery van", "Unlock and drive a motorcycle", "Unlock and drive a scooter", "Unlock and drive a limo", "Unlock and drive a race car", "Unlock and drive a monster truck", "Unlock and drive a fire truck", "Unlock and drive a police car", "Unlock and drive a ice cream truck", "Unlock and drive a food truck", "Unlock and drive a garbage truck", "Unlock and drive a tow truck", "Unlock and drive a convertible", "Fill up your car at the gas station", "Win a street race across town", "Park perfectly in a parking spot", "Beat your best driving time to work", "Give a friend a ride in your car", "Wash your car at the car wash", "Keep your energy full for 1 days", "Keep your energy full for 3 days", "Keep your energy full for 5 days", "Keep your energy full for 7 days", "Keep your energy full for 10 days", "Keep your energy full for 30 days", "Eat at every food shop in the city", "Order food and drag it to Mo to eat", "Try every ice cream flavor", "Get a good night's sleep at home", "Drink a coffee before work", "Take a lunch break at the cafe", "Have a picnic in the park", "Win a 1-on-1 basketball game", "Make a slam dunk", "Make 3 three-pointers", "Make 5 three-pointers", "Make 10 three-pointers", "Make 25 three-pointers", "Beat the boss baller", "Win the city basketball tournament", "Do a crossover and score", "Get a perfect shooting streak", "Practice free throws until you make 10", "See the city light up at night", "Watch the sunset from a rooftop", "Play in the city when it snows", "Splash in puddles on a rainy day", "Fly a kite on a windy day", "Watch fireworks over the city", "Ride the ferris wheel at night", "Find the tallest building in the city", "Ride the subway to the other side of town", "Take the train out of the city and back", "Explore a brand new neighborhood", "Cross the big bridge", "Visit the city park with a fountain", "Feed the ducks at the pond", "Level up Mo to level 5", "Level up Mo to level 10", "Earn a gold trophy", "Fill up your coin bank", "Collect a stamp from every building type", "Unlock a new outfit for Mo", "Unlock a superhero costume", "Get a pair of cool sneakers", "Collect all the hidden stars", "Complete the city map 100%", "Get every job at least once", "Make 10 friends around the city", "Ride every ride in the city", "Try every sport in the city", "Become mayor of the city", "Add a ramen shop to the city", "Add a bagel shop to the city", "Add a juice bar to the city", "Add a pie shop to the city", "Add a waffle house to the city", "Add a steakhouse to the city", "Add a pancake house to the city", "Add a seafood shack to the city", "Add a bbq joint to the city", "Add a salad bar to the city", "Add a cheese shop to the city", "Add a chocolate factory to the city", "Add a cookie shop to the city", "Add a fruit stand to the city", "Add a veggie market to the city", "Add a fish market to the city", "Add a butcher shop to the city", "Add a tea house to the city", "Add a milkshake bar to the city", "Add a frozen yogurt shop to the city", "Do a good deed: help a kid find their balloon", "Do a good deed: give directions to a lost tourist", "Do a good deed: fix a broken street lamp", "Do a good deed: find the runaway shopping cart", "Do a good deed: rescue a cat from a tree with Arff the hero dog", "Do a good deed: deliver flowers to a friend", "Do a good deed: carry an umbrella to someone in the rain", "Do a good deed: find a parking spot for a neighbor", "Do a good deed: hand out free ice cream on a hot day", "Do a good deed: organize a block party", "Unlock a new look: superhero cape", "Unlock a new look: cool sunglasses", "Unlock a new look: a baseball cap", "Unlock a new look: a wizard hat", "Unlock a new look: a cowboy hat", "Unlock a new look: a crown", "Unlock a new look: a jersey", "Unlock a new look: rain boots", "Unlock a new look: winter coat", "Unlock a new look: a bow tie", "Unlock a new look: a backpack", "Unlock a new look: sneakers that light up", "Unlock a new look: a scarf", "Unlock a new look: a chef hat", "Unlock a new look: a firefighter helmet", "Unlock a new look: a space helmet", "Unlock a new look: a party hat", "Unlock a new look: a tuxedo", "Unlock a new look: a costume", "Unlock a new look: pajamas", "Give Mo a mohawk", "Give Mo a ponytail", "Give Mo curly hair", "Give Mo a buzz cut", "Give Mo rainbow hair", "Give Mo a top knot", "Give Mo braids", "Give Mo spiky hair", "Try a giant pizza in the city", "Try a triple ice cream cone in the city", "Try a stack of pancakes in the city", "Try a fruit smoothie in the city", "Try a hot dog in the city", "Try a taco in the city", "Try sushi in the city", "Try a cupcake in the city", "Try a donut in the city", "Try a burger in the city", "Try noodles in the city", "Try a pretzel in the city", "Try cotton candy in the city", "Try a milkshake in the city", "Try a bagel in the city", "Try waffles in the city", "Try a sandwich in the city", "Try fried rice in the city", "Try a burrito in the city", "Try popcorn in the city", "Meet your neighbor Ava and become friends", "Meet your neighbor Leo and become friends", "Meet your neighbor Mia and become friends", "Meet your neighbor Max and become friends", "Meet your neighbor Zoe and become friends", "Meet your neighbor Sam and become friends", "Meet your neighbor Ella and become friends", "Meet your neighbor Finn and become friends", "Meet your neighbor Lily and become friends", "Meet your neighbor Ben and become friends", "Meet your neighbor Ruby and become friends", "Meet your neighbor Jack and become friends", "Meet your neighbor Nora and become friends", "Meet your neighbor Eli and become friends", "Meet your neighbor Cora and become friends", "Meet your neighbor Owen and become friends", "Add a welcome mat to your home", "Add curtains to your home", "Add a clock to your home", "Add a mirror to your home", "Add a coat rack to your home", "Add flower pots to your home", "Add a doormat to your home", "Add a porch swing to your home", "Add a garden gnome to your home", "Add a bird bath to your home", "Add wind chimes to your home", "Add a flag to your home", "Add a wreath to your home", "Add fairy lights to your home", "Add a hammock to your home", "Add a trampoline in the yard to your home", "Add a slide in the yard to your home", "Add a sandbox in the yard to your home", "Add a swing set to your home", "Add a tiny fountain to your home", "Earn 🪙25 coins total", "Earn 🪙60 coins total", "Earn 🪙80 coins total", "Earn 🪙120 coins total", "Earn 🪙175 coins total", "Earn 🪙250 coins total", "Earn 🪙350 coins total", "Earn 🪙600 coins total", "Earn 🪙800 coins total", "Earn 🪙1250 coins total", "Earn 🪙4000 coins total", "Earn 🪙6000 coins total", "Earn 🪙8000 coins total", "Earn 🪙20000 coins total", "Earn 🪙50000 coins total", "Discover 3 streets with different names", "Discover 7 streets with different names", "Discover 12 streets with different names"];
+var G=[]; (function(){ var cJob=0,cBiz=0,cHome=0,cCity=0,cMisc=0; GOAL500.forEach(function(t){ var lc=t.toLowerCase(); var g={t:t,done:false}; var mm=t.match(/([0-9][0-9,]*)/); var money=/🪙/.test(t);
+  if(money && mm){ g.cat='money'; g.n=parseInt(mm[1].replace(/,/g,'')); }
+  else if(/get a job|for a day/.test(lc)){ cJob++; g.cat='job'; g.n=cJob; }
+  else if(/open (your own|a) /.test(lc)){ cBiz++; g.cat='biz'; g.n=cBiz; }
+  else if(/decorate your home|to your house|to your home|buy a .*house|paint your house|upgrade to a house|bookshelf|dream home|add a .*room/.test(lc)){ cHome++; g.cat='home'; g.n=cHome; }
+  else if(/add a .* to the city/.test(lc)){ cCity++; g.cat='city'; g.n=cCity; }
+  else { cMisc++; g.cat='misc'; g.n=cMisc; }
+  G.push(g); }); })();
+function goalsDone(){ return goalsN; }
+function evalGoals(){ var newest=null; for(var i=0;i<G.length;i++){ var g=G[i]; if(g.done)continue; var ok=false;
+    if(g.cat==='money') ok=earned>=g.n;
+    else if(g.cat==='job') ok=works>=g.n;
+    else if(g.cat==='biz') ok=buys>=g.n;
+    else if(g.cat==='home') ok=homeUps>=g.n;
+    else if(g.cat==='city') ok=blocksSeen>=g.n;
+    else ok=activities>=g.n;
+    if(ok){ g.done=true; goalsN++; newest=g.t; } }
+  if(newest){ lastGoal=newest; lastGoalT=2.6; ding(); if(goalsN>=500 && !won){ won=true; fanfare(); } } }
+function checkWin(){ evalGoals(); }
+(function(){ function ic(t){ var l=t.toLowerCase();
+  if(/🪙|coin|rich|payday|money|lottery/.test(l))return '🪙';
+  if(/for a day/.test(l))return '🦸';
+  if(/get a job|work \d|raise/.test(l))return '💼';
+  if(/open (your own|a) |business/.test(l))return '🏬';
+  if(/basketball|dunk|hoop|three-pointer|baller|court/.test(l))return '🏀';
+  if(/house|home|room|decorate|bookshelf|garden|pool|garage|paint your|mailbox|floor/.test(l))return '🏡';
+  if(/add a .* to the city/.test(l))return '🏙️';
+  if(/car|drive|truck|bus|taxi|race|vehicle|motorcycle|scooter|limo|boat|helicopter|balloon/.test(l))return '🚗';
+  if(/baby|family|friend|kid|neighbor|meet your/.test(l))return '👪';
+  if(/dog|puppy/.test(l))return '🐕';
+  if(/pizza|burger|ice cream|cake|donut|food|eat|cafe|bakery|snack|taco|sushi|smoothie|pancake|waffle|cupcake|bagel|noodle|milkshake|pretzel|hot dog|cotton candy|popcorn|fruit|burrito|coffee/.test(l))return '🍔';
+  if(/fish/.test(l))return '🎣';
+  if(/fire/.test(l))return '🚒';
+  if(/animal|zoo/.test(l))return '🦁';
+  if(/park|tree|plant|duck|picnic/.test(l))return '🌳';
+  if(/star|badge|trophy|level|complete the city|stamp|100%/.test(l))return '⭐';
+  if(/outfit|look|hat|costume|sneaker|hair|cape|crown|jersey|glasses|tuxedo|pajamas/.test(l))return '🧢';
+  if(/night|sunset|snow|rain|windy|fireworks|festival|parade|beach|camp|kite|puddle/.test(l))return '🌆';
+  if(/deliver|good deed|help|rescue|find |lost|clean|water every|return/.test(l))return '📦';
+  if(/street|explore|bridge|subway|train|ride|ferris|coaster|carousel|tallest/.test(l))return '🚇';
+  if(/energy|sleep|lunch|break|drink/.test(l))return '⚡';
+  return '🎯'; }
+  G.forEach(function(g){ g.icon=ic(g.t); }); })();
+var goalsOpen=false, goalsScroll=0, gsId=null, gsLastY=0;
+var GCHIP={x:W-134,y:50,w:126,h:26}, GCLOSE={x:W-44,y:10,w:34,h:34};
+function gsMax(){ var rowH=22, vis=(H-24)-96; return Math.max(0, G.length*rowH - vis); }
+var screen='title', tod=0.12, night=0, confetti=[], milestoneT=0, lastMilestone=0, saveCd=0, hasSave=false;
+var PLAYBTN={x:W/2-90,y:H/2+70,w:180,h:60};
+function saveState(){ try{ var s={coins:coins,energy:energy,hunger:hunger,hygiene:hygiene,fun:fun,earned:earned,works:works,buys:buys,homeUps:homeUps,blocks:blocksSeen,acts:activities,day:day,moX:mo.x,comp:!!companion,baby:!!baby,dog:dog?dog.name:null,biz:ownedBiz.length}; localStorage.setItem('moCityLife',JSON.stringify(s)); }catch(e){} }
+function loadState(){ try{ var r=localStorage.getItem('moCityLife'); if(!r)return false; var s=JSON.parse(r); coins=s.coins||0; energy=s.energy!=null?s.energy:100; hunger=s.hunger!=null?s.hunger:100; hygiene=s.hygiene!=null?s.hygiene:100; fun=s.fun!=null?s.fun:100; earned=s.earned||0; works=s.works||0; buys=s.buys||0; homeUps=s.homeUps||0; blocksSeen=s.blocks||0; activities=s.acts||0; day=s.day||1; if(s.moX)mo.x=s.moX; if(s.comp){ companion={x:mo.x-32,y:mo.y,step:0,col:partnerCol}; person=null; } if(s.baby){ baby={x:mo.x-42,y:mo.y,step:0}; } if(s.dog){ dog={x:mo.x-24,y:mo.y,step:0,name:s.dog}; dogNPC=null; } ownedBiz=[]; for(var i=0;i<(s.biz||0);i++)ownedBiz.push('🏬'); evalGoals(); lastMilestone=goalsN; return true; }catch(e){ return false; } }
+function spawnConfetti(nn){ for(var i=0;i<nn;i++)confetti.push({x:W/2+(Math.random()-0.5)*80,y:H*0.4,vx:(Math.random()-0.5)*280,vy:-140-Math.random()*220,c:['#ffd23f','#ff7ac0','#5ad1ff','#9dff6a','#ff6a6a','#c9a0ff'][(Math.random()*6)|0],r:Math.random()*6}); }
+var FOODEMO={cafe:'🍔',pizza:'🍕',icecream:'🍦',bakery:'🥐',hotel:'🍽️',hospital:'🥣',grocery:'🍎'};
+var partnerCol=['#c94a8a','#8a5ad0','#2f9e8a','#d08a2f'][Math.floor(Math.random()*4)];
+var items=[], pops=[], msg='Mo lives in the city — it never ends! WORK · EAT · PLAY · SLEEP', msgT=4;
+function showMsg(t){ msg=t; msgT=1.9; }
+function pop(x,y,e){ pops.push({x:x,y:y,t:0.9,e:e}); } // x is WORLD x
+// building meta
+var TYPES=['home','house','pizza','office','cafe','hotel','court','forsale','gym','bank','icecream','movie','home','bakery','shop','toys','museum','realty','hospital','park','school','grocery','forsale','library'];
+function typeOf(n){ return TYPES[((n%TYPES.length)+TYPES.length)%TYPES.length]; }
+var STREETS=['MO','OAK','MAPLE','PINE','MORGAN','HOOP','STAR','ARFF','MAIN','PARK','ELM','CEDAR'];
+function streetName(n){ return STREETS[Math.floor(((n%72)+72)%72/6)%STREETS.length]; }
+function addrOf(n){ var a=1002+((Math.abs(n)*617)%8800); return a-(a%2); }
+function worldX(n){ return X0+n*SP; }
+var SPOT={
+ home:{e:'🏠',label:'HOME',verb:'SLEEP',col:'#c98a6a',aw:'#b8563a',eff:'sleep'},
+ office:{e:'💼',label:'OFFICE',verb:'WORK',col:'#6a9ad0',aw:'#3a6ea5',eff:'work'},
+ cafe:{e:'☕',label:'CAFE',verb:'EAT',col:'#7ab86a',aw:'#c94a30',eff:'eat'},
+ court:{e:'🏀',label:'COURT',verb:'PLAY',col:'#e0a040',aw:'#3a7a34',eff:'fun'},
+ pizza:{e:'🍕',label:'PIZZA',verb:'EAT',col:'#e07a4a',aw:'#c94a30',eff:'eat'},
+ hotel:{e:'🏨',label:'HOTEL',verb:'REST',col:'#b58ad0',aw:'#6a4a9a',eff:'eat'},
+ gym:{e:'💪',label:'GYM',verb:'TRAIN',col:'#d0708a',aw:'#a03a5a',eff:'fun'},
+ bank:{e:'🏦',label:'BANK',verb:'CASH',col:'#7ac0a0',aw:'#2f8e6a',eff:'bank'},
+ icecream:{e:'🍦',label:'ICE CREAM',verb:'TREAT',col:'#f0b0d0',aw:'#e0709a',eff:'eat'},
+ movie:{e:'🎬',label:'MOVIES',verb:'WATCH',col:'#8a7ad0',aw:'#4a3a9a',eff:'fun'},
+ bakery:{e:'🥐',label:'BAKERY',verb:'EAT',col:'#e0c070',aw:'#c09a30',eff:'eat'},
+ shop:{e:'🛍️',label:'SHOP',verb:'SHOP',col:'#70b0d0',aw:'#3a7aa0',eff:'fun'},
+ toys:{e:'🧸',label:'TOYS',verb:'PLAY',col:'#f0a070',aw:'#d06a3a',eff:'fun'},
+ museum:{e:'🏛️',label:'MUSEUM',verb:'VISIT',col:'#cfc0a0',aw:'#9a8a5a',eff:'fun'},
+ hospital:{e:'🏥',label:'HOSPITAL',verb:'HEAL',col:'#d08a8a',aw:'#b04a4a',eff:'eat'},
+ park:{e:'🌳',label:'PARK',verb:'RELAX',col:'#7ec86a',aw:'#3a8a3a',eff:'fun'},
+ school:{e:'🏫',label:'SCHOOL',verb:'LEARN',col:'#e0a86a',aw:'#b0703a',eff:'work'},
+ grocery:{e:'🛒',label:'GROCERY',verb:'SHOP',col:'#8ac07a',aw:'#4a8a3a',eff:'fun'},
+ library:{e:'📚',label:'LIBRARY',verb:'READ',col:'#b0a0d0',aw:'#6a5a9a',eff:'fun'},
+ forsale:{e:'🏬',label:'FOR SALE',verb:'BUY',col:'#c8b0a0',aw:'#8a6a4a',eff:'buy'},
+ realty:{e:'🏡',label:'REALTY',verb:'BUY',col:'#a0c8b0',aw:'#4a8a6a',eff:'realty'}
+};
+
+function nearestSpot(){ var n0=Math.floor((mo.x-X0)/SP)-1; var best=null,bd=52;
+  for(var n=n0;n<=n0+3;n++){ var t=typeOf(n); if(t==='house')continue; var dx=Math.abs(mo.x-worldX(n)); var dy=Math.abs(mo.y-(GY+16)); var dd=Math.hypot(dx,dy); if(dd<bd){ bd=dd; best={n:n,type:t}; } }
+  return best;
+}
+function act(){ if(cd>0)return;
+  // meet & adopt a friend to live with
+  if(person && !companion && d(mo,person)<54){ companion={x:person.x,y:person.y,step:0,col:partnerCol}; person=null; activities++; evalGoals(); cash(); pop(mo.x,mo.y-34,'💗'); showMsg('You found a friend to live with! 💗'); cd=0.6; return; }
+  // meet & adopt a dog (name it!)
+  if(dogNPC && !dog && d(mo,dogNPC)<54){ var nm=null; try{ nm=window.prompt('Name your new dog! 🐕','Arff'); }catch(e){} nm=(nm&&nm.trim())?nm.trim().slice(0,12):'Arff'; dog={x:dogNPC.x,y:dogNPC.y,step:0,name:nm}; dogNPC=null; activities++; evalGoals(); yum(); pop(mo.x,mo.y-34,'🐕'); showMsg('You adopted '+dog.name+'! 🐕💗'); cd=0.6; return; }
+  var s=nearestSpot(); if(!s){ showMsg(person&&!companion?'Go meet your new friend! 💗':'Walk up to a building, then press A'); return; }
+  var sp=SPOT[s.type], eff=sp.eff;
+  if(eff==='sleep'){ if(companion && !baby){ baby={x:companion.x,y:companion.y,step:0}; cash(); pop(mo.x,mo.y-34,'👶'); showMsg('Your family welcomed a baby! 👶💗'); cd=0.7; } else { energy=100; hygiene=100; day++; snore(); if(coins>=rent){ coins-=rent; showMsg('Slept & showered! Paid 🪙'+rent+' rent. Day '+day); } else { showMsg('Day '+day+' — you owe 🪙'+rent+' rent! Go earn money 💸'); } cd=0.6; } }
+  else if(eff==='work'){ if(energy>=20){ coins+=8; earned+=8; energy-=22; works++; activities++; cash(); pop(mo.x,mo.y-30,'+8'); showMsg('Worked at the '+sp.label+'! +8 🪙'); evalGoals(); cd=0.5; } else { nope(); showMsg('Too tired — go EAT or SLEEP'); } }
+  else if(eff==='bank'){ coins+=12; earned+=12; activities++; cash(); pop(mo.x,mo.y-30,'+12'); showMsg('Payday at the bank! +12 🪙'); evalGoals(); cd=0.8; }
+  else if(eff==='eat'){ if(order){ showMsg(order.ready?'Drag your food to Mo to eat! 😋':'Your food is still cooking…'); return; } order={t:15,ready:false,e:FOODEMO[s.type]||'🍽️',px:worldX(s.n),x:worldX(s.n),y:GY-60,drag:false}; activities++; ding(); showMsg(sp.label+': making your food… 15 sec ⏲️'); evalGoals(); cd=0.5; }
+  else if(eff==='fun'){ if(energy>=10){ coins+=3; earned+=3; energy-=10; fun=clamp(fun+28,0,100); activities++; swish(); pop(mo.x,mo.y-30,'😊'); showMsg('Fun at the '+sp.label+'! +3 🪙'); evalGoals(); cd=0.4; } else { nope(); showMsg('Too tired — rest first'); } }
+  else if(eff==='buy'){ var pr=30; if(coins<pr){ nope(); showMsg('Save 🪙'+pr+' to open a business'); } else { coins-=pr; buys++; activities++; ownedBiz.push('🏪'); cash(); pop(mo.x,mo.y-30,'🏪'); showMsg('Opened a new business! It earns you coins 💰'); evalGoals(); cd=0.6; } }
+  else if(eff==='realty'){ var pr=25; if(coins<pr){ nope(); showMsg('Save 🪙'+pr+' to upgrade your home'); } else { coins-=pr; homeUps++; activities++; cash(); pop(mo.x,mo.y-30,'🏡'); showMsg('Made your home even better! 🏡'); evalGoals(); cd=0.6; } }
+}
+
+function upd(dt){ if(msgT>0)msgT-=dt; if(aPulse>0)aPulse-=dt; if(cd>0)cd-=dt;
+  tod=(tod+dt/130)%1; night=tod<0.5?0:Math.sin((tod-0.5)*Math.PI);
+  if(milestoneT>0)milestoneT-=dt;
+  for(var ci=confetti.length-1;ci>=0;ci--){ var c=confetti[ci]; c.vy+=520*dt; c.x+=c.vx*dt; c.y+=c.vy*dt; c.r+=dt*6; if(c.y>H+20)confetti.splice(ci,1); }
+  if(goalsN>lastMilestone){ if(Math.floor(goalsN/25)>Math.floor(lastMilestone/25)){ spawnConfetti(60); milestoneT=2.6; fanfare(); showMsg('🎉 '+goalsN+' goals done! Keep going!'); } lastMilestone=goalsN; }
+  if(screen==='play'){ saveCd-=dt; if(saveCd<=0){ saveCd=4; saveState(); } }
+  if(screen!=='play')return;
+  var slow=(energy<18||hunger<18)?0.6:1;
+  var base=driving?300:172*slow, boost=(!driving&&bId!==null)?1.7:1; var ymin=driving?ROAD_Y+8:GY+6, ymax=driving?ROAD_B-8:GB-6;
+  var v=jv(); if(Math.hypot(v.x,v.y)>0){ mo.x=clamp(mo.x+v.x*base*boost*dt,30,1e9); mo.y=clamp(mo.y+v.y*base*boost*dt,ymin,ymax); mo.step+=dt*10; if(Math.abs(v.x)>0.04)lastdir=v.x>=0?1:-1; }
+  if(driving)mo.y=clamp(mo.y,ROAD_Y+8,ROAD_B-8);
+  // real-life needs drain over time
+  hunger=clamp(hunger-1.5*dt,0,100); hygiene=clamp(hygiene-0.7*dt,0,100); fun=clamp(fun-0.9*dt,0,100);
+  camX=Math.max(0,mo.x-W/2);
+  // family follows Mo in a trail
+  trail.push({x:mo.x,y:mo.y}); if(trail.length>64)trail.shift();
+  if(companion){ var ci=trail[Math.max(0,trail.length-16)]; companion.x=ci.x; companion.y=ci.y; companion.step+=dt*8; }
+  if(dog){ var di=trail[Math.max(0,trail.length-23)]; dog.x=di.x; dog.y=di.y; dog.step+=dt*9; }
+  if(baby){ var bi=trail[Math.max(0,trail.length-34)]; baby.x=bi.x; baby.y=bi.y; baby.step+=dt*8; }
+  if(person)person.bob+=dt*3; if(dogNPC)dogNPC.bob+=dt*3;
+  if(ownedBiz.length){ bizIncome+=ownedBiz.length*0.6*dt; if(bizIncome>=1){ var gi=Math.floor(bizIncome); coins+=gi; earned+=gi; bizIncome-=gi; } }
+  blocksSeen=Math.max(blocksSeen, Math.floor(mo.x/(SP*6)));
+  if(lastGoalT>0)lastGoalT-=dt;
+  evalCd-=dt; if(evalCd<=0){ evalCd=0.4; evalGoals(); }
+  // cars drive along the road (endless, ambiance)
+  cars.forEach(function(c){ var dir=c.lane===0?1:-1; c.x+=dir*c.sp*dt; if(c.x<camX-120||c.x>camX+W+120){ c.x=dir>0?camX-110:camX+W+110; c.col=CARCOLS[(Math.random()*CARCOLS.length)|0]; c.sp=60+Math.random()*55; } });
+  if(order && !order.ready){ order.t-=dt; if(order.t<=0){ order.ready=true; order.t=0; order.x=mo.x; order.y=GY-56; yum(); showMsg('Food ready! Drag it to Mo to eat 😋'); } }
+  energy=clamp(energy-1.0*dt,0,100);
+  // endless collectibles ahead
+  for(var i=items.length-1;i>=0;i--){ if(items[i].x<camX-80){ items.splice(i,1); continue; } if(d(mo,items[i])<32){ var iv=items[i].e==='⭐'?5:2; coins+=iv; earned+=iv; ding(); pop(items[i].x,items[i].y,items[i].e==='⭐'?'+5':'+2'); items.splice(i,1); } }
+  while(items.length<6){ items.push({x:camX+W+Math.random()*260, y:ROAD_B+10+Math.random()*(GB-ROAD_B-20), e:Math.random()<0.8?'🪙':'⭐'}); }
+  for(var i=pops.length-1;i>=0;i--){ pops[i].t-=dt; pops[i].y-=28*dt; if(pops[i].t<=0)pops.splice(i,1); }
+}
+
+function drawMo(sx,y){ var b=Math.sin(mo.step)*2; cx.save(); cx.translate(sx,y); cx.fillStyle='#3a3f8a'; cx.fillRect(-8,14+b,7,13); cx.fillRect(2,14-b,7,13); cx.fillStyle='#e0563b'; rr(-12,-6,24,22,6); cx.fill(); cx.fillStyle='#8a5a34'; cx.beginPath(); cx.arc(0,-17,10,0,7); cx.fill(); cx.fillStyle='#5a3820'; cx.beginPath(); cx.arc(0,-22,10,Math.PI,0); cx.fill(); cx.fillStyle='#fff'; cx.beginPath(); cx.arc(-3,-16,1.9,0,7); cx.arc(4,-16,1.9,0,7); cx.fill(); cx.fillStyle='#201008'; cx.beginPath(); cx.arc(-3,-16,0.9,0,7); cx.arc(4,-16,0.9,0,7); cx.fill(); cx.restore(); }
+
+function h(n,k){ return rnd(n*7.13+k*131.7+3.1); }
+function shade(hex,f){ var r=parseInt(hex.substr(1,2),16),g=parseInt(hex.substr(3,2),16),b=parseInt(hex.substr(5,2),16); return 'rgb('+Math.round(clamp(r*f,0,255))+','+Math.round(clamp(g*f,0,255))+','+Math.round(clamp(b*f,0,255))+')'; }
+var WALLS=['#d98f6e','#7aa6d6','#8ec78a','#d6a6cf','#e6c66a','#cf9a7a','#9ab0c8','#e0a0a0','#a0d0c0','#b0a0d8','#e8b088','#88b0c8','#d0c0a0','#c8888a','#78b0a0','#b8c070'];
+var DOORS=['#5a3a24','#2f4a6a','#6a2f2f','#2f5a3a','#4a2f5a','#3a3a3a'];
+function drawBuilding(n){ var sx=worldX(n)-camX; if(sx<-100||sx>W+100)return; var t=typeOf(n);
+  var wf=0.84+h(n,8)*0.16, bw=(SP-14)*wf, hh=118+Math.floor(h(n,9)*112); var top=GY-hh; var bxl=sx-bw/2;
+  var col=(t==='house')?WALLS[Math.floor(h(n,0)*WALLS.length)]:SPOT[t].col;
+  var style=Math.floor(h(n,1)*4), roof=Math.floor(h(n,2)*5), winS=Math.floor(h(n,3)*4);
+  var balcony=h(n,4)<0.42, escape=h(n,5)<0.34, rtop=Math.floor(h(n,6)*4);
+  cx.fillStyle=col; cx.fillRect(bxl,top,bw,hh);
+  if(style===0){ cx.strokeStyle='rgba(0,0,0,.08)'; cx.lineWidth=1; for(var by=top+6;by<GY-30;by+=8){ cx.beginPath(); cx.moveTo(bxl,by); cx.lineTo(bxl+bw,by); cx.stroke(); } }
+  else if(style===2){ cx.fillStyle='rgba(140,190,230,.4)'; for(var gx=bxl+4;gx<bxl+bw-4;gx+=14)cx.fillRect(gx,top+8,10,hh-46); }
+  else if(style===3){ cx.fillStyle=shade(col,0.9); cx.fillRect(bxl,top+Math.floor(hh*0.45),bw,6); }
+  cx.fillStyle='rgba(0,0,0,.08)'; cx.fillRect(bxl+bw-4,top,4,hh);
+  var rc=shade(col,0.7);
+  if(roof===1){ cx.fillStyle=rc; cx.beginPath(); cx.moveTo(bxl-3,top); cx.lineTo(sx,top-20); cx.lineTo(bxl+bw+3,top); cx.closePath(); cx.fill(); }
+  else if(roof===2){ cx.fillStyle=rc; cx.beginPath(); cx.moveTo(bxl,top); cx.lineTo(bxl+8,top-14); cx.lineTo(bxl+bw-8,top-14); cx.lineTo(bxl+bw,top); cx.closePath(); cx.fill(); }
+  else if(roof===3){ cx.fillStyle=rc; cx.fillRect(bxl+6,top-8,bw-12,8); cx.fillRect(bxl+16,top-15,bw-32,7); }
+  else if(roof===4){ cx.fillStyle='#8a8f98'; cx.fillRect(sx-10,top-16,20,12); cx.fillStyle='#6a6f78'; cx.fillRect(sx-10,top-4,4,4); cx.fillRect(sx+6,top-4,4,4); }
+  else { cx.fillStyle=rc; cx.fillRect(bxl,top,bw,5); }
+  cx.fillStyle='rgba(255,255,255,.18)'; cx.fillRect(bxl,top+5,bw,2);
+  if(rtop===1){ cx.fillStyle='#9aa0a8'; cx.fillRect(bxl+bw*0.6,top-7,12,7); }
+  else if(rtop===2){ cx.strokeStyle='#7a7f88'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(bxl+bw*0.3,top); cx.lineTo(bxl+bw*0.3,top-16); cx.stroke(); cx.fillStyle='#e0563b'; cx.beginPath(); cx.arc(bxl+bw*0.3,top-16,2,0,7); cx.fill(); }
+  else if(rtop===3){ cx.fillStyle=shade(col,0.6); cx.fillRect(bxl+bw*0.68,top-12,9,12); }
+  var inTop=top+14, inBot=GY-40, availH=inBot-inTop;
+  if(style!==2){ var cw,ch2; if(winS===0){cw=20;ch2=16;} else if(winS===1){cw=15;ch2=24;} else if(winS===2){cw=30;ch2=14;} else {cw=16;ch2=16;}
+    var cols=clamp(Math.floor((bw-10)/(cw+7)),1,4), rows=Math.max(1,Math.floor(availH/(ch2+7)));
+    var usW=cols*cw+(cols-1)*7, ox=bxl+(bw-usW)/2;
+    for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){ var wx=ox+c*(cw+7), wy=inTop+r*(ch2+7); if(wy+ch2>inBot)continue; var lit=h(n*3+r*11+c*5,7)<0.42; cx.fillStyle=lit?'#ffe9a0':shade(col,1.18);
+      if(winS===3){ cx.beginPath(); cx.arc(wx+cw/2,wy+ch2/2,cw/2,0,7); cx.fill(); cx.strokeStyle='rgba(60,60,80,.4)'; cx.lineWidth=1.5; cx.stroke(); }
+      else { rr(wx,wy,cw,ch2,2); cx.fill(); cx.strokeStyle='rgba(60,60,80,.35)'; cx.lineWidth=1; cx.stroke(); if(winS===1){ cx.beginPath(); cx.arc(wx+cw/2,wy,cw/2,Math.PI,0); cx.stroke(); } cx.beginPath(); cx.moveTo(wx+cw/2,wy); cx.lineTo(wx+cw/2,wy+ch2); cx.stroke(); }
+      if(balcony && r===rows-2){ cx.strokeStyle=shade(col,0.6); cx.lineWidth=1.5; cx.strokeRect(wx-2,wy+ch2+1,cw+4,5); for(var bxx=wx-2;bxx<wx+cw+2;bxx+=4){ cx.beginPath(); cx.moveTo(bxx,wy+ch2+1); cx.lineTo(bxx,wy+ch2+6); cx.stroke(); } }
+    }
+  }
+  if(escape){ var ex=bxl+6; cx.strokeStyle='rgba(40,40,50,.5)'; cx.lineWidth=1.5; cx.beginPath(); cx.moveTo(ex,top+20); cx.lineTo(ex,GY-34); cx.moveTo(ex+16,top+20); cx.lineTo(ex+16,GY-34); cx.stroke(); for(var fy=top+30;fy<GY-40;fy+=26){ cx.beginPath(); cx.moveTo(ex,fy); cx.lineTo(ex+16,fy+10); cx.stroke(); } }
+  cx.fillStyle=shade(col,0.82); cx.fillRect(bxl,GY-30,bw,30);
+  var doorX=sx; cx.fillStyle=DOORS[Math.floor(h(n,7)*DOORS.length)]; rr(doorX-12,GY-28,24,28,3); cx.fill(); cx.fillStyle='rgba(255,255,255,.25)'; cx.fillRect(doorX-10,GY-26,20,3); cx.fillStyle='#ffd23f'; cx.beginPath(); cx.arc(doorX+6,GY-14,1.6,0,7); cx.fill();
+  cx.fillStyle='#b9bcc0'; cx.fillRect(doorX-16,GY,32,4); cx.fillStyle='#a9acb0'; cx.fillRect(doorX-20,GY+4,40,4);
+  cx.fillStyle='#20242c'; rr(doorX-28,GY-54,56,15,3); cx.fill(); cx.fillStyle='#ffd23f'; cx.font='bold 11px Trebuchet MS'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(addrOf(n)+' '+streetName(n)+' ST',doorX,GY-46); cx.textBaseline='alphabetic';
+  if(t!=='house'){ var sp=SPOT[t]; var aw=bw-8; for(var i=0;i<8;i++){ cx.fillStyle=i%2?sp.aw:'#fff'; cx.fillRect(bxl+4+i*(aw/8),GY-40,aw/8,10); }
+    cx.fillStyle=sp.aw; cx.beginPath(); cx.moveTo(bxl+4,GY-30); cx.lineTo(bxl+bw-4,GY-30); cx.lineTo(bxl+bw-4,GY-24); cx.lineTo(bxl+4,GY-24); cx.fill();
+    cx.fillStyle='#fff'; rr(sx-30,top+(roof===1?-18:2),60,16,4); cx.fill(); cx.fillStyle=sp.aw; cx.font='bold 10px Trebuchet MS'; cx.textAlign='center'; cx.fillText(sp.label,sx,top+(roof===1?-7:13)); emoji(sp.e,sx,top+(roof===1?-30:-10),18);
+  }
+}
+
+function drawCar(sx,y,dir,col){ if(sx<-70||sx>W+70)return; cx.save(); cx.translate(sx,y); if(dir<0)cx.scale(-1,1);
+  cx.fillStyle='rgba(0,0,0,.2)'; cx.beginPath(); cx.ellipse(0,14,26,5,0,0,7); cx.fill();
+  cx.fillStyle=col; rr(-26,-6,52,18,6); cx.fill(); rr(-14,-18,30,15,6); cx.fill();
+  cx.fillStyle='#bfe3ff'; rr(-11,-15,12,10,3); cx.fill(); rr(3,-15,11,10,3); cx.fill();
+  cx.fillStyle='#ffe08a'; cx.beginPath(); cx.arc(24,3,3,0,7); cx.fill();
+  cx.fillStyle='#222'; cx.beginPath(); cx.arc(-15,13,6,0,7); cx.arc(15,13,6,0,7); cx.fill(); cx.fillStyle='#999'; cx.beginPath(); cx.arc(-15,13,2.5,0,7); cx.arc(15,13,2.5,0,7); cx.fill();
+  cx.restore(); }
+function drawPerson(sx,y,col,b){ cx.save(); cx.translate(sx,y); cx.fillStyle='#4a3a6a'; cx.fillRect(-8,14+b,7,13); cx.fillRect(2,14-b,7,13); cx.fillStyle=col; rr(-12,-6,24,22,6); cx.fill(); cx.fillStyle='#caa06a'; cx.beginPath(); cx.arc(0,-17,10,0,7); cx.fill(); cx.fillStyle='#3a2a1a'; cx.beginPath(); cx.arc(0,-23,10,Math.PI,0); cx.fill(); cx.fillStyle='#fff'; cx.beginPath(); cx.arc(-3,-16,1.9,0,7); cx.arc(4,-16,1.9,0,7); cx.fill(); cx.fillStyle='#201008'; cx.beginPath(); cx.arc(-3,-16,0.9,0,7); cx.arc(4,-16,0.9,0,7); cx.fill(); cx.restore(); }
+function drawBaby(sx,y){ cx.save(); cx.translate(sx,y+8); cx.fillStyle='#ffd23f'; rr(-7,-2,14,12,4); cx.fill(); cx.fillStyle='#f0c9a0'; cx.beginPath(); cx.arc(0,-8,6,0,7); cx.fill(); cx.fillStyle='#201008'; cx.beginPath(); cx.arc(-2,-8,0.8,0,7); cx.arc(2,-8,0.8,0,7); cx.fill(); cx.fillStyle='#8ac0f0'; cx.beginPath(); cx.arc(0,-13,3,Math.PI,0); cx.fill(); cx.restore(); }
+function drawDog(sx,y,step){ var b=Math.sin(step)*2, tail=Math.sin(step*2.4)*5; cx.save(); cx.translate(sx,y+4);
+  cx.strokeStyle='#a06a3a'; cx.lineWidth=4; cx.beginPath(); cx.moveTo(11,0); cx.lineTo(18,-6+tail); cx.stroke();
+  cx.fillStyle='#b97a44'; rr(-13,-4,26,16,8); cx.fill(); cx.beginPath(); cx.arc(-13,-8,8,0,7); cx.fill();
+  cx.fillStyle='#8a5a30'; cx.beginPath(); cx.ellipse(-18,-12,3,5,0.5,0,7); cx.fill();
+  cx.fillStyle='#201008'; cx.beginPath(); cx.arc(-15,-9,1.5,0,7); cx.fill();
+  cx.fillStyle='#e26a8a'; cx.beginPath(); cx.arc(-13,-4,1.8,0,7); cx.fill();
+  cx.fillStyle='#3a5a2a'; cx.fillRect(-8,10,3,6+b); cx.fillRect(6,10,3,6-b);
+  cx.restore(); }
+function draw(){
+  if(screen==='title'){ drawTitleScreen(); return; }
+  var g=cx.createLinearGradient(0,0,0,GY); if(night>0.4){ g.addColorStop(0,'#1a2450'); g.addColorStop(1,'#38406e'); } else { g.addColorStop(0,'#8fc4f0'); g.addColorStop(1,'#cfe6f7'); } cx.fillStyle=g; cx.fillRect(0,0,W,GY);
+  if(night>0.35){ cx.fillStyle='#f4f0d0'; cx.beginPath(); cx.arc(W-46,60,15,0,7); cx.fill(); cx.fillStyle='#e0dcb8'; cx.beginPath(); cx.arc(W-40,56,13,0,7); cx.fill(); cx.fillStyle='rgba(255,255,255,'+night+')'; for(var st=0;st<20;st++){ cx.fillRect((st*53)%W,(st*29)%GY,2,2); } }
+  else { cx.fillStyle='#ffe27a'; cx.beginPath(); cx.arc(W-46,66,17,0,7); cx.fill(); }
+  cx.fillStyle='#fff'; var cloudoff=(camX*0.2)%160; [[80-cloudoff,60],[260-cloudoff,46],[420-cloudoff,64]].forEach(function(c){ if(c[0]<-40)c[0]+=480; cx.beginPath(); cx.arc(c[0],c[1],10,0,7); cx.arc(c[0]+13,c[1],13,0,7); cx.arc(c[0]+27,c[1],9,0,7); cx.fill(); });
+  // buildings across visible range
+  var nStart=Math.floor((camX-90-X0)/SP), nEnd=Math.ceil((camX+W+90-X0)/SP);
+  for(var n=nStart;n<=nEnd;n++){ if(n>=0)drawBuilding(n); }
+  // TOP SIDEWALK (Mo walks by the shops)
+  var sso=camX%40;
+  cx.fillStyle='#c4c8cc'; cx.fillRect(0,GY,W,ROAD_Y-GY); cx.strokeStyle='rgba(150,155,160,.5)'; cx.lineWidth=1; for(var s1=-sso;s1<W;s1+=40){ cx.beginPath(); cx.moveTo(s1,GY); cx.lineTo(s1,ROAD_Y); cx.stroke(); }
+  cx.strokeStyle='#a8acb0'; cx.beginPath(); cx.moveTo(0,GY+1); cx.lineTo(W,GY+1); cx.moveTo(0,ROAD_Y-1); cx.lineTo(W,ROAD_Y-1); cx.stroke();
+  // ROAD with lane markings
+  cx.fillStyle='#4e4e58'; cx.fillRect(0,ROAD_Y,W,ROAD_B-ROAD_Y);
+  cx.fillStyle='#ffd23f'; var doff=camX%46; for(var rx=-doff;rx<W;rx+=46)cx.fillRect(rx,(ROAD_Y+ROAD_B)/2-2,24,4);
+  cx.strokeStyle='rgba(255,255,255,.35)'; cx.lineWidth=1; cx.setLineDash([2,10]); cx.beginPath(); cx.moveTo(0,ROAD_Y+18); cx.lineTo(W,ROAD_Y+18); cx.moveTo(0,ROAD_B-18); cx.lineTo(W,ROAD_B-18); cx.stroke(); cx.setLineDash([]);
+  // CARS
+  cars.forEach(function(c){ drawCar(c.x-camX, c.lane===0?ROAD_Y+18:ROAD_B-18, c.lane===0?1:-1, c.col); });
+  // BOTTOM SIDEWALK
+  cx.fillStyle='#c4c8cc'; cx.fillRect(0,ROAD_B,W,GB-ROAD_B); cx.strokeStyle='rgba(150,155,160,.5)'; cx.lineWidth=1; for(var s2=-sso;s2<W;s2+=40){ cx.beginPath(); cx.moveTo(s2,ROAD_B); cx.lineTo(s2,GB); cx.stroke(); }
+  cx.strokeStyle='#a8acb0'; cx.beginPath(); cx.moveTo(0,ROAD_B+1); cx.lineTo(W,ROAD_B+1); cx.stroke();
+  // sidewalk props (trees, benches, hydrants — no people)
+  var po=((camX%200)+200)%200; for(var px=-po;px<W+40;px+=200){ emoji('🌳',px+30,ROAD_B+24,22); emoji('🪑',px+120,GB-14,17); if(px+170<W)emoji('🚮',px+170,GB-14,15); }
+  // street lamps at each building (scroll)
+  for(var n=nStart;n<=nEnd;n++){ var lx=worldX(n)+SP/2-camX; if(lx<-30||lx>W+30)continue; cx.strokeStyle='#4a4a52'; cx.lineWidth=3; cx.beginPath(); cx.moveTo(lx,GY+22); cx.lineTo(lx,GY-30); cx.stroke(); cx.fillStyle='#ffe08a'; cx.beginPath(); cx.arc(lx,GY-32,4,0,7); cx.fill();
+    // green street sign
+    var nm=streetName(n)+' ST'; cx.font='bold 8px Trebuchet MS'; var sw=cx.measureText(nm).width+10; cx.fillStyle='#2f8e4a'; rr(lx-sw/2,GY-26,sw,12,2); cx.fill(); cx.strokeStyle='#fff'; cx.lineWidth=1; cx.strokeRect(lx-sw/2+1.5,GY-24.5,sw-3,9); cx.fillStyle='#fff'; cx.textAlign='center'; cx.fillText(nm,lx,GY-17.5); }
+  // items (world→screen) — BIG
+  items.forEach(function(it){ emoji(it.e,it.x-camX,it.y,30); });
+  // person to adopt (with 💗 bubble)
+  if(person){ var psx=person.x-camX; if(psx>-30&&psx<W+30){ drawPerson(psx,person.y,partnerCol,Math.sin(person.bob)*2); cx.fillStyle='#fff'; rr(psx-13,person.y-52,26,20,6); cx.fill(); cx.beginPath(); cx.moveTo(psx-4,person.y-33); cx.lineTo(psx+4,person.y-33); cx.lineTo(psx,person.y-27); cx.fill(); emoji('💗',psx,person.y-42,15); } }
+  // dog to adopt (with 🦴 bubble)
+  if(dogNPC){ var dsx=dogNPC.x-camX; if(dsx>-30&&dsx<W+30){ drawDog(dsx,dogNPC.y,dogNPC.bob*2); cx.fillStyle='#fff'; rr(dsx-13,dogNPC.y-50,26,20,6); cx.fill(); cx.beginPath(); cx.moveTo(dsx-4,dogNPC.y-31); cx.lineTo(dsx+4,dogNPC.y-31); cx.lineTo(dsx,dogNPC.y-25); cx.fill(); emoji('🦴',dsx,dogNPC.y-40,14); } }
+  // food order: cooking badge, or draggable ready food with a line to Mo
+  if(order){ if(!order.ready){ var bx=order.px-camX; cx.fillStyle='rgba(20,20,30,.72)'; rr(bx-28,GY-72,56,20,6); cx.fill(); emoji('🍳',bx-15,GY-62,15); cx.fillStyle='#fff'; cx.font='bold 12px Trebuchet MS'; cx.textAlign='center'; cx.fillText(Math.ceil(order.t)+'s',bx+9,GY-58); }
+    else { var fx=order.x-camX; cx.strokeStyle='rgba(255,220,120,.7)'; cx.setLineDash([3,4]); cx.lineWidth=1.5; cx.beginPath(); cx.moveTo(fx,order.y); cx.lineTo(mo.x-camX,mo.y-14); cx.stroke(); cx.setLineDash([]); cx.fillStyle='rgba(255,255,255,.9)'; cx.beginPath(); cx.arc(fx,order.y,17,0,7); cx.fill(); emoji(order.e,fx,order.y,24); } }
+  // pops
+  pops.forEach(function(p){ cx.globalAlpha=Math.max(0,p.t*1.5); if(/\+/.test(p.e)){ cx.fillStyle='#ffd23f'; cx.font='bold 15px Trebuchet MS'; cx.textAlign='center'; cx.fillText(p.e,p.x-camX,p.y);} else emoji(p.e,p.x-camX,p.y,18); cx.globalAlpha=1; });
+  // family follows Mo
+  if(baby)drawBaby(baby.x-camX,baby.y);
+  if(dog){ drawDog(dog.x-camX,dog.y,dog.step); cx.fillStyle='#fff'; cx.font='bold 9px Trebuchet MS'; cx.textAlign='center'; cx.fillText(dog.name,dog.x-camX,dog.y-16); }
+  if(companion)drawPerson(companion.x-camX,companion.y,companion.col,Math.sin(companion.step)*2);
+  if(driving){ drawCar(mo.x-camX,mo.y,lastdir,myCarCol); } else { drawMo(mo.x-camX,mo.y); if(Math.min(energy,hunger,hygiene,fun)<20)emoji('😣',mo.x-camX+14,mo.y-22,14); }
+  // day/night overlay on the scene
+  if(night>0.04){ cx.fillStyle='rgba(14,18,52,'+(night*0.5)+')'; cx.fillRect(0,0,W,GB); }
+  // HUD
+  var fam=baby?'👨‍👩‍👧':companion?'💑':'👤';
+  cx.fillStyle='rgba(20,40,70,.55)'; rr(8,8,W-16,42,10); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 13px Trebuchet MS'; cx.textAlign='left'; cx.fillText(fam+' Day '+day,14,26); cx.textAlign='right'; cx.fillStyle='#ffd23f'; cx.font='bold 15px Trebuchet MS'; cx.fillText('🪙 '+coins,W-14,24);
+  var needs=[['⚡',energy,'#39c46a'],['🍔',hunger,'#e0a040'],['🚿',hygiene,'#4aa0e0'],['😊',fun,'#e05aa0']];
+  for(var ni=0;ni<4;ni++){ var nx=14+ni*47; emoji(needs[ni][0],nx+5,39,12); cx.fillStyle='rgba(255,255,255,.28)'; rr(nx+13,34,28,7,3); cx.fill(); cx.fillStyle=needs[ni][1]<25?'#ff6a6a':needs[ni][2]; rr(nx+13,34,28*needs[ni][1]/100,7,3); cx.fill(); }
+  var n2=nearestSpot();
+  // GOALS panel (top-right)
+  var gpx=W-134, gpy=52; cx.fillStyle='rgba(10,20,30,.7)'; rr(gpx,gpy,126,24,8); cx.fill(); cx.strokeStyle='rgba(255,210,63,.6)'; cx.lineWidth=1.5; rr(gpx,gpy,126,24,8); cx.stroke(); cx.textAlign='left'; cx.font='bold 11px Trebuchet MS'; cx.fillStyle='#ffd23f'; cx.fillText('🎯 '+goalsN+'/500 ☰ list',gpx+8,gpy+16);
+  if(lastGoalT>0){ cx.globalAlpha=Math.min(1,lastGoalT); cx.fillStyle='rgba(20,40,20,.82)'; var lw=Math.min(W-40,cx.measureText(lastGoal).width+40); cx.font='bold 11px Trebuchet MS'; lw=Math.min(W-40,cx.measureText(lastGoal).width+40); rr(W/2-lw/2,gpy+30,lw,20,6); cx.fill(); cx.fillStyle='#9dff6a'; cx.textAlign='center'; cx.fillText('✓ '+lastGoal,W/2,gpy+43); cx.globalAlpha=1; }
+  if(person&&!companion){ var ar=person.x>mo.x?'▶':'◀'; cx.textAlign='center'; cx.fillStyle='#ff9ad2'; cx.font='bold 12px Trebuchet MS'; cx.fillText('💗 Find a friend '+ar,W/2,GY-84); }
+  else if(dogNPC&&!dog){ var ad=dogNPC.x>mo.x?'▶':'◀'; cx.textAlign='center'; cx.fillStyle='#ffd27a'; cx.font='bold 12px Trebuchet MS'; cx.fillText('🐕 Adopt a dog '+ad,W/2,GY-84); }
+  if(companion&&!baby){ cx.textAlign='center'; cx.fillStyle='#ffd0e6'; cx.font='bold 11px Trebuchet MS'; cx.fillText('💗 Go HOME to welcome a baby 👶',W/2,GY-72); }
+  if(won){ cx.textAlign='center'; cx.fillStyle='rgba(0,0,0,.55)'; rr(W/2-135,GY-120,270,34,10); cx.fill(); cx.fillStyle='#ffd23f'; cx.font='bold 17px Trebuchet MS'; cx.fillText('🏆 YOU WON! All 500 goals done!',W/2,GY-98); }
+  if(msgT>0){ cx.globalAlpha=Math.min(1,msgT*1.4); cx.textAlign='center'; cx.fillStyle='#fff'; cx.font='bold 14px Trebuchet MS'; cx.fillText(msg,W/2,GY-56); cx.globalAlpha=1; }
+  else if(person&&!companion&&d(mo,person)<54){ cx.textAlign='center'; cx.fillStyle='#ffd0e6'; cx.font='bold 13px Trebuchet MS'; cx.fillText('Press A to MEET 💗',W/2,GY-56); }
+  else if(dogNPC&&!dog&&d(mo,dogNPC)<54){ cx.textAlign='center'; cx.fillStyle='#ffe0a0'; cx.font='bold 13px Trebuchet MS'; cx.fillText('Press A to ADOPT 🐕',W/2,GY-56); }
+  else if(n2){ cx.textAlign='center'; cx.fillStyle='#eaffea'; cx.font='bold 13px Trebuchet MS'; cx.fillText('Press A to '+SPOT[n2.type].verb,W/2,GY-56); }
+  drawControls(n2);
+  // confetti + milestone banner (screen space)
+  confetti.forEach(function(c){ cx.save(); cx.translate(c.x,c.y); cx.rotate(c.r); cx.fillStyle=c.c; cx.fillRect(-4,-4,8,8); cx.restore(); });
+  if(milestoneT>0){ cx.globalAlpha=Math.min(1,milestoneT); cx.textAlign='center'; cx.fillStyle='#ffd23f'; cx.font='bold 22px Trebuchet MS'; cx.fillText('🎉 '+goalsN+'/500 🎉',W/2,H/2-40); cx.globalAlpha=1; }
+  if(goalsOpen)drawGoals();
+}
+function drawTitleScreen(){ var g=cx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#243a6a'); g.addColorStop(1,'#0e1a3a'); cx.fillStyle=g; cx.fillRect(0,0,W,H);
+  for(var i=0;i<60;i++){ cx.fillStyle='rgba(255,255,255,'+(0.12+(i%5)*0.03)+')'; cx.fillRect((i*61)%W,(i*97)%H,2,2); }
+  // skyline silhouette
+  cx.fillStyle='rgba(20,30,60,.8)'; for(var b=0;b<8;b++){ var bw=W/8, bh=60+((b*53)%70); cx.fillRect(b*bw,H*0.42-bh,bw-4,bh); cx.fillStyle='rgba(255,220,120,.5)'; for(var wy=H*0.42-bh+8;wy<H*0.42-8;wy+=14)cx.fillRect(b*bw+6,wy,6,7); cx.fillStyle='rgba(20,30,60,.8)'; }
+  cx.textAlign='center'; cx.fillStyle='#ffd23f'; cx.font='bold 40px Trebuchet MS'; cx.fillText('MO CITY LIFE',W/2,H/2-70);
+  cx.fillStyle='#9dff6a'; cx.font='bold 15px Trebuchet MS'; cx.fillText('by Coach Mo',W/2,H/2-42);
+  cx.font='26px serif'; cx.fillText('🏙️ 🚗 🏀 🐕 💗 🍔',W/2,H/2+6);
+  cx.fillStyle='rgba(255,255,255,.85)'; cx.font='bold 13px Trebuchet MS'; cx.fillText(hasSave?('Welcome back — '+goalsN+'/500 goals'):'A whole city to live in!',W/2,H/2+40);
+  // PLAY button
+  cx.fillStyle='#39c46a'; rr(PLAYBTN.x,PLAYBTN.y,PLAYBTN.w,PLAYBTN.h,18); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 26px Trebuchet MS'; cx.textBaseline='middle'; cx.fillText(hasSave?'▶ CONTINUE':'▶ PLAY',W/2,PLAYBTN.y+PLAYBTN.h/2); cx.textBaseline='alphabetic';
+  cx.fillStyle='rgba(255,255,255,.6)'; cx.font='11px Trebuchet MS'; cx.fillText('Joystick to move · A to do things · tap 🎯 for goals',W/2,H-40);
+}
+function drawGoals(){ cx.fillStyle='rgba(8,12,24,.95)'; cx.fillRect(0,0,W,H);
+  cx.textAlign='left'; cx.fillStyle='#ffd23f'; cx.font='bold 18px Trebuchet MS'; cx.fillText('🎯 GOALS '+goalsN+'/500',14,30);
+  cx.fillStyle='rgba(255,255,255,.2)'; rr(14,38,W-70,10,5); cx.fill(); cx.fillStyle='#39c46a'; rr(14,38,(W-70)*goalsN/500,10,5); cx.fill();
+  cx.fillStyle='#e0563b'; rr(GCLOSE.x,GCLOSE.y,GCLOSE.w,GCLOSE.h,8); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 18px Trebuchet MS'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('✕',GCLOSE.x+GCLOSE.w/2,GCLOSE.y+GCLOSE.h/2); cx.textBaseline='alphabetic';
+  var rowH=22, listTop=70, listBot=H-22; cx.save(); cx.beginPath(); cx.rect(0,listTop,W,listBot-listTop); cx.clip();
+  var first=Math.max(0,Math.floor(goalsScroll/rowH));
+  for(var i=first;i<G.length;i++){ var y=listTop+16 + i*rowH - goalsScroll; if(y>listBot+10)break; var g=G[i];
+    if(g.done){ cx.fillStyle='rgba(40,90,40,.35)'; cx.fillRect(8,y-15,W-16,rowH-3); }
+    cx.textAlign='left'; cx.font='14px serif'; cx.fillText(g.icon,16,y);
+    cx.font='bold 12px Trebuchet MS'; cx.fillStyle=g.done?'#9dff6a':'rgba(255,255,255,.5)'; cx.fillText(g.done?'✓':'▫',38,y-1);
+    cx.font='11px Trebuchet MS'; cx.fillStyle=g.done?'#dfffdf':'rgba(255,255,255,.85)'; var txt=(i+1)+'. '+g.t; while(cx.measureText(txt).width>W-72 && txt.length>6)txt=txt.slice(0,-2); cx.fillText(txt,54,y-1); }
+  cx.restore();
+  cx.fillStyle='rgba(255,255,255,.5)'; cx.font='9px Trebuchet MS'; cx.textAlign='center'; cx.fillText('drag up/down to scroll · tap ✕ to close',W/2,H-8);
+}
+function drawControls(n){ var v=jv();
+  var jg=cx.createRadialGradient(JB.x,JB.y,6,JB.x,JB.y,JB.r); jg.addColorStop(0,'rgba(255,255,255,.10)'); jg.addColorStop(1,'rgba(255,255,255,.22)'); cx.fillStyle=jg; cx.beginPath(); cx.arc(JB.x,JB.y,JB.r,0,7); cx.fill(); cx.strokeStyle='rgba(255,255,255,.5)'; cx.lineWidth=3; cx.beginPath(); cx.arc(JB.x,JB.y,JB.r,0,7); cx.stroke();
+  cx.strokeStyle='rgba(255,255,255,.22)'; cx.lineWidth=1.5; for(var a=0;a<8;a++){ var ang=a*Math.PI/4; cx.beginPath(); cx.moveTo(JB.x+Math.cos(ang)*(JB.r-10),JB.y+Math.sin(ang)*(JB.r-10)); cx.lineTo(JB.x+Math.cos(ang)*(JB.r-2),JB.y+Math.sin(ang)*(JB.r-2)); cx.stroke(); }
+  var kx=JB.x+v.x*(JB.r-20), ky=JB.y+v.y*(JB.r-20); var kg=cx.createRadialGradient(kx-4,ky-6,2,kx,ky,20); kg.addColorStop(0,'#fff'); kg.addColorStop(1,'#cfd6e6'); cx.fillStyle=kg; cx.beginPath(); cx.arc(kx,ky,20,0,7); cx.fill(); cx.strokeStyle='rgba(0,0,0,.2)'; cx.lineWidth=2; cx.beginPath(); cx.arc(kx,ky,20,0,7); cx.stroke();
+  var ar=AB.r+(aPulse>0?3:0); cx.fillStyle=aId!==null?'#ffd23f':'#f0b400'; cx.beginPath(); cx.arc(AB.x,AB.y,ar,0,7); cx.fill(); cx.fillStyle='#2a1400'; cx.font='bold 12px Trebuchet MS'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(n?SPOT[n.type].verb:'DO',AB.x,AB.y); cx.textBaseline='alphabetic';
+  var blab=driving?'PARK':(onRoad()?'DRIVE':'RUN'); cx.fillStyle=driving?'#e0563b':(bId!==null?'#39c46a':'#2f9e57'); cx.beginPath(); cx.arc(BB.x,BB.y,BB.r,0,7); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 12px Trebuchet MS'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(blab,BB.x,BB.y); cx.textBaseline='alphabetic'; }
+hasSave=loadState();
+var last=performance.now();
+function frame(now){ var dt=Math.min(0.05,(now-last)/1000); last=now; upd(dt); draw(); requestAnimationFrame(frame); }
+requestAnimationFrame(frame);
+window._CL={ get coins(){return coins;}, get energy(){return energy;}, get day(){return day;}, get moX(){return mo.x;}, get hasCompanion(){return !!companion;}, get hasBaby(){return !!baby;}, get orderReady(){return order?order.ready:null;}, get orderT(){return order?order.t:null;}, setMo:function(x,y){mo.x=x;mo.y=y;}, atSpot:function(t){ var n=Math.floor((mo.x-X0)/SP); for(var k=0;k<60;k++){ if(typeOf(n+k)===t){ mo.x=worldX(n+k); mo.y=GY+16; return; } } }, a:function(){cd=0;act();}, verb:function(){var s=nearestSpot();return s?SPOT[s.type].verb:null;}, addrHere:function(){return addrOf(Math.round((mo.x-X0)/SP));},
+  toPerson:function(){ if(person){mo.x=person.x;mo.y=person.y;} }, rushFood:function(){ if(order){order.t=0.01;} }, eatNow:function(){ if(order&&order.ready){ energy=clamp(energy+32,0,100); order=null; return true;} return false; },
+  get driving(){return driving;}, toggleDrive:function(){ if(driving){driving=false;mo.y=ROAD_B+16;}else{mo.y=(ROAD_Y+ROAD_B)/2;driving=true;} }, get carCount(){return cars.length;}, carsVisible:function(){return cars.filter(function(c){return c.x>camX-120&&c.x<camX+W+120;}).length;},
+  get goalsN(){return goalsN;}, get won(){return won;}, get earned(){return earned;}, get works(){return works;}, get buys(){return buys;}, get homeUps(){return homeUps;}, get activities(){return activities;}, get blocks(){return blocksSeen;}, openGoals:function(){goalsOpen=true;}, get goalsOpen(){return goalsOpen;}, firstIcons:function(){return G.slice(0,6).map(function(g){return g.icon;});}, get screen(){return screen;}, play:function(){screen='play';}, setNight:function(v){tod=v;}, save:function(){saveState();}, get hunger(){return hunger;}, get hygiene(){return hygiene;}, get fun(){return fun;}, setNeeds:function(h,g,f){hunger=h;hygiene=g;fun=f;}, get hasDog(){return dog?dog.name:null;}, addCoins:function(n){coins+=n;}, adoptDogTest:function(nm){ if(dogNPC&&!dog){ dog={x:dogNPC.x,y:dogNPC.y,step:0,name:nm||'Arff'}; dogNPC=null; } } };
+})();
+</script>
+</body>
+</html>
