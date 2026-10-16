@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>MO ROCKET BALL</title>
+<style>
+ *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+ html,body{margin:0;height:100%;overflow:hidden;font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;background:#07120a;color:#fff;}
+ #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0e2417;}
+ canvas{touch-action:none;display:block;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<script>
+(function(){
+var cv=document.getElementById('cv'), cx=cv.getContext('2d');
+var W=400,H=640, DPR=Math.min(window.devicePixelRatio||1,2), scale=1;
+function fit(){ var ww=window.innerWidth, wh=window.innerHeight; scale=Math.min(ww/W,wh/H); cv.style.width=(W*scale)+'px'; cv.style.height=(H*scale)+'px'; cv.width=W*DPR; cv.height=H*DPR; cx.setTransform(DPR,0,0,DPR,0,0); }
+window.addEventListener('resize',fit); fit();
+function clamp(v,a,b){return v<a?a:v>b?b:v;}
+function rr(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
+function emoji(ch,x,y,sz){ cx.font=(sz||30)+'px serif'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(ch,x,y); cx.textBaseline='alphabetic'; }
+function inR(p,r){ return p.x>=r.x && p.x<=r.x+r.w && p.y>=r.y && p.y<=r.y+r.h; }
+function pt(e){ var r=cv.getBoundingClientRect(); var t=e.touches?e.touches[0]:e; return {x:(t.clientX-r.left)/scale,y:(t.clientY-r.top)/scale}; }
+var AC=null; function ac(){ if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} return AC; }
+function bp(f,dd,t,v){ var a=ac(); if(!a)return; if(a.state==='suspended')a.resume(); var o=a.createOscillator(),g=a.createGain(); o.type=t||'sine'; o.frequency.setValueAtTime(f,a.currentTime); g.gain.setValueAtTime(v||0.14,a.currentTime); g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+(dd||0.1)); o.connect(g);g.connect(a.destination); o.start(); o.stop(a.currentTime+(dd||0.1)+0.02); }
+function hitS(){ bp(300,0.05,'square',0.10); }
+function goalS(){ [0,90,180,300].forEach(function(t,i){ setTimeout(function(){bp([660,880,1100,1500][i],0.15,'triangle',0.15);},t); }); }
+function whistle(){ bp(1400,0.2,'sine',0.12); }
+
+var FX=20, FY=90, FW=360, FH=470, GW=120; // field + goal mouth width
+var GL=W/2-GW/2, GR=W/2+GW/2;
+var scene='title';
+var car={x:200,y:470,vx:0,vy:0}, cpu={x:200,y:180,vx:0,vy:0}, ball={x:200,y:320,vx:0,vy:0};
+var steer=false, sx=0, sy=0, youG=0, cpuG=0, timeLeft=90, ROUND=90, result=null, best=0, confetti=[], flash=0, kickT=0, msg='', msgT=0;
+try{ best=parseInt(localStorage.getItem('moRocketBest'))||0; }catch(e){}
+var PLAYBTN={x:W/2-90,y:H/2+64,w:180,h:60};
+var CR=20, CPR=20, BR=26;
+
+function kickoff(dir){ ball.x=200; ball.y=320; ball.vx=0; ball.vy=0; car.x=200; car.y=470; car.vx=0;car.vy=0; cpu.x=200; cpu.y=180; cpu.vx=0;cpu.vy=0; }
+function start(){ scene='play'; youG=0; cpuG=0; timeLeft=ROUND; result=null; confetti=[]; kickoff(); whistle(); showMsg('GO! Score in the TOP goal! ⚽'); }
+function showMsg(t){ msg=t; msgT=1.6; }
+function spawnConf(){ for(var i=0;i<70;i++)confetti.push({x:200,y:200,vx:(Math.random()-0.5)*280,vy:-140-Math.random()*200,c:['#ffd23f','#ff7ac0','#5ad1ff','#9dff6a'][(Math.random()*4)|0],r:Math.random()*6}); }
+function endGame(){ scene='over'; result= youG>cpuG?'win':(youG<cpuG?'lose':'tie'); if(youG>best){ best=youG; try{localStorage.setItem('moRocketBest',best);}catch(e){} } whistle(); if(result==='win')spawnConf(); }
+
+cv.addEventListener('pointerdown',function(e){ if(ac()&&ac().state==='suspended')ac().resume(); var p=pt(e);
+  if(scene==='title'){ if(inR(p,PLAYBTN)) start(); return; }
+  if(scene==='over'){ if(inR(p,PLAYBTN)) start(); return; }
+  steer=true; sx=p.x; sy=p.y;
+});
+cv.addEventListener('pointermove',function(e){ if(!steer)return; var p=pt(e); sx=p.x; sy=p.y; });
+function endS(){ steer=false; } cv.addEventListener('pointerup',endS); cv.addEventListener('pointercancel',endS);
+
+function collide(a,rad){ var dx=ball.x-a.x, dy=ball.y-a.y, d=Math.hypot(dx,dy), min=rad+BR; if(d<min && d>0){ var nx=dx/d, ny=dy/d; var overlap=min-d; ball.x+=nx*overlap; ball.y+=ny*overlap; var push=Math.hypot(a.vx,a.vy)*0.6+120; ball.vx=nx*push+a.vx*0.4; ball.vy=ny*push+a.vy*0.4; hitS(); kickT=0.2; } }
+
+function upd(dt){ if(msgT>0)msgT-=dt; if(flash>0)flash-=dt; if(kickT>0)kickT-=dt;
+  for(var ci=confetti.length-1;ci>=0;ci--){ var c=confetti[ci]; c.vy+=520*dt; c.x+=c.vx*dt; c.y+=c.vy*dt; c.r+=dt*6; if(c.y>H+20)confetti.splice(ci,1); }
+  if(scene!=='play')return;
+  timeLeft-=dt; if(timeLeft<=0){ timeLeft=0; endGame(); return; }
+  // player car steer toward touch point
+  if(steer){ var dx=sx-car.x, dy=sy-car.y, d=Math.hypot(dx,dy); if(d>4){ car.vx+=dx/d*900*dt; car.vy+=dy/d*900*dt; } }
+  var cs=Math.hypot(car.vx,car.vy), MAX=260; if(cs>MAX){ car.vx*=MAX/cs; car.vy*=MAX/cs; }
+  car.vx*=0.92; car.vy*=0.92; car.x+=car.vx*dt; car.y+=car.vy*dt;
+  car.x=clamp(car.x,FX+CR,FX+FW-CR); car.y=clamp(car.y,FY+CR,FY+FH-CR);
+  // computer AI: get behind the ball (above it) and push it down toward your goal
+  var tx=ball.x, ty=ball.y-46; var ddx=tx-cpu.x, ddy=ty-cpu.y, dd=Math.hypot(ddx,ddy); if(dd>4){ cpu.vx+=ddx/dd*620*dt; cpu.vy+=ddy/dd*620*dt; }
+  var cps=Math.hypot(cpu.vx,cpu.vy), CMAX=200; if(cps>CMAX){ cpu.vx*=CMAX/cps; cpu.vy*=CMAX/cps; }
+  cpu.vx*=0.93; cpu.vy*=0.93; cpu.x+=cpu.vx*dt; cpu.y+=cpu.vy*dt;
+  cpu.x=clamp(cpu.x,FX+CPR,FX+FW-CPR); cpu.y=clamp(cpu.y,FY+CPR,FY+FH-CPR);
+  // ball physics
+  ball.vx*=0.985; ball.vy*=0.985; ball.x+=ball.vx*dt; ball.y+=ball.vy*dt;
+  // side walls
+  if(ball.x<FX+BR){ ball.x=FX+BR; ball.vx*=-0.7; } if(ball.x>FX+FW-BR){ ball.x=FX+FW-BR; ball.vx*=-0.7; }
+  // top wall (except goal mouth) => goal for YOU
+  if(ball.y<FY+BR){ if(ball.x>GL && ball.x<GR){ if(ball.y<FY-4){ youG++; goalS(); flash=0.4; spawnConf(); showMsg('GOAL! ⚽🎉'); kickoff(); } } else { ball.y=FY+BR; ball.vy*=-0.7; } }
+  // bottom wall (except goal mouth) => goal for CPU
+  if(ball.y>FY+FH-BR){ if(ball.x>GL && ball.x<GR){ if(ball.y>FY+FH+4){ cpuG++; goalS(); flash=0.4; showMsg('Computer scored! 😮'); kickoff(); } } else { ball.y=FY+FH-BR; ball.vy*=-0.7; } }
+  collide(car,CR); collide(cpu,CPR);
+}
+
+function drawCar(x,y,col,face){ cx.save(); cx.translate(x,y); cx.fillStyle=col; rr(-16,-12,32,24,7); cx.fill(); cx.fillStyle='rgba(255,255,255,.85)'; rr(-10,-8,20,10,4); cx.fill(); cx.fillStyle='#20242c'; cx.fillRect(-18,-13,5,8); cx.fillRect(13,-13,5,8); cx.fillRect(-18,5,5,8); cx.fillRect(13,5,5,8); cx.restore(); emoji(face,x,y-1,15); }
+function draw(){
+  var fk=flash>0?(Math.random()-0.5)*6:0; cx.save(); cx.translate(fk,fk);
+  if(scene==='title'){ drawTitle(); cx.restore(); return; }
+  cx.fillStyle='#0e2417'; cx.fillRect(0,0,W,H);
+  // field
+  cx.fillStyle='#1f7a3a'; cx.fillRect(FX,FY,FW,FH); cx.fillStyle='#1c6e35'; for(var s=0;s<FH;s+=46)cx.fillRect(FX,FY+s,FW,23);
+  cx.strokeStyle='rgba(255,255,255,.7)'; cx.lineWidth=3; cx.strokeRect(FX,FY,FW,FH);
+  cx.beginPath(); cx.moveTo(FX,FY+FH/2); cx.lineTo(FX+FW,FY+FH/2); cx.stroke();
+  cx.beginPath(); cx.arc(W/2,FY+FH/2,44,0,7); cx.stroke();
+  // goals
+  cx.strokeStyle='#ffd23f'; cx.lineWidth=5; cx.beginPath(); cx.moveTo(GL,FY); cx.lineTo(GR,FY); cx.stroke(); cx.beginPath(); cx.moveTo(GL,FY+FH); cx.lineTo(GR,FY+FH); cx.stroke();
+  cx.fillStyle='rgba(255,210,60,.15)'; cx.fillRect(GL,FY-10,GW,12); cx.fillRect(GL,FY+FH-2,GW,12);
+  cx.fillStyle='#fff'; cx.font='bold 10px Trebuchet MS'; cx.textAlign='center'; cx.fillText('▲ SCORE HERE ▲',W/2,FY-2); cx.fillText('▼ YOUR GOAL ▼',W/2,FY+FH+11);
+  // ball
+  var bs=1+(kickT>0?kickT*0.6:0); cx.save(); cx.translate(ball.x,ball.y); cx.scale(bs,bs); emoji('⚽',0,0,BR*2-6); cx.restore();
+  // cars
+  drawCar(cpu.x,cpu.y,'#c0392b','🐕'); drawCar(car.x,car.y,'#2f6ad0','🧒');
+  // scoreboard
+  cx.fillStyle='rgba(5,15,10,.85)'; rr(8,8,W-16,44,10); cx.fill();
+  cx.textAlign='left'; cx.fillStyle='#5aa9ff'; cx.font='bold 14px Trebuchet MS'; cx.fillText('🧒 YOU',14,26); cx.font='bold 22px Trebuchet MS'; cx.fillText(youG,14,46);
+  cx.textAlign='right'; cx.fillStyle='#ff8a7a'; cx.font='bold 14px Trebuchet MS'; cx.fillText('ARFF CPU 🐕',W-14,26); cx.font='bold 22px Trebuchet MS'; cx.fillText(cpuG,W-14,46);
+  cx.textAlign='center'; cx.fillStyle='#fff'; cx.font='bold 20px Trebuchet MS'; cx.fillText('⏱ '+Math.ceil(timeLeft),W/2,40);
+  if(msgT>0){ cx.globalAlpha=Math.min(1,msgT*1.4); cx.textAlign='center'; cx.fillStyle='#ffd23f'; cx.font='bold 20px Trebuchet MS'; cx.fillText(msg,W/2,FY+FH/2); cx.globalAlpha=1; }
+  confetti.forEach(function(c){ cx.save(); cx.translate(c.x,c.y); cx.rotate(c.r); cx.fillStyle=c.c; cx.fillRect(-4,-4,8,8); cx.restore(); });
+  if(flash>0){ cx.fillStyle='rgba(255,255,255,'+(flash*0.5)+')'; cx.fillRect(0,0,W,H); }
+  if(scene==='over'){ drawOver(); }
+  cx.restore();
+  // steer hint
+  if(scene==='play' && !steer){ cx.fillStyle='rgba(255,255,255,.5)'; cx.font='bold 11px Trebuchet MS'; cx.textAlign='center'; cx.fillText('👆 touch & drag to drive your car',W/2,H-14); }
+}
+function drawOver(){ cx.fillStyle='rgba(5,15,10,.8)'; cx.fillRect(0,0,W,H); cx.textAlign='center'; emoji(result==='win'?'🏆':(result==='tie'?'🤝':'🐕'),W/2,180,64);
+  cx.fillStyle=result==='win'?'#ffd23f':(result==='tie'?'#fff':'#ff9a9a'); cx.font='bold 30px Trebuchet MS'; cx.fillText(result==='win'?'YOU WIN!':(result==='tie'?"IT'S A TIE!":'ARFF WINS!'),W/2,250);
+  cx.fillStyle='#fff'; cx.font='bold 20px Trebuchet MS'; cx.fillText('🧒 '+youG+'   -   '+cpuG+' 🐕',W/2,292);
+  cx.fillStyle= youG>=best?'#9dff6a':'rgba(255,255,255,.8)'; cx.font='bold 13px Trebuchet MS'; cx.fillText(youG>=best?'🏆 NEW BEST!':'🏆 Best: '+best,W/2,320);
+  cx.fillStyle='#39c46a'; rr(PLAYBTN.x,PLAYBTN.y,PLAYBTN.w,PLAYBTN.h,18); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 24px Trebuchet MS'; cx.textBaseline='middle'; cx.fillText('▶ PLAY AGAIN',W/2,PLAYBTN.y+PLAYBTN.h/2); cx.textBaseline='alphabetic'; }
+function drawTitle(){ var g=cx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#1f7a3a'); g.addColorStop(1,'#0a1a10'); cx.fillStyle=g; cx.fillRect(0,0,W,H);
+  cx.textAlign='center'; emoji('🚗',W/2-54,150,44); emoji('⚽',W/2,140,50); emoji('🐕',W/2+56,150,40);
+  cx.fillStyle='#ffd23f'; cx.font='bold 34px Trebuchet MS'; cx.fillText('MO ROCKET',W/2,H/2-44); cx.font='bold 40px Trebuchet MS'; cx.fillStyle='#fff'; cx.fillText('BALL ⚽',W/2,H/2-4);
+  cx.fillStyle='rgba(255,255,255,.85)'; cx.font='12px Trebuchet MS'; cx.fillText('Drive your car to smash the ball into the goal!',W/2,H/2+24); cx.fillText('Beat Arff the CPU 🐕 — most goals wins!',W/2,H/2+42);
+  cx.fillStyle='#39c46a'; rr(PLAYBTN.x,PLAYBTN.y,PLAYBTN.w,PLAYBTN.h,18); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 26px Trebuchet MS'; cx.textBaseline='middle'; cx.fillText('▶ PLAY',W/2,PLAYBTN.y+PLAYBTN.h/2); cx.textBaseline='alphabetic';
+  if(best>0){ cx.fillStyle='rgba(255,255,255,.7)'; cx.font='11px Trebuchet MS'; cx.fillText('🏆 Best: '+best+' goals',W/2,H-30); }
+}
+var last=performance.now();
+function frame(now){ var dt=Math.min(0.05,(now-last)/1000); last=now; upd(dt); draw(); requestAnimationFrame(frame); }
+requestAnimationFrame(frame);
+window._RB={ get scene(){return scene;}, get you(){return youG;}, get cpu(){return cpuG;}, get result(){return result;}, get best(){return best;}, get timeLeft(){return timeLeft;}, start:function(){start();}, setTime:function(t){timeLeft=t;}, setBall:function(x,y,vx,vy){ball.x=x;ball.y=y;ball.vx=vx||0;ball.vy=vy||0;}, setCar:function(x,y){car.x=x;car.y=y;}, ballXY:function(){return {x:ball.x,y:ball.y};}, carXY:function(){return {x:car.x,y:car.y};}, field:function(){return {FX:FX,FY:FY,FW:FW,FH:FH,GL:GL,GR:GR};} };
+})();
+</script>
+</body>
+</html>

@@ -7,95 +7,313 @@
   html,body{margin:0;height:100%;background:#8ac04a;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none;}
   canvas{display:block;width:100%;height:100%;position:absolute;inset:0;}
   a.back{position:fixed;top:8px;left:10px;color:#fff;opacity:.95;text-decoration:none;font-size:14px;z-index:5;font-weight:bold;text-shadow:0 1px 3px #000;}
-  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:18px;font-weight:bold;color:#fff;pointer-events:none;text-shadow:0 1px 4px #000;z-index:4;}
-  #sub{position:fixed;top:34px;left:0;right:0;text-align:center;font-size:14px;font-weight:bold;color:#ffe08a;pointer-events:none;text-shadow:0 1px 3px #000;z-index:4;}
-  #tray{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:10px 8px;background:rgba(0,0,0,0.5);border-top:3px solid rgba(255,255,255,0.3);z-index:6;}
-  .item{position:relative;font-size:30px;background:rgba(255,255,255,0.92);border:3px solid rgba(255,255,255,0.6);border-radius:16px;width:58px;height:58px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 0 rgba(0,0,0,0.28);}
-  .item .lbl{position:absolute;bottom:-15px;left:0;right:0;text-align:center;font-size:9px;color:#fff;font-weight:bold;text-shadow:0 1px 2px #000;}
-  .item.done{opacity:.38;}
-  .item.done::after{content:'✓';position:absolute;top:-6px;right:-6px;background:#2ec46a;color:#fff;font-size:14px;font-weight:bold;width:21px;height:21px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
-  .item:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,0.28);}
-  #start,#over{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8;text-align:center;padding:20px;}
-  #start{background:linear-gradient(#8ac04a,#c0e888);}
-  #start h1{font-size:25px;margin:0 0 6px;text-shadow:0 2px 4px #0007;} #start p{font-size:15px;margin:4px;max-width:330px;}
+  #hud{position:fixed;top:8px;left:0;right:0;text-align:center;font-size:17px;font-weight:bold;color:#fff;pointer-events:none;text-shadow:0 1px 4px #000;z-index:4;}
+  #sub{position:fixed;top:32px;left:0;right:0;text-align:center;font-size:14px;font-weight:bold;color:#fff;pointer-events:none;text-shadow:0 1px 3px #000;z-index:4;padding:0 10px;}
+  #coins{position:fixed;top:8px;right:10px;font-size:16px;font-weight:bold;color:#fff;z-index:5;text-shadow:0 1px 3px #000;}
+  #act{position:fixed;bottom:24px;right:20px;background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:20px;width:92px;height:92px;border-radius:50%;font-family:inherit;box-shadow:0 5px 0 #b4801a;z-index:6;}
+  #act:active{transform:translateY(3px);box-shadow:0 2px 0 #b4801a;}
+  #planbtn{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:linear-gradient(#8fe29a,#2ec46a);border:none;color:#0a3a1a;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #1a8a46;z-index:6;}
+  #planbtn:active{transform:translateX(-50%) translateY(3px);box-shadow:0 2px 0 #1a8a46;}
+  #start,#over,#pick,#type,#upg,#lotto,#mode{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:8;text-align:center;padding:20px;}
+  #mode{background:linear-gradient(#bfe0ff,#8fd0ff);}
+  #mode h1{font-size:26px;margin:0 0 6px;color:#143a5a;text-shadow:0 2px 3px #fff6;} #mode p{font-size:15px;color:#143a5a;max-width:320px;}
+  #modes{display:flex;gap:14px;margin-top:20px;flex-wrap:wrap;justify-content:center;}
+  #modes button{background:linear-gradient(#fff,#cfe8ff);border:none;color:#143a5a;font-weight:bold;font-size:18px;width:140px;height:130px;border-radius:18px;font-family:inherit;box-shadow:0 5px 0 #4a7aa8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;}
+  #modes button .e{font-size:48px;} #modes button:active{transform:translateY(3px);box-shadow:0 2px 0 #4a7aa8;}
+  #start{display:flex;background:linear-gradient(#8ac04a,#c0e888);}
+  #start h1{font-size:25px;margin:0 0 6px;text-shadow:0 2px 4px #0007;} #start p{font-size:15px;margin:4px;max-width:340px;}
   #start .big{font-size:60px;}
-  #over{background:#000a;display:none;}
+  #pick,#type,#upg,#lotto{background:linear-gradient(#ffd9a0,#f0b429);}
+  #pick h1,#type h1,#upg h1,#lotto h1{font-size:28px;margin:0 0 6px;color:#5a3a00;text-shadow:0 2px 3px #fff6;} #pick p,#type p,#upg p,#lotto p{font-size:16px;margin:4px;color:#5a3a00;max-width:330px;}
+  #picks,#types,#upgs,#lottos{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:18px;max-width:350px;}
+  #lottos button{background:linear-gradient(#fff2c0,#ffd23f);border:none;color:#5a3a00;font-weight:bold;font-size:40px;width:92px;height:110px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+  #lottos button.scratched{background:linear-gradient(#8fe29a,#2ec46a);color:#0a3a1a;font-size:20px;}
+  #lottobtns{display:flex;gap:12px;margin-top:18px;flex-wrap:wrap;justify-content:center;}
+  #lottoagain{background:linear-gradient(#fff2c0,#ffd23f);border:none;color:#5a3a00;font-weight:bold;font-size:18px;padding:12px 22px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+  #lottogo,#upgdone{background:linear-gradient(#8fe29a,#2ec46a);border:none;color:#0a3a1a;font-weight:bold;font-size:20px;padding:12px 26px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #1a8a46;}
+  #picks button{background:linear-gradient(#fff2c0,#ffd23f);border:none;color:#5a3a00;font-weight:bold;font-size:26px;width:92px;height:72px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
+  #types button{background:linear-gradient(#fff2c0,#ffd23f);border:none;color:#5a3a00;font-weight:bold;font-size:18px;width:150px;height:120px;border-radius:18px;font-family:inherit;box-shadow:0 5px 0 #b4801a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;}
+  #types button .e{font-size:44px;}
+  #upgs button{background:linear-gradient(#fff2c0,#ffd23f);border:none;color:#5a3a00;font-weight:bold;font-size:13px;width:98px;height:84px;border-radius:14px;font-family:inherit;box-shadow:0 4px 0 #b4801a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}
+  #upgs button .e{font-size:30px;} #upgs button.owned{opacity:.5;} #upgs button:disabled{opacity:.4;}
+  #over{background:#000a;}
   #over h1{font-size:30px;color:#ffd23f;margin:0 0 6px;text-shadow:0 2px 0 #b47a1a;} #over p{font-size:17px;margin:3px;}
-  #start button,#over button{margin-top:16px;background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;font-family:inherit;box-shadow:0 5px 0 #b4801a;}
-  #start button:active,#over button:active{transform:translateY(3px);box-shadow:0 2px 0 #b4801a;}
+  #start button,#over button,#lottogo,#upgdone,#lottoagain,#picks button,#types button,#upgs button{font-family:inherit;}
+  #start button,#over button{margin-top:16px;background:linear-gradient(#ffe07a,#f0b429);border:none;color:#5a3a00;font-weight:bold;font-size:22px;padding:14px 30px;border-radius:16px;box-shadow:0 5px 0 #b4801a;}
+  button:active{transform:translateY(3px);}
 </style></head>
 <body>
 <a class="back" href="../games.html">&#11013; Games</a>
-<div id="hud">✨ <span id="n">0</span>/<span id="tot">0</span></div>
-<div id="sub">Tap a thing — it goes ON!</div>
+<div id="hud">🚜 MO FARM</div>
+<div id="coins">🪙 0</div>
+<div id="sub">Drive Mo around the farm!</div>
 <canvas id="c"></canvas>
-<div id="tray"></div>
-<div id="start"><div class="big">🚜</div><h1>MO Farm Build</h1><p>👆 Tap a thing on the tray — it flies ON and sticks! Use them all!</p><button id="go">&#9654; START</button></div>
-<div id="over"><h1 id="ot">&#127881; DONE!</h1><p id="om"></p><button id="rs">&#9654; Play Again</button></div>
+<button id="act">👆<br>DO</button>
+<button id="planbtn" style="display:none">🌱 START FARMING!</button>
+<div id="start"><div class="big">🚜</div><h1>MO Farm Build</h1><p>🕹️ Drive Mo with the joystick! Win money in the lottery, buy seeds, grow crops, get cheese, meat & eggs, cook dinner — then serve customers at the outdoor tables OR deliver to their far-away houses. Spend your money to make it nicer!</p><button id="go">&#9654; START</button></div>
+<div id="mode"><h1>🎮 How do you want to play?</h1><p>Joystick: drive Mo around. Tap: tap the things.</p><div id="modes"></div></div>
+<div id="lotto"><h1>🎟️ MO LOTTERY</h1><p id="lottop">Pick a ticket to win money for seeds!</p><div id="lottos"></div><div id="lottobtns"><button id="lottoagain" style="display:none">🎟️ Play Again</button><button id="lottogo" style="display:none">&#9654; BUY SEEDS!</button></div></div>
+<div id="type"><h1>🏪 Where will you sell?</h1><p>Pick your shop!</p><div id="types"></div></div>
+<div id="pick"><h1 id="pickh">🏪 Dinner Shop!</h1><p>How many customers do you want today? Half eat here, half want delivery!</p><div id="picks"></div></div>
+<div id="upg"><h1>✨ Make it nicer!</h1><p id="upgbal">Spend your coins on your shop!</p><div id="upgs"></div><button id="upgdone">&#9654; OPEN SHOP!</button></div>
+<div id="over"><h1 id="ot">&#127881; DINNER TIME!</h1><p id="om"></p><button id="rs">&#9654; Play Again</button></div>
 <script>
 (function(){
   var cv=document.getElementById('c'),ctx=cv.getContext('2d'),W,H,DPR;
   function fit(){ DPR=Math.min(2,window.devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
   window.addEventListener('resize',fit); fit();
-  var ITEMS=[{"e": "🚜", "n": "🚜"}, {"e": "🌾", "n": "🌾"}, {"e": "🐄", "n": "🐄"}, {"e": "🐖", "n": "🐖"}, {"e": "🐔", "n": "🐔"}, {"e": "🏚️", "n": "🏚️"}, {"e": "🌽", "n": "🌽"}, {"e": "🥕", "n": "🥕"}], BG=["#8ac04a", "#c0e888"], GROUND="#6a9a3a", HERO='🚜', PAYOFF='🚜', OKMSG='Your farm is all set!', PANEL='#dff3c3';
-  var used, running, flyers, sparks, tt, hearts, stuck, glow, pop, bounce;
-  var tray=document.getElementById('tray'); document.getElementById('tot').textContent=ITEMS.length;
-  function heroSize(){ return Math.min(W*0.30,H*0.20,110); }
-  function heroPos(){ return {x:W*0.5, y:H*0.42}; }
-  function offset(i){ var n=ITEMS.length; var ang=-Math.PI/2 + i*(2*Math.PI/n); var rad=heroSize()*1.15; return {ox:Math.cos(ang)*rad, oy:Math.sin(ang)*rad}; }
-  function buildTray(){ tray.innerHTML=''; ITEMS.forEach(function(it,i){ var b=document.createElement('button'); b.className='item'; b.innerHTML=it.e+'<span class="lbl">'+it.n+'</span>'; b.onclick=function(){ useItem(i,b); }; it.btn=b; tray.appendChild(b); }); }
-  function reset(){ used=0; running=true; flyers=[]; sparks=[]; tt=0; hearts=[]; stuck=[]; glow=0; pop=0; bounce=0;
-    ITEMS.forEach(function(it){ it.done=false; }); buildTray();
-    document.getElementById('n').textContent=0; document.getElementById('over').style.display='none'; document.getElementById('start').style.display='none'; document.getElementById('sub').textContent='👇 Tap a thing — it goes ON!'; }
-  function useItem(i,b){ if(!running)return; var it=ITEMS[i]; if(it.done)return; it.done=true; b.classList.add('done'); used++; document.getElementById('n').textContent=used;
-    var r=b.getBoundingClientRect(), cr=cv.getBoundingClientRect(); var sx=r.left+r.width/2-cr.left, sy=r.top+r.height/2-cr.top; var hp=heroPos(), of=offset(i);
-    flyers.push({e:it.e,x:sx,y:sy,tx:hp.x+of.ox,ty:hp.y+of.oy,i:i,t:0}); beep(540+used*24,0.06);
-    document.getElementById('sub').textContent=it.n+'! '+(ITEMS.length-used)+' to go';
-    if(used>=ITEMS.length){ setTimeout(function(){ if(used>=ITEMS.length&&running) win(); },700); } }
-  function land(fl){ var hp=heroPos(); stuck.push({e:fl.e,ox:fl.tx-hp.x,oy:fl.ty-hp.y,sz:0}); glow=14; pop=8; bounce=8;
-    for(var i=0;i<10;i++)sparks.push({x:fl.tx,y:fl.ty,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6-1,life:24,c:['#ffe27a','#8fe0ff','#fff','#8fffcf','#ffb0e0'][i%5]});
-    if((used%3)===0){ for(var h=0;h<4;h++)hearts.push({x:hp.x+(Math.random()-0.5)*70,y:hp.y,vy:-1-Math.random()*1.4,ph:Math.random()*6.28,life:56}); } }
-  function win(){ running=false; var hp=heroPos(); for(var i=0;i<48;i++)sparks.push({x:hp.x+(Math.random()-0.5)*150,y:hp.y+(Math.random()-0.5)*120,vx:(Math.random()-0.5)*7,vy:(Math.random()-0.5)*7,life:34,c:['#ffe27a','#8fe0ff','#fff','#8fffcf'][i%4]});
-    document.getElementById('ot').innerHTML='🎉 DONE! 🎉'; document.getElementById('om').textContent=OKMSG; document.getElementById('sub').textContent='🎉 '+OKMSG;
-    setTimeout(function(){ document.getElementById('over').style.display='flex'; if(window.MO_MVP)window.MO_MVP(); },1150); }
+  var CROPS=['🌽','🥕','🍅','🥔','🫛','🎃'];
+  var ANIMAL_EMO=['🐄','🐖','🐔'], ANIMAL_PROD=['🧀','🥩','🥚'], ANIMAL_NAME=['cheese','meat','eggs'];
+  var CUST_POOL=['🧒','👩','👨','👧','👦','🧑','👵','👴','🧔','🧕','🙂','😀'];
+  var PICKS=[10,20,30,40,50,60];
+  var SHOPTYPES=[['dinner','🍽️','DINNER SHOP'],['market','🛒','FARM MARKET']];
+  var MARKET_GOODS=['🌽','🥕','🍅','🥔','🎃','🧀','🥩','🥚'];
+  var UPGRADES=[['🪑','Tables',8],['🌸','Flowers',6],['🎈','Balloons',5],['🏮','Lights',10],['☂️','Umbrella',9],['🪧','Big Sign',7]];
+  var LOTTO_PRIZES=[0,0,5,10,10,15,20,30], SEED_COST=2;
+  var DISHES=[['🍲','Veggie Stew'],['🥗','Garden Salad'],['🍝','Farm Pasta'],['🥘','Harvest Pot']];
+  var NPLOT=6, R=46;  // interaction radius
+  var stage, plots, basket, sparks, hearts, tt, growT, dish, cookAdds, coins, flyers, msg, msgT, running, shopType, owned, lottoDone;
+  var mox, moy, moDir, carry, cool;                 // Mo character
+  var joy={on:false,id:-1,bx:0,by:0,dx:0,dy:0};      // joystick
+  var shopTotal, served, dineLeft, delivLeft, active; // shop
+  var planStep, gardenSpots;                          // plan-the-farm intro
+  var mode='joy';                                     // 'joy' = joystick only, 'tap' = tap to interact
+  var act=document.getElementById('act'), sub=document.getElementById('sub');
+  function setMsg(t,dur){ msg=t; msgT=dur||120; if(sub) sub.textContent=t; }
+  function reset(){ stage='mode'; plots=[]; basket=[]; sparks=[]; hearts=[]; flyers=[]; tt=0; growT=0; dish=null; cookAdds=0; coins=0; running=true; shopType='dinner'; owned={}; lottoDone=false;
+    shopTotal=0; served=0; dineLeft=0; delivLeft=0; active=null; carry=null; cool=0; moDir=1; planStep=0; gardenSpots=[];
+    mox=W*0.5; moy=H*0.62;
+    for(var i=0;i<NPLOT;i++) plots.push({state:0,crop:CROPS[i%CROPS.length],grow:0});
+    ['over','start','pick','type','upg','lotto','plan'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display='none'; });
+    document.getElementById('planbtn').style.display='none'; document.getElementById('act').style.display='none';
+    openMode(); }
+  function buildModes(){ var box=document.getElementById('modes'); box.innerHTML=''; [['joy','🕹️','JOYSTICK'],['tap','👆','TAP']].forEach(function(m){ var b=document.createElement('button'); b.innerHTML='<span class="e">'+m[1]+'</span>'+m[2]; b.onclick=function(){ chooseMode(m[0]); }; box.appendChild(b); }); }
+  function openMode(){ stage='mode'; document.getElementById('mode').style.display='flex'; }
+  function chooseMode(m){ mode=m; document.getElementById('mode').style.display='none'; stage='plan'; planStep=0; gardenSpots=[]; updateAct(); beep(680,0.08);
+    if(mode==='tap') setMsg('👆 Tap your house to turn it into a farm!',300);
+    else setMsg('🕹️ Drive Mo to your house and press DO to make it a farm!',300); }
+  // ===== PLAN THE FARM (step one) =====
+  function housePlanPos(){ return {x:W*0.5, y:H*0.42}; }
+  function convertHouse(){ planStep=1; winSound(); var h=housePlanPos(); puff(h,'#ffd23f'); for(var k=0;k<16;k++) sparks.push({x:h.x,y:h.y,vx:(Math.random()-0.5)*7,vy:-Math.random()*6,life:46,c:['#ffd93d','#e0453a','#37b06a','#3a86e0'][k%4]}); setMsg('🎉 It’s a farm now! '+(mode==='tap'?'Tap 3 spots for the gardens!':'Drive around and press DO to place 3 gardens!'),240); }
+  function placeGarden(px,py){ if(gardenSpots.length>=3) return; gardenSpots.push({x:px,y:py}); beep(500+gardenSpots.length*80,0.06); puff({x:px,y:py},'#6a4a2a');
+    if(gardenSpots.length>=3){ planStep=2; winSound(); document.getElementById('planbtn').style.display='block'; setMsg('🌱 Great plan! Press START FARMING to begin.',240); } else setMsg('🌱 Good spot! '+(3-gardenSpots.length)+' more to place',120); }
+  function planTap(px,py){ if(planStep===0){ var h=housePlanPos(); if(Math.hypot(px-h.x,py-h.y)<Math.min(W,H)*0.12) convertHouse(); }
+    else if(planStep===1){ if(py>H*0.5) placeGarden(px,py); } }
+  function startFarming(){ document.getElementById('planbtn').style.display='none'; openLotto(); }
+  function drawPlan(){ var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#9fd6ff'); g.addColorStop(1,'#d8f0a0'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#fff2a0'; ctx.beginPath(); ctx.arc(W-44,54,17,0,6.29); ctx.fill();
+    ctx.fillStyle='#7ec04c'; ctx.fillRect(0,H*0.5,W,H*0.5); ctx.textAlign='center'; ctx.textBaseline='middle';
+    var h=housePlanPos();
+    if(planStep===0){ ctx.save(); ctx.globalAlpha=0.6+Math.sin(tt*5)*0.3; ctx.strokeStyle='#fff6c0'; ctx.lineWidth=4; ctx.beginPath(); ctx.arc(h.x,h.y,Math.min(W,H)*0.13,0,6.29); ctx.stroke(); ctx.restore();
+      ctx.font=(Math.min(W,H)*0.2)+'px sans-serif'; ctx.fillText('🏠',h.x,h.y); }
+    else { barn(); ctx.fillStyle='#b4342a'; rr(W*0.3,H*0.06,W*0.4,H*0.06,8); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 14px Trebuchet MS'; ctx.fillText('🚜 MO FARM',W*0.5,H*0.09); }
+    // garden spots the kid placed
+    for(var i=0;i<gardenSpots.length;i++){ var s=gardenSpots[i]; ctx.fillStyle='#7a4f28'; ctx.beginPath(); ctx.ellipse(s.x,s.y,30,18,0,0,6.29); ctx.fill(); ctx.font='22px sans-serif'; ctx.fillText('🌱',s.x,s.y-2); }
+    if(planStep===1){ ctx.save(); ctx.globalAlpha=0.4; ctx.fillStyle='#fff'; ctx.font='13px Trebuchet MS'; ctx.fillText('(tap the green yard below)',W*0.5,H*0.56); ctx.restore(); } }
+  // ===== LOTTERY =====
+  function buildLotto(){ var box=document.getElementById('lottos'); box.innerHTML=''; for(var i=0;i<3;i++){ (function(k){ var b=document.createElement('button'); b.textContent='🎟️'; b.onclick=function(){ scratch(b); }; box.appendChild(b); })(i); } }
+  function openLotto(){ stage='lottery'; lottoDone=false; document.getElementById('lottop').textContent='Pick a ticket to win money for seeds & food!'; document.getElementById('lottogo').style.display='none'; document.getElementById('lottoagain').style.display='none'; buildLotto(); document.getElementById('lotto').style.display='flex'; }
+  function scratch(b){ if(lottoDone) return; lottoDone=true; var prize=LOTTO_PRIZES[Math.floor(Math.random()*LOTTO_PRIZES.length)]; coins+=prize;
+    var btns=document.getElementById('lottos').children; for(var i=0;i<btns.length;i++){ if(btns[i]!==b){ btns[i].textContent='🎟️'; btns[i].disabled=true; btns[i].style.opacity='0.4'; } }
+    if(prize>0){ b.className='scratched'; b.innerHTML='🪙<br>'+prize; winSound(); document.getElementById('lottop').textContent='🎉 You won 🪙 '+prize+'! You have 🪙 '+coins+'.'; }
+    else { b.style.background='linear-gradient(#f0a0a0,#e06a6a)'; b.innerHTML='😿<br>no win'; beep(200,0.2,'sawtooth'); document.getElementById('lottop').textContent='😿 Aw, no win — play again!'; }
+    document.getElementById('lottoagain').style.display='inline-block';
+    document.getElementById('lottogo').style.display=(coins>=SEED_COST)?'inline-block':'none'; }
+  function lottoAgain(){ openLotto(); }
+  function lottoContinue(){ if(coins<SEED_COST) return; document.getElementById('lotto').style.display='none'; stage='plant'; updateAct(); setMsg('🕹️ Drive Mo to the dirt to plant seeds ('+SEED_COST+' 🪙 each)!',220); }
+  // ===== positions =====
+  function plotPos(i){ var col=i%3, row=Math.floor(i/3); return {x:W*(0.3+col*0.2), y:H*(0.50+row*0.13)}; }
+  function animalPos(i){ return {x:W*(0.16+i*0.11), y:H*0.34}; }
+  function potPos(){ return {x:W*0.5, y:H*0.40}; }
+  function tablePos(){ return {x:W*0.3, y:H*0.80}; }      // outdoor dining table in front of the farm
+  function housePos(){ return {x:W*0.82, y:H*0.32}; }     // far-away house up the road for delivery
+  // ===== stage actions =====
+  function updateAct(){ var L={lottery:'',plant:'🌱',water:'💧',grow:'⏳',harvest:'🧺',gather:'🐄',cook:'🍳',type:'',pick:'',shop:'🍽️',upgrade:''};
+    act.innerHTML=(L[stage]||'👆')+'<br>DO'; var hide=(stage==='mode'||stage==='lottery'||stage==='type'||stage==='pick'||stage==='upgrade'||(stage==='plan'&&mode==='tap')); act.style.display=hide?'none':'block'; }
+  function nearestPlot(want){ var best=-1,bd=R; for(var i=0;i<NPLOT;i++){ if(plots[i].state!==want) continue; var p=plotPos(i),d=Math.hypot(mox-p.x,moy-p.y); if(d<bd){ bd=d; best=i; } } return best; }
+  function doAct(){ if(!running) return; cool=0; tryInteract(true); }
+  function tryInteract(force){ if(cool>0 && !force) return;
+    if(stage==='plan'){ if(mode!=='joy') return; var h=housePlanPos();
+      if(planStep===0 && Math.hypot(mox-h.x,moy-h.y)<R+10) convertHouse();
+      else if(planStep===1 && force && gardenSpots.length<3) placeGarden(mox,moy); return; }
+    if(stage==='plant'){ var i=nearestPlot(0); if(i>=0){ plant(i); cool=14; } }
+    else if(stage==='water'){ var w=nearestPlot(1); if(w>=0){ water(w); cool=12; } }
+    else if(stage==='harvest'){ var h=nearestPlot(4); if(h>=0){ harvest(h); cool=12; } }
+    else if(stage==='gather'){ var a=animalPos(gathered()); if(gathered()<3 && Math.hypot(mox-a.x,moy-a.y)<R){ gatherStep(); cool=16; } }
+    else if(stage==='cook'){ var pt=potPos(); if(Math.hypot(mox-pt.x,moy-pt.y)<R+8){ cookStep(); cool=12; } }
+    else if(stage==='shop'){ shopInteract(); } }
+  function gathered(){ return basket.length-6>=0 ? Math.min(3, basket.length-6) : 0; }
+  function nearestPlotTo(px,py,s){ var best=-1,bd=R+14; for(var i=0;i<NPLOT;i++){ if(plots[i].state!==s) continue; var p=plotPos(i),d=Math.hypot(px-p.x,py-p.y); if(d<bd){ bd=d; best=i; } } return best; }
+  function tapScene(px,py){ // TAP MODE only: act on the tapped thing directly
+    if(stage==='plant'){ var i=nearestPlotTo(px,py,0); if(i>=0){ plant(i); return true; } }
+    else if(stage==='water'){ var w=nearestPlotTo(px,py,1); if(w>=0){ water(w); return true; } }
+    else if(stage==='harvest'){ var h=nearestPlotTo(px,py,4); if(h>=0){ harvest(h); return true; } }
+    else if(stage==='gather'){ var a=animalPos(gathered()); if(gathered()<3 && Math.hypot(px-a.x,py-a.y)<R+14){ gatherStep(); return true; } }
+    else if(stage==='cook'){ var pt=potPos(); if(Math.hypot(px-pt.x,py-pt.y)<R+22){ cookStep(); return true; } }
+    else if(stage==='shop'){ if(active){ var t=active.type==='dine'?tablePos():housePos(); if(Math.hypot(px-t.x,py-t.y)<R+30){ serveActive(); return true; } } }
+    return false; }
+  function plant(i){ if(coins<SEED_COST){ setMsg('🪙 Out of seed money — play the lottery for more!',140); openLotto(); return; } coins-=SEED_COST; plots[i].state=1; carry=null; beep(500+i*20,0.05); puff(plotPos(i),'#6a4a2a');
+    if(allState(1)){ stage='water'; updateAct(); setMsg('💧 Drive to each seed and water it!',160); } else setMsg('🌱 Planted (-'+SEED_COST+' 🪙)! '+countState(0)+' more',90); }
+  function water(i){ plots[i].state=2; beep(660,0.05,'sine'); for(var k=0;k<6;k++) sparks.push({x:plotPos(i).x,y:plotPos(i).y-10,vx:(Math.random()-0.5)*3,vy:-Math.random()*3,life:22,c:'#8fd0ff'});
+    if(allState(2)){ stage='grow'; growT=0; updateAct(); setMsg('🌞 Watching the crops grow…',160); for(var j=0;j<NPLOT;j++){ plots[j].state=3; plots[j].grow=0; } } else setMsg('💧 Watered! '+countState(1)+' more',90); }
+  function harvest(i){ plots[i].state=5; basket.push(plots[i].crop); carry=plots[i].crop; beep(760+basket.length*30,0.06); heartsAt(plotPos(i)); puff(plotPos(i),'#ffd23f');
+    if(allState(5)){ stage='gather'; updateAct(); setMsg('🐄 Drive to the animals for cheese, meat & eggs!',180); } else setMsg('🧺 Picked a '+plots[i].crop+'! '+countState(4)+' more',90); }
+  function gatherStep(){ var g=gathered(); if(g>=3) return; basket.push(ANIMAL_PROD[g]); carry=ANIMAL_PROD[g]; heartsAt(animalPos(g)); beep(500+g*80,0.06);
+    if(gathered()>=3){ stage='cook'; cookAdds=0; carry=null; updateAct(); setMsg('🍳 Drive to the pot and cook dinner!',180); } else setMsg('✅ Got '+ANIMAL_NAME[g]+'! Get '+ANIMAL_NAME[g+1],90); }
+  function cookStep(){ if(cookAdds>=basket.length) return; cookAdds++; beep(420+cookAdds*40,0.06); var pt=potPos();
+    flyers.push({e:basket[cookAdds-1],x:mox,y:moy,tx:pt.x,ty:pt.y-10,t:0}); for(var k=0;k<8;k++) sparks.push({x:pt.x,y:pt.y,vx:(Math.random()-0.5)*5,vy:-Math.random()*4,life:24,c:['#ffd27a','#ff8f5a','#fff'][k%3]});
+    if(cookAdds>=basket.length){ dish=DISHES[Math.floor(Math.random()*DISHES.length)]; winSound(); setMsg('🍲 '+dish[1]+' is ready! Now open a shop!',200); setTimeout(function(){ if(running) openType(); },1100); }
+    else setMsg('🥣 Added '+basket[cookAdds-1]+'! '+(basket.length-cookAdds)+' more — go back to the pot',90); }
+  // ===== shop (dine-in + delivery) =====
+  function buildTypes(){ var box=document.getElementById('types'); box.innerHTML=''; SHOPTYPES.forEach(function(s){ var b=document.createElement('button'); b.innerHTML='<span class="e">'+s[1]+'</span>'+s[2]; b.onclick=function(){ chooseType(s[0]); }; box.appendChild(b); }); }
+  function openType(){ stage='type'; updateAct(); document.getElementById('type').style.display='flex'; }
+  function chooseType(t){ shopType=t; document.getElementById('type').style.display='none'; beep(680,0.08); openPicker(); }
+  function buildPicks(){ var box=document.getElementById('picks'); box.innerHTML=''; PICKS.forEach(function(n){ var b=document.createElement('button'); b.textContent=n; b.onclick=function(){ choosePick(n); }; box.appendChild(b); }); }
+  function openPicker(){ stage='pick'; updateAct(); document.getElementById('pickh').textContent=shopType==='market'?'🛒 Farm Market!':'🍽️ Dinner Shop!'; document.getElementById('pick').style.display='flex'; }
+  function choosePick(n){ shopTotal=n; served=0; dineLeft=Math.ceil(n/2); delivLeft=Math.floor(n/2); document.getElementById('pick').style.display='none'; stage='shop'; updateAct(); mox=W*0.5; moy=H*0.6; nextOrder(); beep(720,0.08); }
+  function nextOrder(){ if(served>=shopTotal){ active=null; return; }
+    var who=CUST_POOL[Math.floor(Math.random()*CUST_POOL.length)];
+    var type;
+    if(dineLeft>0 && delivLeft>0) type=(Math.random()<0.5)?'dine':'deliver';
+    else type=dineLeft>0?'dine':'deliver';
+    active={who:who,type:type};
+    carry=dish?dish[0]:'🍲';
+    if(type==='dine') setMsg('🍽️ Carry dinner to the table in front of the farm!',150);
+    else setMsg('🚚 Delivery! Drive dinner to the far house →',150); }
+  function serveActive(){ if(!active) return; var tgt=active.type==='dine'?tablePos():housePos(); served++; if(active.type==='dine') dineLeft--; else delivLeft--; coins+=(active.type==='deliver'?4:3); carry=null;
+    for(var h=0;h<5;h++) hearts.push({x:tgt.x,y:tgt.y-10,vy:-1-Math.random(),ph:Math.random()*6.28,life:48}); beep(560+(served%8)*40,0.06); if(served%5===0) winSound();
+    if(served>=shopTotal){ setMsg('🎉 All '+shopTotal+' served — you made 🪙 '+coins+'!',200); active=null; setTimeout(openUpgrade,900); }
+    else { setMsg((active.type==='deliver'?'🚚 Delivered! +4 🪙  (':'🍽️ Served! +3 🪙  (')+(shopTotal-served)+' to go)',80); cool=16; nextOrder(); } }
+  function shopInteract(){ if(!active) return; var tgt=active.type==='dine'?tablePos():housePos(); if(Math.hypot(mox-tgt.x,moy-tgt.y)<R+10) serveActive(); }
+  // ===== upgrades =====
+  function buildUpgs(){ var box=document.getElementById('upgs'); box.innerHTML=''; UPGRADES.forEach(function(u){ var b=document.createElement('button'); u.btn=b; b.onclick=function(){ buyUpg(u); }; box.appendChild(b); }); refreshUpgs(); }
+  function refreshUpgs(){ document.getElementById('upgbal').innerHTML='You have <b>🪙 '+coins+'</b> — tap to buy!'; UPGRADES.forEach(function(u){ var o=!!owned[u[0]]; u.btn.className=o?'owned':''; u.btn.disabled=o||coins<u[2]; u.btn.innerHTML='<span class="e">'+u[0]+'</span>'+u[1]+'<br>'+(o?'✓ got it':('🪙 '+u[2])); }); }
+  function openUpgrade(){ if(!running) return; stage='upgrade'; updateAct(); buildUpgs(); document.getElementById('upg').style.display='flex'; }
+  function buyUpg(u){ if(owned[u[0]]||coins<u[2]) return; coins-=u[2]; owned[u[0]]=1; winSound(); refreshUpgs(); }
+  function finishUpg(){ document.getElementById('upg').style.display='none'; win(); }
+  function win(){ running=false; var nd=Object.keys(owned).length;
+    document.getElementById('om').textContent='You grew the food, cooked dinner, served the tables AND delivered to far houses, and made your shop nicer with '+nd+' thing'+(nd===1?'':'s')+'! 🪙 '+coins+' coins left';
+    document.getElementById('ot').innerHTML='🎉 GREAT JOB! 🎉'; document.getElementById('over').style.display='flex'; if(window.MO_MVP) window.MO_MVP(); }
+  // ===== helpers =====
+  function allState(s){ for(var i=0;i<NPLOT;i++) if(plots[i].state!==s) return false; return true; }
+  function countState(s){ var n=0; for(var i=0;i<NPLOT;i++) if(plots[i].state===s) n++; return n; }
+  function heartsAt(p){ for(var h=0;h<4;h++) hearts.push({x:p.x+(Math.random()-0.5)*40,y:p.y,vy:-1-Math.random(),ph:Math.random()*6.28,life:46}); }
+  function puff(p,c){ for(var k=0;k<8;k++) sparks.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5-1,life:22,c:c}); }
   function rr(x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
-  function sunny(){ ctx.save(); ctx.globalAlpha=0.85; ctx.fillStyle='#fff2a0'; ctx.beginPath(); ctx.arc(W-40,42,17,0,6.29); ctx.fill(); ctx.globalAlpha=0.35; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.ellipse(W*0.26+Math.sin(tt*0.3)*10,66,38,14,0,0,6.29); ctx.ellipse(W*0.64,50,30,11,0,0,6.29); ctx.fill(); ctx.restore(); }
-  function draw(){ tt+=0.05; var hp=heroPos(), s=heroSize();
-    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,BG[0]); g.addColorStop(1,BG[1]); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-    if(GROUND){ ctx.fillStyle=GROUND; ctx.fillRect(0,H*0.72,W,H*0.28); }
-    sunny();
-    // soft room/stage panel behind the big hero
-    ctx.save(); ctx.globalAlpha=0.5; ctx.fillStyle=PANEL; rr(hp.x-s*1.7, hp.y-s*1.5, s*3.4, s*3.0, s*0.5); ctx.fill(); ctx.restore();
-    // pedestal
-    ctx.save(); ctx.globalAlpha=0.28; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(hp.x,hp.y+s*0.95,s*1.15,s*0.32,0,0,6.29); ctx.fill(); ctx.restore();
-    ctx.save(); ctx.globalAlpha=0.85; ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.ellipse(hp.x,hp.y+s*0.92,s*1.05,s*0.26,0,0,6.29); ctx.fill(); ctx.restore();
+  // ===== update =====
+  function update(){ tt+=0.05; if(cool>0) cool--;
+    // move Mo with joystick
+    if(joy.on){ var sp=Math.min(1,Math.hypot(joy.dx,joy.dy)); if(sp>0.08){ var spd=Math.min(W,H)*0.012; mox+=joy.dx*spd; moy+=joy.dy*spd; if(joy.dx<-0.1) moDir=-1; else if(joy.dx>0.1) moDir=1; } }
+    mox=Math.max(W*0.06,Math.min(W*0.94,mox)); moy=Math.max(H*0.28,Math.min(H*0.88,moy));
+    if(running && stage!=='grow' && mode==='joy') tryInteract(false);
+    if(stage==='grow'){ growT++; var g=Math.min(1,growT/90); for(var i=0;i<NPLOT;i++) plots[i].grow=g;
+      if(growT>=90){ for(i=0;i<NPLOT;i++) plots[i].state=4; stage='harvest'; updateAct(); setMsg('🧺 Drive to each crop and harvest it!',180); } }
+    if(msgT>0) msgT--;
+    for(var fi=flyers.length-1;fi>=0;fi--){ var fl=flyers[fi]; fl.x+=(fl.tx-fl.x)*0.2; fl.y+=(fl.ty-fl.y)*0.2; if(Math.hypot(fl.tx-fl.x,fl.ty-fl.y)<6) flyers.splice(fi,1); }
+    for(var sp2=sparks.length-1;sp2>=0;sp2--){ var q=sparks[sp2]; q.x+=q.vx; q.y+=q.vy; q.vy+=0.12; q.life--; if(q.life<=0) sparks.splice(sp2,1); }
+    for(var hI=hearts.length-1;hI>=0;hI--){ var ht=hearts[hI]; ht.y+=ht.vy; ht.x+=Math.sin(tt+ht.ph)*0.5; ht.life--; if(ht.life<=0) hearts.splice(hI,1); } }
+  // ===== draw =====
+  function sky(){ var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#9fd6ff'); g.addColorStop(1,'#d8f0a0'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#fff2a0'; ctx.beginPath(); ctx.arc(W-44,54,17,0,6.29); ctx.fill(); }
+  function barn(){ var bx=W*0.04,by=H*0.22,bw=W*0.22,bh=H*0.13; ctx.fillStyle='#b4342a'; ctx.fillRect(bx,by,bw,bh);
+    ctx.fillStyle='#8a251d'; ctx.beginPath(); ctx.moveTo(bx-4,by); ctx.lineTo(bx+bw/2,by-H*0.055); ctx.lineTo(bx+bw+4,by); ctx.fill();
+    ctx.fillStyle='#f0e6d2'; rr(bx+bw*0.34,by+bh*0.4,bw*0.32,bh*0.6,3); ctx.fill(); }
+  function drawMo(){ ctx.textAlign='center'; ctx.textBaseline='middle'; var s=Math.min(W,H)*0.12, bob=joy.on?Math.sin(tt*10)*3:0;
+    ctx.save(); ctx.globalAlpha=0.25; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(mox,moy+s*0.5,s*0.4,s*0.14,0,0,6.29); ctx.fill(); ctx.restore();
+    if(moDir<0){ ctx.save(); ctx.translate(mox,0); ctx.scale(-1,1); ctx.font=s+'px sans-serif'; ctx.fillText('🧑‍🌾',0,moy+bob); ctx.restore(); }
+    else { ctx.font=s+'px sans-serif'; ctx.fillText('🧑‍🌾',mox,moy+bob); }
+    if(carry){ ctx.font=(s*0.5)+'px sans-serif'; ctx.fillText(carry,mox,moy-s*0.55+bob); } }
+  function drawJoy(){ var bx=joy.on?joy.bx:W*0.18, by=joy.on?joy.by:H*0.84, kr=Math.min(W,H)*0.07;
+    ctx.save(); ctx.globalAlpha=joy.on?0.5:0.3; ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(bx,by,kr*1.7,0,6.29); ctx.fill();
+    ctx.globalAlpha=joy.on?0.9:0.55; ctx.fillStyle='#fff'; var kx=bx+joy.dx*kr, ky=by+joy.dy*kr; ctx.beginPath(); ctx.arc(kx,ky,kr,0,6.29); ctx.fill(); ctx.restore();
+    if(!joy.on){ ctx.save(); ctx.globalAlpha=0.5; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='11px Trebuchet MS'; ctx.fillStyle='#fff'; ctx.fillText('move',bx,by+kr*2.2); ctx.restore(); } }
+  function hint(tgt,label){ ctx.save(); ctx.globalAlpha=0.6+Math.sin(tt*5)*0.3; ctx.strokeStyle='#fff6c0'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(tgt.x,tgt.y,R*0.9,0,6.29); ctx.stroke(); ctx.restore();
+    if(label){ ctx.textAlign='center'; ctx.fillStyle='#0a3a1a'; ctx.font='bold 12px Trebuchet MS'; ctx.fillText(label,tgt.x,tgt.y-R); } }
+  function drawFarmWorld(){ sky(); ctx.fillStyle='#6a9a3a'; ctx.fillRect(0,H*0.40,W,H*0.60); barn();
     ctx.textAlign='center'; ctx.textBaseline='middle';
-    // glow ring
-    if(glow>0){ glow--; ctx.save(); ctx.globalAlpha=glow/14*0.55; ctx.strokeStyle='#fff6c0'; ctx.lineWidth=6; ctx.beginPath(); ctx.arc(hp.x,hp.y,s*1.15,0,6.29); ctx.stroke(); ctx.restore(); }
-    // BIG hero (bobbing + pop bounce)
-    var bob=Math.sin(tt*2)*4; var pb=bounce>0?(bounce--,Math.sin((8-bounce)/8*Math.PI)*s*0.12):0;
-    ctx.font=(s*1.4+pb)+'px sans-serif'; ctx.fillText(HERO, hp.x, hp.y+bob);
-    // stuck items around hero
-    for(var st=0;st<stuck.length;st++){ var k=stuck[st]; if(k.sz<1)k.sz=Math.min(1,k.sz+0.14); ctx.save(); ctx.globalAlpha=0.22; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(hp.x+k.ox,hp.y+k.oy+bob+s*0.2*k.sz,s*0.24*k.sz,s*0.09*k.sz,0,0,6.29); ctx.fill(); ctx.restore(); ctx.font=(s*0.5*k.sz)+'px sans-serif'; ctx.fillText(k.e, hp.x+k.ox, hp.y+k.oy+bob); }
-    // hearts
-    for(var hI=hearts.length-1;hI>=0;hI--){ var ht=hearts[hI]; ht.y+=ht.vy; ht.x+=Math.sin(tt+ht.ph)*0.5; ht.life--; if(ht.life<=0){hearts.splice(hI,1);continue;} ctx.globalAlpha=Math.min(1,ht.life/30); ctx.font='20px sans-serif'; ctx.fillText('💛',ht.x,ht.y); ctx.globalAlpha=1; }
-    // flyers
-    for(var fi=flyers.length-1;fi>=0;fi--){ var fl=flyers[fi]; fl.t+=0.06; fl.x+=(fl.tx-fl.x)*0.2; fl.y+=(fl.ty-fl.y)*0.2; ctx.font='34px sans-serif'; ctx.fillText(fl.e,fl.x,fl.y); if(Math.hypot(fl.tx-fl.x,fl.ty-fl.y)<7){ land(fl); flyers.splice(fi,1); } }
-    // sparks
-    for(var sp=sparks.length-1;sp>=0;sp--){ var q=sparks[sp]; q.x+=q.vx; q.y+=q.vy; q.vy+=0.12; q.life--; if(q.life<=0){sparks.splice(sp,1);continue;} ctx.globalAlpha=q.life/26; ctx.fillStyle=q.c; ctx.fillRect(q.x,q.y,3,3); ctx.globalAlpha=1; }
-    // meter
-    var frac=ITEMS.length?used/ITEMS.length:0; var bw=W*0.55,bx=(W-bw)/2,by=76; ctx.save(); ctx.globalAlpha=0.92; ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(bx,by,bw,9); ctx.fillStyle='#ffd23f'; ctx.fillRect(bx,by,Math.max(0,bw*frac),9); ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1; ctx.strokeRect(bx,by,bw,9); ctx.restore();
-    if(PAYOFF && !running && stuck.length){ } // reserved
-    requestAnimationFrame(draw); }
-  var ac; function beep(f,d,ty){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type=ty||'square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+d); }catch(e){} }
+    // animals (gather targets)
+    for(var an=0;an<3;an++){ var a=animalPos(an); if(stage==='gather'&&an>=gathered()) hint(a); ctx.font=(Math.min(W,H)*0.08)+'px sans-serif'; ctx.fillText(ANIMAL_EMO[an],a.x,a.y);
+      if(stage==='gather'&&an<gathered()){ ctx.font='15px sans-serif'; ctx.fillText('✅',a.x+W*0.03,a.y-H*0.03); } }
+    // plots
+    for(var i=0;i<NPLOT;i++){ var p=plotPos(i), st=plots[i].state;
+      ctx.fillStyle='#7a4f28'; ctx.beginPath(); ctx.ellipse(p.x,p.y+8,34,20,0,0,6.29); ctx.fill(); ctx.fillStyle='#5f3d1e'; ctx.beginPath(); ctx.ellipse(p.x,p.y+8,24,13,0,0,6.29); ctx.fill();
+      if(st===1){ ctx.font='22px sans-serif'; ctx.fillText('•',p.x,p.y); }
+      else if(st===2){ ctx.font='26px sans-serif'; ctx.fillText('🌱',p.x,p.y-4); }
+      else if(st===3){ var gs=16+plots[i].grow*22; ctx.font=gs+'px sans-serif'; ctx.fillText('🌱',p.x,p.y-4-plots[i].grow*10); }
+      else if(st===4){ ctx.font='40px sans-serif'; ctx.fillText(plots[i].crop,p.x,p.y-10); }
+      else if(st===5){ ctx.globalAlpha=0.4; ctx.font='18px sans-serif'; ctx.fillText('🕳️',p.x,p.y); ctx.globalAlpha=1; }
+      // hint ring on actionable plot nearest Mo
+      if((stage==='plant'&&st===0)||(stage==='water'&&st===1)||(stage==='harvest'&&st===4)){ if(nearestPlot(st)===i) hint(p); } }
+    // cook pot
+    if(stage==='cook'){ var pt=potPos(); hint(pt,'cook!'); ctx.font='48px sans-serif'; ctx.fillText(dish?dish[0]:'🍲',pt.x,pt.y);
+      ctx.save(); ctx.globalAlpha=0.5; ctx.fillStyle='#fff'; for(var s3=0;s3<3;s3++){ ctx.beginPath(); ctx.arc(pt.x-16+s3*16,pt.y-34-Math.sin(tt*2+s3)*5,6,0,6.29); ctx.fill(); } ctx.restore(); }
+    drawMo(); }
+  function drawShopWorld(){ var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#9fd6ff'); g.addColorStop(1,'#cdeaa0'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#6a9a3a'; ctx.fillRect(0,H*0.40,W,H*0.60); barn(); ctx.textAlign='center'; ctx.textBaseline='middle';
+    var isMkt=shopType==='market';
+    // shop sign on the barn
+    ctx.fillStyle=isMkt?'#2f8a4a':'#b4342a'; rr(W*0.3,H*0.06,W*0.4,H*0.06,8); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 14px Trebuchet MS'; ctx.fillText(isMkt?'🛒 MO FARM MARKET':'🏪 MO DINNER SHOP',W*0.5,H*0.09);
+    if(owned['🎈']){ ctx.font='24px sans-serif'; ctx.fillText('🎈',W*0.26,H*0.09); ctx.fillText('🎈',W*0.74,H*0.09); }
+    if(owned['🏮']){ for(var L=0;L<5;L++){ ctx.font='16px sans-serif'; ctx.fillText('🏮',W*(0.2+L*0.15),H*0.14); } }
+    // road to the far house (delivery) — runs from the front up to the distant house
+    ctx.strokeStyle='#9a9a9a'; ctx.lineWidth=Math.max(18,W*0.08); ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(W*0.42,H*0.9); ctx.lineTo(W*0.82,H*0.36); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=2; ctx.setLineDash([8,10]); ctx.beginPath(); ctx.moveTo(W*0.42,H*0.9); ctx.lineTo(W*0.82,H*0.36); ctx.stroke(); ctx.setLineDash([]);
+    // far house
+    var hp=housePos(); ctx.font='40px sans-serif'; ctx.fillText('🏠',hp.x,hp.y-10); ctx.font='bold 10px Trebuchet MS'; ctx.fillStyle='#5a3a00'; ctx.fillText('far house',hp.x,hp.y+16); if(owned['🌸']){ ctx.font='16px sans-serif'; ctx.fillText('🌸',hp.x-24,hp.y+2); }
+    // outdoor dining table in front of the farm
+    var tp=tablePos(); ctx.fillStyle='#6a4327'; rr(tp.x-W*0.14,tp.y-6,W*0.28,10,4); ctx.fill(); ctx.fillStyle='#5a3620'; ctx.fillRect(tp.x-W*0.12,tp.y+4,6,16); ctx.fillRect(tp.x+W*0.12-6,tp.y+4,6,16);
+    if(owned['☂️']){ ctx.font='40px sans-serif'; ctx.fillText('☂️',tp.x,tp.y-34); }
+    if(owned['🌸']){ ctx.font='16px sans-serif'; ctx.fillText('🌸',tp.x,tp.y-8); }
+    if(owned['🪑']){ ctx.font='20px sans-serif'; ctx.fillText('🪑',tp.x-W*0.17,tp.y); ctx.fillText('🪑',tp.x+W*0.17,tp.y); }
+    // the active customer at their spot + hint
+    if(active){ var tgt=active.type==='dine'?tp:hp;
+      if(active.type==='dine'){ ctx.font='34px sans-serif'; ctx.fillText(active.who,tgt.x,tgt.y-34); hint(tgt,'table — serve!'); }
+      else { ctx.font='30px sans-serif'; ctx.fillText(active.who,tgt.x,tgt.y+20); hint(tgt,'deliver!'); } }
+    drawMo();
+    // counts
+    ctx.fillStyle='#0a3a1a'; ctx.font='bold 15px Trebuchet MS'; ctx.textAlign='center';
+    ctx.fillText('Served '+served+'/'+shopTotal+'   🍽️ table:'+dineLeft+'  🚚 deliver:'+delivLeft,W*0.5,H*0.46); }
+  function drawFX(){ ctx.textAlign='center'; ctx.textBaseline='middle';
+    for(var fi=0;fi<flyers.length;fi++){ ctx.font='26px sans-serif'; ctx.fillText(flyers[fi].e,flyers[fi].x,flyers[fi].y); }
+    for(var sp=0;sp<sparks.length;sp++){ var q=sparks[sp]; ctx.globalAlpha=Math.max(0,q.life/24); ctx.fillStyle=q.c; ctx.fillRect(q.x,q.y,3,3); ctx.globalAlpha=1; }
+    for(var hI=0;hI<hearts.length;hI++){ var ht=hearts[hI]; ctx.globalAlpha=Math.min(1,ht.life/30); ctx.font='18px sans-serif'; ctx.fillText('💛',ht.x,ht.y); ctx.globalAlpha=1; }
+    // progress meter
+    var f=0; if(stage==='plant') f=countState(1)/NPLOT; else if(stage==='water') f=countState(2)/NPLOT; else if(stage==='grow') f=growT/90; else if(stage==='harvest') f=countState(5)/NPLOT; else if(stage==='gather') f=gathered()/3; else if(stage==='cook') f=cookAdds/Math.max(1,basket.length); else if(stage==='shop') f=served/Math.max(1,shopTotal);
+    if(stage!=='lottery'&&stage!=='type'&&stage!=='pick'&&stage!=='upgrade'){ var bw=W*0.55,bx=(W-bw)/2,by=56; ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle='rgba(0,0,0,0.3)'; rr(bx,by,bw,8,4); ctx.fill(); ctx.fillStyle='#ffd23f'; rr(bx,by,Math.max(0,bw*Math.min(1,f)),8,4); ctx.fill(); ctx.restore(); } }
+  function draw(){ update();
+    if(stage==='mode'){ var mg=ctx.createLinearGradient(0,0,0,H); mg.addColorStop(0,'#bfe0ff'); mg.addColorStop(1,'#8fd0ff'); ctx.fillStyle=mg; ctx.fillRect(0,0,W,H); requestAnimationFrame(draw); return; }
+    if(stage==='plan'){ drawPlan(); if(mode==='joy'){ drawMo(); drawJoy(); } drawFX(); document.getElementById('coins').textContent='🪙 '+coins; requestAnimationFrame(draw); return; }
+    if(stage==='shop') drawShopWorld(); else drawFarmWorld(); drawFX(); drawJoy();
+    document.getElementById('coins').textContent='🪙 '+coins; requestAnimationFrame(draw); }
+  // ===== sound =====
+  var ac; function beep(f,d,ty){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type=ty||'square'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(); o.stop(ac.currentTime+(d||0.06)); }catch(e){} }
+  function winSound(){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); [660,880,990].forEach(function(f,i){ var o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.type='sine'; o.connect(g); g.connect(ac.destination); g.gain.value=0.05; o.start(ac.currentTime+i*0.09); o.stop(ac.currentTime+i*0.09+0.1); }); }catch(e){} }
+  // ===== joystick input =====
+  function rel(e){ var r=cv.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; }
+  cv.addEventListener('pointerdown',function(e){ var p=rel(e);
+    if(stage==='mode'||stage==='lottery'||stage==='type'||stage==='pick'||stage==='upgrade') return;
+    if(stage==='plan'){ if(mode==='tap') planTap(p.x,p.y); else if(p.x<W*0.5 && p.y>H*0.55){ joy.on=true; joy.id=e.pointerId; joy.bx=p.x; joy.by=p.y; joy.dx=0; joy.dy=0; } return; }
+    if(mode==='tap'){ if(tapScene(p.x,p.y)) return; }
+    if(p.x<W*0.5 && p.y>H*0.55){ joy.on=true; joy.id=e.pointerId; joy.bx=p.x; joy.by=p.y; joy.dx=0; joy.dy=0; } });
+  cv.addEventListener('pointermove',function(e){ if(!joy.on||e.pointerId!==joy.id) return; var p=rel(e), dx=p.x-joy.bx, dy=p.y-joy.by, m=Math.hypot(dx,dy), mx=Math.min(W,H)*0.07; if(m>mx){ dx*=mx/m; dy*=mx/m; } joy.dx=dx/mx; joy.dy=dy/mx; });
+  function endJoy(e){ if(e.pointerId===joy.id){ joy.on=false; joy.dx=0; joy.dy=0; joy.id=-1; } }
+  cv.addEventListener('pointerup',endJoy); cv.addEventListener('pointercancel',endJoy); cv.addEventListener('pointerleave',endJoy);
+  act.onclick=doAct;
   document.getElementById('go').onclick=function(){ reset(); };
   document.getElementById('rs').onclick=function(){ reset(); };
-  used=0; running=false; flyers=[]; sparks=[]; tt=0; hearts=[]; stuck=[]; glow=0; pop=0; bounce=0; buildTray();
+  document.getElementById('lottogo').onclick=lottoContinue;
+  document.getElementById('lottoagain').onclick=lottoAgain;
+  document.getElementById('upgdone').onclick=finishUpg;
+  document.getElementById('planbtn').onclick=startFarming;
+  // init (idle before start)
+  stage='start'; plots=[]; for(var q=0;q<NPLOT;q++) plots.push({state:0,crop:CROPS[q%CROPS.length],grow:0}); basket=[]; sparks=[]; hearts=[]; flyers=[]; tt=0; growT=0; running=false; coins=0; served=0; shopTotal=0; owned={}; mox=W*0.5; moy=H*0.62; moDir=1; carry=null; cool=0; active=null; dish=null;
+  buildPicks(); buildTypes(); buildModes();
+  window._FARM={get stage(){return stage;}, act:doAct, mode:function(){return mode;}, chooseMode:function(m){ chooseMode(m); }, tap:function(x,y){ return tapScene(W*x,H*y); }, planTap:function(x,y){ planTap(W*x,H*y); }, planStep:function(){return planStep;}, startFarming:startFarming, setPos:function(x,y){ mox=W*x; moy=H*y; }, atPlot:function(i){ var p=plotPos(i); mox=p.x; moy=p.y; }, atAnimal:function(i){ var a=animalPos(i); mox=a.x; moy=a.y; }, atPot:function(){ var p=potPos(); mox=p.x; moy=p.y; }, atTarget:function(){ if(active){ var t=active.type==='dine'?tablePos():housePos(); mox=t.x; moy=t.y; } }, basket:function(){return basket;}, coins:function(){return coins;}, plots:function(){return plots;}, running:function(){return running;}, chooseType:function(t){ chooseType(t); }, choose:function(n){ choosePick(n); }, scratch:function(){ scratch(document.getElementById('lottos').children[0]); }, lottoGo:lottoContinue, buy:function(e){ for(var i=0;i<UPGRADES.length;i++) if(UPGRADES[i][0]===e) buyUpg(UPGRADES[i]); }, finish:finishUpg, active:function(){return active;}, shopInfo:function(){return {served:served,total:shopTotal,dine:dineLeft,deliv:delivLeft};} };
   requestAnimationFrame(draw);
 })();
 </script>
 <script>
-/* MO MVP SUPERSTAR celebration - shows a gold badge + confetti on win/finish */
+/* MO MVP SUPERSTAR celebration */
 (function(){
   var busy=false;
   function celebrate(){ if(busy)return; busy=true;
@@ -112,10 +330,8 @@
   }
   window.MO_MVP=celebrate;
   function hookVisible(el){ if(!el)return; var was=false; new MutationObserver(function(){ var vis=getComputedStyle(el).display!=='none'&&getComputedStyle(el).opacity!=='0'; if(vis&&!was){ was=true; celebrate(); } else if(!vis){ was=false; } }).observe(el,{attributes:true,attributeFilter:['style','class']}); }
-  function hookText(el){ if(!el)return; var was=false; new MutationObserver(function(){ var t=(el.textContent||'').trim(); if(t&&!was){ was=true; celebrate(); } else if(!t){ was=false; } }).observe(el,{childList:true,characterData:true,subtree:true}); }
-  function init(){ hookVisible(document.getElementById('over')); hookText(document.getElementById('win')); }
+  function init(){ hookVisible(document.getElementById('over')); }
   if(document.readyState!=='loading')init(); else document.addEventListener('DOMContentLoaded',init);
 })();
 </script>
-
 </body></html>

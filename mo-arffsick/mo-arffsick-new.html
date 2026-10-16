@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>MO — Arff Goes to the Vet</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#bfe3f0;font-family:'Trebuchet MS',system-ui,sans-serif;color:#214a2a;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #0008;background:#00000044;padding:6px 10px;border-radius:10px;}
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;z-index:10;background:#123a1cbb;}
+  .overlay.hide{display:none;}
+  .card{background:#f2fbf0ee;border:4px solid #7ec98a;border-radius:22px;padding:22px 26px;max-width:92%;box-shadow:0 20px 60px #0007;}
+  .card h1{margin:0 0 8px;font-size:27px;color:#2e8a4a;}
+  .card p{margin:8px 0;line-height:1.35;font-size:16px;}
+  .big{margin-top:14px;padding:14px 30px;font-size:22px;font-weight:900;background:linear-gradient(#aef0b8,#3fc07a);color:#073a18;border:none;border-radius:14px;box-shadow:0 5px 0 #1f8a52;cursor:pointer;}
+  .big:active{transform:translateY(4px);box-shadow:0 1px 0 #1f8a52;}
+  .swrow{display:flex;gap:9px;justify-content:center;margin:5px 0;}
+  .sw{width:32px;height:32px;border-radius:50%;border:3px solid transparent;cursor:pointer;box-shadow:0 2px 5px #0003;}
+  .sw.on{border-color:#2e8a4a;transform:scale(1.14);}
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+
+<div class="overlay" id="startOv">
+  <div class="card">
+    <h1>🏥 ARFF GOES TO THE VET</h1>
+    <p>Poor Arff feels sick! 🤢<br>Walk her to the <b>vet</b> to make her <b>all better</b>.</p>
+    <p style="font-size:14px;opacity:.85"><b>Drag the joystick</b> to walk Mo. Arff follows you.<br>Get to the 🏥 VET at the end of the street!</p>
+    <p style="font-weight:800;margin-bottom:0;color:#2e8a4a">🎨 MO LOOK — pick skin &amp; hair</p>
+    <div class="swrow" id="skinPick"></div>
+    <div class="swrow" id="hairPick"></div>
+    <button class="big" id="startBtn">▶ GO!</button>
+  </div>
+</div>
+
+<div class="overlay hide" id="doneOv">
+  <div class="card">
+    <h1>🏥 ARFF IS ALL BETTER! 🐾</h1>
+    <p id="doneP"></p>
+    <button class="big" id="againBtn">🐾 PLAY AGAIN</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), x=cv.getContext("2d");
+  var W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); cv.style.width=W+"px"; cv.style.height=H+"px"; x.setTransform(DPR,0,0,DPR,0,0); placeJoy(); }
+  addEventListener("resize",resize);
+
+  var AC=null; function ac(){ if(!AC){ try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||"sine"; o.frequency.value=f; g.gain.value=v||0.07; o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1)); o.stop(a.currentTime+(d||0.1)+0.02); }
+  function urpSfx(){ beep(240,0.18,"sawtooth",0.06); setTimeout(function(){beep(170,0.2,"sawtooth",0.05);},120); }
+  function stepSfx(){ beep(420,0.04,"square",0.03); }
+  function healSfx(){ [523,659,784,1046,1319].forEach(function(f,i){ setTimeout(function(){beep(f,0.16,"sine",0.08);}, i*150); }); }
+  function barkHappy(){ beep(700,0.07,"square",0.07); setTimeout(function(){beep(1000,0.09,"square",0.07);},70); }
+
+  // MO LOOK
+  var SKINS=["#f6c48a","#eab98c","#d99a6c","#b97a4e","#8a5a34","#5e3a1e"];
+  var HAIRS=["#2a2018","#4a2a10","#6a4a1a","#101010","#8a5a2a","#caa23a"];
+  var moSkin, moHair;
+  try{ moSkin=localStorage.getItem("moSkin")||SKINS[0]; moHair=localStorage.getItem("moHair")||HAIRS[0]; }catch(e){ moSkin=SKINS[0]; moHair=HAIRS[0]; }
+  function saveLook(){ try{ localStorage.setItem("moSkin",moSkin); localStorage.setItem("moHair",moHair); }catch(e){} }
+
+  function floorY(){ return H*0.80; }
+  var WORLD=0; function worldW(){ return W*2.6; }
+  function vetX(){ return worldW()-W*0.42; }
+  function homeX(){ return W*0.26; }
+
+  var mode="start";            // start | walk | heal | done
+  var mo, arff, joy, camX, puddles, hearts, urpBubble, healT, msgT, msg;
+
+  function reset(){
+    WORLD=worldW();
+    mo={x:homeX()+W*0.10, vx:0, dir:1, ph:0};
+    arff={x:homeX()-10, vx:0, dir:1, ph:0, urp:0, urpTimer:160+Math.random()*120, better:false};
+    camX=0; puddles=[]; hearts=[]; urpBubble=0; healT=0; msgT=0; msg="";
+    placeJoy(); joy.active=false;
+  }
+
+  // joystick
+  var joyR=64; joy={active:false,cx:0,cy:0,R:64,kx:0,ky:0};
+  function placeJoy(){ joy.R=Math.max(54,Math.min(78,Math.min(W,H)*0.13)); joy.cx=joy.R+26; joy.cy=H-joy.R-26; joy.kx=joy.cx; joy.ky=joy.cy; }
+  function pt(e){ var t=e.touches&&e.touches[0]?e.touches[0]:e; var r=cv.getBoundingClientRect(); return {x:(t.clientX-r.left)*(W/r.width), y:(t.clientY-r.top)*(H/r.height)}; }
+  function setKnob(px,py){ var dx=px-joy.cx, dy=py-joy.cy, m=Math.hypot(dx,dy)||1, cl=Math.min(m,joy.R); joy.kx=joy.cx+dx/m*cl; joy.ky=joy.cy+dy/m*cl; }
+  function down(e){ ac(); if(mode!=="walk")return; var p=pt(e); if(Math.hypot(p.x-joy.cx,p.y-joy.cy)<joy.R*2.2 || (p.y>H*0.6)){ if(e.cancelable)e.preventDefault(); joy.active=true; setKnob(p.x,p.y); } }
+  function move(e){ if(!joy.active)return; if(e.cancelable)e.preventDefault(); setKnob(pt(e).x,pt(e).y); }
+  function up(){ joy.active=false; joy.kx=joy.cx; joy.ky=joy.cy; }
+  cv.addEventListener("mousedown",down); addEventListener("mousemove",move); addEventListener("mouseup",up);
+  cv.addEventListener("touchstart",down,{passive:false}); addEventListener("touchmove",move,{passive:false}); addEventListener("touchend",up); addEventListener("touchcancel",up);
+
+  (function buildLook(){
+    var sp=document.getElementById("skinPick"), hp=document.getElementById("hairPick");
+    SKINS.forEach(function(c){ var d=document.createElement("div"); d.className="sw"+(c===moSkin?" on":""); d.style.background=c;
+      d.onclick=function(){ moSkin=c; saveLook(); ac(); Array.prototype.forEach.call(sp.children,function(e){e.classList.remove("on");}); d.classList.add("on"); }; sp.appendChild(d); });
+    HAIRS.forEach(function(c){ var d=document.createElement("div"); d.className="sw"+(c===moHair?" on":""); d.style.background=c;
+      d.onclick=function(){ moHair=c; saveLook(); ac(); Array.prototype.forEach.call(hp.children,function(e){e.classList.remove("on");}); d.classList.add("on"); }; hp.appendChild(d); });
+  })();
+  document.getElementById("startBtn").onclick=function(){ ac(); resize(); reset(); mode="walk"; document.getElementById("startOv").classList.add("hide"); };
+  document.getElementById("againBtn").onclick=function(){ ac(); resize(); reset(); mode="walk"; document.getElementById("doneOv").classList.add("hide"); };
+
+  var last=0;
+  function frame(ts){ var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(mode==="walk"||mode==="heal") update(dt); render(); requestAnimationFrame(frame); }
+
+  function update(dt){
+    if(mode==="walk"){
+      // walk Mo with joystick
+      var off=(joy.kx-joy.cx)/joy.R;
+      if(joy.active && Math.abs(off)>0.12){ mo.dir=off>0?1:-1; mo.vx=off*3.6; } else { mo.vx*=Math.pow(0.6,dt); }
+      mo.x+=mo.vx*dt; if(mo.x<40){mo.x=40;mo.vx=0;} if(mo.x>WORLD-40){mo.x=WORLD-40;mo.vx=0;}
+      mo.ph+=Math.abs(mo.vx)*0.07*dt;
+      // camera follows Mo
+      camX=Math.max(0,Math.min(WORLD-W, mo.x-W*0.42));
+      // Arff follows behind Mo (slow, because she's sick)
+      var tgt=mo.x-56*mo.dir; var d=tgt-arff.x;
+      if(arff.urp<=0){ arff.vx=Math.max(-2.2,Math.min(2.2,d*0.06)); arff.x+=arff.vx*dt; arff.dir=d>=0?1:-1; arff.ph+=Math.abs(arff.vx)*0.08*dt; }
+      else { arff.vx=0; arff.urp-=dt; if(arff.urp<=0){ arff.urpTimer=160+Math.random()*140; } }
+      // Arff gets queasy now and then
+      if(arff.urp<=0){ arff.urpTimer-=dt; if(arff.urpTimer<=0){ arff.urp=70; urpBubble=70; urpSfx(); puddles.push({x:arff.x, y:floorY(), t:420, r:0}); } }
+      if(urpBubble>0) urpBubble-=dt;
+      for(var p=puddles.length-1;p>=0;p--){ puddles[p].t-=dt; if(puddles[p].r<10)puddles[p].r+=0.5*dt; if(puddles[p].t<=0) puddles.splice(p,1); }
+      // reached the vet?
+      if(mo.x>vetX()-40){ startHeal(); }
+    } else if(mode==="heal"){
+      healT-=dt; if(healT<=0){ finish(); }
+      // sparkles / hearts rising
+      if(Math.random()<0.3) hearts.push({x:vetX()-40+(Math.random()*60-30), y:floorY()-30, vy:-Math.random()*1.5-0.5, life:50});
+      for(var h=hearts.length-1;h>=0;h--){ hearts[h].y+=hearts[h].vy*dt; hearts[h].life-=dt; if(hearts[h].life<=0) hearts.splice(h,1); }
+    }
+  }
+
+  function startHeal(){ mode="heal"; healT=140; arff.urp=0; urpBubble=0; healSfx();
+    mo.x=vetX()-70; arff.x=vetX()-24; camX=Math.max(0,Math.min(WORLD-W, mo.x-W*0.42)); }
+  function finish(){ mode="done"; arff.better=true; barkHappy();
+    for(var i=0;i<24;i++) hearts.push({x:vetX()-40+(Math.random()*80-40), y:floorY()-30, vy:-Math.random()*1.8-0.5, life:70});
+    document.getElementById("doneP").innerHTML="🩺 The vet gave Arff medicine and a checkup.<br>No more tummy ache — <b>Arff feels great!</b> 🐾💚<br>She's wagging her tail and ready to play!";
+    document.getElementById("doneOv").classList.remove("hide"); }
+
+  // ---- render ----
+  function rr(a,b,c,d,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+c,b,a+c,b+d,r); x.arcTo(a+c,b+d,a,b+d,r); x.arcTo(a,b+d,a,b,r); x.arcTo(a,b,a+c,b,r); x.closePath(); }
+  function render(){
+    var fy=floorY();
+    // sky
+    var sky=x.createLinearGradient(0,0,0,fy); sky.addColorStop(0,"#bfe3f0"); sky.addColorStop(1,"#e4f6ef"); x.fillStyle=sky; x.fillRect(0,0,W,fy);
+    // sun + clouds (parallax)
+    x.fillStyle="#ffe79a"; x.beginPath(); x.arc(W*0.84,H*0.15,30,0,7); x.fill();
+    x.fillStyle="#ffffff"; for(var c0=0;c0<4;c0++){ var cxp=((c0*W*0.7 - camX*0.3)%(W+200)+W+200)%(W+200)-100; cloud(cxp,H*0.12+c0%2*30); }
+    // grass + sidewalk
+    x.fillStyle="#7cc24a"; x.fillRect(0,fy,W,H-fy);
+    x.fillStyle="#cfc9bd"; x.fillRect(0,fy,W,22);  // sidewalk strip
+    x.fillStyle="#b7b1a4"; for(var s=0;s<30;s++){ var lx=(s*90 - camX)%(WORLD); x.fillRect(lx- ( (camX)%90 ),fy,2,22); }
+    // world objects (offset by camX)
+    x.save(); x.translate(-camX,0);
+    // home
+    drawHome(homeX(), fy);
+    // trees/bushes along the way
+    for(var t=0;t<6;t++){ var tx=homeX()+W*0.5 + t*(W*0.32); if(tx<vetX()-W*0.1) drawTree(tx, fy); }
+    // vet building
+    drawVet(vetX(), fy);
+    // puddles (little sick spots — gentle)
+    for(var p=0;p<puddles.length;p++){ var pu=puddles[p]; x.globalAlpha=Math.min(0.5,pu.t/420*0.5); x.fillStyle="#9ac46a"; x.beginPath(); x.ellipse(pu.x,fy+2,pu.r,pu.r*0.4,0,0,7); x.fill(); } x.globalAlpha=1;
+    // Arff
+    drawArff(arff.x, fy, Math.min(W,H)/300, !arff.better, arff.better, arff.dir, arff.ph);
+    // urp bubble above Arff
+    if(urpBubble>0 && !arff.better){ x.globalAlpha=Math.min(1,urpBubble/20); x.font=Math.round(26)+"px serif"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("🤢", arff.x, fy-56); x.globalAlpha=1; }
+    // hearts (heal)
+    for(var h=0;h<hearts.length;h++){ x.globalAlpha=Math.max(0,hearts[h].life/70); x.font="18px serif"; x.textAlign="center"; x.fillText("💚",hearts[h].x,hearts[h].y); } x.globalAlpha=1;
+    // Mo
+    drawGuy(mo.x, fy, {k:Math.min(W,H)/320, body:"#1a6fd0", pants:"#243a66", skin:moSkin, hair:moHair, label:"MO", dir:mo.dir, walk:Math.abs(mo.vx)>0.3, ph:mo.ph});
+    x.restore();
+
+    // HUD: progress to vet
+    var prog=Math.max(0,Math.min(1,(mo?mo.x:0 - homeX())/(vetX()-homeX())));
+    var bw=Math.min(W*0.7,300), bx=W/2-bw/2, by=12;
+    x.fillStyle="rgba(20,58,28,0.8)"; rr(bx-3,by-3,bw+6,16,8); x.fill();
+    x.fillStyle="#7ec98a"; rr(bx,by,bw*prog,10,5); x.fill();
+    x.fillStyle="#fff"; x.font="bold 11px Trebuchet MS"; x.textAlign="left"; x.textBaseline="middle"; x.fillText("🏠",bx-2,by+5); x.textAlign="right"; x.fillText("🏥",bx+bw+4,by+5);
+
+    // joystick
+    if(mode==="walk"){
+      x.globalAlpha=joy.active?0.95:0.7;
+      x.beginPath(); x.arc(joy.cx,joy.cy,joy.R,0,7); x.fillStyle="rgba(20,50,28,0.3)"; x.fill(); x.lineWidth=5; x.strokeStyle="rgba(255,255,255,0.55)"; x.stroke();
+      x.fillStyle="rgba(255,255,255,0.6)"; x.font="bold "+Math.round(joy.R*0.42)+"px Arial"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("‹",joy.cx-joy.R*0.66,joy.cy); x.fillText("›",joy.cx+joy.R*0.66,joy.cy);
+      x.beginPath(); x.arc(joy.kx,joy.ky,joy.R*0.52,0,7); var kg=x.createRadialGradient(joy.kx-6,joy.ky-6,4,joy.kx,joy.ky,joy.R*0.52); kg.addColorStop(0,"#d6f5dd"); kg.addColorStop(1,"#3fc07a"); x.fillStyle=kg; x.fill(); x.lineWidth=4; x.strokeStyle="#1f8a52"; x.stroke();
+      x.globalAlpha=1;
+      if(!joy.active){ x.fillStyle="rgba(20,58,28,0.8)"; x.font="bold 14px Trebuchet MS"; x.textAlign="right"; x.textBaseline="bottom"; x.fillText("Drag to walk Arff to the vet →", W-14, H-14); }
+    }
+    if(mode==="heal"){ x.fillStyle="rgba(20,58,28,0.85)"; x.font="bold 22px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("🩺 The vet is helping Arff...", W/2, H*0.5); }
+  }
+  function cloud(cx,cy){ x.beginPath(); x.arc(cx,cy,16,0,7); x.arc(cx+18,cy+4,20,0,7); x.arc(cx+40,cy,15,0,7); x.closePath(); x.fill(); }
+  function drawTree(px,fy){ x.fillStyle="#8a5a2a"; x.fillRect(px-5,fy-40,10,40); x.fillStyle="#4ca84c"; x.beginPath(); x.arc(px,fy-50,24,0,7); x.arc(px-18,fy-40,18,0,7); x.arc(px+18,fy-40,18,0,7); x.fill(); }
+  function drawHome(px,fy){
+    x.fillStyle="#e8b06a"; rr(px-70,fy-90,140,90,4); x.fill();
+    x.fillStyle="#b4452f"; x.beginPath(); x.moveTo(px-82,fy-90); x.lineTo(px,fy-134); x.lineTo(px+82,fy-90); x.closePath(); x.fill();
+    x.fillStyle="#6a3a1a"; rr(px-16,fy-52,32,52,3); x.fill();
+    x.fillStyle="#bfe3f0"; rr(px-56,fy-72,26,24,3); x.fill(); rr(px+30,fy-72,26,24,3); x.fill();
+    x.fillStyle="#fff"; x.font="bold 13px Trebuchet MS"; x.textAlign="center"; x.fillText("🏠 HOME",px,fy-100);
+  }
+  function drawVet(px,fy){
+    x.fillStyle="#ffffff"; rr(px-76,fy-104,152,104,6); x.fill(); x.strokeStyle="#cfe3d6"; x.lineWidth=3; rr(px-76,fy-104,152,104,6); x.stroke();
+    x.fillStyle="#2e8a4a"; x.beginPath(); x.moveTo(px-88,fy-104); x.lineTo(px,fy-146); x.lineTo(px+88,fy-104); x.closePath(); x.fill();
+    // red cross sign
+    x.fillStyle="#e24b4b"; x.fillRect(px-9,fy-132,18,6); x.fillRect(px-3,fy-138,6,18);
+    x.fillStyle="#2e8a4a"; rr(px-20,fy-60,40,60,4); x.fill();                        // door
+    x.fillStyle="#bfe3f0"; rr(px-62,fy-82,28,26,3); x.fill(); rr(px+34,fy-82,28,26,3); x.fill();
+    x.fillStyle="#2e8a4a"; x.font="bold 16px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("🏥 VET",px,fy-92);
+  }
+
+  // ---- characters ----
+  function drawGuy(px,feetY,o){
+    var k=o.k||1.3, bob=o.walk?Math.abs(Math.sin(o.ph))*4*k:0, dir=o.dir||1, sw=o.walk?Math.sin(o.ph)*5*k:0;
+    var legLen=12*k, bodyH=24*k, bodyW=22*k, headR=10.5*k;
+    var bodyBot=feetY-bob-legLen, bodyTop=bodyBot-bodyH, hy=bodyTop-headR+5*k;
+    x.save();
+    x.globalAlpha=0.18; x.fillStyle="#000"; x.beginPath(); x.ellipse(px,feetY,bodyW*0.6,5,0,0,7); x.fill(); x.globalAlpha=1;
+    x.strokeStyle=o.pants||"#2a3f66"; x.lineWidth=6*k; x.lineCap="round";
+    x.beginPath(); x.moveTo(px-5*k,bodyBot-2); x.lineTo(px-5*k+sw,feetY-bob); x.stroke();
+    x.beginPath(); x.moveTo(px+5*k,bodyBot-2); x.lineTo(px+5*k-sw,feetY-bob); x.stroke();
+    x.fillStyle=o.body; rr(px-bodyW/2,bodyTop,bodyW,bodyH,7*k); x.fill();
+    x.strokeStyle=o.body; x.lineWidth=5.5*k; x.lineCap="round"; var shY=bodyTop+7*k;
+    x.beginPath(); x.moveTo(px-bodyW*0.42,shY); x.lineTo(px-bodyW*0.58,shY+14*k); x.moveTo(px+bodyW*0.42,shY); x.lineTo(px+bodyW*0.58,shY+14*k); x.stroke();
+    x.fillStyle=o.skin; x.beginPath(); x.arc(px-bodyW*0.58,shY+14*k,3*k,0,7); x.arc(px+bodyW*0.58,shY+14*k,3*k,0,7); x.fill();
+    if(o.label){ x.fillStyle="#fff"; x.font="bold "+Math.round(9*k)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(o.label,px,(bodyTop+bodyBot)/2); }
+    x.fillStyle=o.skin; x.beginPath(); x.arc(px,hy,headR,0,7); x.fill();
+    x.fillStyle=o.hair; x.beginPath(); x.arc(px,hy-2*k,headR,Math.PI,2*Math.PI); x.fill();
+    var ex=headR*0.36, ey=hy+1*k, pr=1.9*k;
+    x.fillStyle="#fff"; x.beginPath(); x.arc(px-ex,ey,pr,0,7); x.arc(px+ex,ey,pr,0,7); x.fill();
+    x.fillStyle="#201008"; x.beginPath(); x.arc(px-ex+dir*0.7*k,ey,pr*0.55,0,7); x.arc(px+ex+dir*0.7*k,ey,pr*0.55,0,7); x.fill();
+    x.strokeStyle="#b06a44"; x.lineWidth=1.7*k; x.beginPath(); x.arc(px,hy+3.5*k,headR*0.42,0.15*Math.PI,0.85*Math.PI); x.stroke();
+    x.restore();
+  }
+  function drawArff(px,feetY,sc,sick,happy,dir,ph){
+    dir=dir||1;
+    x.save(); x.translate(px,feetY-12*sc); x.scale(sc*dir,sc);
+    var fur=sick?"#eaf0e2":"#ffffff";                  // sick = slightly green-tinged white
+    x.fillStyle="rgba(0,0,0,0.18)"; x.beginPath(); x.ellipse(0,11,12,4,0,0,7); x.fill();
+    var wag=happy?Math.sin(last/80)*4:Math.sin(last/500)*1;
+    x.fillStyle=fur; x.beginPath(); x.arc(-9+wag,-3,5,0,7); x.fill();
+    var puffs=[[-6,3,7],[0,4,8],[6,3,7],[-3,-1,6],[3,-1,6]]; for(var i=0;i<puffs.length;i++){ x.beginPath(); x.arc(puffs[i][0],puffs[i][1],puffs[i][2],0,7); x.fill(); }
+    x.fillStyle="#f2f2ee"; x.beginPath(); x.arc(-4,10,2.6,0,7); x.fill(); x.beginPath(); x.arc(4,10,2.6,0,7); x.fill();
+    x.strokeStyle="#ff5aa5"; x.lineWidth=2.6; x.beginPath(); x.moveTo(3,2.5); x.lineTo(15,2.5); x.stroke(); x.fillStyle="#ffd23f"; x.beginPath(); x.arc(9,4.5,1.7,0,7); x.fill();
+    x.fillStyle=fur; x.beginPath(); x.arc(9,-4,8.5,0,7); x.fill();
+    var earDroop=sick?3:0;
+    x.fillStyle="#f4f2ec"; x.beginPath(); x.ellipse(2.5,-4+earDroop,4.5,6.5,-0.5,0,7); x.fill(); x.beginPath(); x.ellipse(15.5,-4+earDroop,4.5,6.5,0.5,0,7); x.fill();
+    x.fillStyle=fur; x.beginPath(); x.arc(6,-10,3.5,0,7); x.fill(); x.beginPath(); x.arc(12,-10,3.5,0,7); x.fill();
+    if(sick){ // sad, half-closed eyes + a little green cheek
+      x.strokeStyle="#2a2018"; x.lineWidth=1.4; x.beginPath(); x.moveTo(4.5,-4); x.lineTo(7.5,-4); x.moveTo(10.5,-4); x.lineTo(13.5,-4); x.stroke();
+      x.fillStyle="#bcd99a"; x.globalAlpha=0.6; x.beginPath(); x.arc(13,-1,2.2,0,7); x.fill(); x.globalAlpha=1;
+    } else {
+      x.fillStyle="#2a2018"; x.beginPath(); x.arc(6,-4,1.5,0,7); x.fill(); x.beginPath(); x.arc(12,-4,1.5,0,7); x.fill();
+      x.fillStyle="#fff"; x.beginPath(); x.arc(6.5,-4.5,0.5,0,7); x.fill(); x.beginPath(); x.arc(12.5,-4.5,0.5,0,7); x.fill();
+    }
+    x.fillStyle="#3a2a2a"; x.beginPath(); x.arc(9,-0.5,2,0,7); x.fill();
+    if(happy && Math.sin(last/200)>0.2){ x.fillStyle="#ff8fae"; x.beginPath(); x.ellipse(9,3.5,2.2,4,0,0,7); x.fill(); }
+    x.fillStyle="#214a2a"; x.font="bold 8px Trebuchet MS"; x.textAlign="center"; x.scale(dir,1); x.fillText("ARFF",9*dir,20);
+    x.restore();
+  }
+
+  window._V={ get:function(){ return {mode:mode, mox:Math.round(mo?mo.x:0), vetx:Math.round(vetX()), arffx:Math.round(arff?arff.x:0), better:arff?arff.better:false}; },
+    walkTo:function(wx){ if(mo){ mo.x=wx; arff.x=wx-56; } } };
+
+  resize(); reset(); mode="start";
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

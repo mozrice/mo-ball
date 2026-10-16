@@ -37,14 +37,21 @@ function pt(e){ var r=cv.getBoundingClientRect(); var t=e.touches?e.touches[0]:e
 var PLAYBTN={x:W/2-90,y:H/2+40,w:180,h:60};
 var BW=(W-40)/4, BY=H-78, BH=62;
 var BTN={ checkin:{x:12,y:BY,w:BW-6,h:BH}, clean:{x:12+BW,y:BY,w:BW-6,h:BH}, serve:{x:12+BW*2,y:BY,w:BW-6,h:BH}, hire:{x:12+BW*3,y:BY,w:BW-6,h:BH} };
+var MODEBTN={x:W/2-110,y:H/2+118,w:220,h:40};
 cv.addEventListener('pointerdown',function(e){ if(ac()&&ac().state==='suspended')ac().resume(); var p=pt(e);
-  if(scene==='title'){ if(inR(p,PLAYBTN)) start('new'); return; }
+  if(scene==='title'){ if(inR(p,MODEBTN)){ joyMode=!joyMode; try{localStorage.setItem('moHotelJoy',joyMode?'1':'0');}catch(_){} bell(); return; } if(inR(p,PLAYBTN)) start('new'); return; }
   if(scene==='over'){ if(inR(p,PLAYBTN)) start(result==='win'?'next':'retry'); return; }
-  if(inR(p,BTN.checkin)) cmd('checkin');
-  else if(inR(p,BTN.clean)) cmd('clean');
-  else if(inR(p,BTN.serve)) cmd('serve');
-  else if(inR(p,BTN.hire)) hire();
+  if(inR(p,BTN.checkin)){ cmd('checkin'); return; }
+  if(inR(p,BTN.clean)){ cmd('clean'); return; }
+  if(inR(p,BTN.serve)){ cmd('serve'); return; }
+  if(inR(p,BTN.hire)){ hire(); return; }
+  if(curObj().t==='fun'){ for(var fj=0;fj<funs.length;fj++){ if(Math.hypot(p.x-funs[fj].x,p.y-funs[fj].y)<26){ collectFun(fj); return; } } }
+  if(joyMode){ if(p.y>104 && p.y<BY){ JOY.active=true; JOY.id=e.pointerId; JOY.bx=p.x; JOY.by=p.y; JOY.dx=0; JOY.dy=0; } return; }
+  for(var si=0;si<stealers.length;si++){ if(!stealers[si].claimed && Math.hypot(p.x-stealers[si].x,p.y-stealers[si].y)<28){ assignCatch(stealers[si]); return; } }
 });
+cv.addEventListener('pointermove',function(e){ if(!JOY.active||e.pointerId!==JOY.id)return; var p=pt(e); var dx=p.x-JOY.bx, dy=p.y-JOY.by, m=Math.hypot(dx,dy); if(m>JOY.R){ dx=dx/m*JOY.R; dy=dy/m*JOY.R; } JOY.dx=dx; JOY.dy=dy; });
+function joyEnd(e){ if(e.pointerId===JOY.id){ JOY.active=false; JOY.id=null; JOY.dx=0; JOY.dy=0; } }
+cv.addEventListener('pointerup',joyEnd); cv.addEventListener('pointercancel',joyEnd);
 
 var scene='title';
 var GY=110, GB=H-150;
@@ -65,15 +72,47 @@ function reviewWord(){ return review>=9?'Exceptional':review>=8?'Wonderful':revi
 var ENTRY={x:W/2,y:H-150};
 var workers=[], guests=[], spawnCd=1.5, pops=[], cardFx=[];
 var coins=0, served=0, cards=0, hireCost=30, msg='', msgT=0;
+var CHECKIN_LINES=['👋 Welcome to Mo Hotel!','📝 Got your name!','📖 Found your booking!','🔑 Here is your room key!','🚪 Showed them their room!','🛗 Pointed them to the elevator!'];
 var DARK=80, timeLeft=DARK, result=null, confetti=[];
 var level=1, best=1, combo=0, lastCheckin=-9, stars=0, serviceCount=0, vipCount=0, petCount=0, cleanCount=0;
+var stealers=[], guardCount=0, stealCd=2;
+var joyMode=false; try{ joyMode=localStorage.getItem('moHotelJoy')==='1'; }catch(e){}
+var JOY={active:false,id:null,bx:0,by:0,dx:0,dy:0,R:44};
+var DESKX=W/2, DESKY=H-118;
+var sites=[], siteDone=0, funs=[], funCount=0, funCd=0.6;
 // Each level has its OWN objective. Coach Mo sends these — add one entry per level.
 var LEVELOBJ=[
- {t:'fill', n:9, label:'Fill all 9 rooms'}
+ {t:'checkin', n:8,  label:'Check in the guests'},
+ {t:'guard',   n:8,  label:'Guard rooms from stealers'},
+ {t:'build',   n:9,  label:'Rebuild the hotel rooms'},
+ {t:'place',   n:9,  label:'Place all the items'},
+ {t:'pool',    n:10, label:'Build the swimming pool'},
+ {t:'outside', n:10, label:'Build the proooo outside'},
+ {t:'arff',    n:8,  label:"Make Arff's house"},
+ {t:'fun',     n:12, label:'Have fun at Arff\'s house'}
 ];
+function isBuildObj(o){ o=o||curObj(); return o.t==='build'||o.t==='place'||o.t==='pool'||o.t==='outside'||o.t==='arff'; }
+var SITEPOS={
+ outside:{pos:[[60,150],[150,140],[250,145],[342,152],[70,250],[200,238],[332,250],[110,338],[230,344],[322,340]], d:['🌳','🌸','🌳','🌷','🌲','🌺','🌳','🪴','🌻','🌳']},
+ arff:{pos:[[150,308],[200,308],[250,308],[150,258],[250,258],[200,240],[118,330],[282,330]], d:['🧱','🪵','🧱','🪟','🪟','🔺','🦴','🛏️']}
+};
+function setupSites(ot){ sites=[]; siteDone=0;
+  function P(x,y,u,dd){ sites.push({x:x,y:y,done:false,claimed:null,u:u,d:dd}); }
+  if(ot==='build'){ ROOMS.forEach(function(r){ P(r.x,r.y,'🧱','🏠'); }); }
+  else if(ot==='place'){ var it=['🛋️','🛏️','🪑','📺','🪴','🚪','🖼️','🪞','💡']; ROOMS.forEach(function(r,i){ P(r.x,r.y,'📦',it[i%it.length]); }); }
+  else if(ot==='pool'){ var PX=[64,128,192,256,320], PY=[218,300]; for(var py=0;py<PY.length;py++)for(var px=0;px<PX.length;px++)P(PX[px],PY[py],'',''); }
+  else if(ot==='outside'||ot==='arff'){ var S=SITEPOS[ot]; for(var i=0;i<S.pos.length;i++)P(S.pos[i][0],S.pos[i][1],ot==='arff'?'🔨':'🕳️',S.d[i]); }
+}
+function nearestSite(){ var b=null,bd=1e9; for(var i=0;i<sites.length;i++){ var st=sites[i]; if(st.done||st.claimed)continue; var dd=Math.hypot(boss.x-st.x,boss.y-st.y); if(dd<bd){bd=dd;b=st;} } return b; }
+function assignSite(){ var st=nearestSite(); if(!st){ nope(); showMsg('All done — nothing left! ✨'); return; } var w=freeWorker(); if(!w){ nope(); showMsg('All workers busy! Tap HIRE 👷'); return; } st.claimed=w; w.task={type:'site',site:st}; w.state='toTask'; w.tx=st.x; w.ty=st.y+ (curObj().t==='pool'?0:12); bell(); showMsg('Sent a worker to work on it!'); }
+function siteDoneFx(st){ st.done=true; st.claimed=null; siteDone++; coins+=2; combo++; if(combo>=2){ coins+=combo; comboSnd(); pop(st.x,st.y-24,'COMBO x'+combo); } var v=curObj().t; cleanS(); pop(st.x,st.y-8, v==='pool'?'💧':(v==='place'?'🛋️':(v==='outside'?'🌳':(v==='arff'?'🐾':'🔨')))); pop(st.x,st.y-8,'+2'); }
+function collectFun(i){ var f=funs[i]; if(!f)return; funs.splice(i,1); funCount++; combo++; coins+=1; cash(); pop(f.x,f.y-6,'🎉'); if(combo>=2){ comboSnd(); pop(f.x,f.y-24,'COMBO x'+combo); } }
+function assignFun(){ var f=null,bd=1e9; for(var i=0;i<funs.length;i++){ if(funs[i].claimed)continue; var dd=Math.hypot(boss.x-funs[i].x,boss.y-funs[i].y); if(dd<bd){bd=dd;f=funs[i];} } if(!f){ nope(); showMsg('Wait for fun to pop up! 🎈'); return; } var w=freeWorker(); if(!w){ nope(); showMsg('All busy! Tap HIRE 👷'); return; } f.claimed=w; w.task={type:'funcatch',f:f}; w.state='toTask'; bell(); }
 function curObj(){ return LEVELOBJ[(level-1)%LEVELOBJ.length]; }
-function objVal(o){ o=o||curObj(); switch(o.t){ case 'fill': return occupiedCount(); case 'coins': return coins; case 'checkin': return served; case 'serve': return serviceCount; case 'vip': return vipCount; case 'pet': return petCount; case 'clean': return cleanCount; case 'cards': return cards; default: return 0; } }
+function objVal(o){ o=o||curObj(); switch(o.t){ case 'fill': return occupiedCount(); case 'coins': return coins; case 'checkin': return served; case 'serve': return serviceCount; case 'vip': return vipCount; case 'pet': return petCount; case 'clean': return cleanCount; case 'cards': return cards; case 'guard': return guardCount; case 'build': case 'place': case 'pool': case 'outside': case 'arff': return siteDone; case 'fun': return funCount; default: return 0; } }
 function objMet(){ var o=curObj(); return objVal(o)>=o.n; }
+function nearestStealer(){ var best=null,bd=1e9; for(var i=0;i<stealers.length;i++){ if(stealers[i].claimed)continue; var dd=d(boss,stealers[i]); if(dd<bd){bd=dd;best=stealers[i];} } return best; }
+function assignCatch(s){ var w=freeWorker(); if(!w){ nope(); showMsg('All guards busy! Tap HIRE 👷'); return; } s.claimed=w; w.task={type:'catch',s:s}; w.state='toTask'; bell(); }
 try{ best=parseInt(localStorage.getItem('moHotelBest'))||1; }catch(e){}
 function darkForLevel(l){ return Math.max(44, 82-(l-1)*6); }
 function occupiedCount(){ return ROOMS.filter(function(r){return r.state==='occupied';}).length; }
@@ -83,13 +122,19 @@ var GCOL=['#e0563b','#3a7ac0','#2f9e5a','#c94a8a','#e0a040','#8a5ad0'];
 function showMsg(t){ msg=t; msgT=1.8; }
 function pop(x,y,e){ pops.push({x:x,y:y,t:0.9,e:e}); }
 function addWorker(){ var h=STAFFHOME[workers.length%STAFFHOME.length]; workers.push({x:h.x,y:h.y,hx:h.x,hy:h.y,state:'idle',task:null,workT:0,step:Math.random()*6,card:null}); }
-function start(mode){ if(mode==='new')level=1; else if(mode==='next')level++; scene='play'; coins=0; served=0; cards=0; hireCost=30; guests=[]; workers=[]; addWorker(); addWorker(); ROOMS.forEach(function(r){r.state='empty';r.claimed=null;}); DARK=darkForLevel(level); spawnCd=0.5; timeLeft=DARK; result=null; confetti=[]; combo=0; lastCheckin=-9; serviceCount=0; vipCount=0; petCount=0; cleanCount=0; review=8.6; bell(); showMsg('Level '+level+': '+curObj().label+' before dark!'); }
+function start(mode){ if(mode==='new')level=1; else if(mode==='next')level++; scene='play'; coins=0; served=0; cards=0; hireCost=30; guests=[]; workers=[]; var nw=Math.min(6,1+level); for(var wi=0;wi<nw;wi++)addWorker(); ROOMS.forEach(function(r){r.state='empty';r.claimed=null;r.robbed=0;}); DARK=darkForLevel(level); spawnCd=0.5; timeLeft=DARK; result=null; confetti=[]; combo=0; lastCheckin=-9; serviceCount=0; vipCount=0; petCount=0; cleanCount=0; stealers=[]; guardCount=0; stealCd=1.4; funs=[]; funCount=0; funCd=0.6; setupSites(curObj().t); boss.x=DESKX; boss.y=DESKY; JOY.active=false; JOY.id=null; JOY.dx=0; JOY.dy=0; review=8.6; bell(); showMsg('Level '+level+': '+curObj().label+' before dark!'); }
 function spawnConf(){ for(var i=0;i<60;i++)confetti.push({x:W/2,y:H/2,vx:(Math.random()-0.5)*260,vy:-140-Math.random()*200,c:['#ffd23f','#ff7ac0','#5ad1ff','#9dff6a'][(Math.random()*4)|0],r:Math.random()*6}); }
 function openRoom(){ for(var i=0;i<ROOMS.length;i++)if(ROOMS[i].state==='empty' && !ROOMS[i].claimed)return ROOMS[i]; return null; }
 function freeWorker(){ for(var i=0;i<workers.length;i++)if(workers[i].state==='idle')return workers[i]; return null; }
 
-function cmd(type){ if(scene!=='play')return; var w=freeWorker(); if(!w){ nope(); showMsg('All workers busy! Hire more 👷'); return; }
-  if(type==='checkin'){ var g=null; for(var i=0;i<guests.length;i++)if(guests[i].state==='wait'&&!guests[i].claimed){g=guests[i];break;} if(!g){ nope(); showMsg('No guests waiting to check in'); return; } var rm=openRoom(); if(!rm){ nope(); showMsg('No clean rooms — send a worker to CLEAN'); return; } g.claimed=w; rm.claimed=w; w.task={type:'checkin',g:g,rm:rm}; w.state='toTask'; w.tx=g.x; w.ty=g.y-4; bell(); showMsg('Sent a worker to check them in!'); }
+function cmd(type){ if(scene!=='play')return; var ot=curObj().t;
+  if(type==='checkin'){
+    if(ot==='guard'){ var s=nearestStealer(); if(!s){ nope(); showMsg('No stealers to catch right now'); return; } assignCatch(s); return; }
+    if(isBuildObj()){ assignSite(); return; }
+    if(ot==='fun'){ assignFun(); return; }
+  }
+  var w=freeWorker(); if(!w){ nope(); showMsg('All workers busy! Hire more 👷'); return; }
+  if(type==='checkin'){ var g=null; for(var i=0;i<guests.length;i++)if(guests[i].state==='wait'&&!guests[i].claimed){g=guests[i];break;} if(!g){ nope(); showMsg('No guests waiting to check in'); return; } var rm=openRoom(); if(!rm){ nope(); showMsg('No clean rooms — send a worker to CLEAN'); return; } g.claimed=w; rm.claimed=w; w.task={type:'checkin',g:g,rm:rm}; w.state='toTask'; w.tx=g.x; w.ty=g.y-4; bell(); showMsg('👋 Welcoming a guest — checking them in!'); }
   else if(type==='clean'){ var rm=null; for(var i=0;i<ROOMS.length;i++)if(ROOMS[i].state==='dirty'&&!ROOMS[i].claimed){rm=ROOMS[i];break;} if(!rm){ nope(); showMsg('No dirty rooms right now ✨'); return; } rm.claimed=w; w.task={type:'clean',rm:rm}; w.state='toTask'; w.tx=rm.x; w.ty=rm.y+20; showMsg('Sent a worker to clean the room!'); }
   else if(type==='serve'){ var g=null; for(var i=0;i<guests.length;i++)if(guests[i].state==='inroom'&&guests[i].want&&!guests[i].claimed){g=guests[i];break;} if(!g){ nope(); showMsg('No guests need service yet'); return; } g.claimed=w; w.task={type:'serve',g:g}; w.state='toTask'; w.tx=g.x; w.ty=g.y-4; showMsg('Sent a worker with room service!'); }
 }
@@ -104,7 +149,18 @@ function upd(dt){ if(msgT>0)msgT-=dt; boss.step+=dt*3;
   timeLeft-=dt;
   if(objMet()){ result='win'; stars=(timeLeft/DARK>0.5?3:(timeLeft/DARK>0.25?2:1)); best=Math.max(best,level); try{localStorage.setItem('moHotelBest',best);}catch(e){} scene='over'; winSnd(); spawnConf(); return; }
   if(timeLeft<=0){ timeLeft=0; result='lose'; scene='over'; nope(); return; }
-  spawnCd-=dt; if(spawnCd<=0 && guests.filter(function(g){return g.state==='wait';}).length<3){ var pet=Math.random()<0.3?(Math.random()<0.6?'dog':'cat'):null; var vip=!pet && Math.random()<0.16; guests.push({x:ENTRY.x,y:ENTRY.y,state:'wait',col:GCOL[(Math.random()*GCOL.length)|0],step:Math.random()*6,want:false,happy:0,claimed:null,pet:pet,vip:vip,served:false}); spawnCd=3+Math.random()*3; bell(); }
+  var ot=curObj().t; var GUARD=ot==='guard', FUN=ot==='fun', BUILDING=isBuildObj();
+  ROOMS.forEach(function(r){ if(r.robbed>0)r.robbed-=dt; });
+  // JOYSTICK: move the boss (YOU) around the floor
+  if(joyMode && JOY.active){ var sp=170*dt; boss.x=clamp(boss.x+JOY.dx/JOY.R*sp,26,W-26); boss.y=clamp(boss.y+JOY.dy/JOY.R*sp,112,BY-16); }
+  if(GUARD){
+    stealCd-=dt; if(stealCd<=0 && stealers.length<5){ stealers.push({x:40+Math.random()*(W-80),y:118,step:Math.random()*6,room:ROOMS[(Math.random()*ROOMS.length)|0],caught:false,claimed:null}); stealCd=1.3+Math.random()*1.3; }
+    for(var si=stealers.length-1;si>=0;si--){ var s=stealers[si]; s.step+=dt*8; if(s.claimed)continue; if(joyMode && Math.hypot(boss.x-s.x,boss.y-s.y)<26){ guardCount++; combo++; comboSnd(); pop(s.x,s.y-22,'🚨 CAUGHT!'); if(combo>=2)pop(s.x,s.y-40,'COMBO x'+combo); stealers.splice(si,1); continue; } if(moveTo(s,s.room.x,s.room.y+18,54*dt)<12){ s.room.robbed=0.7; pop(s.room.x,s.room.y,'💢'); nope(); stealers.splice(si,1); } }
+  }
+  if(BUILDING && joyMode){ for(var qi=0;qi<sites.length;qi++){ var st=sites[qi]; if(st.done)continue; if(Math.hypot(boss.x-st.x,boss.y-st.y)<24){ siteDoneFx(st); } } }
+  if(FUN){ funCd-=dt; if(funCd<=0 && funs.length<7){ funs.push({x:30+Math.random()*(W-60),y:GB-6,vy:-(20+Math.random()*22),sway:Math.random()*6,e:['🎈','🎉','🦴','🎾','🐾','⭐','🍖'][(Math.random()*7)|0],claimed:null}); funCd=0.7+Math.random()*0.9; }
+    for(var fi=funs.length-1;fi>=0;fi--){ var f=funs[fi]; f.sway+=dt*3; f.y+=f.vy*dt; f.x+=Math.sin(f.sway)*14*dt; if(joyMode && Math.hypot(boss.x-f.x,boss.y-f.y)<26){ collectFun(fi); continue; } if(f.y<120){ funs.splice(fi,1); } } }
+  spawnCd-=dt; if(!GUARD && !FUN && !BUILDING) if(spawnCd<=0 && guests.filter(function(g){return g.state==='wait';}).length<3){ var pet=Math.random()<0.3?(Math.random()<0.6?'dog':'cat'):null; var vip=!pet && Math.random()<0.16; guests.push({x:ENTRY.x,y:ENTRY.y,state:'wait',col:GCOL[(Math.random()*GCOL.length)|0],step:Math.random()*6,want:false,happy:0,claimed:null,pet:pet,vip:vip,served:false}); spawnCd=3+Math.random()*3; bell(); }
   var wq=guests.filter(function(g){return g.state==='wait';}); wq.forEach(function(g,i){ var tx=ENTRY.x-58+i*52; g.x+=(tx-g.x)*Math.min(1,5*dt); });
   // guests
   for(var i=guests.length-1;i>=0;i--){ var g=guests[i]; g.step+=dt*3; if(g.happy>0)g.happy-=dt;
@@ -113,9 +169,12 @@ function upd(dt){ if(msgT>0)msgT-=dt; boss.step+=dt*3;
   }
   // workers
   workers.forEach(function(w){ w.step+=dt*7;
+    if(w.task && w.task.type==='catch'){ var s=w.task.s; if(!s||s.caught||stealers.indexOf(s)<0){ w.task=null; w.state='return'; } else if(w.state==='toTask'){ if(moveTo(w,s.x,s.y,180*dt)<16){ s.caught=true; guardCount++; combo++; comboSnd(); pop(s.x,s.y-22,'🚨 CAUGHT!'); if(combo>=2)pop(s.x,s.y-40,'COMBO x'+combo); stealers.splice(stealers.indexOf(s),1); w.task=null; w.state='return'; } } return; }
+    if(w.task && w.task.type==='funcatch'){ var f=w.task.f; if(!f||funs.indexOf(f)<0){ w.task=null; w.state='return'; } else if(w.state==='toTask'){ if(moveTo(w,f.x,f.y,190*dt)<18){ var idx=funs.indexOf(f); if(idx>=0)collectFun(idx); w.task=null; w.state='return'; } } return; }
+    if(w.task && w.task.type==='site'){ var st=w.task.site; if(!st||st.done){ w.task=null; w.state='return'; } else if(w.state==='toTask'){ if(moveTo(w,w.tx,w.ty,150*dt)<9){ w.state='work'; w.workT=1.0; } } else if(w.state==='work'){ w.workT-=dt; if(w.workT<=0){ siteDoneFx(st); w.state='return'; w.task=null; } } return; }
     if(w.state==='toTask'){ if(moveTo(w,w.tx,w.ty,150*dt)<8){ w.state='work'; w.workT=1.3; } }
     else if(w.state==='work'){ w.workT-=dt; if(w.workT<=0){ var t=w.task;
-        if(t.type==='checkin'){ t.g.state='toRoom'; t.g.claimed=null; t.g.room=t.rm; t.g.tx=t.rm.x; t.g.ty=t.rm.y+18; var rate=t.rm.type.rate*(t.g.vip?2:1); coins+=rate; served++; if(t.g.vip)vipCount++; if(t.g.pet)petCount++; review=clamp(review+0.03,0,10); pop(t.g.x,t.g.y-28,'+'+rate); var now=performance.now()/1000; if(now-lastCheckin<3.6){combo++;}else{combo=1;} lastCheckin=now; if(combo>=2){ coins+=combo; comboSnd(); pop(t.g.x,t.g.y-42,'COMBO x'+combo+'!'); } w.card=t.rm.num; w.state='deliver'; w.tx=boss.x-6; w.ty=boss.y-14; }
+        if(t.type==='checkin'){ t.g.state='toRoom'; t.g.claimed=null; t.g.room=t.rm; t.g.tx=t.rm.x; t.g.ty=t.rm.y+18; var rate=t.rm.type.rate*(t.g.vip?2:1); coins+=rate; served++; if(t.g.vip)vipCount++; showMsg(CHECKIN_LINES[served%CHECKIN_LINES.length]); pop(t.g.x,t.g.y-44,'🔑 Rm '+t.rm.num); if(t.g.pet)petCount++; review=clamp(review+0.03,0,10); pop(t.g.x,t.g.y-28,'+'+rate); var now=performance.now()/1000; if(now-lastCheckin<3.6){combo++;}else{combo=1;} lastCheckin=now; if(combo>=2){ coins+=combo; comboSnd(); pop(t.g.x,t.g.y-42,'COMBO x'+combo+'!'); } w.card=t.rm.num; w.state='deliver'; w.tx=boss.x-6; w.ty=boss.y-14; }
         else if(t.type==='clean'){ t.rm.state='empty'; t.rm.claimed=null; coins+=3; cleanCount++; cleanS(); pop(t.rm.x,t.rm.y,'✨'); pop(t.rm.x,t.rm.y,'+3'); w.state='return'; w.task=null; }
         else if(t.type==='serve'){ t.g.want=false; t.g.served=true; t.g.claimed=null; t.g.happy=1.4; coins+=4; serviceCount++; review=clamp(review+0.1,0,10); cash(); pop(t.g.x,t.g.y-28,'💗'); pop(t.g.x,t.g.y-28,'+4'); w.state='return'; w.task=null; }
       } }
@@ -154,6 +213,28 @@ function drawRoom(rm){ var x=rm.x,y=rm.y;
   cx.fillStyle='rgba(40,20,60,.75)'; cx.font='bold 8px Trebuchet MS'; cx.fillText(rm.type.n,x,y+27);
   var ic= rm.state==='empty'?'✨':(rm.state==='dirty'?'🧹':'💤'); emoji(ic,x+23,y-20,13);
   if(rm.state==='dirty'){ cx.strokeStyle='rgba(255,180,60,.8)'; cx.lineWidth=2; cx.beginPath(); cx.arc(x,y-2,34+Math.sin(boss.step*2)*2,0,7); cx.stroke(); }
+  if(rm.robbed>0){ cx.fillStyle='rgba(220,40,40,'+(rm.robbed*0.55)+')'; rr(x-30,y-24,60,44,4); cx.fill(); emoji('💢',x,y-2,20); }
+}
+function drawSites(ot){
+  sites.forEach(function(st){
+    if(ot==='pool'){ if(st.done){ cx.fillStyle='#2f9edb'; rr(st.x-19,st.y-13,38,26,4); cx.fill(); cx.fillStyle='rgba(255,255,255,.45)'; cx.fillRect(st.x-14,st.y-6+Math.sin(boss.step*2+st.x*0.1)*1.5,28,3); } else { cx.fillStyle='#8a6a4a'; rr(st.x-19,st.y-13,38,26,4); cx.fill(); cx.strokeStyle='rgba(255,190,70,.85)'; cx.lineWidth=2; cx.strokeRect(st.x-19,st.y-13,38,26); emoji('⛏️',st.x,st.y,16); } return; }
+    if(!st.done){ cx.strokeStyle='rgba(255,190,70,.9)'; cx.lineWidth=2; cx.setLineDash([5,4]); cx.beginPath(); cx.arc(st.x,st.y,19+Math.sin(boss.step*2)*2,0,7); cx.stroke(); cx.setLineDash([]); emoji(st.u,st.x,st.y,24); }
+    else { cx.fillStyle='rgba(70,190,90,.22)'; cx.beginPath(); cx.arc(st.x,st.y,17,0,7); cx.fill(); emoji(st.d,st.x,st.y,26); }
+  });
+}
+function drawConstruction(ot){
+  if(ot==='outside'||ot==='arff'){ cx.fillStyle='#6fae54'; cx.fillRect(0,GY,W,GB+20-GY); cx.fillStyle='#66a34d'; for(var gx=0;gx<W;gx+=16)cx.fillRect(gx,GY,2,GB+20-GY); }
+  else { cx.fillStyle='#cdbfa6'; cx.fillRect(0,GY,W,GB+20-GY); }
+  if(ot==='pool'){ cx.fillStyle='#7a5a3a'; rr(40,200,W-80,150,14); cx.fill(); cx.strokeStyle='#c9a24a'; cx.lineWidth=3; rr(40,200,W-80,150,14); cx.stroke(); }
+  if(ot==='arff' && objMet()){ emoji('🏠',200,270,86); }
+  drawSites(ot);
+  if(ot==='arff' && objMet()){ var ax=150+Math.sin(boss.step*1.3)*10; emoji('🐕',ax,332,32); emoji('💗',ax,306,15); cx.fillStyle='#fff'; cx.font='bold 12px Trebuchet MS'; cx.textAlign='center'; cx.fillText("ARFF'S HOUSE! 🐾",200,150); }
+}
+function drawFunScene(){ cx.fillStyle='#6fae54'; cx.fillRect(0,GY,W,GB+20-GY); cx.fillStyle='#66a34d'; for(var gx=0;gx<W;gx+=16)cx.fillRect(gx,GY,2,GB+20-GY);
+  emoji('🏠',305,178,58); emoji('🐾',305,150,15);
+  var ax=200+Math.sin(boss.step*1.3)*70; emoji('🐕',ax,352,32); emoji('💗',ax,328,14);
+  funs.forEach(function(f){ cx.strokeStyle='rgba(255,255,255,.55)'; cx.lineWidth=1.5; cx.beginPath(); cx.arc(f.x,f.y,15,0,7); cx.stroke(); emoji(f.e,f.x,f.y,28); });
+  cx.fillStyle='#fff'; cx.font='bold 12px Trebuchet MS'; cx.textAlign='center'; cx.fillText('🎉 Tap the fun with Arff! 🎈',W/2,GB+10);
 }
 function draw(){
   if(scene==='title'){ drawTitle(); return; }
@@ -172,11 +253,16 @@ function draw(){
   // OBJECTIVE OF THIS LEVEL (changes each level)
   var _o=curObj(); cx.textAlign='center'; cx.fillStyle='#fff'; cx.font='bold 11px Trebuchet MS'; cx.fillText('🎯 '+_o.label+' before dark:  '+objVal(_o)+'/'+_o.n,W/2,90);
   var tf=clamp(timeLeft/DARK,0,1); cx.fillStyle='rgba(255,255,255,.25)'; rr(90,94,W-180,6,3); cx.fill(); cx.fillStyle=tf<0.3?'#3a3a7a':(tf<0.6?'#e0a040':'#ffd23f'); rr(90,94,(W-180)*tf,6,3); cx.fill();
-  ROOMS.forEach(drawRoom);
-  // front desk + boss (you)
-  cx.fillStyle='#8a5a34'; rr(boss.x-60,boss.y-8,120,26,6); cx.fill(); cx.fillStyle='#a9743e'; rr(boss.x-60,boss.y-8,120,7,4); cx.fill();
-  cx.fillStyle='#fff'; cx.font='bold 10px Trebuchet MS'; cx.fillText('🔔 YOU (OWNER)',boss.x,boss.y+8);
+  var _ot=curObj().t;
+  if(_ot==='fun'){ drawFunScene(); }
+  else if(isBuildObj()){ drawConstruction(_ot); }
+  else { ROOMS.forEach(drawRoom); }
+  // front desk (fixed) — you can leave it in joystick mode
+  cx.fillStyle='#8a5a34'; rr(DESKX-60,DESKY-8,120,26,6); cx.fill(); cx.fillStyle='#a9743e'; rr(DESKX-60,DESKY-8,120,7,4); cx.fill();
+  cx.textAlign='center'; cx.fillStyle='#fff'; cx.font='bold 10px Trebuchet MS'; cx.fillText('🔔 FRONT DESK',DESKX,DESKY+8);
+  // YOU (owner) — walk with the joystick when it's on
   drawPerson(boss.x,boss.y-22,'#2a2a6a',Math.sin(boss.step)*1.5,true);
+  emoji('👑',boss.x,boss.y-42,13);
   // your card stack
   for(var k=0;k<Math.min(cards,8);k++){ cx.fillStyle='#ffd23f'; rr(boss.x+40+ (k%4)*5, boss.y-6-Math.floor(k/4)*4, 12,8,2); cx.fill(); cx.strokeStyle='#b8963a'; cx.lineWidth=1; cx.strokeRect(boss.x+40+(k%4)*5, boss.y-6-Math.floor(k/4)*4,12,8); }
   // grand entrance with striped awning
@@ -194,7 +280,9 @@ function draw(){
     if(g.happy>0)emoji('💗',g.x+13,g.y-16,13);
   });
   // workers
-  workers.forEach(function(w){ drawPerson(w.x,w.y,'#c0392b',Math.sin(w.step)*2,true); if(w.card)emoji('🎟',w.x,w.y-26,14); if(w.state==='work')emoji('✨',w.x+12,w.y-18,13); });
+  workers.forEach(function(w){ drawPerson(w.x,w.y,'#c0392b',Math.sin(w.step)*2,true); if(w.card)emoji('🎟',w.x,w.y-26,14); if(w.state==='work')emoji('🛠️',w.x+12,w.y-18,13); });
+  // room stealers (guard level)
+  stealers.forEach(function(s){ var pl=Math.sin(s.step)*2; cx.strokeStyle='rgba(255,60,60,.9)'; cx.lineWidth=2.5; cx.beginPath(); cx.arc(s.x,s.y-4,19+pl,0,7); cx.stroke(); emoji('🦹',s.x,s.y-4,30); if(s.claimed)emoji('👮',s.x+15,s.y-20,13); });
   // card fx flying to boss
   cardFx.forEach(function(cf){ emoji('🎟',cf.x,cf.y,16); });
   // pops
@@ -205,11 +293,17 @@ function draw(){
   // THIS LEVEL'S OBJECTIVE (lights up green when done)
   var oo=curObj(), done=objMet(), ox=W/2-130, oy=440; cx.fillStyle=done?'rgba(30,90,40,.7)':'rgba(30,20,50,.62)'; rr(ox,oy,260,24,7); cx.fill();
   cx.textAlign='center'; cx.font='bold 12px Trebuchet MS'; cx.fillStyle=done?'#9dff6a':'#fff'; cx.fillText((done?'✓ ':'🎯 Lv'+level+': ')+oo.label+'  '+objVal(oo)+'/'+oo.n,W/2,oy+15);
-  // command buttons
+  // JOYSTICK (appears where you touch, in joystick mode)
+  if(joyMode && JOY.active){ cx.strokeStyle='rgba(255,255,255,.45)'; cx.lineWidth=3; cx.beginPath(); cx.arc(JOY.bx,JOY.by,JOY.R,0,7); cx.stroke(); cx.fillStyle='rgba(255,255,255,.6)'; cx.beginPath(); cx.arc(JOY.bx+JOY.dx,JOY.by+JOY.dy,18,0,7); cx.fill(); }
+  else if(joyMode){ cx.fillStyle='rgba(255,255,255,.5)'; cx.font='bold 10px Trebuchet MS'; cx.textAlign='center'; cx.fillText('🕹 touch & drag to walk',96,BY-6); }
+  // command buttons — the big action button changes with the objective
   var waiting=guests.filter(function(g){return g.state==='wait';}).length;
   var dirty=ROOMS.filter(function(r){return r.state==='dirty';}).length;
   var wants=guests.filter(function(g){return g.state==='inroom'&&g.want;}).length;
-  btn(BTN.checkin,'#3a7ac0','🛎 CHECK IN',waiting);
+  var ACT={guard:['🚨 GUARD','#c0392b'],build:['🔨 BUILD','#b06a2a'],place:['🛋 PLACE','#8a5ac0'],pool:['🏊 POOL','#2f8ad0'],outside:['🌳 BUILD','#3f9e4a'],arff:['🏠 BUILD','#c07a2a'],fun:['🎉 FUN','#e05fa0']};
+  var _at=curObj().t, a=ACT[_at];
+  if(a){ var bd = _at==='guard'?(stealers.length||null) : (_at==='fun'?(funs.length||null) : (sites.length-siteDone||null)); btn(BTN.checkin,a[1],a[0],bd); }
+  else btn(BTN.checkin,'#3a7ac0','🛎 CHECK IN',waiting);
   btn(BTN.clean,'#7a9a4a','🧹 CLEAN',dirty);
   btn(BTN.serve,'#c94a8a','🍽 SERVE',wants);
   btn(BTN.hire,'#e0a040','👷 HIRE\n🪙'+hireCost,null);
@@ -222,21 +316,25 @@ function drawOver(){ var g=cx.createLinearGradient(0,0,0,H); g.addColorStop(0, r
   confetti.forEach(function(c){ cx.save(); cx.translate(c.x,c.y); cx.rotate(c.r); cx.fillStyle=c.c; cx.fillRect(-4,-4,8,8); cx.restore(); });
   cx.textAlign='center'; emoji(result==='win'?'🌙':'🌃',W/2,H/2-128,56);
   cx.fillStyle=result==='win'?'#ffd23f':'#ff9a9a'; cx.font='bold 27px Trebuchet MS'; cx.fillText(result==='win'?'LEVEL '+level+' CLEARED!':'NIGHT FELL 🌃',W/2,H/2-58);
-  if(result==='win'){ var st=''; for(var s=0;s<3;s++)st+= s<stars?'⭐':'▫️'; cx.font='24px serif'; cx.fillText(st,W/2,H/2-26); cx.fillStyle='#fff'; cx.font='bold 14px Trebuchet MS'; cx.fillText('All 9 rooms filled before dark!',W/2,H/2+2); cx.fillStyle='#9dff6a'; cx.fillText('🪙 '+coins+'   🎟 '+cards+'   ⭐ '+review.toFixed(1),W/2,H/2+24); }
-  else { cx.fillStyle='#fff'; cx.font='bold 15px Trebuchet MS'; cx.fillText('Only '+occupiedCount()+'/9 rooms filled.',W/2,H/2-24); }
-  cx.fillStyle='rgba(255,255,255,.75)'; cx.font='bold 12px Trebuchet MS'; cx.fillText('🏆 Best: Level '+best,W/2,H/2+ (result==='win'?46:2));
+  if(result==='win'){ var st=''; for(var s=0;s<3;s++)st+= s<stars?'⭐':'▫️'; cx.font='24px serif'; cx.fillText(st,W/2,H/2-26); cx.fillStyle='#fff'; cx.font='bold 13px Trebuchet MS'; cx.fillText('✓ '+curObj().label+'!',W/2,H/2+2); cx.fillStyle='#9dff6a'; cx.font='bold 12px Trebuchet MS'; cx.fillText('Next level you get +1 helper worker! 👷',W/2,H/2+22); cx.fillStyle='#ffd23f'; cx.fillText('🪙 '+coins+'   🎟 '+cards+'   ⭐ '+review.toFixed(1),W/2,H/2+40); }
+  else { cx.fillStyle='#fff'; cx.font='bold 14px Trebuchet MS'; cx.fillText(curObj().label+': '+objVal(curObj())+'/'+curObj().n,W/2,H/2-24); }
+  cx.fillStyle='rgba(255,255,255,.75)'; cx.font='bold 12px Trebuchet MS'; cx.fillText('🏆 Best: Level '+best,W/2,H/2+ (result==='win'?60:2));
   cx.fillStyle='#39c46a'; rr(PLAYBTN.x,PLAYBTN.y,PLAYBTN.w,PLAYBTN.h,18); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 20px Trebuchet MS'; cx.textBaseline='middle'; cx.fillText(result==='win'?'▶ NEXT LEVEL':'▶ TRY AGAIN',W/2,PLAYBTN.y+PLAYBTN.h/2); cx.textBaseline='alphabetic'; }
 function drawTitle(){ var g=cx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#4a3a7a'); g.addColorStop(1,'#1a1030'); cx.fillStyle=g; cx.fillRect(0,0,W,H);
   cx.textAlign='center'; emoji('🏨',W/2,H/2-120,66);
-  cx.fillStyle='#ffd23f'; cx.font='bold 40px Trebuchet MS'; cx.fillText('MO HOTEL',W/2,H/2-40); cx.fillStyle='#fff'; cx.font='bold 12px Trebuchet MS'; cx.fillText("You're the OWNER — fill all 9 rooms before dark! 🌙",W/2,H/2-12);
+  cx.fillStyle='#ffd23f'; cx.font='bold 40px Trebuchet MS'; cx.fillText('MO HOTEL',W/2,H/2-40); cx.fillStyle='#fff'; cx.font='bold 12px Trebuchet MS'; cx.fillText("You're the OWNER — beat every level's job! 🌙",W/2,H/2-12);
   emoji('⭐⭐⭐⭐⭐',W/2,H/2+16,20);
+  cx.fillStyle='rgba(255,255,255,.6)'; cx.font='10px Trebuchet MS'; cx.fillText('🏆 Best: Level '+best,W/2,H/2+40);
   cx.fillStyle='#39c46a'; rr(PLAYBTN.x,PLAYBTN.y,PLAYBTN.w,PLAYBTN.h,18); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 26px Trebuchet MS'; cx.textBaseline='middle'; cx.fillText('▶ PLAY',W/2,PLAYBTN.y+PLAYBTN.h/2); cx.textBaseline='alphabetic';
-  cx.fillStyle='rgba(255,255,255,.7)'; cx.font='11px Trebuchet MS'; cx.fillText('Tap CHECK IN · CLEAN · SERVE · HIRE. Workers bring you key cards 🎟',W/2,H-40);
+  // control mode toggle
+  cx.fillStyle=joyMode?'#2f8ad0':'rgba(255,255,255,.16)'; rr(MODEBTN.x,MODEBTN.y,MODEBTN.w,MODEBTN.h,12); cx.fill(); cx.strokeStyle='rgba(255,255,255,.5)'; cx.lineWidth=2; rr(MODEBTN.x,MODEBTN.y,MODEBTN.w,MODEBTN.h,12); cx.stroke();
+  cx.fillStyle='#fff'; cx.font='bold 14px Trebuchet MS'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(joyMode?'🕹 JOYSTICK MODE: ON':'🕹 JOYSTICK MODE: OFF',W/2,MODEBTN.y+MODEBTN.h/2); cx.textBaseline='alphabetic';
+  cx.fillStyle='rgba(255,255,255,.7)'; cx.font='10px Trebuchet MS'; cx.fillText(joyMode?'Walk around with the joystick to catch & build!':'Tap the buttons — your workers do the jobs 🎟',W/2,H-34);
 }
 var last=performance.now();
 function frame(now){ var dt=Math.min(0.05,(now-last)/1000); last=now; upd(dt); draw(); requestAnimationFrame(frame); }
 requestAnimationFrame(frame);
-window._HO={ get scene(){return scene;}, get coins(){return coins;}, get served(){return served;}, get cards(){return cards;}, get workers(){return workers.length;}, get result(){return result;}, get occ(){return occupiedCount();}, get timeLeft(){return timeLeft;}, start:function(){start();}, cmd:function(t){cmd(t);}, hire:function(){hire();}, addCoins:function(n){coins+=n;}, waitingCount:function(){return guests.filter(function(g){return g.state==='wait';}).length;}, fillAll:function(){ROOMS.forEach(function(r){r.state='occupied';});}, setTime:function(t){timeLeft=t;}, get level(){return level;}, get obj(){return curObj().label+' '+objVal(curObj())+'/'+curObj().n;}, setLevel:function(l){level=l;} };
+window._HO={ get scene(){return scene;}, get coins(){return coins;}, get served(){return served;}, get cards(){return cards;}, get workers(){return workers.length;}, get result(){return result;}, get occ(){return occupiedCount();}, get timeLeft(){return timeLeft;}, start:function(m){start(m||'new');}, cmd:function(t){cmd(t);}, hire:function(){hire();}, addCoins:function(n){coins+=n;}, waitingCount:function(){return guests.filter(function(g){return g.state==='wait';}).length;}, fillAll:function(){ROOMS.forEach(function(r){r.state='occupied';});}, setTime:function(t){timeLeft=t;}, get level(){return level;}, get objt(){return curObj().t;}, get obj(){return curObj().label+' '+objVal(curObj())+'/'+curObj().n;}, get objVal(){return objVal(curObj());}, get objN(){return curObj().n;}, get met(){return objMet();}, setLevel:function(l){level=l;}, get joy(){return joyMode;}, setJoy:function(v){joyMode=!!v;}, moveBoss:function(x,y){boss.x=x;boss.y=y;}, get stealers(){return stealers.length;}, get funs(){return funs.length;}, get sites(){return sites.length;}, get siteDone(){return siteDone;}, siteAt:function(i){return sites[i]?{x:sites[i].x,y:sites[i].y,done:sites[i].done}:null;}, funAt:function(i){return funs[i]?{x:funs[i].x,y:funs[i].y}:null;}, autoStep:function(){ var t=curObj().t,tg=null; if(t==='guard')tg=stealers[0]; else if(t==='fun')tg=funs[0]; else if(isBuildObj()){ for(var i=0;i<sites.length;i++)if(!sites[i].done){tg=sites[i];break;} } if(tg){ boss.x=tg.x; boss.y=tg.y; } } };
 })();
 </script>
 </body>

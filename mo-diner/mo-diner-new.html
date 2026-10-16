@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MO Diner</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#ffe6c0;font-family:'Trebuchet MS',system-ui,sans-serif;color:#222;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+</style></head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<script>
+(function(){
+  var cv=document.getElementById('c'), x=cv.getContext('2d'), W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; x.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',resize); resize();
+
+  function ac(){ try{ return ac._c=ac._c||new(window.AudioContext||window.webkitAudioContext)(); }catch(e){return null;} }
+  function beep(f,d,t){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.frequency.value=f;o.type=t||'square';o.connect(g);g.connect(a.destination);g.gain.value=0.05;o.start();o.stop(a.currentTime+(d||0.08)); }
+  function ding(){ [880,1175].forEach(function(f,i){ setTimeout(function(){beep(f,0.1,'sine');},i*80); }); }
+  function chime(){ [660,880,1175].forEach(function(f,i){ setTimeout(function(){beep(f,0.1,'sine');},i*70); }); }
+
+  var FOODS=['🍔','🍟','🌭','🍕','🥤','🍦','🥞','🌮','🍗'];
+  var FACES=['🧑','👩','👦','👧','🧓','👨','🧒','👱'];
+  var state='closed', score=0, coins=0, combo=0, best=+(localStorage.getItem('moDinerBest')||0);
+  var mx=0, face=1, order=[], tray=[], foods=[], cust='🧑', timer=0, timerMax=1, open=0, pops=[], fly=[], signFlip=0;
+
+  function floorY(){ return H*0.74; }
+  function doorX(){ return W*0.10; }
+  function custX(){ return W*0.86; }
+
+  function layoutFoods(){ foods=[]; var n=FOODS.length, x0=W*0.22, x1=W*0.72; for(var i=0;i<n;i++){ foods.push({ch:FOODS[i], x:x0+(x1-x0)*(i/(n-1)), got:false}); } }
+  function reset(){ score=0; coins=0; combo=0; pops=[]; fly=[]; mx=W*0.5; layoutFoods(); }
+  function newCustomer(){ var len=1+Math.min(Math.floor(score/4),2); var pool=FOODS.slice(); for(var i=pool.length-1;i>0;i--){var j=(Math.random()*(i+1))|0,t=pool[i];pool[i]=pool[j];pool[j]=t;} order=pool.slice(0,len); tray=[]; cust=FACES[(Math.random()*FACES.length)|0]; for(var k=0;k<foods.length;k++)foods[k].got=false; timerMax=Math.max(7,13-score*0.3); timer=timerMax; }
+
+  // ---- joystick (hold & move the stick, no tapping) ----
+  var joyA=false, jbx=0, jby=0, jx=0, jy=0, JR=52;
+  function down(e){ var r=cv.getBoundingClientRect(); joyA=true; jbx=e.clientX-r.left; jby=e.clientY-r.top; jx=jbx; jy=jby; if(ac()&&ac().state==='suspended')ac().resume(); }
+  function move(e){ if(!joyA)return; var r=cv.getBoundingClientRect(); jx=e.clientX-r.left; jy=e.clientY-r.top; }
+  function up(){ joyA=false; }
+  cv.addEventListener('pointerdown',down); cv.addEventListener('pointermove',move); addEventListener('pointerup',up); cv.addEventListener('pointercancel',up);
+
+  function burst(px,py,c){ for(var i=0;i<14;i++){ var a=Math.random()*6.28,s=60+Math.random()*160; pops.push({x:px,y:py,vx:Math.cos(a)*s,vy:Math.sin(a)*s-40,life:0.6,c:c||['#ffd23f','#ff6b6b','#4fd18b','#3a8bf0'][i%4]}); } }
+  function flyText(t,px,py,c){ fly.push({t:t,x:px,y:py,vy:-1.3,life:1,c:c||'#2a8a2a'}); }
+
+  function rr(a,b,c,d,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+c,b,a+c,b+d,r); x.arcTo(a+c,b+d,a,b+d,r); x.arcTo(a,b+d,a,b,r); x.arcTo(a,b,a+c,b,r); x.closePath(); }
+  function emo(ch,px,py,s){ x.font=s+'px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(ch,px,py); x.textBaseline='alphabetic'; }
+  function txt(s,px,py,sz,c,a){ x.fillStyle=c||'#a0522a'; x.font='900 '+sz+'px Trebuchet MS, sans-serif'; x.textAlign=a||'center'; x.fillText(s,px,py); }
+
+  function chef(px,fy,walking){ var t=Date.now()/120, legs=walking?Math.sin(t)*6:0, f=face, s=Math.min(W,H)*0.0016+0.9;
+    x.save(); x.translate(px,fy); x.scale(s,s);
+    x.globalAlpha=0.2; x.fillStyle='#000'; x.beginPath(); x.ellipse(0,4,16,5,0,0,7); x.fill(); x.globalAlpha=1;
+    x.strokeStyle='#2b5aa0'; x.lineWidth=6; x.lineCap='round'; x.beginPath(); x.moveTo(-5,-16); x.lineTo(-5+legs,-1); x.moveTo(5,-16); x.lineTo(5-legs,-1); x.stroke();
+    x.fillStyle='#fff'; rr(-13,-40,26,26,8); x.fill(); x.fillStyle='#e07a2a'; rr(-13,-26,26,5,2); x.fill();
+    x.fillStyle='#f6c9a0'; x.beginPath(); x.arc(0,-50,11,0,7); x.fill();
+    x.fillStyle='#fff'; rr(-14,-66,28,12,5); x.fill(); x.beginPath(); x.arc(0,-62,12,Math.PI,0); x.fill();
+    x.fillStyle='#111'; x.beginPath(); x.arc(f*3,-50,1.8,0,7); x.fill();
+    x.restore(); }
+
+  function loop(){
+    var fy=floorY();
+    // scene
+    x.fillStyle='#fff3e0'; x.fillRect(0,0,W,H);
+    x.fillStyle='#f2d9b8'; x.fillRect(0,0,W,fy); // wall
+    // window
+    x.fillStyle='#cdeffb'; rr(W*0.3,H*0.14,W*0.4,H*0.2,10); x.fill(); x.strokeStyle='#9fc0d2'; x.lineWidth=3; rr(W*0.3,H*0.14,W*0.4,H*0.2,10); x.stroke();
+    x.fillStyle='#c79a5e'; x.fillRect(0,fy,W,H-fy); x.fillStyle='#b5894f'; x.fillRect(0,fy,W,6); // floor
+    // counter shelf for foods
+    x.fillStyle='#d9a86a'; x.fillRect(W*0.18,fy-40,W*0.6,8);
+
+    // door + sign (left)
+    var dx=doorX(); x.fillStyle='#9a6a3a'; rr(dx-26,fy-120,52,120,6); x.fill(); x.fillStyle='#caa06a'; rr(dx-20,fy-114,40,70,4); x.fill();
+    x.fillStyle='#f4c9a0'; x.beginPath(); x.arc(dx+14,fy-58,3,0,7); x.fill();
+    var sc=state==='play'; x.save(); x.translate(dx,fy-150); if(signFlip>0){ x.scale(1,Math.abs(Math.cos(signFlip*Math.PI))); }
+    x.fillStyle=sc?'#2a9d3a':'#e2342f'; rr(-42,-20,84,40,8); x.fill(); x.strokeStyle='#fff'; x.lineWidth=3; rr(-42,-20,84,40,8); x.stroke(); txt(sc?'OPEN':'CLOSED',0,6,sc?17:14,'#fff'); x.restore();
+
+    // food stations (needed ones glow)
+    for(var i=0;i<foods.length;i++){ var fo=foods[i]; if(fo.got)continue; var need=state==='play'&&order.indexOf(fo.ch)>=0&&tray.indexOf(fo.ch)<0;
+      if(need){ var pz=1+Math.sin(Date.now()/250+i)*0.12; x.fillStyle='rgba(255,210,63,.5)'; x.beginPath(); x.arc(fo.x,fy-52,22,0,7); x.fill(); emo(fo.ch,fo.x,fy-52,34*pz); }
+      else { x.globalAlpha=0.9; emo(fo.ch,fo.x,fy-52,30); x.globalAlpha=1; } }
+
+    // customer (right) with order bubble
+    if(state==='play'){ var cxp=custX(); var ready=tray.length===order.length;
+      if(ready){ x.fillStyle='rgba(79,209,139,.4)'; x.beginPath(); x.arc(cxp,fy-26,30,0,7); x.fill(); }
+      emo(cust,cxp,fy-28,Math.min(W,H)*0.07);
+      var bw=order.length*40+34, bx=cxp-bw+10, by=fy-120;
+      x.fillStyle='#fff'; x.strokeStyle='#e07a2a'; x.lineWidth=3; rr(bx,by,bw,46,12); x.fill(); x.stroke();
+      for(var o=0;o<order.length;o++){ var ox=bx+20+o*40; emo(order[o],ox,by+23,26); if(tray.indexOf(order[o])>=0){ x.strokeStyle='#2a8a2a'; x.lineWidth=3; x.lineCap='round'; x.beginPath(); x.moveTo(ox-9,by+25); x.lineTo(ox-3,by+31); x.lineTo(ox+10,by+17); x.stroke(); } }
+    }
+
+    // Mo (chef) walks
+    var walking=joyA && Math.abs(jx-jbx)>8;
+    chef(mx,fy,walking);
+    // tray above Mo
+    for(var tI=0;tI<tray.length;tI++){ emo(tray[tI],mx-20+tI*20,fy-96,20); }
+
+    // ---- update ----
+    if(state==='play'){ timer-=1/60; if(timer<=0){ state='over'; best=Math.max(best,score); try{localStorage.setItem('moDinerBest',score);}catch(e){} beep(160,0.3); } }
+    if(joyA){ var dxj=jx-jbx; if(Math.abs(dxj)>8){ var sp=W*0.5; mx+=(dxj>0?1:-1)*Math.min(Math.abs(dxj),JR)/JR*sp/60; face=dxj>0?1:-1; } }
+    if(mx<20)mx=20; if(mx>W-20)mx=W-20;
+    if(signFlip>0)signFlip-=1/30;
+    // open the diner by walking Mo to the door sign (no tapping)
+    if((state==='closed'||state==='over') && Math.abs(mx-dx)<42){ var wasOver=(state==='over'); state='play'; signFlip=1; ding(); layoutFoods(); if(wasOver){ score=0; coins=0; combo=0; } newCustomer(); }
+    if(state==='play'){
+      // collect needed foods by walking over them
+      for(var i2=0;i2<foods.length;i2++){ var f2=foods[i2]; if(!f2.got && order.indexOf(f2.ch)>=0 && tray.indexOf(f2.ch)<0 && Math.abs(mx-f2.x)<40){ f2.got=true; tray.push(f2.ch); beep(700+tray.length*80,0.07); burst(f2.x,fy-52,'#7bd07b'); flyText('+'+f2.ch,f2.x,fy-70,'#2a8a2a'); } }
+      // serve by walking to the customer with the full order
+      if(tray.length===order.length && Math.abs(mx-custX())<60){ score++; combo++; var tip=1+Math.min(combo,8); coins+=tip; best=Math.max(best,score); try{localStorage.setItem('moDinerBest',score);}catch(e){} chime(); burst(custX(),fy-28,'#ffd23f'); flyText('Served! +'+tip+'🪙',custX(),fy-60,'#2a8a2a'); newCustomer(); }
+    }
+
+    // particles
+    for(var i3=pops.length-1;i3>=0;i3--){ var p=pops[i3]; p.life-=0.03; if(p.life<=0){pops.splice(i3,1);continue;} p.x+=p.vx*0.03; p.y+=p.vy*0.03; p.vy+=10; x.globalAlpha=Math.max(p.life,0); x.fillStyle=p.c; x.fillRect(p.x-3,p.y-3,6,6); } x.globalAlpha=1;
+    for(var i4=fly.length-1;i4>=0;i4--){ var fl=fly[i4]; fl.life-=0.016; if(fl.life<=0){fly.splice(i4,1);continue;} fl.y+=fl.vy; x.globalAlpha=Math.max(fl.life,0); txt(fl.t,fl.x,fl.y,22,fl.c); } x.globalAlpha=1;
+
+    // timer bar
+    if(state==='play'){ var frac=Math.max(0,timer/timerMax); x.fillStyle='#e8d4b8'; rr(W*0.15,12,W*0.7,12,6); x.fill(); x.fillStyle=frac<0.3?'#e2342f':'#3a9d3a'; rr(W*0.15,12,W*0.7*frac,12,6); x.fill(); }
+
+    // HUD
+    txt('🍽️ '+score, 14, 42, Math.round(W*0.05),'#a0522a','left');
+    txt('🪙 '+coins, W/2, 42, Math.round(W*0.045),'#d9a21a','center');
+    txt('Best '+best, W-14, 40, Math.round(W*0.038),'#a0522a','right');
+    if(combo>1 && state==='play') txt('🔥 x'+combo, W-14, 66, Math.round(W*0.038),'#e2342f','right');
+
+    // messages / joystick
+    if(state==='closed') txt('🕹️ Walk Chef Mo to the door sign to OPEN the diner!', W/2, fy+40, Math.round(W*0.035),'#7a4a10');
+    else if(state==='over'){ x.fillStyle='rgba(120,80,40,.55)'; x.fillRect(0,0,W,H); txt('🍽️ Diner Closed!', W/2, H*0.38, Math.round(W*0.07),'#fff'); txt('You served '+score+' and earned '+coins+' 🪙', W/2, H*0.46, Math.round(W*0.04),'#fff'); txt('Best: '+best, W/2, H*0.52, Math.round(W*0.038),'#ffe'); txt('🕹️ Walk to the door sign to open again!', W/2, H*0.6, Math.round(W*0.038),'#fff'); }
+    else txt('🕹️ Walk to the glowing food, then bring it to the customer!', W/2, fy+40, Math.round(W*0.032),'#7a4a10');
+
+    if(joyA){ x.globalAlpha=0.26; x.fillStyle='#000'; x.beginPath(); x.arc(jbx,jby,JR,0,7); x.fill(); var kx=Math.max(-JR,Math.min(JR,jx-jbx)); x.globalAlpha=0.8; x.fillStyle='#fff'; x.beginPath(); x.arc(jbx+kx,jby,JR*0.5,0,7); x.fill(); x.globalAlpha=1; }
+
+    requestAnimationFrame(loop);
+  }
+  reset(); mx=W*0.5; loop();
+})();
+</script>
+</body></html>

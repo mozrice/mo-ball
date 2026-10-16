@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>MO Family Fort</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#f3d9b0;font-family:'Trebuchet MS',system-ui,sans-serif;color:#5a3a1a;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #0008;background:#00000044;padding:6px 10px;border-radius:10px;}
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;z-index:10;background:#3a2410bb;}
+  .overlay.hide{display:none;}
+  .card{background:#fff6e8ee;border:4px solid #d4a574;border-radius:22px;padding:22px 26px;max-width:90%;box-shadow:0 20px 60px #0007;}
+  .card h1{margin:0 0 8px;font-size:28px;color:#a8641e;}
+  .card p{margin:8px 0;line-height:1.35;font-size:16px;}
+  .big{margin-top:14px;padding:14px 30px;font-size:22px;font-weight:900;background:linear-gradient(#ffd98a,#f0a829);color:#5a3d00;border:none;border-radius:14px;box-shadow:0 5px 0 #b8792a;cursor:pointer;}
+  .big:active{transform:translateY(4px);box-shadow:0 1px 0 #b8792a;}
+  .swrow{display:flex;gap:9px;justify-content:center;margin:5px 0;}
+  .sw{width:32px;height:32px;border-radius:50%;border:3px solid transparent;cursor:pointer;box-shadow:0 2px 5px #0003;}
+  .sw.on{border-color:#a8641e;transform:scale(1.14);}
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+
+<div class="overlay" id="startOv">
+  <div class="card">
+    <h1>🏰 FAMILY FORT</h1>
+    <p>Build a cozy fort with Mo!</p>
+    <p><b>Hold the joystick</b> and slide to <b>walk Mo</b>.<br>Walk over a <b style="color:#e0792a">glowing piece</b> to pick it up, then carry it to the <b>build spot</b>! 🛋️</p>
+    <p style="font-weight:800;margin-bottom:0;color:#a8641e">🎨 MO LOOK — pick skin &amp; hair</p>
+    <div class="swrow" id="skinPick"></div>
+    <div class="swrow" id="hairPick"></div>
+    <button class="big" id="startBtn">▶ BUILD!</button>
+  </div>
+</div>
+
+<div class="overlay hide" id="doneOv">
+  <div class="card">
+    <h1 id="doneTitle">🏰 FORT COMPLETE!</h1>
+    <p id="doneP"></p>
+    <button class="big" id="againBtn">🏰 BUILD AGAIN</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), x=cv.getContext("2d");
+  var W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); cv.style.width=W+"px"; cv.style.height=H+"px"; x.setTransform(DPR,0,0,DPR,0,0); layout(); }
+  addEventListener("resize",resize);
+
+  // sound
+  var AC=null; function ac(){ if(!AC){ try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||"sine"; o.frequency.value=f; g.gain.value=v||0.07; o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1)); o.stop(a.currentTime+(d||0.1)+0.02); }
+  function grabSfx(){ beep(520,0.06,"square",0.07); setTimeout(function(){beep(760,0.08,"square",0.06);},50); }
+  function placeSfx(){ beep(400,0.08,"triangle",0.08); setTimeout(function(){beep(620,0.1,"triangle",0.07);},70); }
+  function doneSfx(){ [523,659,784,1046,1319].forEach(function(f,i){ setTimeout(function(){beep(f,0.16,"square",0.08);}, i*140); }); }
+
+  function floorY(){ return H*0.80; }
+  function buildX(){ return W*0.54; }
+
+  var mode="start";                     // start | play | done
+  var mo, pieces, idx, confetti, cheer;
+  var joy={active:false,cx:0,cy:0,R:64,kx:0,ky:0};
+  function placeJoy(){ joy.R=Math.max(54,Math.min(78,Math.min(W,H)*0.13)); joy.cx=joy.R+26; joy.cy=H-joy.R-26; joy.kx=joy.cx; joy.ky=joy.cy; }
+  // ---- MO LOOK (Morgan picks skin + hair; family use Mo's skin tone) ----
+  var SKINS=["#f6c48a","#eab98c","#d99a6c","#b97a4e","#8a5a34","#5e3a1e"];
+  var HAIRS=["#2a2018","#4a2a10","#6a4a1a","#101010","#8a5a2a","#caa23a"];
+  var moSkin, moHair;
+  try{ moSkin=localStorage.getItem("moSkin")||SKINS[0]; moHair=localStorage.getItem("moHair")||HAIRS[0]; }catch(e){ moSkin=SKINS[0]; moHair=HAIRS[0]; }
+  function saveLook(){ try{ localStorage.setItem("moSkin",moSkin); localStorage.setItem("moHair",moHair); }catch(e){} }
+
+  // the fort pieces — picked up in order, carried to the build spot
+  var PIECEDEF=[
+    {key:"chairL", name:"Left Chair",   emoji:"🪑", fx:0.30},
+    {key:"chairR", name:"Right Chair",  emoji:"🪑", fx:0.90},
+    {key:"box",    name:"Box Wall",     emoji:"📦", fx:0.40},
+    {key:"pillowL",name:"Pillow Wall",  emoji:"🛏️", fx:0.78},
+    {key:"cushR",  name:"Cushion Wall", emoji:"🛋️", fx:0.26},
+    {key:"blanket",name:"Blanket Roof", emoji:"🧶", fx:0.70},
+    {key:"lights", name:"String Lights",emoji:"✨", fx:0.36},
+    {key:"flag",   name:"Fort Flag",    emoji:"🚩", fx:0.86}
+  ];
+
+  function layout(){ placeJoy(); }
+
+  function reset(){
+    mo={x:W*0.5, y:floorY(), vx:0, dir:1, ph:0, carry:null};
+    placeJoy(); joy.active=false;
+    pieces=PIECEDEF.map(function(p){ return {key:p.key,name:p.name,emoji:p.emoji,x:p.fx*W,got:false,placed:false}; });
+    idx=0; confetti=[]; cheer=0;
+  }
+
+  // ---- input: a real, always-on joystick (drag the knob to walk) ----
+  function pt(e){ var t=e.touches&&e.touches[0]?e.touches[0]:e; var r=cv.getBoundingClientRect(); return {x:(t.clientX-r.left)*(W/r.width), y:(t.clientY-r.top)*(H/r.height)}; }
+  function setKnob(px,py){ var dx=px-joy.cx, dy=py-joy.cy, m=Math.hypot(dx,dy)||1, cl=Math.min(m,joy.R); joy.kx=joy.cx+dx/m*cl; joy.ky=joy.cy+dy/m*cl; }
+  function down(e){ ac(); if(mode!=="play")return; var p=pt(e);
+    // grab the stick if you touch near it, OR anywhere in the bottom-left play zone
+    if(Math.hypot(p.x-joy.cx,p.y-joy.cy) < joy.R*2.2 || (p.y>H*0.62 && p.x<W*0.6)){ if(e.cancelable)e.preventDefault(); joy.active=true; setKnob(p.x,p.y); } }
+  function move(e){ if(!joy.active)return; if(e.cancelable)e.preventDefault(); var p=pt(e); setKnob(p.x,p.y); }
+  function up(){ joy.active=false; joy.kx=joy.cx; joy.ky=joy.cy; }
+  cv.addEventListener("mousedown",down); addEventListener("mousemove",move); addEventListener("mouseup",up);
+  cv.addEventListener("touchstart",down,{passive:false}); addEventListener("touchmove",move,{passive:false}); addEventListener("touchend",up); addEventListener("touchcancel",up);
+
+  // MO LOOK picker (Morgan picks skin + hair; family share Mo's skin)
+  (function buildLook(){
+    var sp=document.getElementById("skinPick"), hp=document.getElementById("hairPick");
+    SKINS.forEach(function(c){ var d=document.createElement("div"); d.className="sw"+(c===moSkin?" on":""); d.style.background=c;
+      d.onclick=function(){ moSkin=c; saveLook(); ac(); Array.prototype.forEach.call(sp.children,function(e){e.classList.remove("on");}); d.classList.add("on"); }; sp.appendChild(d); });
+    HAIRS.forEach(function(c){ var d=document.createElement("div"); d.className="sw"+(c===moHair?" on":""); d.style.background=c;
+      d.onclick=function(){ moHair=c; saveLook(); ac(); Array.prototype.forEach.call(hp.children,function(e){e.classList.remove("on");}); d.classList.add("on"); }; hp.appendChild(d); });
+  })();
+  document.getElementById("startBtn").onclick=function(){ ac(); resize(); reset(); mode="play"; document.getElementById("startOv").classList.add("hide"); };
+  document.getElementById("againBtn").onclick=function(){ ac(); resize(); reset(); mode="play"; document.getElementById("doneOv").classList.add("hide"); };
+
+  function current(){ return idx<pieces.length? pieces[idx] : null; }
+
+  var last=0;
+  function frame(ts){ var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(mode==="play") update(dt); render(); requestAnimationFrame(frame); }
+
+  function update(dt){
+    mo.ph+=Math.abs(mo.vx)*0.06*dt+0.02*dt;
+    // walk with the joystick knob (horizontal, position control)
+    var off=(joy.kx-joy.cx)/joy.R;            // -1 (left) .. +1 (right)
+    if(joy.active && Math.abs(off)>0.12){ mo.dir=off>0?1:-1; mo.vx=off*3.9; } else { mo.vx*=Math.pow(0.6,dt); }
+    mo.x+=mo.vx*dt; if(mo.x<W*0.07){mo.x=W*0.07;mo.vx=0;} if(mo.x>W*0.93){mo.x=W*0.93;mo.vx=0;}
+    var c=current();
+    if(c){
+      if(!mo.carry && !c.got){ if(Math.abs(mo.x-c.x)<42){ c.got=true; mo.carry=c; grabSfx(); for(var k=0;k<8;k++) confetti.push({x:mo.x,y:floorY()-40,vx:(Math.random()-0.5)*2,vy:-Math.random()*2-1,life:24,col:"#ffd98a"}); } }
+      else if(mo.carry){ if(Math.abs(mo.x-buildX())<46){ mo.carry.placed=true; mo.carry=null; placeSfx(); cheer=20; idx++; for(var k2=0;k2<14;k2++) confetti.push({x:buildX()+(Math.random()*80-40),y:floorY()-60,vx:(Math.random()-0.5)*2,vy:-Math.random()*2-1,life:30,col:"#7bd07b"}); if(idx>=pieces.length) finish(); } }
+    }
+    for(var p=confetti.length-1;p>=0;p--){ var cf=confetti[p]; cf.x+=cf.vx*dt; cf.y+=cf.vy*dt; cf.vy+=0.08*dt; cf.life-=dt; if(cf.life<=0) confetti.splice(p,1); }
+    if(cheer>0) cheer-=dt;
+  }
+
+  function finish(){
+    mode="done"; doneSfx();
+    for(var i=0;i<120;i++) confetti.push({x:Math.random()*W,y:-10,vx:(Math.random()-0.5)*3,vy:Math.random()*2+1,life:70+Math.random()*50,col:["#e0453a","#ffd93d","#3a86e0","#37b06a","#fff","#8a63d2"][Math.floor(Math.random()*6)]});
+    setTimeout(function(){ if(mode!=="done")return;
+      document.getElementById("doneP").innerHTML="🎉 Mo and the family built the <b>whole fort</b>!<br>Pillows, blankets, lights and a flag on top. 🚩<br>Time to get cozy inside! 🏰";
+      document.getElementById("doneOv").classList.remove("hide");
+    }, 1700);
+  }
+
+  // ---- render ----
+  function rr(a,b,c,d,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+c,b,a+c,b+d,r); x.arcTo(a+c,b+d,a,b+d,r); x.arcTo(a,b+d,a,b,r); x.arcTo(a,b,a+c,b,r); x.closePath(); }
+  function render(){
+    // room: wall + floor
+    var fy=floorY();
+    var wall=x.createLinearGradient(0,0,0,fy); wall.addColorStop(0,"#ffe9c9"); wall.addColorStop(1,"#f6d6a8"); x.fillStyle=wall; x.fillRect(0,0,W,fy);
+    x.fillStyle="#caa06a"; x.fillRect(0,fy,W,H-fy);
+    x.fillStyle="#b98f58"; x.fillRect(0,fy,W,5);
+    // window
+    x.fillStyle="#bfe3f0"; rr(W*0.06,H*0.14,W*0.22,H*0.26,10); x.fill(); x.strokeStyle="#fff"; x.lineWidth=5; rr(W*0.06,H*0.14,W*0.22,H*0.26,10); x.stroke();
+    x.beginPath(); x.moveTo(W*0.17,H*0.14); x.lineTo(W*0.17,H*0.40); x.moveTo(W*0.06,H*0.27); x.lineTo(W*0.28,H*0.27); x.stroke();
+    // couch in the back
+    x.fillStyle="#9a6ac0"; rr(W*0.66,fy-H*0.14,W*0.28,H*0.14,14); x.fill(); x.fillStyle="#8457ad"; rr(W*0.66,fy-H*0.14,W*0.28,H*0.05,14); x.fill();
+
+    // build spot marker
+    var bx=buildX();
+    if(mode==="play" && mo.carry){ x.strokeStyle="rgba(224,121,42,0.9)"; x.lineWidth=4; x.setLineDash([10,8]); rr(bx-70,fy-150,140,150,12); x.stroke(); x.setLineDash([]);
+      x.fillStyle="#e0792a"; x.font="bold 15px 'Trebuchet MS'"; x.textAlign="center"; x.fillText("BUILD HERE ⬇", bx, fy-158); }
+
+    // the growing fort (placed pieces)
+    drawFort(bx, fy);
+
+    // confetti behind characters
+    for(var i=0;i<confetti.length;i++){ var cf=confetti[i]; x.globalAlpha=Math.max(0,cf.life/40); x.fillStyle=cf.col; x.fillRect(cf.x,cf.y,5,5);} x.globalAlpha=1;
+
+    // family + Arff cheering on the left
+    drawFamily(W*0.03, fy);
+
+    // current piece glowing on the floor (if not yet carried)
+    var c=current();
+    if(mode==="play" && c && !c.got){ var gy=fy-10, gl=0.5+0.5*Math.sin(last/200);
+      x.globalAlpha=0.35+0.3*gl; x.fillStyle="#ffdf8a"; x.beginPath(); x.ellipse(c.x,gy,34,14,0,0,7); x.fill(); x.globalAlpha=1;
+      x.font="30px serif"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(c.emoji,c.x,fy-26);
+      // arrow + name
+      x.fillStyle="#e0792a"; x.beginPath(); x.moveTo(c.x-9,fy-62); x.lineTo(c.x+9,fy-62); x.lineTo(c.x,fy-50); x.closePath(); x.fill();
+      x.font="bold 13px 'Trebuchet MS'"; x.fillStyle="#7a4a10"; x.fillText("Get the "+c.name+"!", c.x, fy-74); }
+
+    // Mo
+    drawMo();
+
+    // ---- the joystick (always on screen) ----
+    if(mode==="play"){
+      x.globalAlpha=joy.active?0.95:0.7;
+      // base
+      x.beginPath(); x.arc(joy.cx,joy.cy,joy.R,0,7); x.fillStyle="rgba(60,36,16,0.30)"; x.fill(); x.lineWidth=5; x.strokeStyle="rgba(255,255,255,0.55)"; x.stroke();
+      // left/right arrows on the base
+      x.fillStyle="rgba(255,255,255,0.6)"; x.font="bold "+Math.round(joy.R*0.42)+"px Arial"; x.textAlign="center"; x.textBaseline="middle";
+      x.fillText("‹",joy.cx-joy.R*0.66,joy.cy); x.fillText("›",joy.cx+joy.R*0.66,joy.cy);
+      // knob
+      x.beginPath(); x.arc(joy.kx,joy.ky,joy.R*0.52,0,7); var kg=x.createRadialGradient(joy.kx-6,joy.ky-6,4,joy.kx,joy.ky,joy.R*0.52); kg.addColorStop(0,"#ffe8b0"); kg.addColorStop(1,"#e8a23a"); x.fillStyle=kg; x.fill(); x.lineWidth=4; x.strokeStyle="#9a6a1e"; x.stroke();
+      x.globalAlpha=1;
+    }
+
+    // HUD
+    var placed=pieces.filter(function(p){return p.placed;}).length;
+    x.fillStyle="rgba(90,58,26,0.9)"; rr(W/2-120,8,240,30,9); x.fill();
+    x.fillStyle="#fff"; x.font="bold 16px 'Trebuchet MS'"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("🏰 Family Fort  "+placed+" / "+pieces.length, W/2, 23);
+
+    if(mode==="play" && !joy.active){ x.fillStyle="rgba(90,58,26,0.8)"; x.font="bold 14px 'Trebuchet MS'"; x.textAlign="right"; x.textBaseline="bottom"; x.fillText("Drag the joystick to walk Mo →", W-14, H-14); }
+  }
+
+  function drawFort(bx, fy){
+    function placed(k){ return pieces.filter(function(p){return p.key===k;})[0].placed; }
+    // chairs (posts)
+    if(placed("chairL")){ x.fillStyle="#b5651d"; x.fillRect(bx-66,fy-96,12,96); x.fillRect(bx-66,fy-100,30,12); }
+    if(placed("chairR")){ x.fillStyle="#b5651d"; x.fillRect(bx+54,fy-96,12,96); x.fillRect(bx+36,fy-100,30,12); }
+    // box wall (left base)
+    if(placed("box")){ x.fillStyle="#c89a5b"; rr(bx-64,fy-40,40,40,4); x.fill(); x.strokeStyle="#9a7330"; x.lineWidth=3; rr(bx-64,fy-40,40,40,4); x.stroke(); x.beginPath(); x.moveTo(bx-44,fy-40); x.lineTo(bx-44,fy); x.stroke(); }
+    // pillow wall (right)
+    if(placed("pillowL")){ x.fillStyle="#f2a0b4"; rr(bx+26,fy-36,40,18,9); x.fill(); x.fillStyle="#e887a0"; rr(bx+26,fy-18,40,18,9); x.fill(); }
+    // cushion wall (left upper)
+    if(placed("cushR")){ x.fillStyle="#7fb3e0"; rr(bx-62,fy-74,38,32,8); x.fill(); x.fillStyle="#6a9fd0"; rr(bx-62,fy-74,38,10,8); x.fill(); }
+    // blanket roof (draped between chair tops)
+    if(placed("blanket")){ x.fillStyle="#d26aa0"; x.beginPath(); x.moveTo(bx-70,fy-100); x.quadraticCurveTo(bx,fy-140,bx+66,fy-100); x.lineTo(bx+66,fy-84); x.quadraticCurveTo(bx,fy-120,bx-70,fy-84); x.closePath(); x.fill();
+      x.strokeStyle="#b84f86"; x.lineWidth=3; x.beginPath(); x.moveTo(bx-70,fy-92); x.quadraticCurveTo(bx,fy-130,bx+66,fy-92); x.stroke(); }
+    // string lights across the front
+    if(placed("lights")){ x.strokeStyle="#caa"; x.lineWidth=2; x.beginPath(); x.moveTo(bx-66,fy-104); x.quadraticCurveTo(bx,fy-92,bx+66,fy-104); x.stroke();
+      for(var i=0;i<=6;i++){ var t=i/6, lx=bx-66+(132)*t, ly=fy-104+Math.sin(Math.PI*t)*12; x.fillStyle=["#ff6a6a","#ffd93d","#7bd07b","#6ab0ff"][i%4]; x.beginPath(); x.arc(lx,ly+6,3.5,0,7); x.fill(); } }
+    // flag on top
+    if(placed("flag")){ x.strokeStyle="#7a4a10"; x.lineWidth=3; x.beginPath(); x.moveTo(bx,fy-138); x.lineTo(bx,fy-118); x.stroke(); x.fillStyle="#e0453a"; x.beginPath(); x.moveTo(bx,fy-138); x.lineTo(bx+26,fy-131); x.lineTo(bx,fy-124); x.closePath(); x.fill();
+      x.fillStyle="#fff"; x.font="bold 9px Arial"; x.textAlign="center"; x.fillText("FORT",bx+12,fy-129); }
+    // cozy glow inside when mostly built
+    var placedN=pieces.filter(function(p){return p.placed;}).length;
+    if(placedN>=4){ x.fillStyle="rgba(255,220,120,0.18)"; x.beginPath(); x.ellipse(bx,fy-50,52,44,0,0,7); x.fill(); }
+  }
+
+  function drawFamily(bx, fy){
+    // Mom + little sibling (share Mo's skin tone) + fluffy Arff — cheering
+    var k=Math.min(W,H)/320;
+    var b1=(cheer>0?Math.abs(Math.sin(last/90))*7:Math.sin(last/520)*2);
+    var b2=(cheer>0?Math.abs(Math.sin(last/90+1.2))*7:Math.sin(last/520+1)*2);
+    drawGuy(W*0.07, fy, {k:k*1.04, body:"#d2588a", pants:"#7a3a58", skin:moSkin, hair:"#4a2a12", longHair:true, dress:true, armsUp:true, dir:1, bob:b1});   // Mom
+    drawGuy(W*0.155, fy, {k:k*0.8, body:"#37b06a", pants:"#2a6a44", skin:moSkin, hair:moHair, armsUp:true, dir:1, bob:b2});                                  // sibling
+    drawArffFluffy(W*0.235, fy, k*0.9);                                                                                                                       // Arff
+    if(cheer>0){ x.font="16px serif"; x.textAlign="center"; x.globalAlpha=Math.min(1,cheer/12); x.fillText("🎉", W*0.11, fy-70*k); x.globalAlpha=1; }
+  }
+
+  function drawMo(){
+    var px=mo.x, py=floorY();
+    var walking=Math.abs(mo.vx)>0.3, bob=walking?Math.abs(Math.sin(mo.ph))*4:Math.sin(last/500)*1.2;
+    var k=Math.min(W,H)/320;
+    drawGuy(px,py,{k:k, body:"#1a6fd0", pants:"#243a66", skin:moSkin, hair:moHair, label:"MO", dir:mo.dir, walk:walking, ph:mo.ph, armsUp:!!mo.carry, bob:bob});
+    if(mo.carry){ var topY=py-bob-(62*k); x.font=Math.round(34*k)+"px serif"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(mo.carry.emoji, px, topY); }
+  }
+
+  // clean drawn character with a face (matches the MO look in the games)
+  function drawGuy(px,feetY,o){
+    var k=o.k||1.3, bob=o.bob||0, dir=o.dir||1, sw=o.walk?Math.sin(o.ph)*5*k:0;
+    var legLen=12*k, bodyH=24*k, bodyW=22*k, headR=10.5*k;
+    var bodyBot=feetY-bob-legLen, bodyTop=bodyBot-bodyH, hy=bodyTop-headR+5*k;
+    x.save();
+    x.globalAlpha=0.18; x.fillStyle="#000"; x.beginPath(); x.ellipse(px,feetY,bodyW*0.6,5,0,0,7); x.fill(); x.globalAlpha=1;
+    // legs
+    x.strokeStyle=o.pants||"#2a3f66"; x.lineWidth=6*k; x.lineCap="round";
+    x.beginPath(); x.moveTo(px-5*k,bodyBot-2); x.lineTo(px-5*k+sw,feetY-bob); x.stroke();
+    x.beginPath(); x.moveTo(px+5*k,bodyBot-2); x.lineTo(px+5*k-sw,feetY-bob); x.stroke();
+    // body / dress
+    x.fillStyle=o.body;
+    if(o.dress){ x.beginPath(); x.moveTo(px-bodyW*0.42,bodyTop); x.lineTo(px+bodyW*0.42,bodyTop); x.lineTo(px+bodyW*0.62,bodyBot); x.lineTo(px-bodyW*0.62,bodyBot); x.closePath(); x.fill(); }
+    else { rr(px-bodyW/2,bodyTop,bodyW,bodyH,7*k); x.fill(); }
+    // arms
+    x.strokeStyle=o.body; x.lineWidth=5.5*k; x.lineCap="round"; var shY=bodyTop+7*k;
+    if(o.armsUp){ x.beginPath(); x.moveTo(px-bodyW*0.42,shY); x.lineTo(px-bodyW*0.72,shY-15*k); x.moveTo(px+bodyW*0.42,shY); x.lineTo(px+bodyW*0.72,shY-15*k); x.stroke();
+      x.fillStyle=o.skin; x.beginPath(); x.arc(px-bodyW*0.72,shY-15*k,3*k,0,7); x.arc(px+bodyW*0.72,shY-15*k,3*k,0,7); x.fill(); }
+    else { x.beginPath(); x.moveTo(px-bodyW*0.42,shY); x.lineTo(px-bodyW*0.58,shY+14*k); x.moveTo(px+bodyW*0.42,shY); x.lineTo(px+bodyW*0.58,shY+14*k); x.stroke();
+      x.fillStyle=o.skin; x.beginPath(); x.arc(px-bodyW*0.58,shY+14*k,3*k,0,7); x.arc(px+bodyW*0.58,shY+14*k,3*k,0,7); x.fill(); }
+    // label
+    if(o.label){ x.fillStyle="#fff"; x.font="bold "+Math.round(9*k)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(o.label,px,(bodyTop+bodyBot)/2); }
+    // head
+    x.fillStyle=o.skin; x.beginPath(); x.arc(px,hy,headR,0,7); x.fill();
+    // hair
+    x.fillStyle=o.hair; x.beginPath(); x.arc(px,hy-2*k,headR,Math.PI,2*Math.PI); x.fill();
+    if(o.longHair){ x.fillRect(px-headR,hy-2*k,3.5*k,headR*1.7); x.fillRect(px+headR-3.5*k,hy-2*k,3.5*k,headR*1.7); }
+    // face — eyes with pupils (looking toward dir) + smile
+    var ex=headR*0.36, ey=hy+1*k, pr=1.9*k;
+    x.fillStyle="#fff"; x.beginPath(); x.arc(px-ex,ey,pr,0,7); x.arc(px+ex,ey,pr,0,7); x.fill();
+    x.fillStyle="#201008"; x.beginPath(); x.arc(px-ex+dir*0.7*k,ey,pr*0.55,0,7); x.arc(px+ex+dir*0.7*k,ey,pr*0.55,0,7); x.fill();
+    x.strokeStyle="#b06a44"; x.lineWidth=1.7*k; x.beginPath(); x.arc(px,hy+3.5*k,headR*0.42,0.15*Math.PI,0.85*Math.PI); x.stroke();
+    x.restore();
+  }
+  function drawArffFluffy(px,feetY,sc){
+    x.save(); x.translate(px,feetY-12*sc); x.scale(sc,sc);
+    x.fillStyle="rgba(0,0,0,0.18)"; x.beginPath(); x.ellipse(0,11,12,4,0,0,7); x.fill();
+    x.fillStyle="#fff"; x.beginPath(); x.arc(-9+Math.sin(last/300)*3,-3,5,0,7); x.fill();                 // wagging tail
+    var puffs=[[-6,3,7],[0,4,8],[6,3,7],[-3,-1,6],[3,-1,6]]; for(var i=0;i<puffs.length;i++){ x.beginPath(); x.arc(puffs[i][0],puffs[i][1],puffs[i][2],0,7); x.fill(); }
+    x.fillStyle="#f2f2ee"; x.beginPath(); x.arc(-4,10,2.6,0,7); x.fill(); x.beginPath(); x.arc(4,10,2.6,0,7); x.fill();
+    x.strokeStyle="#ff5aa5"; x.lineWidth=2.6; x.beginPath(); x.moveTo(3,2.5); x.lineTo(15,2.5); x.stroke(); x.fillStyle="#ffd23f"; x.beginPath(); x.arc(9,4.5,1.7,0,7); x.fill();
+    x.fillStyle="#fff"; x.beginPath(); x.arc(9,-4,8.5,0,7); x.fill();                                      // head
+    x.fillStyle="#f4f2ec"; x.beginPath(); x.ellipse(2.5,-4,4.5,6.5,-0.5,0,7); x.fill(); x.beginPath(); x.ellipse(15.5,-4,4.5,6.5,0.5,0,7); x.fill(); // ears
+    x.fillStyle="#fff"; x.beginPath(); x.arc(6,-10,3.5,0,7); x.fill(); x.beginPath(); x.arc(12,-10,3.5,0,7); x.fill();
+    x.fillStyle="#2a2018"; x.beginPath(); x.arc(6,-4,1.5,0,7); x.fill(); x.beginPath(); x.arc(12,-4,1.5,0,7); x.fill();
+    x.fillStyle="#fff"; x.beginPath(); x.arc(6.5,-4.5,0.5,0,7); x.fill(); x.beginPath(); x.arc(12.5,-4.5,0.5,0,7); x.fill();
+    x.fillStyle="#3a2a2a"; x.beginPath(); x.arc(9,-0.5,2,0,7); x.fill();
+    if(Math.sin(last/300)>0.2){ x.fillStyle="#ff8fae"; x.beginPath(); x.ellipse(9,3.5,2.2,4,0,0,7); x.fill(); }
+    x.fillStyle="#7a4a10"; x.font="bold 8px Trebuchet MS"; x.textAlign="center"; x.fillText("ARFF",9,20);
+    x.restore();
+  }
+
+  // test hooks
+  window._FT={ get:function(){return {mode:mode,idx:idx,placed:pieces?pieces.filter(function(p){return p.placed;}).length:0,carry:mo&&mo.carry?mo.carry.key:null,mox:Math.round(mo?mo.x:0)};},
+    walkTo:function(tx){ mo.x=tx; },                       // teleport helper for tests
+    cur:function(){ var c=current(); return c?{key:c.key,x:Math.round(c.x),got:c.got}:null; },
+    bx:function(){ return Math.round(buildX()); } };
+
+  resize(); reset(); mode="start";
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
