@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>MO BLOCKS</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#7ec0ee;font-family:'Trebuchet MS',system-ui,sans-serif;color:#2a2018;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000055;padding:6px 10px;border-radius:10px;}
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;z-index:10;background:#1a2a3acc;}
+  .overlay.hide{display:none;}
+  .card{background:#f2ead8ee;border:4px solid #8a5a2a;border-radius:20px;padding:22px 26px;max-width:92%;box-shadow:0 20px 60px #0007;}
+  .card h1{margin:0 0 8px;font-size:28px;color:#5a7a2a;}
+  .card p{margin:8px 0;line-height:1.35;font-size:16px;}
+  .big{margin-top:14px;padding:14px 30px;font-size:22px;font-weight:900;background:linear-gradient(#bdf0c8,#3fc07a);color:#073a18;border:none;border-radius:14px;box-shadow:0 5px 0 #1f8a52;cursor:pointer;}
+  .big:active{transform:translateY(4px);box-shadow:0 1px 0 #1f8a52;}
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div class="overlay" id="startOv">
+  <div class="card">
+    <h1>⛏️ MO BLOCKS</h1>
+    <p>Dig, collect blocks, and build!</p>
+    <p style="font-size:14px;opacity:.9"><b>Joystick:</b> walk &amp; jump.<br><b>Hold toward a block</b> to mine it (it goes in your bag).<br><b>Drag a block</b> from your bag to build with it. 🧱<br>Mine the <b>leaf bushes</b> 🌿 and lay down soft <b>carpet</b> 🧶!<br>Find the shiny <b>gems</b> 💎!</p>
+    <p style="font-size:13px;opacity:.9">🐷 Walk to the friendly <b>pigs</b> at the farm — they share <b>food</b>. Mo <b>eats on his own</b> to fill a heart. ❤️</p>
+    <p style="font-size:13px;opacity:.9">🏠 <b>Hold the joystick still</b> on the ground to build a quick house. 🌙 At <b>night</b>, spooky <b>zombies</b> come out — hop on one to boop it away! ☀️ They melt at sunrise.</p>
+    <p style="font-size:13px;opacity:.88"><b>Pick a mode:</b></p>
+    <p style="font-size:12px;opacity:.82;margin:0"><b>🛡️ Survival</b> — hearts, pigs, night zombies.&nbsp; <b>✨ Creative</b> — <b>fly</b>, dig instantly, build with endless blocks, no danger.</p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px;">
+      <button class="big" id="survBtn">🛡️ Survival</button>
+      <button class="big" id="creatBtn" style="background:linear-gradient(#bcd6ff,#5a93e8);box-shadow:0 5px 0 #2f63b8;color:#082a5a;">✨ Creative</button>
+    </div>
+  </div>
+</div>
+<div class="overlay hide" id="faintOv">
+  <div class="card">
+    <h1 style="color:#c06a2a;">😴 All tuckered out!</h1>
+    <p>Mo took a big tumble and needs a rest.</p>
+    <p style="font-size:14px;opacity:.9">Don't worry — your blocks and gems are all still here. Mo will wake up right back up top!</p>
+    <button class="big" id="wakeBtn">☀️ Wake up &amp; play</button>
+  </div>
+</div>
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), x=cv.getContext("2d");
+  var W=0,H=0,DPR=1,CELL=36,COLS=12,ROWS=30,worldH=0;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); cv.style.width=W+"px"; cv.style.height=H+"px"; x.setTransform(DPR,0,0,DPR,0,0); CELL=Math.floor(W/COLS); worldH=ROWS*CELL; placeJoy(); }
+  addEventListener("resize",resize);
+
+  var AC=null; function ac(){ if(!AC){ try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||"sine"; o.frequency.value=f; g.gain.value=v||0.06; o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1)); o.stop(a.currentTime+(d||0.1)+0.02); }
+  function digSfx(){ beep(180+Math.random()*60,0.04,"square",0.04); }
+  function breakSfx(){ beep(300,0.06,"square",0.06); setTimeout(function(){beep(200,0.06,"square",0.05);},50); }
+  function placeSfx(){ beep(520,0.05,"square",0.06); }
+  function gemSfx(){ beep(900,0.07,"sine",0.08); setTimeout(function(){beep(1300,0.1,"sine",0.08);},70); }
+  function jumpSfx(){ beep(500,0.06,"triangle",0.05); }
+
+  // block types: 0 air, 1 grass,2 dirt,3 stone,4 wood,5 leaf,6 gem
+  var TYPES={1:{n:"Grass",c:"#5bbf3a",c2:"#8a5a2a",hard:16},2:{n:"Dirt",c:"#9a6a3a",c2:"#7a4f28",hard:16},3:{n:"Stone",c:"#8f8f8f",c2:"#6f6f6f",hard:34},4:{n:"Wood",c:"#9a6a2a",c2:"#6f4a1a",hard:22},5:{n:"Leaf",c:"#4caf50",c2:"#3a8a3e",hard:10},6:{n:"Gem",c:"#4fd8e8",c2:"#2a9ab0",hard:46},7:{n:"Carpet",c:"#d9607a",c2:"#b0405a",hard:8}};
+  var ORDER=[2,3,4,5,1,7,6];
+
+  var grid, mo, joy, camY, inv, selType, mineT, mineKey, drag, gems, mode="start", hearts, spawnX, spawnY, pops;
+  var zombies, night, nightT, spawnCd, surfaceRow, pigs, food, buildHold=0, buildLock=false, eatCd=0, creative=false;
+  var DAYLEN=1500, NIGHTLEN=1050, MAXZ=4; // ~25s day, ~17.5s night
+
+  function solid(cx,cy){ if(cy<0||cy>=ROWS||cx<0||cx>=COLS) return cy>=ROWS; var t=grid[cy][cx]; return t!==0; }
+  function genWorld(){
+    grid=[]; var sRow=Math.floor(ROWS*0.30); surfaceRow=sRow;
+    for(var r=0;r<ROWS;r++){ var row=[]; for(var c=0;c<COLS;c++){
+      var t=0;
+      if(r===sRow) t=1;
+      else if(r>sRow && r<=sRow+2) t=2;
+      else if(r>sRow+2){ t=3; if(Math.random()<0.08) t=6; else if(Math.random()<0.12) t=2; }
+      row.push(t); } grid.push(row); }
+    // a tree
+    var tc=3+Math.floor(Math.random()*(COLS-6));
+    for(var h=1;h<=3;h++) grid[sRow-h][tc]=4;
+    for(var lx=-1;lx<=1;lx++) for(var ly=-5;ly<=-3;ly++){ var yy=sRow+ly, xx=tc+lx; if(yy>=0&&xx>=0&&xx<COLS && grid[yy][xx]===0) grid[yy][xx]=5; }
+    grid[sRow-4][tc]=5;
+    // a few leaf bushes (stacks of leaves) on the grass to mine
+    var bushes=2+Math.floor(Math.random()*2);
+    for(var b=0;b<bushes;b++){ var bc=1+Math.floor(Math.random()*(COLS-2)); if(Math.abs(bc-tc)<2) continue;
+      var bh=2+Math.floor(Math.random()*2);
+      for(var k=1;k<=bh;k++){ var yy=sRow-k; if(yy>=0 && grid[yy][bc]===0) grid[yy][bc]=5; }
+    }
+    return sRow;
+  }
+
+  var joyR=60; joy={active:false,cx:0,cy:0,R:60,kx:0,ky:0,id:null};
+  function placeJoy(){ joy.R=Math.max(48,Math.min(72,Math.min(W,H)*0.12)); joy.cx=joy.R+22; joy.cy=H-joy.R-22; joy.kx=joy.cx; joy.ky=joy.cy; }
+
+  function reset(){
+    var sRow=genWorld();
+    spawnX=(COLS/2)*CELL; spawnY=(sRow-2)*CELL;
+    mo={x:spawnX, y:spawnY, vx:0, vy:0, dir:1, onG:false, jumped:false, hp:3, fallFromY:spawnY, hurtT:0};
+    camY=0; inv={1:0,2:5,3:0,4:0,5:0,6:0,7:4}; selType=2; mineT=0; mineKey=""; drag=null; gems=0; hearts=[]; pops=[];
+    zombies=[]; night=false; nightT=DAYLEN; spawnCd=60; food=2;
+    // a little pig FARM: a fenced pen on the surface (kept away from Mo's spawn column)
+    var pL=Math.min(COLS-5,Math.floor(COLS*0.62)), pR=Math.min(COLS-2,pL+3);
+    grid[surfaceRow-1][pL]=4; grid[surfaceRow-1][pR]=4;           // fence posts
+    grid[surfaceRow-2][pL]=4; grid[surfaceRow-2][pR]=4;           // taller gate posts
+    pigs=[]; for(var pgi=0;pgi<3;pgi++){ var pc=pL+1+(pgi%(pR-pL-1)); pigs.push({x:pc*CELL, y:(surfaceRow-1)*CELL, vx:0, vy:0, dir:Math.random()<0.5?-1:1, onG:false, blocked:false, wander:40+Math.random()*80, cd:60, happy:0}); }
+    // keep Mo's spawn column clear of tree/fence so he never starts stuck
+    var scx=Math.floor(COLS/2); grid[surfaceRow-1][scx]=0; grid[surfaceRow-2][scx]=0; grid[surfaceRow-3][scx]=0;
+    placeJoy(); joy.active=false;
+  }
+  function respawn(){
+    mo.x=spawnX; mo.y=spawnY; mo.vx=0; mo.vy=0; mo.onG=false; mo.jumped=false;
+    mo.hp=3; mo.fallFromY=spawnY; mo.hurtT=50;
+    zombies=[]; night=false; nightT=DAYLEN; spawnCd=120;
+    camY=Math.max(0,Math.min(worldH-H, mo.y-H*0.5)); joy.active=false; joy.kx=joy.cx; joy.ky=joy.cy;
+    mode="play"; document.getElementById("faintOv").classList.add("hide");
+  }
+
+  function pt(e){ var t=e.touches&&e.touches[0]?e.touches[0]:e; var r=cv.getBoundingClientRect(); return {x:(t.clientX-r.left)*(W/r.width), y:(t.clientY-r.top)*(H/r.height)}; }
+  function setKnob(px,py){ var dx=px-joy.cx, dy=py-joy.cy, m=Math.hypot(dx,dy)||1, cl=Math.min(m,joy.R); joy.kx=joy.cx+dx/m*cl; joy.ky=joy.cy+dy/m*cl; }
+  function invSlotAt(px,py){ var n=ORDER.length, sw=Math.min(44,W/(n+1)), gap=(W-n*sw)/(n+1), y0=H-sw-6; if(py<y0-4||py>y0+sw+4) return -1; for(var i=0;i<n;i++){ var sx=gap+i*(sw+gap); if(px>=sx&&px<=sx+sw) return i; } return -1; }
+  function down(e){ ac(); if(mode!=="play")return; var p=pt(e);
+    var slot=invSlotAt(p.x,p.y);
+    if(slot>=0){ var t=ORDER[slot]; selType=t; if(inv[t]>0){ if(e.cancelable)e.preventDefault(); drag={t:t,x:p.x,y:p.y}; } return; }
+    if(Math.hypot(p.x-joy.cx,p.y-joy.cy)<joy.R*2.3 || p.y>H*0.62){ if(e.cancelable)e.preventDefault(); joy.active=true; setKnob(p.x,p.y); } }
+  function move(e){ var p=pt(e);
+    if(drag){ if(e.cancelable)e.preventDefault(); drag.x=p.x; drag.y=p.y; return; }
+    if(joy.active){ if(e.cancelable)e.preventDefault(); setKnob(p.x,p.y); } }
+  function up(){ if(drag){ tryPlace(drag); drag=null; } joy.active=false; joy.kx=joy.cx; joy.ky=joy.cy; }
+  cv.addEventListener("mousedown",down); addEventListener("mousemove",move); addEventListener("mouseup",up);
+  cv.addEventListener("touchstart",down,{passive:false}); addEventListener("touchmove",move,{passive:false}); addEventListener("touchend",up); addEventListener("touchcancel",up);
+
+  function tryPlace(d){ var gx=Math.floor(d.x/CELL), gy=Math.floor((d.y+camY)/CELL);
+    if(gx<0||gx>=COLS||gy<0||gy>=ROWS) return;
+    if(grid[gy][gx]!==0) return;
+    // survival: must touch an existing solid block (no floating). creative: place anywhere.
+    if(!creative && !(solid(gx-1,gy)||solid(gx+1,gy)||solid(gx,gy-1)||solid(gx,gy+1))) return;
+    // not inside Mo
+    var mcx=Math.floor((mo.x)/CELL), mcy1=Math.floor(mo.y/CELL), mcy2=Math.floor((mo.y+CELL*1.3)/CELL);
+    if(gx===mcx && (gy===mcy1||gy===mcy2)) return;
+    if(creative){ grid[gy][gx]=d.t; placeSfx(); }
+    else if(inv[d.t]>0){ grid[gy][gx]=d.t; inv[d.t]--; placeSfx(); }
+  }
+
+  function startGame(cr){ ac(); creative=cr; resize(); reset(); mode="play"; document.getElementById("startOv").classList.add("hide"); }
+  document.getElementById("survBtn").onclick=function(){ startGame(false); };
+  document.getElementById("creatBtn").onclick=function(){ startGame(true); };
+  document.getElementById("wakeBtn").onclick=function(){ ac(); respawn(); };
+
+  function hurtSfx(){ beep(230,0.12,"sine",0.06); setTimeout(function(){beep(170,0.14,"sine",0.05);},90); }
+  function faintSfx(){ beep(300,0.18,"sine",0.07); setTimeout(function(){beep(220,0.2,"sine",0.06);},140); setTimeout(function(){beep(150,0.28,"sine",0.06);},300); }
+  function hurtMo(n){
+    if(creative || mo.hurtT>0 || mode!=="play") return;
+    mo.hp-=n; mo.hurtT=36;
+    for(var i=0;i<8;i++) pops.push({x:mo.x+CELL*0.35, y:mo.y-camY, vx:(Math.random()-0.5)*4, vy:-Math.random()*3-1, life:34, txt:"oof!"});
+    if(mo.hp<=0){ mo.hp=0; faintSfx(); mode="faint"; document.getElementById("faintOv").classList.remove("hide"); }
+    else hurtSfx();
+  }
+  function moanSfx(){ beep(140,0.18,"sawtooth",0.03); setTimeout(function(){beep(110,0.2,"sawtooth",0.028);},120); }
+  function poofSfx(){ beep(380,0.08,"triangle",0.05); setTimeout(function(){beep(560,0.08,"triangle",0.045);},60); }
+  function nightSfx(){ beep(330,0.25,"sine",0.05); setTimeout(function(){beep(247,0.3,"sine",0.045);},180); }
+  function daySfx(){ beep(523,0.18,"sine",0.05); setTimeout(function(){beep(784,0.22,"sine",0.05);},150); }
+
+  function topSolidRow(cx){ for(var r=0;r<ROWS;r++){ if(solid(cx,r)) return r; } return ROWS; }
+  function spawnZombie(){
+    // pick a column a little away from Mo, on the surface
+    var mcx=Math.floor(mo.x/CELL), cx, tries=0;
+    do{ cx=1+Math.floor(Math.random()*(COLS-2)); tries++; }while(Math.abs(cx-mcx)<3 && tries<12);
+    var r=topSolidRow(cx); if(r>=ROWS) r=surfaceRow;
+    zombies.push({x:cx*CELL+CELL*0.15, y:(r-1.4)*CELL, vx:0, vy:0, dir:1, onG:false, blocked:false, wob:Math.random()*6});
+  }
+  function poofZombie(z){ poofSfx(); for(var i=0;i<10;i++) pops.push({x:z.x+CELL*0.35, y:z.y-camY, vx:(Math.random()-0.5)*4, vy:-Math.random()*3-1, life:30, txt:"poof", green:true}); }
+
+  function updateDayNight(dt){
+    nightT-=dt;
+    if(nightT<=0){ night=!night; nightT=night?NIGHTLEN:DAYLEN; if(night){ nightSfx(); spawnCd=50; } else { daySfx(); } }
+  }
+  function updateZombies(dt){
+    var zmw=CELL*0.7, zmh=CELL*1.3, mmw=CELL*0.7, mmh=CELL*1.4;
+    if(!creative && night && zombies.length<MAXZ){ spawnCd-=dt; if(spawnCd<=0){ spawnCd=150+Math.random()*150; spawnZombie(); moanSfx(); } }
+    for(var i=zombies.length-1;i>=0;i--){ var z=zombies[i];
+      if(!night){ poofZombie(z); zombies.splice(i,1); continue; } // melt away at sunrise
+      var dirx=mo.x>z.x?1:-1; z.dir=dirx; z.vx=dirx*1.05; z.blocked=false;
+      z.x+=z.vx*dt; collideE(z,zmw,zmh,true);
+      if(z.blocked && z.onG){ z.vy=-7.4; z.onG=false; } // hop over blocks
+      z.vy+=0.5*dt; if(z.vy>12)z.vy=12;
+      z.y+=z.vy*dt; z.onG=false; collideE(z,zmw,zmh,false);
+      z.wob+=dt*0.25;
+      if(z.y>worldH+CELL*2){ zombies.splice(i,1); continue; }
+      // touch Mo?
+      if(mo.x<z.x+zmw && mo.x+mmw>z.x && mo.y<z.y+zmh && mo.y+mmh>z.y){
+        if(mo.vy>1 && (mo.y+mmh) < z.y+zmh*0.55){ poofZombie(z); zombies.splice(i,1); mo.vy=-6.5; mo.jumped=true; } // boop from on top
+        else hurtMo(1);
+      }
+    }
+  }
+
+  var last=0;
+  function frame(ts){ var dt=Math.min(2.4,((ts-last)/16.67)||1); last=ts; if(mode==="play") update(dt); render(); requestAnimationFrame(frame); }
+
+  function update(dt){
+    var mw=CELL*0.7, mh=CELL*1.4;
+    var ox=(joy.kx-joy.cx)/joy.R, oy=(joy.ky-joy.cy)/joy.R;
+    // horizontal move
+    if(joy.active && Math.abs(ox)>0.25){ mo.dir=ox>0?1:-1; mo.vx=ox*3.4; } else mo.vx*=Math.pow(0.5,dt);
+    if(creative){
+      // ---- CREATIVE: fly freely, no gravity, no damage ----
+      if(joy.active && Math.abs(oy)>0.25){ mo.vy=oy*3.8; } else mo.vy*=Math.pow(0.5,dt);
+      mo.x+=mo.vx*dt; collide(mw,mh,true);
+      mo.y+=mo.vy*dt; mo.onG=false; collide(mw,mh,false);
+      mo.fallFromY=mo.y;
+    } else {
+      // ---- SURVIVAL: gravity, jump, fall energy ----
+      if(joy.active && oy<-0.5 && mo.onG && !mo.jumped){ mo.vy=-8.4; mo.onG=false; mo.jumped=true; jumpSfx(); }
+      if(oy>=-0.3) mo.jumped=false;
+      mo.vy+=0.5*dt; if(mo.vy>12)mo.vy=12;
+      mo.x+=mo.vx*dt; collide(mw,mh,true);
+      var wasOnG=mo.onG;
+      mo.y+=mo.vy*dt; mo.onG=false; collide(mw,mh,false);
+      if(!mo.onG){ if(mo.y<mo.fallFromY) mo.fallFromY=mo.y; }
+      else { if(!wasOnG){ var drop=(mo.y-mo.fallFromY)/CELL; if(drop>=4.5){ hurtMo(drop>=9?3:(drop>=6.5?2:1)); } } mo.fallFromY=mo.y; }
+    }
+    if(mo.hurtT>0) mo.hurtT-=dt;
+    // camera
+    camY=Math.max(0,Math.min(worldH-H, mo.y-H*0.5));
+
+    // ---- mining: hold the joystick toward a solid block ----
+    var tgt=null;
+    if(joy.active){
+      var cx=Math.floor((mo.x+mw/2)/CELL);
+      if(Math.abs(ox)>0.35){ var side=ox>0?1:-1; var midRow=Math.floor((mo.y+mh*0.5)/CELL); var fcx=Math.floor((ox>0?(mo.x+mw):(mo.x))/CELL)+side; if(solid(cx+side,midRow)) tgt=[cx+side,midRow]; }
+      if(!tgt && oy>0.4){ var feetRow=Math.floor((mo.y+mh+1)/CELL); if(solid(cx,feetRow)) tgt=[cx,feetRow]; }
+    }
+    if(tgt){ var key=tgt[0]+","+tgt[1]; if(key!==mineKey){ mineKey=key; mineT=0; } var t=grid[tgt[1]][tgt[0]]; mineT+=dt; if(Math.random()<0.3)digSfx();
+      var hard=creative?1:TYPES[t].hard;
+      if(mineT>=hard){ grid[tgt[1]][tgt[0]]=0; inv[t]=(inv[t]||0)+1; mineT=0; mineKey=""; breakSfx();
+        if(t===6){ gems++; gemSfx(); for(var i=0;i<12;i++) hearts.push({x:tgt[0]*CELL+CELL/2, y:tgt[1]*CELL-camY, vx:(Math.random()-0.5)*3, vy:-Math.random()*2-1, life:40}); } } }
+    else { mineKey=""; mineT=0; }
+
+    updateDayNight(dt);
+    updateZombies(dt);
+    updatePigs(dt);
+
+    // auto-eat: when Mo is tired and has food, Mo eats on its own
+    if(mo.hp<3 && food>0){ eatCd+=dt; if(eatCd>=70){ eat(); eatCd=0; } } else eatCd=0;
+    // build a house by HOLDING the joystick still on the ground (no tap)
+    if(!joy.active) buildLock=false;
+    if(joy.active && Math.abs(ox)<0.25 && Math.abs(oy)<0.25 && mo.onG && Math.abs(mo.vx)<0.6 && !buildLock){
+      buildHold+=dt; if(buildHold>=60){ buildHouse(); buildLock=true; buildHold=0; } }
+    else buildHold=0;
+
+    for(var h=hearts.length-1;h>=0;h--){ var hh=hearts[h]; hh.x+=hh.vx*dt; hh.y+=hh.vy*dt; hh.vy+=0.12*dt; hh.life-=dt; if(hh.life<=0) hearts.splice(h,1); }
+    for(var pp=pops.length-1;pp>=0;pp--){ var po=pops[pp]; po.x+=po.vx*dt; po.y+=po.vy*dt; po.vy+=0.1*dt; po.life-=dt; if(po.life<=0) pops.splice(pp,1); }
+  }
+  function collide(mw,mh,horiz){ collideE(mo,mw,mh,horiz); }
+  function collideE(e,mw,mh,horiz){
+    var left=Math.floor(e.x/CELL), right=Math.floor((e.x+mw)/CELL), top=Math.floor(e.y/CELL), bot=Math.floor((e.y+mh)/CELL);
+    for(var cy=top;cy<=bot;cy++) for(var cx=left;cx<=right;cx++){
+      if(!solid(cx,cy)) continue;
+      var bx=cx*CELL, by=cy*CELL;
+      if(e.x<bx+CELL && e.x+mw>bx && e.y<by+CELL && e.y+mh>by){
+        if(horiz){ if(e.vx>0){ e.x=bx-mw; } else if(e.vx<0){ e.x=bx+CELL; } e.blocked=true; e.vx=0; }
+        else { if(e.vy>0){ e.y=by-mh; e.onG=true; } else if(e.vy<0){ e.y=by+CELL; } e.vy=0; }
+      }
+    }
+  }
+
+  // ---- render ----
+  function rr(a,b,c,d,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+c,b,a+c,b+d,r); x.arcTo(a+c,b+d,a,b+d,r); x.arcTo(a,b+d,a,b,r); x.arcTo(a,b,a+c,b,r); x.closePath(); }
+  function heartIcon(cx,cy,s,fill){ x.beginPath(); x.moveTo(cx,cy+s*0.3); x.bezierCurveTo(cx,cy,cx-s,cy-s*0.1,cx-s,cy-s*0.55); x.bezierCurveTo(cx-s,cy-s*1.0,cx-s*0.4,cy-s*1.05,cx,cy-s*0.55); x.bezierCurveTo(cx+s*0.4,cy-s*1.05,cx+s,cy-s*1.0,cx+s,cy-s*0.55); x.bezierCurveTo(cx+s,cy-s*0.1,cx,cy,cx,cy+s*0.3); x.closePath(); if(fill){ x.fillStyle="#e8465a"; x.fill(); } else { x.fillStyle="rgba(255,255,255,0.22)"; x.fill(); } x.lineWidth=2; x.strokeStyle=fill?"#9a1f30":"rgba(255,255,255,0.5)"; x.stroke(); }
+  function render(){
+    // sky gradient (deeper = darker when underground)
+    var depth=Math.min(1,camY/(worldH-H||1));
+    var sky=x.createLinearGradient(0,0,0,H); sky.addColorStop(0, depth<0.5?"#7ec0ee":"#3a4a6a"); sky.addColorStop(1, depth<0.5?"#bfe3f0":"#1a1a2a"); x.fillStyle=sky; x.fillRect(0,0,W,H);
+    // night darkening (smooth dusk/dawn)
+    var na=0; if(night){ na=0.5; if(nightT>NIGHTLEN-120) na=0.5*(NIGHTLEN-nightT)/120; else if(nightT<120) na=0.5*nightT/120; }
+    if(na>0.002){ x.fillStyle="rgba(16,20,54,"+na+")"; x.fillRect(0,0,W,H);
+      if(depth<0.6 && na>0.2){ x.fillStyle="rgba(255,255,255,"+(na*1.4)+")"; var sp=[[0.12,0.14],[0.28,0.08],[0.44,0.18],[0.63,0.1],[0.78,0.2],[0.88,0.07],[0.2,0.24],[0.7,0.26]]; for(var si=0;si<sp.length;si++){ x.fillRect(W*sp[si][0], H*sp[si][1], 2.5,2.5); } } }
+    // cells in view
+    var r0=Math.floor(camY/CELL), r1=Math.ceil((camY+H)/CELL);
+    for(var r=r0;r<r1;r++){ if(r<0||r>=ROWS)continue; for(var c=0;c<COLS;c++){ var t=grid[r][c]; if(t===0)continue; drawBlock(c*CELL, r*CELL-camY, t); } }
+    // pigs & zombies (behind Mo)
+    for(var zp=0;zp<pigs.length;zp++) drawPig(pigs[zp]);
+    for(var zi=0;zi<zombies.length;zi++) drawZombie(zombies[zi]);
+    // Mo
+    drawMo();
+    // mining crack overlay
+    if(mineKey && mineT>0){ var p=mineKey.split(","), gx=+p[0], gy=+p[1], t=grid[gy]&&grid[gy][gx]; if(t){ var frac=mineT/TYPES[t].hard; x.strokeStyle="rgba(0,0,0,"+(0.3+frac*0.5)+")"; x.lineWidth=2; var bx=gx*CELL, by=gy*CELL-camY; x.beginPath(); x.moveTo(bx+4,by+4); x.lineTo(bx+CELL-6,by+CELL-8); x.moveTo(bx+CELL-5,by+5); x.lineTo(bx+6,by+CELL-6); if(frac>0.5){ x.moveTo(bx+CELL/2,by+3); x.lineTo(bx+CELL/2,by+CELL-4); } x.stroke(); } }
+    // gem sparkles
+    for(var i=0;i<hearts.length;i++){ x.globalAlpha=Math.max(0,hearts[i].life/40); x.fillStyle="#bff6ff"; x.beginPath(); x.arc(hearts[i].x,hearts[i].y,3,0,7); x.fill(); } x.globalAlpha=1;
+    // pops: green poofs, hearts, and text
+    x.textAlign="center"; x.textBaseline="middle"; x.font="bold 15px Trebuchet MS";
+    for(var pi=0;pi<pops.length;pi++){ var po=pops[pi]; x.globalAlpha=Math.max(0,po.life/34);
+      if(po.green){ x.fillStyle="#7bd36a"; x.beginPath(); x.arc(po.x,po.y,4,0,7); x.fill(); }
+      else if(po.heart){ heartIcon(po.x,po.y,6,true); }
+      else { x.lineWidth=3; x.strokeStyle="#000"; x.fillStyle="#ffd24a"; x.strokeText(po.txt,po.x,po.y); x.fillText(po.txt,po.x,po.y); }
+    } x.globalAlpha=1;
+
+    // drag ghost
+    if(drag){ x.globalAlpha=0.7; drawBlock(drag.x-CELL/2, drag.y-CELL/2, drag.t); x.globalAlpha=1;
+      var gx=Math.floor(drag.x/CELL), gy=Math.floor((drag.y+camY)/CELL); x.strokeStyle="#fff"; x.lineWidth=2; x.strokeRect(gx*CELL, gy*CELL-camY, CELL, CELL); }
+
+    // ---- inventory bar (drag from here to build) ----
+    var n=ORDER.length, sw=Math.min(44,W/(n+1)), gap=(W-n*sw)/(n+1), y0=H-sw-6;
+    for(var s=0;s<n;s++){ var tt=ORDER[s], sx=gap+s*(sw+gap);
+      x.fillStyle="rgba(0,0,0,0.3)"; rr(sx-2,y0-2,sw+4,sw+4,6); x.fill();
+      drawBlock(sx,y0,tt);
+      if(tt===selType){ x.strokeStyle="#fff"; x.lineWidth=3; rr(sx,y0,sw,sw,4); x.stroke(); }
+      var cnt=creative?"∞":(inv[tt]||0); x.fillStyle="#fff"; x.font="bold 12px Trebuchet MS"; x.textAlign="right"; x.textBaseline="bottom"; x.strokeStyle="#000"; x.lineWidth=3; x.strokeText(cnt, sx+sw-2, y0+sw-1); x.fillText(cnt, sx+sw-2, y0+sw-1); }
+
+    // HUD: gems
+    x.fillStyle="rgba(10,20,10,0.8)"; rr(W/2-60,8,120,28,8); x.fill(); x.fillStyle="#bff6ff"; x.font="bold 16px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("💎 "+gems, W/2, 22);
+    if(creative){
+      // creative badge (top-right), no hearts/food
+      x.fillStyle="rgba(40,70,140,0.82)"; rr(W-108,10,96,26,8); x.fill(); x.fillStyle="#dCE8ff"; x.font="bold 14px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("✨ Creative", W-60, 23);
+    } else {
+      // HUD: energy hearts (top-right)
+      if(mo){ var hs=11, hy=24, hx=W-20; for(var hi=0;hi<3;hi++){ heartIcon(hx-hi*(hs*2+6), hy, hs, hi<mo.hp); } }
+      // food count (info only, not a button)
+      drawFoodIcon(28,58,8); x.fillStyle="#fff"; x.font="bold 15px Trebuchet MS"; x.textAlign="left"; x.textBaseline="middle"; x.lineWidth=3; x.strokeStyle="#000"; x.strokeText("x"+food,42,58); x.fillText("x"+food,42,58);
+    }
+    // build-house progress ring (hold joystick still on the ground)
+    if(buildHold>0){ var bf=Math.min(1,buildHold/60); x.beginPath(); x.arc(joy.cx,joy.cy,joy.R+8,-Math.PI/2,-Math.PI/2+bf*Math.PI*2); x.strokeStyle="#ffd24a"; x.lineWidth=5; x.stroke();
+      x.fillStyle="#fff"; x.font="bold 13px Trebuchet MS"; x.textAlign="center"; x.textBaseline="bottom"; x.strokeStyle="#000"; x.lineWidth=3; x.strokeText("building…",joy.cx,joy.cy-joy.R-14); x.fillText("building…",joy.cx,joy.cy-joy.R-14); }
+    // day/night badge (center-left of gems)
+    if(night){ x.fillStyle="#dfe6ff"; x.beginPath(); x.arc(W/2-86,22,9,0,7); x.fill(); x.fillStyle=sky?"#3a4a6a":"#3a4a6a"; x.beginPath(); x.arc(W/2-82,20,8,0,7); x.fill(); }
+    else { x.fillStyle="#ffd24a"; x.beginPath(); x.arc(W/2-86,22,8,0,7); x.fill(); }
+
+    // joystick
+    if(mode==="play"){
+      x.globalAlpha=joy.active?0.9:0.6;
+      x.beginPath(); x.arc(joy.cx,joy.cy,joy.R,0,7); x.fillStyle="rgba(0,0,0,0.3)"; x.fill(); x.lineWidth=5; x.strokeStyle="rgba(255,255,255,0.5)"; x.stroke();
+      x.beginPath(); x.arc(joy.kx,joy.ky,joy.R*0.5,0,7); x.fillStyle="#e8e8e8"; x.fill(); x.lineWidth=3; x.strokeStyle="#888"; x.stroke();
+      x.globalAlpha=1;
+    }
+  }
+  function drawBlock(px,py,t){ var T=TYPES[t];
+    x.fillStyle=T.c; x.fillRect(px,py,CELL,CELL);
+    if(t===1){ x.fillStyle=T.c2; x.fillRect(px,py+CELL*0.34,CELL,CELL*0.66); x.fillStyle="#6fd34a"; x.fillRect(px,py,CELL,CELL*0.16); }
+    // texture specks
+    x.fillStyle="rgba(0,0,0,0.12)"; for(var i=0;i<4;i++){ var rx=px+((i*7+t*3)%CELL), ry=py+((i*11+t*5)%CELL); x.fillRect(rx,ry,3,3); }
+    if(t===6){ x.fillStyle="#bff6ff"; x.beginPath(); x.moveTo(px+CELL/2,py+5); x.lineTo(px+CELL-6,py+CELL/2); x.lineTo(px+CELL/2,py+CELL-5); x.lineTo(px+6,py+CELL/2); x.closePath(); x.fill(); x.fillStyle="#fff"; x.fillRect(px+CELL/2-2,py+9,3,3); }
+    if(t===4){ x.strokeStyle=T.c2; x.lineWidth=1.5; x.beginPath(); x.moveTo(px+CELL*0.35,py); x.lineTo(px+CELL*0.35,py+CELL); x.moveTo(px+CELL*0.7,py); x.lineTo(px+CELL*0.7,py+CELL); x.stroke(); }
+    if(t===7){ // cozy carpet: soft stripes + diamond + fringe
+      x.fillStyle=T.c2; x.fillRect(px,py+CELL*0.28,CELL,CELL*0.12); x.fillRect(px,py+CELL*0.60,CELL,CELL*0.12);
+      x.fillStyle="#ffd1dc"; x.beginPath(); x.moveTo(px+CELL/2,py+CELL*0.26); x.lineTo(px+CELL*0.74,py+CELL/2); x.lineTo(px+CELL/2,py+CELL*0.74); x.lineTo(px+CELL*0.26,py+CELL/2); x.closePath(); x.fill();
+      x.fillStyle="#fff"; for(var fx=0;fx<CELL;fx+=5) x.fillRect(px+fx+1,py,2,3); // top fringe
+    }
+    x.strokeStyle="rgba(0,0,0,0.18)"; x.lineWidth=1; x.strokeRect(px+0.5,py+0.5,CELL-1,CELL-1);
+  }
+  function drawMo(){
+    var mw=CELL*0.7, mh=CELL*1.4, px=mo.x, py=mo.y-camY;
+    // blocky Mo: head + body, skin/shirt
+    var sk= (function(){ try{return localStorage.getItem("moSkin")||"#f6c48a";}catch(e){return "#f6c48a";} })();
+    var hr= (function(){ try{return localStorage.getItem("moHair")||"#2a2018";}catch(e){return "#2a2018";} })();
+    // legs
+    x.fillStyle="#243a66"; x.fillRect(px+mw*0.08, py+mh*0.66, mw*0.34, mh*0.34); x.fillRect(px+mw*0.58, py+mh*0.66, mw*0.34, mh*0.34);
+    // body (blue shirt)
+    x.fillStyle="#1a6fd0"; x.fillRect(px, py+mh*0.34, mw, mh*0.34);
+    // arms
+    x.fillStyle="#1560b8"; x.fillRect(px-mw*0.14, py+mh*0.36, mw*0.16, mh*0.3); x.fillRect(px+mw, py+mh*0.36, mw*0.16, mh*0.3);
+    // head
+    x.fillStyle=sk; x.fillRect(px+mw*0.08, py, mw*0.84, mh*0.36);
+    x.fillStyle=hr; x.fillRect(px+mw*0.08, py, mw*0.84, mh*0.12);
+    // eyes (face dir)
+    x.fillStyle="#201008"; var ey=py+mh*0.2; if(mo.dir>0){ x.fillRect(px+mw*0.5,ey,4,4); x.fillRect(px+mw*0.72,ey,4,4); } else { x.fillRect(px+mw*0.2,ey,4,4); x.fillRect(px+mw*0.42,ey,4,4); }
+    // hurt flash (gentle red wash + dizzy stars)
+    if(mo.hurtT>0 && Math.floor(mo.hurtT*0.6)%2===0){ x.fillStyle="rgba(232,70,90,0.35)"; x.fillRect(px-mw*0.14, py, mw*1.3, mh); }
+  }
+  function drawZombie(z){
+    var zw=CELL*0.7, zh=CELL*1.3, px=z.x, py=z.y-camY, sway=Math.sin(z.wob)*2;
+    // legs
+    x.fillStyle="#2f5a2a"; x.fillRect(px+zw*0.12, py+zh*0.66, zw*0.3, zh*0.34); x.fillRect(px+zw*0.58, py+zh*0.66, zw*0.3, zh*0.34);
+    // tattered body
+    x.fillStyle="#3f7a34"; x.fillRect(px, py+zh*0.34, zw, zh*0.34);
+    x.fillStyle="#2a5422"; x.fillRect(px, py+zh*0.6, zw*0.26, zh*0.08); x.fillRect(px+zw*0.62, py+zh*0.57, zw*0.3, zh*0.06);
+    // arms reaching forward
+    x.fillStyle="#4a8a3c"; var ax=z.dir>0?px+zw-2:px-zw*0.26;
+    x.fillRect(ax, py+zh*0.34+sway, zw*0.32, zh*0.13); x.fillRect(ax, py+zh*0.46+sway, zw*0.32, zh*0.11);
+    // mossy head
+    x.fillStyle="#5aa048"; x.fillRect(px+zw*0.08, py, zw*0.84, zh*0.34);
+    x.fillStyle="#4a8a3c"; x.fillRect(px+zw*0.08, py, zw*0.84, zh*0.06);
+    // hollow eyes + faint red glow
+    var ey=py+zh*0.12, exL=px+zw*0.22, exR=px+zw*0.56;
+    x.fillStyle="#0a1a08"; x.fillRect(exL,ey,zw*0.22,zh*0.1); x.fillRect(exR,ey,zw*0.22,zh*0.1);
+    x.fillStyle="#e23a2a"; x.fillRect(exL+zw*0.06,ey+2,3,3); x.fillRect(exR+zw*0.06,ey+2,3,3);
+    // jagged frown
+    x.fillStyle="#13260f"; x.fillRect(px+zw*0.28, py+zh*0.25, zw*0.44, zh*0.045);
+  }
+  function drawPig(p){
+    var pw=CELL*0.9, ph=CELL*0.58, px=p.x, py=p.y-camY;
+    x.fillStyle="#f2a0b4"; rr(px,py,pw,ph,ph*0.42); x.fill();
+    x.fillStyle="#e07f98"; x.fillRect(px+pw*0.14,py+ph*0.82,pw*0.14,ph*0.3); x.fillRect(px+pw*0.7,py+ph*0.82,pw*0.14,ph*0.3);
+    var hx=p.dir<0?px:px+pw*0.62;
+    x.fillStyle="#f2a0b4"; rr(hx,py-ph*0.12,pw*0.4,ph*0.62,7); x.fill();
+    x.fillStyle="#e07f98"; x.beginPath(); x.moveTo(hx+pw*0.08,py-ph*0.1); x.lineTo(hx+pw*0.18,py-ph*0.32); x.lineTo(hx+pw*0.26,py-ph*0.06); x.closePath(); x.fill();
+    var sx=p.dir<0?hx-pw*0.02:hx+pw*0.3; x.fillStyle="#e07f98"; x.fillRect(sx,py+ph*0.12,pw*0.12,ph*0.3);
+    x.fillStyle="#3a2020"; x.fillRect(p.dir<0?hx+pw*0.06:hx+pw*0.2, py+ph*0.0, 3,3);
+    if(p.happy>0){ x.globalAlpha=Math.min(1,p.happy/20); heartIcon(px+pw*0.5, py-ph*0.4, 6, true); x.globalAlpha=1; }
+  }
+  function drawFoodIcon(cx,cy,s){ x.fillStyle="#b5702f"; x.beginPath(); x.arc(cx,cy-1,s,0,7); x.fill(); x.fillStyle="#8a4f1e"; x.beginPath(); x.arc(cx,cy-1,s*0.6,0,7); x.fill(); x.fillStyle="#f0e0c0"; x.fillRect(cx-2,cy+s-1,4,s*0.8); x.beginPath(); x.arc(cx,cy+s*1.7,3.5,0,7); x.fill(); }
+  function drawHouseIcon(cx,cy,s){ x.fillStyle="#9a6a2a"; x.fillRect(cx-s,cy-s*0.2,s*2,s*1.1); x.fillStyle="#b23a2a"; x.beginPath(); x.moveTo(cx-s*1.2,cy-s*0.2); x.lineTo(cx,cy-s*1.1); x.lineTo(cx+s*1.2,cy-s*0.2); x.closePath(); x.fill(); x.fillStyle="#5a3a1a"; x.fillRect(cx-s*0.3,cy+s*0.2,s*0.6,s*0.7); }
+
+  function eatSfx(){ beep(440,0.07,"triangle",0.05); setTimeout(function(){beep(660,0.09,"triangle",0.05);},70); }
+  function foodSfx(){ beep(700,0.06,"sine",0.06); setTimeout(function(){beep(980,0.09,"sine",0.06);},60); }
+  function eat(){ if(food>0 && mo.hp<3){ food--; mo.hp++; eatSfx(); for(var i=0;i<6;i++) pops.push({x:mo.x+CELL*0.35,y:mo.y-camY-6,vx:(Math.random()-0.5)*3,vy:-Math.random()*2-1,life:30,heart:true}); } }
+
+  function buildHouse(){
+    var mw=CELL*0.7, mh=CELL*1.4, cx=Math.floor((mo.x+mw/2)/CELL);
+    var gr=Math.floor((mo.y+mh+2)/CELL); while(gr<ROWS && !solid(cx,gr)) gr++; if(gr>=ROWS) gr=surfaceRow+1;
+    var L=Math.max(0,cx-2), R=Math.min(COLS-1,cx+2), topR=Math.max(0,gr-4);
+    for(var r=topR;r<gr;r++) for(var c=L;c<=R;c++){ if(c===L||c===R||r===topR){ grid[r][c]=4; } }
+    for(var r2=topR+1;r2<gr;r2++) for(var c2=L+1;c2<R;c2++) grid[r2][c2]=0;      // hollow inside
+    for(var c3=L+1;c3<R;c3++) grid[gr][c3]=7;                                     // carpet floor
+    grid[gr-1][L]=0; grid[gr-2][L]=0;                                             // doorway
+    placeSfx();
+  }
+
+  function updatePigs(dt){
+    var pw=CELL*0.9, ph=CELL*0.58, worldW=COLS*CELL;
+    for(var i=0;i<pigs.length;i++){ var p=pigs[i];
+      p.wander-=dt; if(p.wander<=0){ p.wander=70+Math.random()*130; var rr2=Math.random(); p.dir=rr2<0.4?-1:(rr2<0.8?1:0); }
+      p.vx=(p.dir||0)*0.7; p.blocked=false;
+      p.x+=p.vx*dt; collideE(p,pw,ph,true); if(p.blocked){ p.dir=-p.dir; }
+      if(p.x<0){p.x=0;p.dir=1;} if(p.x>worldW-pw){p.x=worldW-pw;p.dir=-1;}
+      p.vy+=0.5*dt; if(p.vy>12)p.vy=12; p.y+=p.vy*dt; p.onG=false; collideE(p,pw,ph,false);
+      if(p.cd>0)p.cd-=dt; if(p.happy>0)p.happy-=dt;
+      if(p.y>worldH+CELL*2){ p.x=(COLS/2)*CELL; p.y=(surfaceRow-1)*CELL; p.vy=0; }
+      if(p.cd<=0 && mo.x<p.x+pw && mo.x+CELL*0.7>p.x && mo.y<p.y+ph && mo.y+CELL*1.4>p.y){
+        food++; p.cd=320; p.happy=28; foodSfx(); pops.push({x:p.x+pw*0.5, y:p.y-camY-4, vx:0, vy:-1.6, life:32, txt:"+food"}); }
+    }
+  }
+
+  window._B={ get:function(){ return {mode:mode, creative:creative, gems:gems, hp:mo?mo.hp:0, night:night, zombies:zombies?zombies.length:0, pigs:pigs?pigs.length:0, food:food, inv:Object.assign({},inv), moy:Math.round(mo?mo.y:0) }; },
+    start:function(cr){ startGame(cr); },
+    joy:function(ox,oy){ joy.active=(ox!==0||oy!==0); joy.kx=joy.cx+ox*joy.R; joy.ky=joy.cy+oy*joy.R; },
+    placeAt:function(px,py,t){ drag={t:t,x:px,y:py}; tryPlace(drag); drag=null; },
+    hurt:function(n){ mo.hurtT=0; hurtMo(n||1); }, wake:function(){ respawn(); },
+    setNight:function(b){ night=b; nightT=b?NIGHTLEN:DAYLEN; }, spawnZ:function(){ spawnZombie(); },
+    pigVisit:function(){ if(pigs[0]){ pigs[0].x=mo.x; pigs[0].y=mo.y; pigs[0].cd=0; } }, eat:function(){ eat(); }, house:function(){ buildHouse(); } };
+
+  resize(); reset(); mode="start";
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

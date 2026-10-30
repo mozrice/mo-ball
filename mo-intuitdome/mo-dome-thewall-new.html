@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>MO INTUIT DOME — The Wall</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#060a1c;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000066;padding:6px 10px;border-radius:10px;}
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;z-index:10;background:#060a1ccc;}
+  .overlay.hide{display:none;}
+  .card{background:#1a0f22e6;border:3px solid #ff5a5a;border-radius:20px;padding:22px 26px;max-width:92%;box-shadow:0 0 40px #ff5a5a55,0 18px 50px #000a;}
+  .card h1{margin:0 0 8px;font-size:26px;color:#ffcf5a;text-shadow:0 0 14px #ffcf5a66;}
+  .card p{margin:8px 0;line-height:1.35;font-size:16px;color:#ffd9d9;}
+  .big{margin-top:14px;padding:14px 28px;font-size:21px;font-weight:900;background:linear-gradient(#ff8a5a,#e8402a);color:#2a0a04;border:none;border-radius:14px;box-shadow:0 5px 0 #a82a1a;cursor:pointer;}
+  .big:active{transform:translateY(4px);box-shadow:0 1px 0 #a82a1a;}
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div class="overlay" id="startOv">
+  <div class="card">
+    <h1>📣 THE WALL</h1>
+    <p>You're in <b>The Wall</b> — the loudest fan section at MO INTUIT DOME!</p>
+    <p style="font-size:14px;opacity:.92">Do all the fan stuff: wave your towel, chant, hold your sign, cheer the LOUDEST, drum, and high-five the row.<br><b>HOLD</b> to cheer &amp; chant. <b>Swipe side to side</b> to wave &amp; high-five.</p>
+    <button class="big" id="startBtn">▶ GO SUPER FAN!</button>
+  </div>
+</div>
+<div class="overlay hide" id="endOv">
+  <div class="card">
+    <h1>⭐ SUPER FAN of the game!</h1>
+    <p>You led The Wall and the whole dome heard you, Mo! The team felt the energy! 🎉</p>
+    <button class="big" id="againBtn">🔁 Do it again</button>
+  </div>
+</div>
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), x=cv.getContext("2d");
+  var W=0,H=0,DPR=1;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); cv.style.width=W+"px"; cv.style.height=H+"px"; x.setTransform(DPR,0,0,DPR,0,0); buildCrowd(); }
+  addEventListener("resize",resize);
+
+  var AC=null; function ac(){ if(!AC){ try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||"sine"; o.frequency.value=f; g.gain.value=v||0.05; o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1)); o.stop(a.currentTime+(d||0.1)+0.02); }
+  function ding(){ beep(900,0.08,"sine",0.06); setTimeout(function(){beep(1300,0.1,"sine",0.05);},70); }
+  function roar(){ for(var i=0;i<9;i++){ (function(j){ setTimeout(function(){ beep(200+Math.random()*500,0.12,"sawtooth",0.025); }, j*45); })(i); } }
+
+  // The Wall fan activities (ideas 21-30)
+  var SCENES=[
+    {t:"Take your seat in The Wall!", sub:"Behind the basket — loudest section!", k:"auto", dur:140},
+    {t:"Put on your CLIPS colors!", sub:"Red & ready!", k:"auto", dur:130},
+    {t:"Wave your rally towel!", lab:"SWIPE TO WAVE!", k:"drag", prop:"towel"},
+    {t:"Learn the team chant!", lab:"LET'S GO MO!", k:"hold", prop:"cheer"},
+    {t:"Hold up your D-FENSE sign!", lab:"D-FENSE!", k:"hold", prop:"sign", sign:"D-FENSE"},
+    {t:"Cheer the LOUDEST!", lab:"LOUDER!!!", k:"hold", prop:"cheer", loud:true},
+    {t:"Join the drum beat!", lab:"BOOM BOOM!", k:"hold", prop:"drum"},
+    {t:"Call and answer — shout MO!", lab:"...MO!", k:"hold", prop:"cheer"},
+    {t:"Spell the team name!", lab:"C-L-I-P-S!", k:"hold", prop:"sign", sign:"CLIPS"},
+    {t:"High-five the whole row!", lab:"SWIPE TO HIGH-FIVE!", k:"drag", prop:"five"}
+  ];
+  var mode="start", si=0, sceneT=0, anim=0, crowd=[], prog=0, holding=false, dragging=false, lastx=0, waveX=0;
+
+  function buildCrowd(){ crowd=[]; var cols=["#e8545a","#ff8a3a","#f2c04a","#e8545a","#ff5a5a","#4f90e8","#fff","#e8545a"];
+    var top=H*0.14, rows=9; for(var row=0;row<rows;row++){ var yy=top+row*H*0.052; var n=Math.floor(W/20);
+      for(var i=0;i<n;i++){ crowd.push({x:6+i*20+(row%2?10:0), y:yy, c:cols[(i*3+row)%cols.length], ph:Math.random()*6}); } } }
+
+  function pt(e){ var t=e.touches&&e.touches[0]?e.touches[0]:e; var r=cv.getBoundingClientRect(); return {x:(t.clientX-r.left)*(W/r.width), y:(t.clientY-r.top)*(H/r.height)}; }
+  function scene(){ return SCENES[si]; }
+  function down(e){ ac(); if(mode!=="play")return; var p=pt(e); if(e.cancelable)e.preventDefault();
+    if(scene().k==="hold") holding=true; else if(scene().k==="drag"){ dragging=true; lastx=p.x; } }
+  function move(e){ if(!dragging)return; if(e.cancelable)e.preventDefault(); var p=pt(e); var dx=Math.abs(p.x-lastx); prog=Math.min(1,prog+dx*0.0045); waveX=(p.x-W/2)/(W/2); lastx=p.x; }
+  function up(){ holding=false; dragging=false; }
+  cv.addEventListener("mousedown",down); addEventListener("mousemove",move); addEventListener("mouseup",up);
+  cv.addEventListener("touchstart",down,{passive:false}); addEventListener("touchmove",move,{passive:false}); addEventListener("touchend",up); addEventListener("touchcancel",up);
+
+  function startScene(){ sceneT=0; prog=0; holding=false; dragging=false; waveX=0; if(scene().k==="auto") ding(); }
+  function nextScene(){ ding(); roar(); si++; if(si>=SCENES.length){ endShow(); return; } startScene(); }
+  function endShow(){ mode="end"; roar(); document.getElementById("endOv").classList.remove("hide"); }
+  function start(){ ac(); si=0; mode="play"; document.getElementById("startOv").classList.add("hide"); document.getElementById("endOv").classList.add("hide"); startScene(); }
+  document.getElementById("startBtn").onclick=start; document.getElementById("againBtn").onclick=start;
+
+  function update(){ anim++; var s=scene();
+    if(s.k==="auto"){ sceneT++; if(sceneT>=s.dur){ nextScene(); return; } }
+    else if(s.k==="hold"){ if(holding){ prog=Math.min(1,prog+(s.loud?0.011:0.014)); if(anim%4===0)beep(s.prop==="drum"?(140+prog*120):(300+prog*500),0.05,s.prop==="drum"?"square":"sawtooth",0.03); } else prog=Math.max(0,prog-0.006); if(prog>=1){ nextScene(); return; } }
+    else if(s.k==="drag"){ if(!dragging) prog=Math.max(0,prog-0.004); if(prog>=1){ nextScene(); return; } }
+  }
+
+  function skC(){ try{return localStorage.getItem("moSkin")||"#f6c48a";}catch(e){return "#f6c48a";} }
+  function hrC(){ try{return localStorage.getItem("moHair")||"#2a2018";}catch(e){return "#2a2018";} }
+  function rr(a,b,c,d,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+c,b,a+c,b+d,r); x.arcTo(a+c,b+d,a,b+d,r); x.arcTo(a,b+d,a,b,r); x.arcTo(a,b,a+c,b,r); x.closePath(); }
+
+  function draw(){
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#180a1e"); g.addColorStop(1,"#0a0610"); x.fillStyle=g; x.fillRect(0,0,W,H);
+    // basket we're behind (top)
+    x.strokeStyle="#ff7a2a"; x.lineWidth=5; x.beginPath(); x.ellipse(W/2,H*0.08,W*0.1,10,0,0,7); x.stroke();
+    x.fillStyle="#eef2fb"; rr(W/2-W*0.13,H*0.03,W*0.26,14,4); x.fill();
+    // The Wall crowd — jumps with progress/loudness
+    var loud = (mode==="play") ? prog : 0;
+    for(var i=0;i<crowd.length;i++){ var p=crowd[i]; var jy=Math.sin((anim*0.12)+p.ph)*(1.2+loud*7); x.fillStyle=p.c; x.globalAlpha=0.92; x.beginPath(); x.arc(p.x,p.y+jy,4.2,0,7); x.fill();
+      // tiny raised arms when loud
+      if(loud>0.3){ x.strokeStyle=p.c; x.lineWidth=2; x.beginPath(); x.moveTo(p.x,p.y+jy); x.lineTo(p.x-3,p.y+jy-6); x.moveTo(p.x,p.y+jy); x.lineTo(p.x+3,p.y+jy-6); x.stroke(); } }
+    x.globalAlpha=1;
+    // YOU (Mo) at the front
+    drawMo(W/2, H*0.72);
+    if(mode==="play"){
+      var s=scene();
+      // banner
+      x.fillStyle="#000a"; rr(W*0.05,H*0.015,W*0.9,30,10); x.fill(); x.fillStyle="#ffcf5a"; x.font="bold 16px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(s.t, W/2, H*0.03);
+      if(s.sub){ x.fillStyle="#ffd9d9"; x.font="bold 13px Trebuchet MS"; x.fillText(s.sub, W/2, H*0.065); }
+      // big action label (pulsing when active)
+      if(s.lab){ var act=(holding||dragging); var pz=1+(act?0.12*Math.sin(anim*0.4):0); x.fillStyle=act?"#ff5a5a":"#aa3a3a"; x.font="bold "+Math.round(30*pz)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.strokeStyle="#000"; x.lineWidth=5; x.strokeText(s.lab,W/2,H*0.42); x.fillText(s.lab,W/2,H*0.42); }
+      // meter
+      if(s.k==="hold"||s.k==="drag"){ var mw=W*0.74, mx=W/2-mw/2, my=H*0.88, mh=22; x.fillStyle="#000a"; rr(mx-3,my-3,mw+6,mh+6,10); x.fill(); x.fillStyle="#2a1420"; rr(mx,my,mw,mh,8); x.fill(); x.fillStyle="#ff5a5a"; rr(mx,my,mw*prog,mh,8); x.fill();
+        x.fillStyle="#fff"; x.font="bold 13px Trebuchet MS"; x.textAlign="center"; x.textBaseline="bottom"; x.fillText(s.k==="hold"?(holding?"KEEP HOLDING!":"HOLD anywhere!"):(dragging?"KEEP SWIPING!":"SWIPE side to side!"), W/2, my-6); }
+      // progress dots
+      for(var d2=0;d2<SCENES.length;d2++){ x.fillStyle=d2<si?"#3fd06a":(d2===si?"#ffcf5a":"#3a2030"); x.beginPath(); x.arc(W/2-(SCENES.length-1)*9/2+d2*9, H*0.48, 3.5,0,7); x.fill(); }
+    }
+  }
+  function drawMo(cx,cy){ var s=Math.max(30,W*0.085), skin=skC(), hair=hrC(); var sc=mode==="play"?scene():null;
+    // towel wave behind
+    if(sc && sc.prop==="towel"){ x.save(); x.translate(cx+waveX*40, cy-s*1.1); x.rotate(waveX*0.6); x.fillStyle="#ffcf5a"; rr(-s*0.5,-s*0.2,s,s*0.4,6); x.fill(); x.fillStyle="#fff"; x.font="bold 11px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("MO",0,0); x.restore(); }
+    // legs + body
+    x.fillStyle="#243a66"; x.fillRect(cx-s*0.26,cy,s*0.22,s*0.6); x.fillRect(cx+s*0.04,cy,s*0.22,s*0.6);
+    x.fillStyle="#e8542a"; rr(cx-s*0.4,cy-s*0.7,s*0.8,s*0.8,8); x.fill();
+    x.fillStyle="#fff"; x.font="bold "+Math.round(s*0.28)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("MO",cx,cy-s*0.3);
+    // arms: up when cheering/holding, out when drag
+    var up = (sc && (sc.prop==="cheer"||sc.prop==="drum")) && holding;
+    x.strokeStyle="#e8542a"; x.lineWidth=s*0.18; x.lineCap="round";
+    if(up){ x.beginPath(); x.moveTo(cx-s*0.36,cy-s*0.5); x.lineTo(cx-s*0.55,cy-s*1.0); x.moveTo(cx+s*0.36,cy-s*0.5); x.lineTo(cx+s*0.55,cy-s*1.0); x.stroke(); }
+    else { x.beginPath(); x.moveTo(cx-s*0.36,cy-s*0.45); x.lineTo(cx-s*0.6,cy-s*0.3); x.moveTo(cx+s*0.36,cy-s*0.45); x.lineTo(cx+s*0.6,cy-s*0.3); x.stroke(); }
+    // head
+    x.fillStyle=skin; x.beginPath(); x.arc(cx,cy-s*0.95,s*0.3,0,7); x.fill();
+    x.fillStyle=hair; x.beginPath(); x.arc(cx,cy-s*1.02,s*0.3,Math.PI*1.03,Math.PI*1.97); x.fill();
+    x.fillStyle="#201008"; x.beginPath(); x.arc(cx-s*0.1,cy-s*0.95,s*0.045,0,7); x.arc(cx+s*0.1,cy-s*0.95,s*0.045,0,7); x.fill();
+    x.fillStyle="#2a0a0a"; x.beginPath(); x.arc(cx,cy-s*0.84,s*0.09,0,Math.PI); x.fill(); // open mouth cheering
+    // sign held up
+    if(sc && sc.prop==="sign" && holding){ x.fillStyle="#fff"; rr(cx-s*0.6,cy-s*1.7,s*1.2,s*0.5,6); x.fill(); x.strokeStyle="#e8542a"; x.lineWidth=3; rr(cx-s*0.6,cy-s*1.7,s*1.2,s*0.5,6); x.stroke(); x.fillStyle="#e8402a"; x.font="bold "+Math.round(s*0.3)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(sc.sign,cx,cy-s*1.45); }
+  }
+
+  function frame(){ requestAnimationFrame(frame); if(mode==="play")update(); draw(); }
+  resize(); requestAnimationFrame(frame);
+
+  window._W={ get:function(){ return {mode:mode, si:si, scene:scene()?scene().k:null, prop:scene()?scene().prop:null, prog:prog }; },
+    hold:function(b){ holding=b; }, swipe:function(amt){ prog=Math.min(1,prog+amt); } };
+})();
+</script>
+</body>
+</html>

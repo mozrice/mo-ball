@@ -51,6 +51,20 @@ const CFG = {"mode": "catch", "emoji": "🐕", "title": "Walk the Dog", "key": "
   function setHs(s){ try{ if(s>hs()) localStorage.setItem(CFG.key,String(s)); }catch(e){} }
 
   var state='menu', score=0, best=hs(), timeLeft=CFG.time||45, last=0, combo=0;
+  var introDoneT=4, introItems=[], introMo={x:0}, introFace=1, joyA=false, joyBX=0, joyBY=0, JR=46,
+      introPoss=[[0.24,-44],[0.4,-56],[0.55,-12],[0.14,-74],[0.68,-40],[0.82,-10],[0.9,-64]],
+      INTRO=[['🦮','leash'],['🦴','treats'],['🛍️','bags'],['🔑','keys'],['💧','water'],['👟','shoes'],['🧢','hat']];
+  function houseRect(){ return {x0:14, y0:H*0.22, x1:W-14, y1:H*0.9}; }
+  function floorY(){ return H*0.75; }
+  function allIntroGot(){ for(var i=0;i<introItems.length;i++) if(!introItems[i].got)return false; return introItems.length>0; }
+  function initIntro(){ introDoneT=4; var hr=houseRect(), fy=floorY(); introItems=INTRO.map(function(p,i){ var f=introPoss[i]; return {ch:p[0],label:p[1],got:false,x:hr.x0+(hr.x1-hr.x0)*f[0],y:fy+f[1]}; }); introMo={x:hr.x0+26}; introFace=1; joyA=false; }
+  function drawMoWalk(x,fy){ var t=Date.now()/120, legs=(joyA&&pointer.down)?Math.sin(t)*5:0, f=introFace;
+    cx.save(); cx.globalAlpha=0.2; cx.fillStyle='#000'; cx.beginPath(); cx.ellipse(x,fy+2,12,4,0,0,7); cx.fill(); cx.globalAlpha=1;
+    cx.strokeStyle='#2b5aa0'; cx.lineWidth=5; cx.lineCap='round'; cx.beginPath(); cx.moveTo(x-4,fy-14); cx.lineTo(x-4+legs,fy-1); cx.moveTo(x+4,fy-14); cx.lineTo(x+4-legs,fy-1); cx.stroke();
+    cx.fillStyle='#3a7bd5'; roundRect(x-10,fy-34,20,22,6); cx.fill();
+    cx.fillStyle='#f6c9a0'; cx.beginPath(); cx.arc(x,fy-44,9,0,7); cx.fill();
+    cx.fillStyle='#6b4423'; cx.beginPath(); cx.arc(x,fy-48,9,Math.PI*1.02,Math.PI*2-0.02); cx.fill();
+    cx.fillStyle='#222'; cx.beginPath(); cx.arc(x+f*3,fy-43,1.7,0,7); cx.fill(); cx.restore(); }
   var players=1, curP=1, pscores=[];
   var parts=[];
   var CHAR={hop:0,react:0,prevScore:0};
@@ -101,8 +115,9 @@ const CFG = {"mode": "catch", "emoji": "🐕", "title": "Walk the Dog", "key": "
 
   function start(){ resize(); state='play'; score=0; combo=0; timeLeft=CFG.time||45; parts=[]; M[CFG.mode].init(); last=performance.now(); beep(660,0.09,'square',0.05); }
   function over(){ setHs(score); best=hs(); beep(200,0.3,'sawtooth',0.05); if(players>1&&CFG.mode!=='party'){ pscores.push({p:curP,s:score}); if(curP<players){ curP++; state='handoff'; } else { pscores.sort(function(a,b){return b.s-a.s;}); state='vsresult'; } } else { state='over'; } }
-  function beginGame(){ curP=1; pscores=[]; if(players>1){ state='handoff'; } else { start(); } }
+  function beginGame(){ curP=1; pscores=[]; if(players>1){ state='handoff'; } else { initIntro(); state='intro'; beep(660,0.08,'square',0.05); } }
   function handle(x,y,type){ if(type!=='down'){ if(state==='play'){ var mm=M[CFG.mode]; if(mm.pointer)mm.pointer(x,y,type); } return; }
+    if(state==='intro'){ if(allIntroGot()&&x>houseRect().x1-64){ start(); return; } joyA=true; joyBX=x; joyBY=y; return; }
     if(state==='menu'){ menuDeco(); if(CFG.mode==='party'){ start(); return; }
       if(y>H*0.56&&y<H*0.56+48){ if(x>W/2-96&&x<W/2-42)players=Math.max(1,players-1); else if(x>W/2+42&&x<W/2+96)players=Math.min(9,players+1); beep(500,0.05,'square',0.04); return; }
       if(y>H*0.7&&y<H*0.7+54&&x>W/2-92&&x<W/2+92){ beginGame(); } return; }
@@ -113,6 +128,12 @@ const CFG = {"mode": "catch", "emoji": "🐕", "title": "Walk the Dog", "key": "
 
   function loop(t){ var dt=Math.min((t-last)/1000,0.05); last=t;
     if(state==='play'){ timeLeft-=dt; if(timeLeft<=0){ timeLeft=0; over(); } var m=M[CFG.mode]; if(m.update)m.update(dt); }
+    if(state==='intro'){ var hr=houseRect();
+      if(pointer.down&&joyA){ var dx=pointer.x-joyBX, adx=Math.abs(dx); if(adx>6){ var cl=Math.min(adx,JR)/JR, sp=165; introMo.x+=(dx>0?1:-1)*sp*cl*dt; introFace=dx>0?1:-1; } }
+      if(!pointer.down) joyA=false;
+      if(introMo.x<hr.x0+14)introMo.x=hr.x0+14; if(introMo.x>hr.x1-14)introMo.x=hr.x1-14;
+      for(var ii=0;ii<introItems.length;ii++){ var it=introItems[ii]; if(!it.got&&Math.abs(introMo.x-it.x)<30){ it.got=true; burst(it.x,it.y,'#7bd07b'); beep(560+ii*40,0.08,'square',0.05); charCheer(); } }
+      if(allIntroGot()){ if(introMo.x>hr.x1-54){ start(); } else { introDoneT-=dt; if(introDoneT<=0) start(); } } }
     for(var i=parts.length-1;i>=0;i--){ var p=parts[i]; p.life-=dt; if(p.life<=0){parts.splice(i,1);continue;} p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=320*dt; }
     charTick(dt); if(state==='play'&&score>CHAR.prevScore)charCheer(); CHAR.prevScore=score; render(); requestAnimationFrame(loop);
   }
@@ -203,6 +224,22 @@ const CFG = {"mode": "catch", "emoji": "🐕", "title": "Walk the Dog", "key": "
   function roundRect(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
   function hud(){ text('⭐ '+score, 12, 20, 20, '#7a4a10','left'); text('⏱ '+Math.ceil(timeLeft), W-12,20,20,'#7a4a10','right'); if(combo>1){ text('🔥 x'+combo, W/2, 20, 18, '#e0453a'); } }
 
+  function drawIntro(){
+    var hr=houseRect(), fy=floorY(), got=0; for(var i=0;i<introItems.length;i++) if(introItems[i].got)got++; var allg=got>=introItems.length;
+    text('🏠 Walk Mo to get ready!', W/2, H*0.12, 17, '#5a3a1a');
+    text('🎒 '+got+' / '+introItems.length+' found', W/2, H*0.17, 14, '#7a4a10');
+    cx.fillStyle='#f3e6cb'; roundRect(hr.x0,hr.y0,hr.x1-hr.x0,hr.y1-hr.y0,12); cx.fill();
+    cx.fillStyle='#cdeffb'; roundRect(hr.x0+28,hr.y0+18,48,36,6); cx.fill(); cx.strokeStyle='#8fb6c9'; cx.lineWidth=2; roundRect(hr.x0+28,hr.y0+18,48,36,6); cx.stroke(); cx.beginPath(); cx.moveTo(hr.x0+52,hr.y0+18); cx.lineTo(hr.x0+52,hr.y0+54); cx.moveTo(hr.x0+28,hr.y0+36); cx.lineTo(hr.x0+76,hr.y0+36); cx.stroke();
+    cx.fillStyle='#c79a5e'; cx.fillRect(hr.x0,fy,hr.x1-hr.x0,hr.y1-fy); cx.fillStyle='#b5894f'; cx.fillRect(hr.x0,fy,hr.x1-hr.x0,5);
+    cx.strokeStyle='#b58a5a'; cx.lineWidth=4; roundRect(hr.x0,hr.y0,hr.x1-hr.x0,hr.y1-hr.y0,12); cx.stroke();
+    emo('🛏️',hr.x0+44,fy-16,30); emo('🛋️',(hr.x0+hr.x1)*0.52,fy-15,30); emo('🪑',hr.x1-72,fy-14,24);
+    var ddx=hr.x1-22; cx.fillStyle=allg?'#7bd07b':'#9a7a52'; roundRect(ddx-16,fy-54,32,54,5); cx.fill(); emo('🚪',ddx,fy-27,26); if(allg)emo('🐕',ddx,fy-66,20);
+    for(var i=0;i<introItems.length;i++){ var it=introItems[i]; if(it.got)continue; var pz=1+Math.sin(Date.now()/300+i)*0.1; cx.globalAlpha=0.92; cx.fillStyle='#fff'; cx.beginPath(); cx.arc(it.x,it.y,16,0,7); cx.fill(); cx.globalAlpha=1; emo(it.ch,it.x,it.y,28*pz); }
+    drawMoWalk(introMo.x,fy);
+    if(joyA){ cx.globalAlpha=0.28; cx.fillStyle='#000'; cx.beginPath(); cx.arc(joyBX,joyBY,JR,0,7); cx.fill(); var jx=Math.max(-JR,Math.min(JR,pointer.x-joyBX)); cx.globalAlpha=0.82; cx.fillStyle='#fff'; cx.beginPath(); cx.arc(joyBX+jx,joyBY,JR*0.5,0,7); cx.fill(); cx.globalAlpha=1; }
+    if(allg) text('🐕 Walk right to the 🚪 to walk the dog!', W/2, H*0.955, 12, '#2a8a2a');
+    else text('Hold & drag left / right to walk 🕹️', W/2, H*0.955, 12.5, '#8a6a40');
+  }
   function render(){ bg();
     if(state==='menu'){ menuDeco(); if(CFG.mode==='party'){ emo(CFG.emoji,W/2,H*0.32,74); text(CFG.title,W/2,H*0.5,21,'#5a3a1a'); cx.fillStyle='#D4A574'; roundRect(W/2-88,H*0.64,176,54,15); cx.fill(); text('▶ TAP TO PLAY',W/2,H*0.64+27,18,'#fff'); wrapText(CFG.hint||'',W/2,H*0.8,14,W-50,'#8a6a40'); }
       else { emo(CFG.emoji,W/2,H*0.22,64); text(CFG.title,W/2,H*0.38,21,'#5a3a1a'); text('Best: '+best,W/2,H*0.45,15,'#a06a30'); text('Players',W/2,H*0.52,15,'#8a6a40');
@@ -211,6 +248,7 @@ const CFG = {"mode": "catch", "emoji": "🐕", "title": "Walk the Dog", "key": "
         wrapText(players>1?('Pass & play - '+players+' players take turns, most points wins!'):(CFG.hint||''),W/2,H*0.84,13,W-40,'#8a6a40'); } }
     else if(state==='play'){ var m=M[CFG.mode]; if(m.render)m.render(); if(CFG.mode!=='party'){ charDraw(); hud(); } }
     else if(state==='over'){ winScreen(); }
+    else if(state==='intro'){ drawIntro(); }
     else if(state==='handoff'){ emo(CFG.emoji,W/2,H*0.26,60); if(pscores.length>0) text('Player '+pscores[pscores.length-1].p+' got '+pscores[pscores.length-1].s,W/2,H*0.42,17,'#a06a30'); text('Player '+curP,W/2,H*0.54,30,'#e0453a'); text('Get Ready!',W/2,H*0.62,20,'#5a3a1a'); cx.fillStyle='#7bd07b'; roundRect(W/2-92,H*0.72,184,54,14); cx.fill(); text('▶ TAP TO START',W/2,H*0.72+27,19,'#fff'); }
     else if(state==='vsresult'){ emo('🏆',W/2,H*0.13,48); text('RESULTS',W/2,H*0.22,24,'#5a3a1a'); var md=['🥇','🥈','🥉']; for(var i=0;i<pscores.length;i++){ text((i<3?md[i]:'  ')+' Player '+pscores[i].p+' - '+pscores[i].s+' pts',W/2,H*0.31+i*32,17,i===0?'#e0453a':'#5a3a1a'); } cx.fillStyle='#7bd07b'; roundRect(W/2-92,H*0.87,184,50,14); cx.fill(); text('↻ PLAY AGAIN',W/2,H*0.87+25,18,'#fff'); }
     for(var i=0;i<parts.length;i++){ var p=parts[i]; cx.globalAlpha=Math.max(p.life,0); cx.fillStyle=p.c; cx.beginPath(); cx.arc(p.x,p.y,4,0,7); cx.fill(); } cx.globalAlpha=1;

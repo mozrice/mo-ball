@@ -1,0 +1,1264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>MO INTUIT DOME</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#060a1c;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000066;padding:6px 10px;border-radius:10px;}
+  #skipBtn{position:fixed;top:8px;right:10px;display:none;z-index:9;font-family:'Trebuchet MS',sans-serif;font-size:14px;font-weight:bold;color:#fff;background:#00000077;border:2px solid #ffffff55;padding:6px 12px;border-radius:12px;cursor:pointer;}
+  #skipBtn.show{display:block;}
+  #skipBtn:active{transform:translateY(2px);}
+  #ui{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;z-index:5;pointer-events:none;}
+  #ui .wrap{pointer-events:auto;display:flex;flex-direction:column;align-items:center;}
+  h1{margin:0;font-size:min(13vw,62px);letter-spacing:2px;color:#37e0ff;text-shadow:0 0 24px #37e0ff88,0 0 48px #37e0ff44;}
+  h2{margin:6px 0 0;font-size:min(5vw,22px);color:#ffcf5a;text-shadow:0 0 14px #ffcf5a55;font-weight:bold;}
+  #start{margin-top:min(44vh,360px);padding:18px 54px;font-size:26px;font-weight:900;letter-spacing:1px;
+    background:linear-gradient(#5fe9ff,#1f9fd8);color:#042033;border:none;border-radius:18px;
+    box-shadow:0 7px 0 #1477a8,0 0 34px #37e0ff66;cursor:pointer;}
+  #start:active{transform:translateY(5px);box-shadow:0 2px 0 #1477a8,0 0 24px #37e0ff66;}
+  #typeWrap{position:fixed;left:0;right:0;bottom:12%;display:none;justify-content:center;z-index:8;}
+  #typeWrap.show{display:flex;}
+  #word{width:min(80vw,420px);text-align:center;font-family:'Trebuchet MS',sans-serif;font-size:30px;font-weight:900;
+    letter-spacing:4px;text-transform:uppercase;color:#042033;background:#eaf6ff;border:4px solid #37e0ff;border-radius:16px;
+    padding:12px 10px;box-shadow:0 0 26px #37e0ff66;outline:none;}
+  #word::placeholder{color:#8fb6cc;letter-spacing:3px;font-weight:700;}
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<button id="skipBtn">Skip &#9654;</button>
+<canvas id="c"></canvas>
+<div id="ui"><div class="wrap">
+  <h1>MO INTUIT DOME</h1>
+  <h2>🏀 Home of the L.A. CLIPS</h2>
+  <button id="start">▶ START</button>
+</div></div>
+<div id="typeWrap"><input id="word" type="text" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="type: GAME DAY"></div>
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), x=cv.getContext("2d");
+  var W=0,H=0,DPR=1,anim=0,stars=[],conf=[];
+  // modes: start | bed | type | gday | walk | tickets
+  var mode="start";
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); cv.style.width=W+"px"; cv.style.height=H+"px"; x.setTransform(DPR,0,0,DPR,0,0); buildStars(); layout(); }
+  addEventListener("resize",resize);
+  function buildStars(){ stars=[]; for(var i=0;i<60;i++){ stars.push({x:Math.random()*W, y:Math.random()*H*0.5, r:Math.random()*1.6+0.5, ph:Math.random()*6}); } }
+
+  function skC(){ try{return localStorage.getItem("moSkin")||"#f6c48a";}catch(e){return "#f6c48a";} }
+  function hrC(){ try{return localStorage.getItem("moHair")||"#2a2018";}catch(e){return "#2a2018";} }
+  function rr(a,b,c,d,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+c,b,a+c,b+d,r); x.arcTo(a+c,b+d,a,b+d,r); x.arcTo(a,b+d,a,b,r); x.arcTo(a,b,a+c,b,r); x.closePath(); }
+
+  var AC=null; function ac(){ if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}} if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||"sine"; o.frequency.value=f; g.gain.value=v||0.05; o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1)); o.stop(a.currentTime+(d||0.1)+0.02); }
+  function ding(){ beep(900,0.08,"sine",0.06); setTimeout(function(){beep(1300,0.1,"sine",0.05);},70); }
+  function roar(){ for(var i=0;i<8;i++){ (function(j){ setTimeout(function(){ beep(220+Math.random()*500,0.12,"sawtooth",0.02); }, j*45); })(i); } }
+
+  // ---- geometry ----
+  var bed={}, moPos={x:0,y:0}, onBed=true, dragging=false, moScale=1;
+  var moX=0, moVX=0, walkPhase=0, fridgeX=0, floorY=0, gotTickets=false;
+  var foods=[], dragFood=-1, eatenCount=0, mouthX=0, mouthY=0, moEatX=0, chomp=0;
+  var bottle={x:0,y:0}, bottleDrag=false, fill=0, sinkX=0, sinkY=0;
+  var clockX=0, clockCY=0, atClock=false;
+  var bagItems=[], dragItem=-1, packedCount=0, bagX=0, bagY=0;
+  var streetGoalX=0, bowlsX=0;
+  var loadBag={x:0,y:0}, loadDrag=false, carLoadX=0;
+  var snacks=[], dragSnack=-1, coolerX=0, coolerY=0, snackCount=0;
+  var waters=[], dragWater=-1, holders=[], waterCount=0;
+  var flag={x:0,y:0}, flagDrag=false, flagCarX=0;
+  var seatSign={x:0,y:0}, seatDrag=false, seatCarX=0;
+  var foamItem={x:0,y:0}, foamDrag=false, foamCarX=0;
+  var jacketItem={x:0,y:0}, jacketDrag=false, jacketCarX=0;
+  var trunkProg=0, trunkDrag=false, trunkCarX=0;
+  var famMembers=[], famCount=0, famTypeOn=false;
+  var songPicked=false;
+  var mirrors=[], mirrorCount=0;
+  var myColor=null, carsDriving=[], colorScore=0, carSpawnT=0;
+  var COLORCHO=[{n:"RED",c:"#e8402a"},{n:"BLUE",c:"#1f6fd0"},{n:"GREEN",c:"#2f9f5a"},{n:"YELLOW",c:"#f2c84a"}];
+  var quietProg=0, quietHold=false;
+  var bagSnacks=[], dragBagSnack=-1, snackMouthX=0, snackMouthY=0, snackChomp=0;
+  var driveProg=0, driveHold=false;
+  var followStep=0, followDir=1;
+  var garageCarX=0, garageSpotX=0, garageParkT=0;
+  var elevStage=0, elevDoor=0;
+  var ridePhase=0, teammateX=0, doorHold=false, rideY=0;
+  var stairProg=0, stairHold=false, lockerDoorX=0;
+  var pdPhase=0, pdDoor=0;
+  var dressJerseyOn=false, dressShortsOn=false, dressItem=-1, dressItems=[], dressMoX=0, dressMoY=0;
+  var FLOORS=["G","1","2","LR"];
+  var rpsWins=0, rpsCpuWins=0, rpsPlayer=-1, rpsCpu=-1, rpsResult="", rpsShowT=0, RPS=["🪨","📄","✂️"], RPSN=["ROCK","PAPER","SCISSORS"];
+  var pen={x:0,y:0}, penDrag=false, signProg=0, inkPts=[];
+  var hatX=0, moHat=-1, HATCOLS=["#e8402a","#1f5fd0","#ffcf5a"];
+  var plugs=[], dragPlug=-1, outlet={x:0,y:0}, camPort={x:0,y:0};
+  var joy={active:false,id:null,bx:0,by:0,r:0,kx:0,ky:0,dx:0};
+  function layout(){
+    bed.w=Math.min(W*0.7,420); bed.h=Math.min(H*0.16,120); bed.x=W/2-bed.w/2; bed.y=H*0.55;
+    moScale=Math.max(26,W*0.10);
+    if(onBed){ moPos.x=W/2; moPos.y=bed.y+8; }
+    floorY=H*0.72; fridgeX=W*0.82;
+    joy.r=Math.min(W*0.15,70); joy.bx=joy.r+22; joy.by=H-joy.r-22; joy.kx=joy.bx; joy.ky=joy.by;
+  }
+
+  function drawMo(cx,cy,sleeping,wphase){ var s=moScale, skin=skC(), hair=hrC();
+    if(sleeping){
+      x.fillStyle="#3b6fb0"; rr(cx-bed.w*0.34,cy-6,bed.w*0.68,bed.h*0.7,14); x.fill();
+      x.fillStyle="#5a8fd8"; rr(cx-bed.w*0.34,cy-6,bed.w*0.68,10,6); x.fill();
+      var hx=cx-bed.w*0.28, hy=cy+bed.h*0.14;
+      x.fillStyle=skin; x.beginPath(); x.arc(hx,hy,s*0.3,0,7); x.fill();
+      x.fillStyle=hair; x.beginPath(); x.arc(hx,hy-s*0.08,s*0.3,Math.PI*0.95,Math.PI*2.05); x.fill();
+      x.fillStyle="#201008"; x.beginPath(); x.arc(hx+s*0.05,hy,s*0.03,0,7); x.fill();
+      var zz=(anim*0.03)%1; x.fillStyle="#bcd6ff"; x.font="bold "+Math.round(s*0.4)+"px Trebuchet MS"; x.textAlign="left"; x.textBaseline="middle"; x.globalAlpha=1-zz; x.fillText("z", cx+bed.w*0.1+zz*20, cy-10-zz*30); x.globalAlpha=1;
+      return;
+    }
+    // ---- MO L.A. CLIPS uniform (RED & BLUE) ----
+    var JB="#1f5fd0", RED="#e8402a";
+    var sw=wphase?Math.sin(wphase)*s*0.16:0;
+    // blue shorts with red stripe
+    x.fillStyle=JB; x.fillRect(cx-s*0.26,cy,s*0.22,s*0.6+(wphase?sw:0)); x.fillRect(cx+s*0.04,cy,s*0.22,s*0.6-(wphase?sw:0));
+    x.fillStyle=RED; x.fillRect(cx-s*0.17,cy,s*0.03,s*0.6+(wphase?sw:0)); x.fillRect(cx+s*0.14,cy,s*0.03,s*0.6-(wphase?sw:0));
+    // sleeveless arms (skin)
+    var up=(mode==="gday"||mode==="tickets");
+    x.strokeStyle=skin; x.lineWidth=s*0.16; x.lineCap="round";
+    if(up){ x.beginPath(); x.moveTo(cx-s*0.36,cy-s*0.5); x.lineTo(cx-s*0.58,cy-s*1.02); x.moveTo(cx+s*0.36,cy-s*0.5); x.lineTo(cx+s*0.58,cy-s*1.02); x.stroke(); }
+    else { var aw=wphase?Math.cos(wphase)*s*0.12:0; x.beginPath(); x.moveTo(cx-s*0.36,cy-s*0.45); x.lineTo(cx-s*0.6,cy-s*0.28+aw); x.moveTo(cx+s*0.36,cy-s*0.45); x.lineTo(cx+s*0.6,cy-s*0.28-aw); x.stroke(); }
+    // jersey body (blue) with RED side panels + red neck trim
+    x.fillStyle=JB; rr(cx-s*0.4,cy-s*0.7,s*0.8,s*0.8,8); x.fill();
+    x.fillStyle=RED; rr(cx-s*0.4,cy-s*0.7,s*0.11,s*0.8,8); x.fill(); rr(cx+s*0.29,cy-s*0.7,s*0.11,s*0.8,8); x.fill();
+    x.strokeStyle=RED; x.lineWidth=s*0.06; x.beginPath(); x.moveTo(cx-s*0.17,cy-s*0.7); x.lineTo(cx-s*0.06,cy-s*0.57); x.lineTo(cx+s*0.06,cy-s*0.57); x.lineTo(cx+s*0.17,cy-s*0.7); x.stroke();
+    // "MO" (white, red outline) + number 1 (red, white outline)
+    x.font="900 "+Math.round(s*0.25)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle";
+    x.strokeStyle=RED; x.lineWidth=s*0.06; x.strokeText("MO",cx,cy-s*0.42); x.fillStyle="#fff"; x.fillText("MO",cx,cy-s*0.42);
+    x.font="900 "+Math.round(s*0.24)+"px Trebuchet MS"; x.strokeStyle="#fff"; x.lineWidth=s*0.06; x.strokeText("1",cx,cy-s*0.14); x.fillStyle=RED; x.fillText("1",cx,cy-s*0.14);
+    x.fillStyle=skin; x.beginPath(); x.arc(cx,cy-s*0.95,s*0.3,0,7); x.fill();
+    x.fillStyle=hair; x.beginPath(); x.arc(cx,cy-s*1.02,s*0.3,Math.PI*1.03,Math.PI*1.97); x.fill();
+    x.fillStyle="#201008"; x.beginPath(); x.arc(cx-s*0.1,cy-s*0.95,s*0.045,0,7); x.arc(cx+s*0.1,cy-s*0.95,s*0.045,0,7); x.fill();
+    x.fillStyle="#2a0a0a"; x.beginPath(); x.arc(cx,cy-s*0.84,s*0.09,0,Math.PI); x.fill();
+    if(moHat>=0){ var hc2=HATCOLS[moHat]; x.fillStyle=hc2; x.beginPath(); x.arc(cx,cy-s*1.08,s*0.31,Math.PI,2*Math.PI); x.fill(); x.fillRect(cx-s*0.31,cy-s*1.10,s*0.62,s*0.05); x.fillRect(cx+s*0.06,cy-s*1.10,s*0.4,s*0.07); x.fillStyle="#fff"; x.font="900 "+Math.round(s*0.17)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("M",cx,cy-s*1.2); }
+  }
+
+  function banner(txt,col){ x.fillStyle="#000a"; rr(W*0.05,H*0.04,W*0.9,34,12); x.fill(); x.fillStyle=col||"#ffcf5a"; x.font="bold 18px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(txt, W/2, H*0.04+17); }
+  function drawClock(cx,cy,r){
+    x.fillStyle="#2a2f52"; x.beginPath(); x.arc(cx,cy,r+6,0,7); x.fill();
+    x.fillStyle="#fff"; x.beginPath(); x.arc(cx,cy,r,0,7); x.fill();
+    x.strokeStyle="#13306a"; x.lineWidth=3; x.beginPath(); x.arc(cx,cy,r,0,7); x.stroke();
+    for(var i=0;i<12;i++){ var a=i*Math.PI/6; x.strokeStyle="#334"; x.lineWidth=2; x.beginPath(); x.moveTo(cx+Math.cos(a)*r*0.82,cy+Math.sin(a)*r*0.82); x.lineTo(cx+Math.cos(a)*r*0.92,cy+Math.sin(a)*r*0.92); x.stroke(); }
+    function hand(deg,len,wd,col){ var a=(deg-90)*Math.PI/180; x.strokeStyle=col; x.lineWidth=wd; x.lineCap="round"; x.beginPath(); x.moveTo(cx,cy); x.lineTo(cx+Math.cos(a)*len, cy+Math.sin(a)*len); x.stroke(); }
+    hand(210, r*0.5, 4, "#13306a"); hand(0, r*0.72, 3, "#e8402a");
+    x.fillStyle="#13306a"; x.beginPath(); x.arc(cx,cy,3.5,0,7); x.fill();
+    x.fillStyle="#13306a"; x.font="bold "+Math.round(r*0.42)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("7:00", cx, cy+r+16);
+  }
+  function paperRect(){ return {x:W*0.5-W*0.38, y:H*0.22, w:W*0.76, h:H*0.4}; }
+  function drawPaperSign(p){ var r=paperRect();
+    x.fillStyle="#fff"; rr(r.x,r.y,r.w,r.h,10); x.fill(); x.strokeStyle="#c9b48a"; x.lineWidth=3; rr(r.x,r.y,r.w,r.h,10); x.stroke();
+    if(inkPts.length>1){ x.strokeStyle="#9ec3f0"; x.lineWidth=3; x.lineCap="round"; x.beginPath(); x.moveTo(inkPts[0].x,inkPts[0].y); for(var i=1;i<inkPts.length;i++){ x.lineTo(inkPts[i].x,inkPts[i].y); } x.stroke(); }
+    x.textAlign="center"; x.textBaseline="middle";
+    x.fillStyle="rgba(31,95,208,"+(0.14+0.86*p)+")"; x.font="900 "+Math.round(Math.min(W*0.12,64))+"px Trebuchet MS"; x.fillText("GOOD LUCK", W/2, r.y+r.h*0.36);
+    x.fillStyle="rgba(232,64,42,"+(0.14+0.86*p)+")"; x.fillText("CLIPS!", W/2, r.y+r.h*0.68);
+  }
+  function drawPen(cx,cy){ x.save(); x.translate(cx,cy); x.rotate(-0.6);
+    x.fillStyle="#1f5fd0"; rr(-5,-moScale*0.95,10,moScale*0.95,3); x.fill();
+    x.fillStyle="#ffcf5a"; rr(-5,-moScale*0.95,10,11,3); x.fill();
+    x.fillStyle="#333"; x.beginPath(); x.moveTo(-5,0); x.lineTo(5,0); x.lineTo(0,11); x.closePath(); x.fill();
+    x.restore(); }
+  function drawMeow(cx,cy){ var s=moScale*0.55;
+    x.fillStyle="#9a9aa6"; rr(cx-s*0.7,cy-s*0.6,s*1.3,s*0.7,s*0.3); x.fill();
+    x.beginPath(); x.arc(cx-s*0.6,cy-s*0.75,s*0.42,0,7); x.fill();
+    x.beginPath(); x.moveTo(cx-s*0.95,cy-s*1.05); x.lineTo(cx-s*0.8,cy-s*1.45); x.lineTo(cx-s*0.6,cy-s*1.05); x.closePath(); x.fill();
+    x.beginPath(); x.moveTo(cx-s*0.6,cy-s*1.05); x.lineTo(cx-s*0.42,cy-s*1.45); x.lineTo(cx-s*0.25,cy-s*1.05); x.closePath(); x.fill();
+    x.strokeStyle="#9a9aa6"; x.lineWidth=s*0.24; x.lineCap="round"; x.beginPath(); x.moveTo(cx+s*0.55,cy-s*0.25); x.quadraticCurveTo(cx+s*1.05,cy-s*0.55,cx+s*0.9,cy-s*1.05); x.stroke();
+    x.fillStyle="#2a6e3a"; x.beginPath(); x.arc(cx-s*0.72,cy-s*0.78,s*0.08,0,7); x.arc(cx-s*0.48,cy-s*0.78,s*0.08,0,7); x.fill();
+    x.fillStyle="#e86a8a"; x.beginPath(); x.arc(cx-s*0.6,cy-s*0.62,s*0.06,0,7); x.fill(); }
+  function drawBowls(cx,cy){
+    drawMeow(cx, cy-moScale*0.35);
+    x.fillStyle="#e86a2a"; x.beginPath(); x.ellipse(cx-moScale*0.55,cy-4,moScale*0.42,moScale*0.18,0,0,7); x.fill();
+    x.fillStyle="#8a5a2a"; for(var k=0;k<6;k++){ x.beginPath(); x.arc(cx-moScale*0.55+(k%3-1)*moScale*0.18, cy-8-((k/3|0))*moScale*0.08, moScale*0.06,0,7); x.fill(); }
+    x.fillStyle="#6aa0d8"; x.beginPath(); x.ellipse(cx+moScale*0.55,cy-4,moScale*0.42,moScale*0.18,0,0,7); x.fill();
+    x.fillStyle="#9fd0ff"; x.beginPath(); x.ellipse(cx+moScale*0.55,cy-7,moScale*0.3,moScale*0.12,0,0,7); x.fill();
+    x.fillStyle="#7a5030"; x.font="bold 12px Trebuchet MS"; x.textAlign="center"; x.textBaseline="top"; x.fillText("food",cx-moScale*0.55,cy+6); x.fillText("water",cx+moScale*0.55,cy+6); }
+  function drawPerson2(cx,cy,col,sc){ var s=moScale*sc;
+    x.fillStyle="#243a66"; x.fillRect(cx-s*0.18,cy,s*0.14,s*0.45); x.fillRect(cx+s*0.04,cy,s*0.14,s*0.45);
+    x.fillStyle=col; rr(cx-s*0.28,cy-s*0.55,s*0.56,s*0.62,6); x.fill();
+    x.fillStyle="#f6c48a"; x.beginPath(); x.arc(cx,cy-s*0.76,s*0.24,0,7); x.fill();
+    x.fillStyle="#2a2018"; x.beginPath(); x.arc(cx,cy-s*0.84,s*0.24,Math.PI*1.05,Math.PI*1.95); x.fill();
+    x.fillStyle="#201008"; x.beginPath(); x.arc(cx-s*0.08,cy-s*0.76,s*0.035,0,7); x.arc(cx+s*0.08,cy-s*0.76,s*0.035,0,7); x.fill(); }
+  function drawJerseyIcon(cx,cy){ var s=moScale*0.9; x.fillStyle="#1f5fd0"; rr(cx-s*0.4,cy-s*0.35,s*0.8,s*0.7,6); x.fill();
+    x.fillStyle="#e8402a"; rr(cx-s*0.4,cy-s*0.35,s*0.1,s*0.7,6); x.fill(); rr(cx+s*0.3,cy-s*0.35,s*0.1,s*0.7,6); x.fill();
+    rr(cx-s*0.6,cy-s*0.3,s*0.24,s*0.28,5); x.fill(); rr(cx+s*0.36,cy-s*0.3,s*0.24,s*0.28,5); x.fill();
+    x.fillStyle="#fff"; x.font="900 "+Math.round(s*0.24)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("MO",cx,cy); }
+  function drawShortsIcon(cx,cy){ var s=moScale*0.9; x.fillStyle="#1f5fd0"; rr(cx-s*0.36,cy-s*0.25,s*0.72,s*0.5,5); x.fill(); x.fillStyle="#2a3246"; x.fillRect(cx-s*0.04,cy+s*0.05,s*0.08,s*0.2);
+    x.fillStyle="#e8402a"; x.fillRect(cx-s*0.3,cy-s*0.25,s*0.04,s*0.5); x.fillRect(cx+s*0.26,cy-s*0.25,s*0.04,s*0.5); }
+  function drawDressMo(cx,cy,jOn,sOn){ var s=moScale, skin=skC(), hair=hrC();
+    x.fillStyle=sOn?"#1f5fd0":"#d8d8d8"; x.fillRect(cx-s*0.26,cy,s*0.22,s*0.6); x.fillRect(cx+s*0.04,cy,s*0.22,s*0.6);
+    if(sOn){ x.fillStyle="#e8402a"; x.fillRect(cx-s*0.17,cy,s*0.03,s*0.6); x.fillRect(cx+s*0.14,cy,s*0.03,s*0.6); }
+    x.strokeStyle=skin; x.lineWidth=s*0.16; x.lineCap="round"; x.beginPath(); x.moveTo(cx-s*0.36,cy-s*0.45); x.lineTo(cx-s*0.6,cy-s*0.28); x.moveTo(cx+s*0.36,cy-s*0.45); x.lineTo(cx+s*0.6,cy-s*0.28); x.stroke();
+    if(jOn){ x.fillStyle="#1f5fd0"; rr(cx-s*0.4,cy-s*0.7,s*0.8,s*0.8,8); x.fill(); x.fillStyle="#e8402a"; rr(cx-s*0.4,cy-s*0.7,s*0.11,s*0.8,8); x.fill(); rr(cx+s*0.29,cy-s*0.7,s*0.11,s*0.8,8); x.fill(); x.fillStyle="#fff"; x.font="900 "+Math.round(s*0.25)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("MO",cx,cy-s*0.42); x.fillStyle="#ffcf5a"; x.fillText("1",cx,cy-s*0.14); }
+    else { x.fillStyle="#eef2f6"; rr(cx-s*0.33,cy-s*0.68,s*0.66,s*0.78,8); x.fill(); }
+    x.fillStyle=skin; x.beginPath(); x.arc(cx,cy-s*0.95,s*0.3,0,7); x.fill();
+    x.fillStyle=hair; x.beginPath(); x.arc(cx,cy-s*1.02,s*0.3,Math.PI*1.03,Math.PI*1.97); x.fill();
+    x.fillStyle="#201008"; x.beginPath(); x.arc(cx-s*0.1,cy-s*0.95,s*0.045,0,7); x.arc(cx+s*0.1,cy-s*0.95,s*0.045,0,7); x.fill();
+    x.fillStyle="#2a0a0a"; x.beginPath(); x.arc(cx,cy-s*0.84,s*0.09,0,Math.PI); x.fill(); }
+  function drawLockerInterior(){
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#2a3246"); g.addColorStop(1,"#39425a"); x.fillStyle=g; x.fillRect(0,0,W,H*0.74);
+    x.fillStyle="#5a6a84"; x.fillRect(0,H*0.74,W,H*0.26); x.fillStyle="#4a5572"; x.fillRect(0,H*0.74,W,5);
+    // lockers along the wall
+    var lockCols=["#e8402a","#1f6fd0","#2f9f5a","#8e44ad","#e0a52a"];
+    for(var lk=0;lk<5;lk++){ var lx=W*0.04+lk*W*0.14, ly=H*0.22, lw=W*0.12, lh=H*0.4;
+      x.fillStyle=lockCols[lk]; rr(lx,ly,lw,lh,4); x.fill(); x.fillStyle="#00000033"; x.fillRect(lx,ly+lh*0.42,lw,3);
+      x.fillStyle="#fff"; rr(lx+lw*0.2,ly+6,lw*0.6,10,2); x.fill(); // nameplate
+      x.fillStyle="#cfd8e4"; x.beginPath(); x.arc(lx+lw-8,ly+lh*0.5,3,0,7); x.fill(); } // handle
+    // bench
+    x.fillStyle="#7a5a3a"; rr(W*0.1,H*0.72,W*0.5,10,4); x.fill(); x.fillStyle="#5a4028"; x.fillRect(W*0.14,H*0.73,8,H*0.06); x.fillRect(W*0.52,H*0.73,8,H*0.06);
+    // speaker on a shelf (right)
+    var spx=W*0.8, spy=H*0.34; x.fillStyle="#1a1d26"; rr(spx-moScale*0.5,spy-moScale*0.7,moScale,moScale*1.4,8); x.fill();
+    x.fillStyle=(mode==="lockermusic")?"#3fd06a":"#333"; x.beginPath(); x.arc(spx,spy-moScale*0.25,moScale*0.3,0,7); x.fill(); x.beginPath(); x.arc(spx,spy+moScale*0.4,moScale*0.2,0,7); x.fill();
+    if(mode==="lockermusic"){ x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.18); x.strokeStyle="#ffcf5a"; x.lineWidth=3; rr(spx-moScale*0.55,spy-moScale*0.75,moScale*1.1,moScale*1.5,8); x.stroke(); x.restore(); }
+  }
+  function drawPlayerDoor(){
+    var inside=(mode==="playerdoordone");
+    var g=x.createLinearGradient(0,0,0,H); if(inside){ g.addColorStop(0,"#dfe8f2"); g.addColorStop(1,"#c4d0de"); } else { g.addColorStop(0,"#15356e"); g.addColorStop(1,"#0e2246"); } x.fillStyle=g; x.fillRect(0,0,W,H);
+    if(!inside){
+      // building wall
+      x.fillStyle="#1a2a4a"; x.fillRect(0,H*0.15,W,H*0.63);
+      x.fillStyle="#2a3a5a"; x.fillRect(0,H*0.78,W,H*0.22);
+      // glass door frame
+      var dw=W*0.5,dh=H*0.5,dx=W/2-dw/2,dy=H*0.26;
+      x.fillStyle="#3a4a6a"; rr(dx-10,dy-10,dw+20,dh+16,8); x.fill();
+      // interior glow behind glass
+      x.fillStyle="#cfe0f5"; x.fillRect(dx,dy,dw,dh);
+      // two glass panels slide apart by pdDoor
+      var half=dw/2, op=pdDoor*half;
+      x.fillStyle="rgba(120,170,220,0.7)"; x.fillRect(dx, dy, half-op, dh);
+      x.fillStyle="rgba(100,150,205,0.7)"; x.fillRect(dx+half+op, dy, half-op, dh);
+      // team logo on the glass (#102)
+      if(pdDoor<0.5){ x.fillStyle="#13306a"; x.beginPath(); x.arc(W/2,dy+dh*0.4,36,0,7); x.fill(); x.strokeStyle="#ffcf5a"; x.lineWidth=3; x.beginPath(); x.arc(W/2,dy+dh*0.4,36,0,7); x.stroke(); x.fillStyle="#fff"; x.font="900 20px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("MO",W/2,dy+dh*0.4); }
+      // sign
+      x.fillStyle="#13306a"; rr(dx-10,dy-40,dw+20,28,5); x.fill(); x.fillStyle="#ffcf5a"; x.font="bold 14px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("PLAYERS ENTRANCE", W/2, dy-26);
+      // badge reader (#103) — glows in phase 0, green when tapped
+      var rx=dx+dw+30, ry=dy+dh*0.5; x.fillStyle=(pdPhase>=1)?"#3fd06a":"#2a3a5a"; rr(rx-24,ry-32,48,64,8); x.fill();
+      if(pdPhase===0){ x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.18); x.strokeStyle="#ffcf5a"; x.lineWidth=3; rr(rx-24,ry-32,48,64,8); x.stroke(); x.restore(); }
+      x.fillStyle="#fff"; x.font="20px serif"; x.fillText("🪪",rx,ry-4); x.fillStyle="#cfe0ff"; x.font="bold 10px Trebuchet MS"; x.fillText("BADGE",rx,ry+18);
+      drawMo(dx-moScale*1.1, H*0.74, false);
+    } else { // inside: bright hallway
+      x.fillStyle="#5a6a84"; x.fillRect(0,H*0.72,W,H*0.28);
+      for(var cl=0;cl<4;cl++){ x.fillStyle="#fff"; x.globalAlpha=0.6; rr(W*0.08+cl*W*0.24,H*0.08,W*0.14,8,3); x.fill(); } x.globalAlpha=1;
+      drawMo(W*0.4, H*0.74, false);
+    }
+  }
+  function drawStairs(){
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#3a4254"); g.addColorStop(1,"#2a3040"); x.fillStyle=g; x.fillRect(0,0,W,H);
+    // "busy elevator" hint sign
+    x.fillStyle="#13306a"; rr(W*0.3,H*0.08,W*0.4,30,6); x.fill(); x.fillStyle="#ffcf5a"; x.font="bold 14px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("🛗 BUSY — TAKE THE STAIRS", W/2, H*0.095);
+    var N=8, sw=W*0.1, sh=H*0.072, baseX=W*0.1, baseY=H*0.86;
+    for(var i=0;i<N;i++){ var sx=baseX+i*sw, sy=baseY-i*sh; x.fillStyle=i%2?"#6a7488":"#7a8498"; x.fillRect(sx,sy,W,sh+2); x.fillStyle="#565f70"; x.fillRect(sx,sy,W,4); }
+    // handrail
+    x.strokeStyle="#9aa6b8"; x.lineWidth=5; x.beginPath(); x.moveTo(baseX,baseY+10); x.lineTo(baseX+N*sw,baseY-N*sh+10); x.stroke();
+    // Mo climbing at stairProg
+    var si=stairProg*(N-1); var mx=baseX+si*sw+sw*0.5, my=baseY-si*sh;
+    drawMo(mx, my, false, stairHold?anim*0.35:0);
+  }
+  function drawLockerHall(){
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#2a3245"); g.addColorStop(1,"#39465e"); x.fillStyle=g; x.fillRect(0,0,W,H*0.72);
+    x.fillStyle="#5a6a84"; x.fillRect(0,H*0.72,W,H*0.28); x.fillStyle="#4a5572"; x.fillRect(0,H*0.72,W,5);
+    // ceiling lights
+    for(var cl=0;cl<4;cl++){ x.fillStyle="#cfe6ff"; x.globalAlpha=0.5; rr(W*0.08+cl*W*0.24,H*0.08,W*0.14,7,3); x.fill(); } x.globalAlpha=1;
+    // team photos on wall
+    for(var ph=0;ph<3;ph++){ x.fillStyle="#1f2a40"; rr(W*0.1+ph*W*0.26,H*0.2,W*0.16,H*0.12,4); x.fill(); x.strokeStyle="#ffcf5a"; x.lineWidth=2; rr(W*0.1+ph*W*0.26,H*0.2,W*0.16,H*0.12,4); x.stroke(); }
+    // locker room door at right
+    var dw=W*0.2,dh=H*0.4,dx=lockerDoorX-dw/2,dy=floorY-dh;
+    x.fillStyle="#7a5a3a"; rr(dx-6,dy-6,dw+12,dh+6,6); x.fill(); x.fillStyle="#9a7a4a"; rr(dx,dy,dw,dh,4); x.fill();
+    x.fillStyle="#c9a86a"; x.beginPath(); x.arc(dx+dw-14,dy+dh*0.5,5,0,7); x.fill();
+    x.fillStyle="#13306a"; rr(dx-6,dy-34,dw+12,26,5); x.fill(); x.fillStyle="#fff"; x.font="bold 13px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("LOCKER ROOM", lockerDoorX, dy-21);
+  }
+  function drawElevRide(){
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#cfd8e4"); g.addColorStop(1,"#b4bfce"); x.fillStyle=g; x.fillRect(0,0,W,H);
+    // car walls + handrail
+    x.fillStyle="#9aa6b6"; x.fillRect(0,H*0.2,W,8); x.fillStyle="#8894a6"; x.fillRect(0,H*0.5,W,6);
+    x.fillStyle="#eef3f8"; rr(W*0.3,H*0.06,W*0.4,12,4); x.fill(); // ceiling light
+    // floor indicator panel (lights up)
+    var fl = ridePhase<2?"G":FLOORS[Math.min(3,Math.floor(rideY))];
+    x.fillStyle="#12203e"; rr(W/2-50,H*0.1,100,40,8); x.fill(); x.fillStyle="#ffcf5a"; x.font="900 26px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("▲ "+fl, W/2, H*0.1+20);
+    // doors (open in phase1 and phase3)
+    var openD=(ridePhase===1||ridePhase===3)?1:0;
+    // Mo + little sibling inside
+    drawMo(W*0.32, H*0.82, false);
+    drawPerson2(W*0.5, H*0.82, "#e8545a", 0.7); // little sibling close
+    if(ridePhase===0){ // floor buttons
+      for(var fi=0;fi<4;fi++){ var fbx=W*0.78, fby=H*0.32+fi*H*0.1; var isLR=(FLOORS[3-fi]==="LR"); x.fillStyle=isLR?"#3fd06a":"#5a6374"; x.beginPath(); x.arc(fbx,fby,moScale*0.42,0,7); x.fill(); if(isLR){ x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.16); x.strokeStyle="#fff"; x.lineWidth=3; x.beginPath(); x.arc(fbx,fby,moScale*0.55,0,7); x.stroke(); x.restore(); } x.fillStyle="#fff"; x.font="900 14px Trebuchet MS"; x.fillText(FLOORS[3-fi],fbx,fby+1); } }
+    else if(ridePhase===1){ // teammate running in + OPEN button
+      drawPerson2(teammateX, H*0.82, "#1f6fd0", 0.95);
+      var obx=W*0.8, oby=H*0.82; x.fillStyle=doorHold?"#3fd06a":"#5a6374"; rr(obx-W*0.14,oby-28,W*0.28,56,12); x.fill(); x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.16); x.strokeStyle="#fff"; x.lineWidth=3; rr(obx-W*0.14,oby-28,W*0.28,56,12); x.stroke(); x.restore(); x.fillStyle="#fff"; x.font="900 18px Trebuchet MS"; x.fillText("OPEN", obx, oby); }
+  }
+  function drawElevator(){
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#222838"); g.addColorStop(1,"#30374a"); x.fillStyle=g; x.fillRect(0,0,W,H);
+    x.fillStyle="#3a4254"; x.fillRect(0,H*0.78,W,H*0.22); x.fillStyle="#2f3545"; x.fillRect(0,H*0.78,W,5);
+    // elevator frame
+    var ex=W*0.42, ey=H*0.26, ew=W*0.46, eh=H*0.5;
+    x.fillStyle="#8a909c"; rr(ex-10,ey-10,ew+20,eh+20,8); x.fill();
+    // interior
+    x.fillStyle="#c9d4e0"; x.fillRect(ex,ey,ew,eh);
+    x.fillStyle="#eef3f8"; x.fillRect(ex+ew*0.3,ey+8,ew*0.4,10); // ceiling light
+    // doors (slide apart by elevDoor)
+    var half=ew/2, open=elevDoor*half;
+    x.fillStyle="#6a7384"; x.fillRect(ex, ey, half-open, eh);
+    x.fillStyle="#5a6374"; x.fillRect(ex+half+open, ey, half-open, eh);
+    x.strokeStyle="#4a5162"; x.lineWidth=2; x.strokeRect(ex,ey,ew,eh);
+    // up button
+    var bx=ex+ew+28, by=ey+eh*0.4; x.fillStyle=(elevStage===0)?"#3fd06a":"#2a3040"; x.beginPath(); x.arc(bx,by,moScale*0.42,0,7); x.fill();
+    if(elevStage===0){ x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.18); x.strokeStyle="#fff"; x.lineWidth=3; x.beginPath(); x.arc(bx,by,moScale*0.55,0,7); x.stroke(); x.restore(); }
+    x.fillStyle="#fff"; x.font="900 "+Math.round(moScale*0.5)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("▲",bx,by+2);
+    // Mo: beside the elevator, or stepping in
+    if(mode==="elevatordone"||elevStage>=2 && elevDoor>=1){ drawMo(ex+ew*0.5, H*0.74, false); }
+    else { drawMo(ex-moScale*1.4, H*0.74, false); }
+  }
+  function drawGarage(){
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#1a2030"); g.addColorStop(1,"#2a3040"); x.fillStyle=g; x.fillRect(0,0,W,H);
+    // ceiling lights
+    for(var cl=0;cl<4;cl++){ x.fillStyle="#cfe6ff"; x.globalAlpha=0.5; rr(W*0.1+cl*W*0.25, H*0.08, W*0.14, 8, 4); x.fill(); } x.globalAlpha=1;
+    // pillars
+    x.fillStyle="#3a4254"; for(var pz=0;pz<3;pz++){ x.fillRect(W*0.12+pz*W*0.38, H*0.3, W*0.07, H*0.45); }
+    // floor
+    x.fillStyle="#464c5a"; x.fillRect(0,H*0.78,W,H*0.22);
+    x.fillStyle="#3a4150"; x.fillRect(0,H*0.78,W,5);
+    // parking spots painted on floor
+    var spotY=H*0.68, sw=W*0.2, sh=H*0.14;
+    for(var sp=0;sp<4;sp++){ var sx=W*0.06+sp*W*0.23; x.strokeStyle="#ffd24a"; x.lineWidth=3; x.strokeRect(sx,spotY,sw,sh); }
+    // MO reserved spot (glowing) — at garageSpotX
+    var mx=garageSpotX-sw/2; x.save(); x.globalAlpha=0.3+0.25*Math.sin(anim*0.12); x.fillStyle="#37e0ff"; x.fillRect(mx,spotY,sw,sh); x.restore();
+    x.strokeStyle="#37e0ff"; x.lineWidth=4; x.strokeRect(mx,spotY,sw,sh);
+    x.fillStyle="#13306a"; rr(garageSpotX-W*0.08,spotY-26,W*0.16,22,5); x.fill(); x.fillStyle="#fff"; x.font="900 14px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("MO · #1", garageSpotX, spotY-15);
+  }
+  function drawFollow(){
+    var sky=x.createLinearGradient(0,0,0,H*0.5); sky.addColorStop(0,"#3a3f55"); sky.addColorStop(1,"#55597a"); x.fillStyle=sky; x.fillRect(0,0,W,H*0.5);
+    // garage/building wall behind
+    x.fillStyle="#2a2f42"; x.fillRect(0,H*0.3,W,H*0.2);
+    x.fillStyle="#1a1d2e"; for(var gi=0;gi<5;gi++){ x.fillRect(W*0.08+gi*W*0.18, H*0.34, W*0.1, H*0.1); } // dark garage openings
+    // ground
+    x.fillStyle="#4a4d55"; x.fillRect(0,H*0.5,W,H*0.5);
+    // forking road: left ramp and right ramp from a central point
+    x.fillStyle="#34363e"; x.beginPath(); x.moveTo(W*0.44,H*0.5); x.lineTo(W*0.56,H*0.5); x.lineTo(W*0.78,H*0.72); x.lineTo(W*0.5,H*0.72); x.closePath(); x.fill();
+    x.beginPath(); x.moveTo(W*0.44,H*0.5); x.lineTo(W*0.56,H*0.5); x.lineTo(W*0.5,H*0.72); x.lineTo(W*0.22,H*0.72); x.closePath(); x.fill();
+    // the PLAYERS ONLY sign pointing followDir
+    x.fillStyle="#2a2f3a"; x.fillRect(W/2-3,H*0.4,6,H*0.12);
+    x.fillStyle="#13306a"; rr(W/2-W*0.24,H*0.33,W*0.48,H*0.1,8); x.fill(); x.strokeStyle="#ffcf5a"; x.lineWidth=2; rr(W/2-W*0.24,H*0.33,W*0.48,H*0.1,8); x.stroke();
+    x.fillStyle="#fff"; x.font="900 18px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("PLAYERS ONLY", W/2, H*0.36);
+    x.fillStyle="#ffcf5a"; x.font="900 30px Trebuchet MS"; x.fillText(followDir>0?"➡":"⬅", W/2, H*0.405);
+    // the car at the fork
+    drawCarSide(W/2, H*0.68);
+  }
+  function drawDriveUp(){
+    var dusk=driveProg>0.6; var sky=x.createLinearGradient(0,0,0,H*0.6);
+    if(dusk){ sky.addColorStop(0,"#ff9a5a"); sky.addColorStop(0.5,"#e86a8a"); sky.addColorStop(1,"#6a4a8a"); } else { sky.addColorStop(0,"#7ec0ee"); sky.addColorStop(1,"#d6ecf8"); }
+    x.fillStyle=sky; x.fillRect(0,0,W,H*0.6);
+    // the dome GROWS as you drive to it
+    var dz=0.3+1.4*driveProg; var dcx=W/2, dcy=H*0.58, dw=Math.min(W*0.9,W*0.3*dz), dh=Math.min(H*0.3,H*0.1*dz);
+    var glow="hsl("+((anim*2)%360)+",80%,60%)";
+    x.save(); x.shadowColor=glow; x.shadowBlur=24; x.fillStyle="#0e1830"; x.beginPath(); x.ellipse(dcx,dcy,dw/2,dh,0,Math.PI,0); x.fill(); x.restore();
+    for(var r2=0;r2<4;r2++){ x.strokeStyle=glow; x.globalAlpha=0.7-r2*0.15; x.lineWidth=3; x.beginPath(); x.ellipse(dcx,dcy,dw/2*(0.5+r2*0.17),dh*(0.5+r2*0.17),0,Math.PI,0); x.stroke(); } x.globalAlpha=1;
+    x.fillStyle="#ffcf5a"; x.font="bold "+Math.round(10+14*driveProg)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("MO INTUIT DOME", dcx, dcy-dh*0.5);
+    // ground
+    x.fillStyle="#6a7a4a"; x.fillRect(0,H*0.6,W,H*0.4);
+    // road (perspective)
+    x.fillStyle="#3a3a42"; x.beginPath(); x.moveTo(W*0.4,H*0.6); x.lineTo(W*0.6,H*0.6); x.lineTo(W*0.92,H); x.lineTo(W*0.08,H); x.closePath(); x.fill();
+    x.strokeStyle="#ffd24a"; x.lineWidth=5; x.setLineDash([26,22]); x.lineDashOffset=-(anim*7)%48; x.beginPath(); x.moveTo(W/2,H*0.6); x.lineTo(W/2,H); x.stroke(); x.setLineDash([]);
+    // Players' Entrance gate (appears near the end)
+    if(driveProg>0.55){ var ga=(driveProg-0.55)/0.45; var gy=H*0.5-ga*H*0.1, gw=W*(0.3+ga*0.3);
+      x.fillStyle="#2a2f3a"; x.fillRect(W/2-gw/2-8, gy-60, 12, 60); x.fillRect(W/2+gw/2-4, gy-60, 12, 60); // posts
+      x.fillStyle="#13306a"; rr(W/2-gw/2-8, gy-82, gw+20, 24, 5); x.fill(); x.fillStyle="#ffcf5a"; x.font="bold "+Math.round(10+ga*6)+"px Trebuchet MS"; x.textBaseline="middle"; x.fillText("PLAYERS ENTRANCE", W/2, gy-70);
+      // arm: down while driving, lifts when done
+      var armUp=(mode==="driveupdone"); x.save(); x.translate(W/2-gw/2-2, gy-14); x.rotate(armUp?-1.3:0); x.fillStyle="#e8402a"; x.fillRect(0,-6,gw*0.9,10); for(var s2=0;s2<5;s2++){ x.fillStyle=s2%2?"#fff":"#e8402a"; x.fillRect(s2*gw*0.18,-6,gw*0.09,10); } x.restore(); }
+    // the car driving up (bottom center, bobbing)
+    drawCarSide(W/2, H*0.9+Math.sin(anim*0.3)*(driveHold?2:0));
+  }
+  function drawStreet(){
+    var sky=x.createLinearGradient(0,0,0,H*0.55); sky.addColorStop(0,"#7ec0ee"); sky.addColorStop(1,"#d6ecf8"); x.fillStyle=sky; x.fillRect(0,0,W,H*0.55);
+    x.save(); x.shadowColor="#37e0ff"; x.shadowBlur=12; x.fillStyle="#17407a"; var dw=W*0.2,dh=H*0.055; x.beginPath(); x.ellipse(W*0.8,H*0.45,dw/2,dh,0,Math.PI,0); x.fill(); x.restore();
+    x.fillStyle="#ffcf5a"; x.font="bold 10px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("MO DOME",W*0.8,H*0.43);
+    var hy=H*0.30; var hc=["#d98b6a","#e8c06a","#9ac47a","#7ab0d8","#c79ad8","#e0a0a0"];
+    for(var i=0;i<6;i++){ var hx=i*W*0.19-10; x.fillStyle=hc[i%6]; x.fillRect(hx,hy,W*0.15,H*0.22); x.fillStyle="#8a5a3a"; x.beginPath(); x.moveTo(hx-4,hy); x.lineTo(hx+W*0.075,hy-24); x.lineTo(hx+W*0.15+4,hy); x.closePath(); x.fill(); x.fillStyle="#5a3a2a"; x.fillRect(hx+W*0.055,hy+H*0.11,W*0.035,H*0.11); }
+    x.fillStyle="#6ab04a"; x.fillRect(0,H*0.52,W,H*0.055);
+    x.fillStyle="#cfc9bf"; x.fillRect(0,H*0.575,W,H*0.165);
+    x.fillStyle="#44474e"; x.fillRect(0,H*0.74,W,H*0.26);
+    x.strokeStyle="#ffd24a"; x.lineWidth=4; x.setLineDash([24,20]); x.lineDashOffset=-(anim*3)%44; x.beginPath(); x.moveTo(0,H*0.87); x.lineTo(W,H*0.87); x.stroke(); x.setLineDash([]); }
+  function drawMirror(m){ var w=moScale*1.3, h=moScale*0.85;
+    x.fillStyle="#2a2f3a"; rr(m.x-w/2,m.y-h/2,w,h,10); x.fill();
+    x.fillStyle=m.checked?"#8fd0a0":"#9fd0ff"; rr(m.x-w/2+5,m.y-h/2+5,w-10,h-10,7); x.fill();
+    x.fillStyle="#2a2f3a"; x.font="bold 12px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(m.label, m.x, m.y);
+    if(m.checked){ x.fillStyle="#3fd06a"; x.beginPath(); x.arc(m.x+w*0.38,m.y-h*0.38,moScale*0.22,0,7); x.fill(); x.fillStyle="#fff"; x.font="bold 16px Trebuchet MS"; x.fillText("✓",m.x+w*0.38,m.y-h*0.38); }
+    else { x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.15); x.strokeStyle="#ffcf5a"; x.lineWidth=3; rr(m.x-w/2,m.y-h/2,w,h,10); x.stroke(); x.restore(); } }
+  function songSlots(){ var y0=H*0.26, gap=moScale*1.15; return [
+    {y:y0, label:"🎵 Sleepy Lullaby", correct:false},
+    {y:y0+gap, label:"🏀 MO MVP CLIPS", correct:true},
+    {y:y0+gap*2, label:"🌧️ Quiet Rain", correct:false} ]; }
+  function drawSongPanel(){ var px=W*0.12, py=H*0.16, pw=W*0.76, ph=moScale*4.6;
+    x.fillStyle="#12203e"; rr(px,py,pw,ph,14); x.fill(); x.strokeStyle="#37e0ff"; x.lineWidth=3; rr(px,py,pw,ph,14); x.stroke();
+    x.fillStyle="#ffcf5a"; x.font="bold 18px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("🎶 Car Playlist", W/2, py+22);
+    var sl=songSlots();
+    for(var i=0;i<sl.length;i++){ var r=sl[i]; var rx=px+14, rw=pw-28, rh=moScale*0.9;
+      x.fillStyle=r.correct?"#e8402a":"#243a5a"; rr(rx,r.y-rh/2,rw,rh,10); x.fill();
+      if(r.correct){ x.fillStyle="#1f5fd0"; rr(rx,r.y-rh/2,rw*0.2,rh,10); x.fill(); x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.14); x.strokeStyle="#ffcf5a"; x.lineWidth=3; rr(rx,r.y-rh/2,rw,rh,10); x.stroke(); x.restore(); }
+      x.fillStyle="#fff"; x.font="bold 16px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(r.label, W/2, r.y); } }
+  function drawPerson(cx,cy,col,tapped,num){ var s=moScale*0.85;
+    x.fillStyle="#243a66"; x.fillRect(cx-s*0.2,cy,s*0.16,s*0.5); x.fillRect(cx+s*0.04,cy,s*0.16,s*0.5);
+    x.fillStyle=col; rr(cx-s*0.32,cy-s*0.6,s*0.64,s*0.68,7); x.fill();
+    x.fillStyle="#f6c48a"; x.beginPath(); x.arc(cx,cy-s*0.82,s*0.26,0,7); x.fill();
+    x.fillStyle="#2a2018"; x.beginPath(); x.arc(cx,cy-s*0.9,s*0.26,Math.PI*1.05,Math.PI*1.95); x.fill();
+    x.fillStyle="#201008"; x.beginPath(); x.arc(cx-s*0.09,cy-s*0.82,s*0.04,0,7); x.arc(cx+s*0.09,cy-s*0.82,s*0.04,0,7); x.fill();
+    if(tapped){ x.fillStyle="#3fd06a"; x.beginPath(); x.arc(cx,cy-s*1.3,s*0.26,0,7); x.fill(); x.fillStyle="#fff"; x.font="900 "+Math.round(s*0.3)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(num,cx,cy-s*1.3); }
+    else { x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.15); x.strokeStyle="#ffcf5a"; x.lineWidth=3; x.beginPath(); x.arc(cx,cy-s*0.5,s*0.7,0,7); x.stroke(); x.restore(); } }
+  function drawJacket(cx,cy){ var s=moScale*1.0; x.fillStyle="#2f8f5a";
+    rr(cx-s*0.4,cy-s*0.35,s*0.8,s*0.7,8); x.fill(); // body
+    rr(cx-s*0.6,cy-s*0.3,s*0.24,s*0.5,6); x.fill(); rr(cx+s*0.36,cy-s*0.3,s*0.24,s*0.5,6); x.fill(); // sleeves
+    x.fillStyle="#237045"; rr(cx-s*0.08,cy-s*0.35,s*0.16,s*0.7,3); x.fill(); // zipper
+    x.fillStyle="#fff"; x.font="900 "+Math.round(s*0.2)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("MO",cx+s*0.22,cy-s*0.1); }
+  function drawTrunkLid(cx,cy,prog){ var w=moScale*2.0,h=moScale*0.75; var open=1-prog;
+    x.save(); x.translate(cx-w*0.42,cy-h); x.rotate(-open*1.1); x.fillStyle="#c6361f"; rr(0,-h*0.5,w*0.5,h*0.5,4); x.fill();
+    x.fillStyle="#ffcf5a"; x.beginPath(); x.arc(w*0.42,-h*0.25,4,0,7); x.fill(); x.restore(); }
+  function drawFoamFinger(cx,cy){ var s=moScale*1.0;
+    x.fillStyle="#e8402a"; rr(cx-s*0.24,cy-s*0.2,s*0.48,s*0.65,8); x.fill();
+    rr(cx-s*0.2,cy-s*0.85,s*0.28,s*0.72,7); x.fill();
+    x.fillStyle="#c6361f"; rr(cx+s*0.08,cy-s*0.05,s*0.16,s*0.2,4); x.fill();
+    x.fillStyle="#fff"; x.font="900 "+Math.round(s*0.34)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("1",cx-s*0.06,cy+s*0.16); }
+  function drawMiniSign(cx,cy){ var w=moScale*1.2,h=moScale*0.75; x.fillStyle="#fff"; rr(cx-w/2,cy-h/2,w,h,5); x.fill(); x.strokeStyle="#c9b48a"; x.lineWidth=2; rr(cx-w/2,cy-h/2,w,h,5); x.stroke();
+    x.fillStyle="#1f5fd0"; x.font="900 "+Math.round(h*0.3)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("GOOD LUCK",cx,cy-h*0.16); x.fillStyle="#e8402a"; x.fillText("CLIPS!",cx,cy+h*0.2); }
+  function drawFlag(cx,cy){ var s=moScale*1.0; var wv=Math.sin(anim*0.2)*4;
+    x.strokeStyle="#6a4a2a"; x.lineWidth=3; x.beginPath(); x.moveTo(cx,cy); x.lineTo(cx,cy-s); x.stroke();
+    x.fillStyle="#1f5fd0"; x.beginPath(); x.moveTo(cx,cy-s); x.lineTo(cx+s*0.7,cy-s*0.86+wv); x.lineTo(cx,cy-s*0.55); x.closePath(); x.fill();
+    x.fillStyle="#e8402a"; x.beginPath(); x.moveTo(cx,cy-s*0.78); x.lineTo(cx+s*0.5,cy-s*0.7+wv); x.lineTo(cx,cy-s*0.55); x.closePath(); x.fill();
+    x.fillStyle="#fff"; x.font="900 "+Math.round(s*0.2)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("MO",cx+s*0.22,cy-s*0.76); }
+  function drawHolders(){ var ty=H*0.5; x.fillStyle="#3a3f4a"; rr(W*0.1,ty,W*0.8,moScale*1.1,12); x.fill(); x.fillStyle="#2a2f38"; rr(W*0.1,ty,W*0.8,10,8); x.fill();
+    x.fillStyle="#555"; x.font="bold 13px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle";
+    for(var i=0;i<holders.length;i++){ var hd=holders[i]; x.fillStyle="#1a1d24"; x.beginPath(); x.ellipse(hd.x,hd.y,moScale*0.34,moScale*0.16,0,0,7); x.fill();
+      if(hd.filled){ drawBottle(hd.x, hd.y-moScale*0.5, 1); }
+      else { x.save(); x.globalAlpha=0.35+0.3*Math.sin(anim*0.14+i); x.strokeStyle="#ffcf5a"; x.lineWidth=2; x.beginPath(); x.ellipse(hd.x,hd.y,moScale*0.34,moScale*0.16,0,0,7); x.stroke(); x.restore(); } } }
+  function drawCooler(cx,cy,filled){ var w=moScale*1.4,h=moScale*0.9;
+    x.fillStyle="#2f8fd0"; rr(cx-w/2,cy-h,w,h,8); x.fill();
+    x.fillStyle="#1f6fb0"; rr(cx-w/2,cy-h*0.55,w,h*0.12,4); x.fill();
+    x.fillStyle="#d8ecff"; rr(cx-w/2,cy-h-h*0.22,w,h*0.3,6); x.fill(); // open lid
+    x.fillStyle="#fff"; x.font="bold "+Math.round(moScale*0.26)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("🧊 MO",cx,cy-h*0.28);
+    x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.14); x.strokeStyle="#ffcf5a"; x.lineWidth=3; rr(cx-w/2,cy-h-h*0.22,w,h*0.5,6); x.stroke(); x.restore(); }
+  function drawSnackBag(cx,cy){ var w=moScale*1.3,h=moScale*1.5;
+    x.fillStyle="#e8a02a"; rr(cx-w/2,cy-h*0.4,w,h,10); x.fill();
+    x.fillStyle="#c6801f"; rr(cx-w/2,cy-h*0.4,w,h*0.18,10); x.fill();
+    for(var z=0;z<5;z++){ x.fillStyle=z%2?"#f0b84a":"#e8a02a"; x.fillRect(cx-w/2, cy-h*0.1+z*h*0.14, w, h*0.07); }
+    x.fillStyle="#fff"; x.font="900 "+Math.round(moScale*0.26)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("SNACKS",cx,cy+h*0.3); }
+  function drawColorCar(cx,cy,col){ var w=moScale*1.6,h=moScale*0.6;
+    x.fillStyle=col; rr(cx-w*0.28,cy-h*1.6,w*0.56,h*0.85,7); x.fill();
+    x.fillStyle="#bfe3ff"; rr(cx-w*0.23,cy-h*1.5,w*0.46,h*0.6,4); x.fill();
+    x.fillStyle=col; rr(cx-w/2,cy-h,w,h,9); x.fill();
+    x.fillStyle="#1a1a1a"; x.beginPath(); x.arc(cx-w*0.28,cy,h*0.5,0,7); x.arc(cx+w*0.28,cy,h*0.5,0,7); x.fill();
+    x.fillStyle="#9aa0a6"; x.beginPath(); x.arc(cx-w*0.28,cy,h*0.2,0,7); x.arc(cx+w*0.28,cy,h*0.2,0,7); x.fill(); }
+  function drawCarSide(cx,cy){ var w=moScale*2.0,h=moScale*0.75;
+    x.fillStyle="#c6361f"; rr(cx-w*0.3,cy-h*1.7,w*0.6,h*0.9,8); x.fill();
+    x.fillStyle="#bfe3ff"; rr(cx-w*0.25,cy-h*1.6,w*0.5,h*0.66,5); x.fill();
+    x.fillStyle="#e8402a"; rr(cx-w/2,cy-h,w,h,10); x.fill();
+    x.fillStyle="#1a1a1a"; x.beginPath(); x.arc(cx-w*0.28,cy,h*0.52,0,7); x.arc(cx+w*0.28,cy,h*0.52,0,7); x.fill();
+    x.fillStyle="#9aa0a6"; x.beginPath(); x.arc(cx-w*0.28,cy,h*0.22,0,7); x.arc(cx+w*0.28,cy,h*0.22,0,7); x.fill();
+    x.fillStyle="#ffcf5a"; x.font="bold "+Math.round(moScale*0.26)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("MO",cx,cy-h*0.5); }
+  function drawArff(cx,cy){ var s=moScale*0.55;
+    x.fillStyle="#f6f6f6"; rr(cx-s*0.8,cy-s*0.6,s*1.4,s*0.6,s*0.3); x.fill();
+    x.beginPath(); x.arc(cx-s*0.9,cy-s*0.7,s*0.42,0,7); x.fill();
+    x.fillStyle="#dcdcdc"; x.save(); x.translate(cx-s*1.1,cy-s*0.85); x.rotate(0.4); x.beginPath(); x.ellipse(0,0,s*0.16,s*0.3,0,0,7); x.fill(); x.restore();
+    x.strokeStyle="#f6f6f6"; x.lineWidth=s*0.22; x.lineCap="round"; var sw2=Math.sin(walkPhase)*s*0.25;
+    x.beginPath(); x.moveTo(cx-s*0.5,cy-s*0.05); x.lineTo(cx-s*0.5,cy+s*0.45+sw2); x.moveTo(cx+s*0.35,cy-s*0.05); x.lineTo(cx+s*0.35,cy+s*0.45-sw2); x.stroke();
+    x.beginPath(); x.moveTo(cx+s*0.6,cy-s*0.45); x.lineTo(cx+s*0.95,cy-s*0.85); x.stroke();
+    x.strokeStyle="#c8c8c8"; x.lineWidth=1.5; x.beginPath(); x.arc(cx-s*0.9,cy-s*0.7,s*0.42,0,7); x.stroke();
+    x.fillStyle="#201008"; x.beginPath(); x.arc(cx-s*0.95,cy-s*0.72,s*0.07,0,7); x.fill(); x.beginPath(); x.arc(cx-s*1.28,cy-s*0.58,s*0.09,0,7); x.fill(); }
+  function drawCamera(cx,cy,charging){ var w=moScale*1.3,h=moScale*0.9;
+    x.fillStyle="#2a2f3a"; rr(cx-w/2,cy-h,w,h,8); x.fill();
+    x.fillStyle="#4a5160"; rr(cx-w*0.18,cy-h*1.25,w*0.36,h*0.3,4); x.fill(); // viewfinder bump
+    x.fillStyle="#111"; x.beginPath(); x.arc(cx,cy-h*0.5,h*0.32,0,7); x.fill(); x.fillStyle="#3a7bd8"; x.beginPath(); x.arc(cx,cy-h*0.5,h*0.2,0,7); x.fill();
+    // charge port (plug 0 spot)
+    camPort.x=cx-w*0.5-4; camPort.y=cy-h*0.5; x.fillStyle=charging?"#3fd06a":"#888"; rr(cx-w*0.5-8,cy-h*0.6,8,h*0.2,2); x.fill();
+    if(charging){ x.fillStyle="#3fd06a"; x.font="bold "+Math.round(moScale*0.4)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("⚡",cx,cy-h*0.5); } }
+  function drawOutlet(cx,cy,on){ x.fillStyle="#eee"; rr(cx-moScale*0.3,cy-moScale*0.4,moScale*0.6,moScale*0.8,6); x.fill(); x.strokeStyle="#bbb"; x.lineWidth=2; rr(cx-moScale*0.3,cy-moScale*0.4,moScale*0.6,moScale*0.8,6); x.stroke();
+    x.fillStyle=on?"#3fd06a":"#555"; x.fillRect(cx-moScale*0.1,cy-moScale*0.18,moScale*0.05,moScale*0.14); x.fillRect(cx+moScale*0.05,cy-moScale*0.18,moScale*0.05,moScale*0.14); x.beginPath(); x.arc(cx,cy+moScale*0.08,moScale*0.04,0,7); x.fill(); }
+  function drawPlug(cx,cy,placed){ x.fillStyle=placed?"#3fd06a":"#f2c84a"; rr(cx-moScale*0.22,cy-moScale*0.16,moScale*0.44,moScale*0.32,5); x.fill();
+    x.fillStyle="#999"; x.fillRect(cx+moScale*0.2,cy-moScale*0.08,moScale*0.12,0.05*moScale); x.fillRect(cx+moScale*0.2,cy+moScale*0.03,moScale*0.12,0.05*moScale);
+    x.strokeStyle="#333"; x.lineWidth=3; x.beginPath(); x.moveTo(cx-moScale*0.22,cy); x.lineTo(cx-moScale*0.5,cy+moScale*0.2); x.stroke(); }
+  function hatSlots(){ var y=H*0.40; return [{x:W*0.3,y:y},{x:W*0.5,y:y},{x:W*0.7,y:y}]; }
+  function drawCap(cx,cy,col){ var r=moScale*0.5;
+    x.fillStyle=col; x.beginPath(); x.arc(cx,cy,r,Math.PI,2*Math.PI); x.fill(); x.fillRect(cx-r,cy-3,r*2,5);
+    x.fillRect(cx+r*0.25,cy-7,r*1.0,7);
+    x.fillStyle="#fff"; x.font="900 "+Math.round(r*0.55)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("M",cx,cy-r*0.4); }
+  function drawHatShelf(){ x.fillStyle="#8a5a34"; rr(W*0.5-W*0.42,H*0.40+4,W*0.84,14,4); x.fill(); x.fillStyle="#6e4525"; x.fillRect(W*0.5-W*0.42,H*0.40+4,W*0.84,5);
+    var sl=hatSlots(); for(var i=0;i<3;i++){ drawCap(sl[i].x, sl[i].y, HATCOLS[i]); } }
+  function drawBag(cx,cy){ var bw=moScale*1.25, bh=moScale*1.45;
+    x.fillStyle="#e8402a"; rr(cx-bw/2, cy-bh, bw, bh, 16); x.fill();
+    x.fillStyle="#c6361f"; rr(cx-bw*0.34, cy-bh*0.5, bw*0.68, bh*0.42, 10); x.fill();
+    x.fillStyle="#1f5fd0"; rr(cx-bw/2, cy-bh, bw, bh*0.3, 14); x.fill();
+    x.strokeStyle="#9c2512"; x.lineWidth=moScale*0.1; x.lineCap="round"; x.beginPath(); x.moveTo(cx-bw*0.3,cy-bh*0.78); x.lineTo(cx-bw*0.3,cy-bh*0.12); x.moveTo(cx+bw*0.3,cy-bh*0.78); x.lineTo(cx+bw*0.3,cy-bh*0.12); x.stroke();
+    x.fillStyle="#fff"; x.font="bold "+Math.round(moScale*0.3)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("MO",cx,cy-bh*0.85);
+    // open-bag glow hint
+    x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.12); x.strokeStyle="#ffcf5a"; x.lineWidth=3; rr(cx-bw*0.5,cy-bh,bw,bh*0.3,14); x.stroke(); x.restore();
+  }
+  function drawBottle(cx,cy,f){ var bw=moScale*0.52, bh=moScale*1.15;
+    x.fillStyle="#2f6fd0"; rr(cx-bw*0.3,cy-bh*0.5-11,bw*0.6,13,3); x.fill();
+    x.fillStyle="rgba(230,245,255,0.5)"; rr(cx-bw/2,cy-bh*0.5,bw,bh,8); x.fill();
+    var wh=bh*f; x.save(); rr(cx-bw/2,cy-bh*0.5,bw,bh,8); x.clip(); x.fillStyle="#4fb3ff"; x.fillRect(cx-bw/2, cy+bh*0.5-wh, bw, wh); x.restore();
+    x.strokeStyle="#9fc0d8"; x.lineWidth=2; rr(cx-bw/2,cy-bh*0.5,bw,bh,8); x.stroke(); }
+
+  function drawStart(){
+    var sky=x.createLinearGradient(0,0,0,H); sky.addColorStop(0,"#070b22"); sky.addColorStop(0.6,"#0d1740"); sky.addColorStop(1,"#0a1130"); x.fillStyle=sky; x.fillRect(0,0,W,H);
+    for(var i=0;i<stars.length;i++){ var s=stars[i]; x.globalAlpha=0.35+0.5*Math.abs(Math.sin(anim*0.03+s.ph)); x.fillStyle="#cfe6ff"; x.beginPath(); x.arc(s.x,s.y,s.r,0,7); x.fill(); } x.globalAlpha=1;
+    x.fillStyle="#0c1226"; x.fillRect(0,H*0.70,W,H*0.30);
+    var glow="hsl("+((anim*1.2)%360)+",80%,60%)";
+    var dcx=W/2, dcy=H*0.70, dw=Math.min(W*0.82,560), dh=Math.min(H*0.34,230), pulse=0.6+0.4*Math.abs(Math.sin(anim*0.05));
+    x.save(); x.shadowColor=glow; x.shadowBlur=40; x.fillStyle="#0e1830"; x.beginPath(); x.ellipse(dcx,dcy,dw/2,dh,0,Math.PI,0); x.fill(); x.restore();
+    for(var r2=0;r2<5;r2++){ x.strokeStyle=glow; x.globalAlpha=pulse*(0.85-r2*0.14); x.lineWidth=3; x.beginPath(); x.ellipse(dcx,dcy,dw/2*(0.42+r2*0.15),dh*(0.42+r2*0.15),0,Math.PI,0); x.stroke(); } x.globalAlpha=1;
+    var sweep=(anim%140)/140; x.save(); x.globalAlpha=0.6; x.strokeStyle="#fff"; x.lineWidth=5; var ex=dcx-dw/2+dw*sweep; x.beginPath(); x.moveTo(ex,dcy); x.lineTo(ex,dcy-dh*0.95); x.stroke(); x.restore();
+    x.fillStyle="#17223f"; rr(dcx-dw/2,dcy,dw,12,5); x.fill();
+  }
+  function drawRoom(){
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#2a2f52"); g.addColorStop(1,"#3a2f46"); x.fillStyle=g; x.fillRect(0,0,W,H);
+    x.fillStyle="#6a4a34"; x.fillRect(0,H*0.72,W,H*0.28); x.fillStyle="#5a3f2c"; x.fillRect(0,H*0.72,W,6);
+    var wx=W*0.08, wy=H*0.14, ww=Math.min(W*0.3,180), wh=Math.min(H*0.26,170);
+    x.fillStyle="#8fd0ff"; rr(wx,wy,ww,wh,10); x.fill();
+    var sun=x.createRadialGradient(wx+ww*0.7,wy+wh*0.3,4,wx+ww*0.7,wy+wh*0.3,ww*0.7); sun.addColorStop(0,"#fff7c4"); sun.addColorStop(1,"#8fd0ff00"); x.fillStyle=sun; rr(wx,wy,ww,wh,10); x.fill();
+    x.fillStyle="#ffd54a"; x.beginPath(); x.arc(wx+ww*0.7,wy+wh*0.3,ww*0.16,0,7); x.fill();
+    x.strokeStyle="#4a3524"; x.lineWidth=6; rr(wx,wy,ww,wh,10); x.stroke(); x.beginPath(); x.moveTo(wx+ww/2,wy); x.lineTo(wx+ww/2,wy+wh); x.moveTo(wx,wy+wh/2); x.lineTo(wx+ww,wy+wh/2); x.stroke();
+    x.fillStyle="#13306a"; rr(W*0.68,H*0.12,W*0.24,H*0.2,8); x.fill(); x.fillStyle="#37e0ff"; x.font="bold 14px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("GAME",W*0.8,H*0.19); x.fillStyle="#ffcf5a"; x.fillText("TODAY!",W*0.8,H*0.25); x.fillText("🏀",W*0.8,H*0.30);
+    x.fillStyle="#7a4a2a"; rr(bed.x-10,bed.y-8,bed.w+20,bed.h+30,10); x.fill();
+    x.fillStyle="#fff"; rr(bed.x,bed.y,bed.w,bed.h,10); x.fill();
+    x.fillStyle="#eef2ff"; rr(bed.x+8,bed.y+bed.h*0.1,bed.w*0.26,bed.h*0.5,8); x.fill();
+    x.fillStyle="#5a3620"; rr(bed.x-14,bed.y-bed.h*0.5,18,bed.h*1.2,6); x.fill();
+  }
+  function drawKitchen(){
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#f0e4c8"); g.addColorStop(1,"#e2cfa6"); x.fillStyle=g; x.fillRect(0,0,W,H*0.72);
+    // tiled floor
+    x.fillStyle="#9a6a44"; x.fillRect(0,floorY,W,H-floorY); x.fillStyle="#86583a"; x.fillRect(0,floorY,W,6);
+    x.strokeStyle="#7a5030"; x.lineWidth=2; for(var i=0;i<12;i++){ x.beginPath(); x.moveTo(i*W/11,floorY); x.lineTo(i*W/11,H); x.stroke(); }
+    // counter on the left
+    x.fillStyle="#c9a06a"; rr(0,floorY-70,W*0.42,70,6); x.fill(); x.fillStyle="#a8824f"; x.fillRect(0,floorY-70,W*0.42,8);
+    // fridge (right)
+    var fw=Math.min(W*0.22,150), fh=Math.min(H*0.42,320), fx=fridgeX-fw/2, fy=floorY-fh;
+    x.fillStyle="#e9eef2"; rr(fx,fy,fw,fh,12); x.fill(); x.strokeStyle="#b9c4cc"; x.lineWidth=3; rr(fx,fy,fw,fh,12); x.stroke();
+    x.strokeStyle="#c4cfd6"; x.lineWidth=3; x.beginPath(); x.moveTo(fx+6,fy+fh*0.38); x.lineTo(fx+fw-6,fy+fh*0.38); x.stroke();
+    x.fillStyle="#9aa6ad"; rr(fx+fw-16,fy+fh*0.12,7,fh*0.2,4); x.fill(); rr(fx+fw-16,fy+fh*0.46,7,fh*0.3,4); x.fill();
+    // tickets magnet on fridge
+    var ty=fy+fh*0.16; var tw=fw*0.62;
+    x.save(); x.translate(fx+fw*0.42,ty); x.rotate(-0.08);
+    x.fillStyle=gotTickets?"#cfd8dd":"#ffcf5a"; rr(-tw/2,-12,tw,26,6); x.fill();
+    x.fillStyle="#13306a"; x.font="bold 12px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(gotTickets?"got it!":"🎟️ TICKETS",0,1); x.restore();
+    if(!gotTickets){ x.fillStyle="#e8545a"; x.beginPath(); x.arc(fx+fw*0.42,ty-14,5,0,7); x.fill(); } // magnet
+  }
+
+  function drawJoystick(){
+    x.save(); x.globalAlpha=0.85;
+    x.fillStyle="#00000055"; x.beginPath(); x.arc(joy.bx,joy.by,joy.r,0,7); x.fill();
+    x.strokeStyle="#37e0ff"; x.lineWidth=3; x.beginPath(); x.arc(joy.bx,joy.by,joy.r,0,7); x.stroke();
+    x.fillStyle="#37e0ff"; x.beginPath(); x.arc(joy.kx,joy.ky,joy.r*0.44,0,7); x.fill();
+    x.fillStyle="#042033"; x.font="bold 16px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("↔",joy.kx,joy.ky);
+    x.restore();
+  }
+
+  function draw(){
+    if(mode==="start"){ drawStart(); return; }
+    if(mode==="elevator"||mode==="elevatordone"){ drawElevator();
+      if(mode==="elevator"){ banner(elevStage===0?"🛗 Tap the UP button!":(elevStage===1?"🛗 Doors opening…":"🛗 Tap the elevator to step in!"),"#ffcf5a"); }
+      else { drawCelebrate("🛗 Going up!","Up to the locker room — let's go!","▶ Again"); }
+      return; }
+    if(mode==="suitup"||mode==="suitupdone"){ drawLockerInterior();
+      drawDressMo(dressMoX, dressMoY, dressJerseyOn||mode==="suitupdone", dressShortsOn||mode==="suitupdone");
+      if(mode==="suitup"){ x.save(); x.globalAlpha=0.3+0.25*Math.sin(anim*0.14); x.strokeStyle="#ffcf5a"; x.lineWidth=3; x.beginPath(); x.arc(dressMoX,dressMoY-moScale*0.4,moScale*0.9,0,7); x.stroke(); x.restore();
+        for(var si5=0;si5<dressItems.length;si5++){ var it=dressItems[si5]; if(it.on)continue; if(it.kind==="jersey") drawJerseyIcon(it.x,it.y); else drawShortsIcon(it.x,it.y); }
+        banner("👕 Drag the jersey & shorts onto Mo!","#ffcf5a"); }
+      else { drawCelebrate("👕 Suited up — a real player!","Get set for warm-ups!","▶ Again"); }
+      return; }
+    if(mode==="lockermusic"||mode==="lockermusicdone"){ drawLockerInterior();
+      if(mode==="lockermusic"){ drawMo(W*0.3, H*0.76, false); banner("🎵 Tap the speaker for pre-game music!","#ffcf5a"); }
+      else { for(var nz=0;nz<8;nz++){ var npx=W*0.2+(nz*61+anim*2)%(W*0.6); var npy=H*0.4-((anim*2+nz*44)%140); x.fillStyle="#ffcf5a"; x.font="24px serif"; x.textAlign="center"; x.fillText("♪",npx,npy); } drawMo(W*0.3, H*0.76, false); drawCelebrate("🎵 Pre-game music pumping!","Let's get ready in the locker room!","▶ Again"); }
+      return; }
+    if(mode==="playerdoor"||mode==="playerdoordone"){ drawPlayerDoor();
+      if(mode==="playerdoor"){ banner(pdPhase===0?"🪪 Tap your badge on the reader!":(pdPhase===1?"🔓 Beep — unlocking…":"🚪 Tap to step into the building!"),"#ffcf5a"); }
+      else { drawCelebrate("🏢 You're inside!","Bright, clean hallway — welcome, Team!","▶ Again"); }
+      return; }
+    if(mode==="stairs"||mode==="stairsdone"){ drawStairs();
+      if(mode==="stairs"){ banner("🪜 HOLD to climb the stairs!","#ffcf5a");
+        var smw=W*0.6,smx=W/2-smw/2,smy=H*0.92; x.fillStyle="#000a"; rr(smx-3,smy-3,smw+6,18,8); x.fill(); x.fillStyle="#123"; rr(smx,smy,smw,12,6); x.fill(); x.fillStyle="#3fd06a"; rr(smx,smy,smw*stairProg,12,6); x.fill(); }
+      else { drawCelebrate("🪜 Up the stairs!","Now head to the locker room!","▶ To the locker room"); }
+      return; }
+    if(mode==="lockerwalk"||mode==="lockerwalkdone"){ drawLockerHall();
+      if(mode==="lockerwalk"){ drawMo(moX, floorY, false, walkPhase); banner("🕹️ Walk to the locker room!","#ffcf5a");
+        if(moX<lockerDoorX-moScale){ var la=Math.min(lockerDoorX-W*0.1, moX+W*0.16+6*Math.sin(anim*0.2)); x.fillStyle="#ffcf5a"; x.font="bold 26px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("➡",la,floorY-moScale*0.5); }
+        drawJoystick(); }
+      else { drawMo(lockerDoorX-moScale*1.1, floorY, false); drawCelebrate("🚪 At the locker room!","This is the team's room — let's go in!","▶ Again"); }
+      return; }
+    if(mode==="elevride"||mode==="elevridedone"){ drawElevRide();
+      if(mode==="elevride"){ banner(ridePhase===0?"🔢 Pick your floor — tap LR!":(ridePhase===1?"🙌 HOLD the OPEN button for your teammate!":(ridePhase===2?"⬆️ Going up… feel it rise!":"🚪 Doors open — tap to step out!")),"#ffcf5a"); }
+      else { drawCelebrate("🛗 Locker room floor!","Follow the signs to the locker room!","▶ Again"); }
+      return; }
+    if(mode==="garage"||mode==="garagedone"){ drawGarage();
+      if(mode==="garage"){ drawCarSide(garageCarX, H*0.74); banner("🅿️ Joystick Mo's car into his spot!","#ffcf5a"); drawJoystick();
+        if(Math.abs(garageCarX-garageSpotX)>moScale*0.6){ var ar=garageCarX<garageSpotX?"➡":"⬅"; x.fillStyle="#ffcf5a"; x.font="bold 26px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(ar, garageCarX+(garageCarX<garageSpotX?1:-1)*W*0.14, H*0.66); } }
+      else { drawCarSide(garageSpotX, H*0.74); drawCelebrate("🅿️ Parked in Mo's spot!","Feel the cool garage air — let's go!","▶ Again"); }
+      return; }
+    if(mode==="followsigns"||mode==="followsignsdone"){ drawFollow();
+      if(mode==="followsigns"){ banner("🪧 Follow the PLAYERS ONLY sign — tap the arrow!","#ffcf5a");
+        // two big arrow buttons
+        for(var ab=0;ab<2;ab++){ var axp=ab?W*0.72:W*0.28, ayp=H*0.84; x.fillStyle="#243a5a"; rr(axp-W*0.17,ayp-34,W*0.34,68,16); x.fill(); x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.14+ab); x.strokeStyle="#37e0ff"; x.lineWidth=3; rr(axp-W*0.17,ayp-34,W*0.34,68,16); x.stroke(); x.restore(); x.fillStyle="#fff"; x.font="900 40px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(ab?"➡":"⬅", axp, ayp); }
+        x.fillStyle="#cfe0ff"; x.font="bold 14px Trebuchet MS"; x.textAlign="center"; x.textBaseline="bottom"; x.fillText("Turn "+followStep+" / 3", W/2, H*0.72); }
+      else { drawCelebrate("🅿️ Into the players' garage!","You followed the signs — nice!","▶ Again"); }
+      return; }
+    if(mode==="driveup"||mode==="driveupdone"){ drawDriveUp();
+      if(mode==="driveup"){ banner("🚗 HOLD to drive to the dome!","#ffcf5a");
+        var dmw=W*0.6,dmx=W/2-dmw/2,dmy=H*0.9; x.fillStyle="#000a"; rr(dmx-3,dmy-3,dmw+6,18,8); x.fill(); x.fillStyle="#123"; rr(dmx,dmy,dmw,12,6); x.fill(); x.fillStyle="#3fd06a"; rr(dmx,dmy,dmw*driveProg,12,6); x.fill();
+        x.fillStyle="#fff"; x.font="bold 13px Trebuchet MS"; x.textAlign="center"; x.textBaseline="bottom"; x.fillText(driveHold?"driving…":"HOLD anywhere to drive!", W/2, dmy-5); }
+      else { drawCelebrate("🚗 At the Players' Entrance!","The gate lifts — welcome, Team!","▶ Again"); }
+      return; }
+    if(mode==="street"||mode==="atcar"||mode==="load"||mode==="loaded"||mode==="cooler"||mode==="coolerdone"||mode==="water5"||mode==="water5done"||mode==="flag"||mode==="flagdone"||mode==="signseat"||mode==="signseatdone"||mode==="foam"||mode==="foamdone"||mode==="jacket"||mode==="jacketdone"||mode==="closetrunk"||mode==="closetrunkdone"||mode==="family"||mode==="familydone"||mode==="song"||mode==="songdone"||mode==="mirrors"||mode==="mirrorsdone"||mode==="colorpick"||mode==="colorgame"||mode==="colordone"||mode==="quiet"||mode==="quietdone"||mode==="rps"||mode==="rpsdone"||mode==="guess"||mode==="guessdone"||mode==="snackbag"||mode==="snackbagdone"){ drawStreet();
+      if(mode==="street"){ drawCarSide(streetGoalX, floorY); drawArff(moX-moScale*0.95, floorY); drawMo(moX, floorY, false, walkPhase); banner("🕹️ Walk Mo down the street to the car!","#ffcf5a");
+        if(moX<streetGoalX-moScale){ var ax=Math.min(streetGoalX-W*0.06, moX+W*0.16+6*Math.sin(anim*0.2)); x.fillStyle="#ffcf5a"; x.font="bold 26px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("➡",ax,floorY-moScale*0.5); }
+        drawJoystick(); }
+      else if(mode==="atcar"){ drawCarSide(streetGoalX, floorY); drawArff(streetGoalX-moScale*2.1, floorY); drawMo(streetGoalX-moScale*1.3, floorY, false); drawCelebrate("🚗 At the car!","Time to load up and drive!","▶ Load the car"); }
+      else if(mode==="load"){ drawCarSide(carLoadX, floorY); drawMo(carLoadX-moScale*1.9, floorY, false);
+        var tx=carLoadX, ty=floorY-moScale*1.0; x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.14); x.strokeStyle="#ffcf5a"; x.lineWidth=3; x.beginPath(); x.arc(tx,ty,moScale*0.9,0,7); x.stroke(); x.restore();
+        drawBag(loadBag.x, loadBag.y); banner("🎒 Drag the game bag into the car!","#ffcf5a"); }
+      else if(mode==="loaded"){ drawCarSide(carLoadX, floorY); drawMo(carLoadX-moScale*1.9, floorY, false); drawCelebrate("🚗 Bag loaded!","Now load the snack cooler!","▶ Load the cooler"); }
+      else if(mode==="cooler"){ drawCarSide(W*0.82, floorY); drawCooler(coolerX, coolerY, snackCount); drawMo(W*0.08, floorY, false);
+        x.font=Math.round(moScale*0.6)+"px serif"; x.textAlign="center"; x.textBaseline="middle";
+        for(var sc=0;sc<snacks.length;sc++){ if(snacks[sc].inCooler)continue; x.fillText(snacks[sc].emoji, snacks[sc].x, snacks[sc].y); }
+        banner("🧊 Drag the snacks into the cooler!","#ffcf5a");
+        x.fillStyle="#cfe0ff"; x.font="bold 14px Trebuchet MS"; x.textAlign="center"; x.textBaseline="bottom"; x.fillText("Packed "+snackCount+" / "+snacks.length, W/2, H*0.68); }
+      else if(mode==="coolerdone"){ drawCarSide(W*0.82, floorY); drawCooler(coolerX, coolerY, snacks.length); drawMo(W*0.08, floorY, false); drawCelebrate("🧊 Cooler packed!","Now fill the cup holders!","▶ Fill the cup holders"); }
+      else if(mode==="water5"){ drawHolders();
+        for(var wi=0;wi<waters.length;wi++){ if(waters[wi].inHolder)continue; drawBottle(waters[wi].x, waters[wi].y, 1); }
+        banner("🥤 Drag 5 waters into the cup holders!","#ffcf5a");
+        x.fillStyle="#cfe0ff"; x.font="bold 14px Trebuchet MS"; x.textAlign="center"; x.textBaseline="bottom"; x.fillText(waterCount+" / 5 in", W/2, H*0.62); }
+      else if(mode==="water5"){ /* handled above */ }
+      else if(mode==="water5done"){ drawHolders(); drawCelebrate("🥤 All 5 waters in!","Now put up the team flag!","▶ Put up the flag"); }
+      else if(mode==="flag"){ drawCarSide(flagCarX, floorY); drawMo(flagCarX-moScale*2.2, floorY, false);
+        var ftx=flagCarX-moScale*0.35, fty=floorY-moScale*1.55; x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.14); x.strokeStyle="#ffcf5a"; x.lineWidth=3; x.beginPath(); x.arc(ftx,fty,moScale*0.7,0,7); x.stroke(); x.restore();
+        drawFlag(flag.x, flag.y); banner("🚩 Drag the team flag to the windshield!","#ffcf5a"); }
+      else if(mode==="flagdone"){ drawCarSide(flagCarX, floorY); drawFlag(flagCarX-moScale*0.35, floorY-moScale*0.65); drawMo(flagCarX-moScale*2.2, floorY, false); drawCelebrate("🚩 Flag's up!","Now put the good-luck sign in!","▶ Put the sign in"); }
+      else if(mode==="signseat"){ drawCarSide(seatCarX, floorY); drawMo(seatCarX-moScale*2.2, floorY, false);
+        var stx=seatCarX-moScale*0.1, sty=floorY-moScale*1.4; x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.14); x.strokeStyle="#ffcf5a"; x.lineWidth=3; x.beginPath(); x.arc(stx,sty,moScale*0.85,0,7); x.stroke(); x.restore();
+        drawMiniSign(seatSign.x, seatSign.y); banner("🪧 Drag the good-luck sign into the back seat!","#ffcf5a"); }
+      else if(mode==="signseatdone"){ drawCarSide(seatCarX, floorY); drawMiniSign(seatCarX-moScale*0.1, floorY-moScale*1.35); drawMo(seatCarX-moScale*2.2, floorY, false); drawCelebrate("🪧 Sign's in!","Now load the foam fingers!","▶ Load the foam fingers"); }
+      else if(mode==="foam"){ drawCarSide(foamCarX, floorY); drawMo(foamCarX-moScale*2.2, floorY, false);
+        var gtx=foamCarX, gty=floorY-moScale*0.95; x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.14); x.strokeStyle="#ffcf5a"; x.lineWidth=3; x.beginPath(); x.arc(gtx,gty,moScale*0.9,0,7); x.stroke(); x.restore();
+        drawFoamFinger(foamItem.x, foamItem.y); banner("👆 Drag the foam finger into the trunk!","#ffcf5a"); }
+      else if(mode==="foamdone"){ drawCarSide(foamCarX, floorY); drawMo(foamCarX-moScale*2.2, floorY, false); drawCelebrate("👆 Foam fingers loaded!","Now pack a jacket for later!","▶ Pack a jacket"); }
+      else if(mode==="jacket"){ drawCarSide(jacketCarX, floorY); drawMo(jacketCarX-moScale*2.2, floorY, false);
+        var jtx=jacketCarX, jty=floorY-moScale*0.95; x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.14); x.strokeStyle="#ffcf5a"; x.lineWidth=3; x.beginPath(); x.arc(jtx,jty,moScale*0.9,0,7); x.stroke(); x.restore();
+        drawJacket(jacketItem.x, jacketItem.y); banner("🧥 Drag the jacket into the car!","#ffcf5a"); }
+      else if(mode==="jacketdone"){ drawCarSide(jacketCarX, floorY); drawMo(jacketCarX-moScale*2.2, floorY, false); drawCelebrate("🧥 Jacket packed!","Last thing — close the trunk!","▶ Close the trunk"); }
+      else if(mode==="closetrunk"){ drawCarSide(trunkCarX, floorY); drawTrunkLid(trunkCarX, floorY, trunkProg); drawMo(trunkCarX-moScale*2.2, floorY, false);
+        banner("🚗 Drag the trunk DOWN to close it!","#ffcf5a");
+        var tmw=W*0.5,tmx=W/2-tmw/2,tmy=H*0.9; x.fillStyle="#000a"; rr(tmx-3,tmy-3,tmw+6,18,8); x.fill(); x.fillStyle="#123"; rr(tmx,tmy,tmw,12,6); x.fill(); x.fillStyle="#e8402a"; rr(tmx,tmy,tmw*trunkProg,12,6); x.fill(); }
+      else if(mode==="closetrunkdone"){ drawCarSide(trunkCarX, floorY); drawMo(trunkCarX-moScale*2.2, floorY, false); drawCelebrate("🚗 Trunk closed!","Now count that everyone's in!","▶ Count the family"); }
+      else if(mode==="family"){ drawCarSide(W*0.86, floorY);
+        for(var fm=0;fm<famMembers.length;fm++){ var mb=famMembers[fm]; drawPerson(mb.x, floorY, mb.col, mb.tapped, fm+1); }
+        if(!famTypeOn){ banner("👆 Tap each family member to count them!","#ffcf5a"); }
+        else { banner("How many are in? Type it! ⌨️","#ffcf5a"); var v=(document.getElementById("word").value||""); var nd=(v.match(/\d/g)||[]).length;
+          x.textAlign="center"; x.textBaseline="middle"; x.font="bold 46px Trebuchet MS"; x.fillStyle="#2a3a5a"; x.fillText("4 in the car", W/2, H*0.3);
+          x.fillStyle="#37e0ff"; x.save(); rr(W/2-140,H*0.3-30,280,60,8); x.clip(); x.fillText((nd>=1?"4":" ")+" in the car", W/2, H*0.3); x.restore(); } }
+      else if(mode==="familydone"){ drawCarSide(W*0.86, floorY); drawCelebrate("👨‍👩‍👧 Everyone's in!","Now pick the drive song!","▶ Pick a song"); }
+      else if(mode==="song"){ drawSongPanel(); banner("🎵 Tap the MO MVP CLIPS song!","#ffcf5a"); }
+      else if(mode==="songdone"){ drawSongPanel(); for(var nn=0;nn<6;nn++){ var npx=W*0.3+ (nn*53+anim*2)%(W*0.4); var npy=H*0.3-((anim*2+nn*40)%120); x.fillStyle="#ffcf5a"; x.font="22px serif"; x.fillText("♪", npx, npy); } drawCelebrate("🎵 MO MVP CLIPS!","Last check — the mirrors!","▶ Check the mirrors"); }
+      else if(mode==="mirrors"){ drawCarSide(W*0.86, floorY);
+        for(var mr=0;mr<mirrors.length;mr++){ drawMirror(mirrors[mr]); }
+        banner("🪞 Tap each mirror to check it!","#ffcf5a");
+        x.fillStyle="#cfe0ff"; x.font="bold 14px Trebuchet MS"; x.textAlign="center"; x.textBaseline="bottom"; x.fillText("Checked "+mirrorCount+" / 3", W/2, H*0.9); }
+      else if(mode==="mirrorsdone"){ drawCarSide(W*0.86, floorY); drawCelebrate("🪞 Mirrors checked!","Now drive — play the Color Car Game!","▶ Start the drive"); }
+      else if(mode==="colorpick"){ banner("🎨 Pick a color to hunt for!","#ffcf5a");
+        for(var ci=0;ci<4;ci++){ var bx=W*0.5-W*0.36+ (ci%2)*W*0.38, by=H*0.34+Math.floor(ci/2)*H*0.2, bw=W*0.32, bh=H*0.14;
+          x.fillStyle=COLORCHO[ci].c; rr(bx,by,bw,bh,14); x.fill(); x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.14+ci); x.strokeStyle="#fff"; x.lineWidth=3; rr(bx,by,bw,bh,14); x.stroke(); x.restore();
+          x.fillStyle="#fff"; x.font="900 22px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.strokeStyle="#0006"; x.lineWidth=4; x.strokeText(COLORCHO[ci].n,bx+bw/2,by+bh/2); x.fillText(COLORCHO[ci].n,bx+bw/2,by+bh/2); } }
+      else if(mode==="colorgame"){ for(var di=0;di<carsDriving.length;di++){ drawColorCar(carsDriving[di].x, carsDriving[di].y, carsDriving[di].c); }
+        // target swatch
+        x.fillStyle=myColor.c; rr(W*0.05,H*0.06,40,28,6); x.fill(); x.fillStyle="#fff"; x.font="bold 16px Trebuchet MS"; x.textAlign="left"; x.textBaseline="middle"; x.fillText("Tap "+myColor.n+" cars!  "+colorScore+" / 5", W*0.05+48, H*0.08); }
+      else if(mode==="colordone"){ drawCarSide(W*0.86, floorY); drawCelebrate("🎨 You caught 5 "+(myColor?myColor.n:"")+" cars!","Next car game — the Quiet Game!","▶ Quiet Game"); }
+      else if(mode==="quiet"){ var fx=W*0.5+Math.sin(anim*0.07)*W*0.32, fy=H*0.32+Math.cos(anim*0.11)*H*0.1; x.font=Math.round(moScale*1.4)+"px serif"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(["😜","🤪","😝","🙃"][Math.floor(anim/30)%4], fx, fy);
+        banner("🤫 Stay quiet — HOLD anywhere!","#ffcf5a");
+        var qmw=W*0.6,qmx=W/2-qmw/2,qmy=H*0.78; x.fillStyle="#000a"; rr(qmx-3,qmy-3,qmw+6,22,8); x.fill(); x.fillStyle="#123"; rr(qmx,qmy,qmw,16,6); x.fill(); x.fillStyle="#3fd06a"; rr(qmx,qmy,qmw*quietProg,16,6); x.fill();
+        x.fillStyle="#fff"; x.font="bold 14px Trebuchet MS"; x.textAlign="center"; x.textBaseline="bottom"; x.fillText(quietHold?"Shhh… keep holding!":"HOLD to stay quiet!", W/2, qmy-6); }
+      else if(mode==="quietdone"){ drawCarSide(W*0.86, floorY); drawCelebrate("🤫 You won the Quiet Game!","Shhh champ — keep driving!","▶ Rock Paper Scissors"); }
+      else if(mode==="rps"){ banner("✊ Rock Paper Scissors — win 2!","#ffcf5a");
+        x.fillStyle="#fff"; x.font="bold 18px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("You "+rpsWins+"  —  "+rpsCpuWins+" Family", W/2, H*0.22);
+        if(rpsShowT>0){ x.font=Math.round(moScale*1.3)+"px serif"; x.fillText(RPS[rpsPlayer], W*0.3, H*0.33); x.fillText(RPS[rpsCpu], W*0.7, H*0.33); x.fillStyle="#ffcf5a"; x.font="900 24px Trebuchet MS"; x.fillText(rpsResult, W/2, H*0.44); }
+        for(var ri=0;ri<3;ri++){ var rx=W*0.5-W*0.42+ri*W*0.3, ry=H*0.56, rw=W*0.26, rh=H*0.18; x.fillStyle="#243a5a"; rr(rx,ry,rw,rh,14); x.fill(); x.save(); x.globalAlpha=0.4+0.3*Math.sin(anim*0.14+ri); x.strokeStyle="#37e0ff"; x.lineWidth=3; rr(rx,ry,rw,rh,14); x.stroke(); x.restore(); x.font=Math.round(moScale*0.9)+"px serif"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(RPS[ri], rx+rw/2, ry+rh*0.42); x.fillStyle="#fff"; x.font="bold 12px Trebuchet MS"; x.fillText(RPSN[ri], rx+rw/2, ry+rh*0.8); } }
+      else if(mode==="rpsdone"){ drawCarSide(W*0.86, floorY); drawCelebrate("✊ You won the tournament!","Nice — one more game!","▶ Guess the Score"); }
+      else if(mode==="guess"){ banner("🏀 Guess tonight's final score! Type it ⌨️","#ffcf5a");
+        var gv=(document.getElementById("word").value||"").replace(/\D/g,""); x.fillStyle="#fff"; rr(W*0.2,H*0.28,W*0.6,H*0.14,10); x.fill(); x.strokeStyle="#c9b48a"; x.lineWidth=2; rr(W*0.2,H*0.28,W*0.6,H*0.14,10); x.stroke();
+        x.fillStyle="#13306a"; x.font="900 30px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("CLIPS: "+(gv||"__"), W/2, H*0.35);
+        if(gv.length>=1){ x.fillStyle="#1f9fd8"; rr(W/2-100,H*0.68,200,46,12); x.fill(); x.fillStyle="#042033"; x.font="bold 18px Trebuchet MS"; x.fillText("✏️ Write it down", W/2, H*0.68+23); } }
+      else if(mode==="guessdone"){ drawCarSide(W*0.86, floorY); drawCelebrate("✏️ Guesses written down!","Snack time — grab one from the bag!","▶ Snack time"); }
+      else if(mode==="snackbag"){ drawMo(W*0.26, floorY, false);
+        if(dragBagSnack>=0||snackChomp>0){ x.fillStyle="#2a0a0a"; x.beginPath(); x.ellipse(snackMouthX,snackMouthY,moScale*0.14,moScale*(snackChomp>0?0.13:0.10),0,0,7); x.fill(); }
+        drawSnackBag(W*0.74, floorY-moScale*0.4);
+        x.font=Math.round(moScale*0.55)+"px serif"; x.textAlign="center"; x.textBaseline="middle";
+        for(var bs=0;bs<bagSnacks.length;bs++){ if(bagSnacks[bs].eaten)continue; x.fillText(bagSnacks[bs].emoji, bagSnacks[bs].x, bagSnacks[bs].y); }
+        banner("🍿 Peek in the bag — drag a snack to Mo's mouth!","#ffcf5a"); }
+      else { drawMo(W*0.4, floorY, false); drawCelebrate("😋 Yum — snack eaten!","Munch munch — on to the dome!","▶ Again"); }
+      return; }
+    if(mode==="bed"||mode==="type"||mode==="gday"||mode==="clockwalk"||mode==="clocktype"||mode==="timed"||mode==="pack"||mode==="packed"||mode==="sign"||mode==="signdone"||mode==="hatwalk"||mode==="hatpick"||mode==="hatdone"||mode==="hours"||mode==="hoursdone"||mode==="charge"||mode==="charged"){ drawRoom(); }
+    else { drawKitchen(); }
+
+    if(mode==="bed"){
+      if(onBed && !dragging){ drawMo(W/2, bed.y, true); banner("🛏️ Drag Mo out of bed!","#ffcf5a");
+        var ay=bed.y+bed.h+20+6*Math.sin(anim*0.15); x.fillStyle="#37e0ff"; x.font="bold 30px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("⬇",W/2,ay);
+      } else { drawMo(moPos.x, moPos.y, false); banner("🛏️ Pull Mo down onto the floor!","#ffcf5a"); }
+    }
+    else if(mode==="type"){
+      drawMo(W/2, H*0.70, false); banner("Say it's GAME DAY — type it! ⌨️","#ffcf5a");
+      var v=(document.getElementById("word").value||"").toUpperCase();
+      x.textAlign="center"; x.textBaseline="middle"; x.font="bold 34px Trebuchet MS";
+      x.fillStyle="#2a3a5a"; x.fillText("GAME DAY", W/2, H*0.3);
+      var target="GAME DAY", nL=v.replace(/[^A-Z ]/g,'').length, shown=""; for(var i=0;i<target.length;i++){ shown += (i<nL? target[i] : " "); }
+      x.fillStyle="#37e0ff"; x.save(); rr(W/2-150,H*0.3-26,300,52,8); x.clip(); x.fillText(shown, W/2, H*0.3); x.restore();
+    }
+    else if(mode==="gday"){
+      drawCelebrate("IT'S GAME DAY! 🏀","Now go get the tickets!","▶ Go to the kitchen");
+      drawMo(W/2, H*0.70, false);
+    }
+    else if(mode==="walk"){
+      drawMo(moX, floorY, false, walkPhase);
+      banner("🕹️ Walk Mo to the fridge!","#ffcf5a");
+      // hint arrow toward fridge
+      if(!gotTickets){ var ax=Math.min(fridgeX-W*0.1, moX+W*0.16+6*Math.sin(anim*0.2)); x.fillStyle="#37e0ff"; x.font="bold 26px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("➡",ax,floorY-moScale*0.5); }
+      drawJoystick();
+    }
+    else if(mode==="tickets"){
+      var mcx=fridgeX-moScale*0.9;
+      drawMo(mcx, floorY, false);
+      // speech bubble: Mo SAYS "TICKETS!"
+      var bw=Math.min(W*0.4,150), bh=40, bx=mcx-bw-6, by=floorY-moScale*1.5;
+      if(bx<6){ bx=mcx+moScale*0.4; }
+      x.fillStyle="#fff"; rr(bx,by,bw,bh,12); x.fill(); x.fillStyle="#fff"; x.beginPath(); x.moveTo(bx+bw*0.6,by+bh); x.lineTo(bx+bw*0.72,by+bh+14); x.lineTo(bx+bw*0.8,by+bh); x.closePath(); x.fill();
+      x.fillStyle="#e8402a"; x.font="bold 20px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("TICKETS!", bx+bw/2, by+bh/2);
+      drawCelebrate("🎟️ You got the tickets!","Mo says: TICKETS!","▶ Eat breakfast");
+    }
+    else if(mode==="eat"){
+      // table + plate
+      x.fillStyle="#8a5a34"; rr(W*0.52,floorY-30,W*0.44,14,5); x.fill(); x.fillStyle="#6e4525"; x.fillRect(W*0.6,floorY-18,10,18); x.fillRect(W*0.88,floorY-18,10,18);
+      x.fillStyle="#eef2f6"; x.beginPath(); x.ellipse(W*0.73,floorY-34,W*0.17,11,0,0,7); x.fill();
+      drawMo(moEatX, floorY, false);
+      // open mouth when a food is in hand
+      if(dragFood>=0||chomp>0){ x.fillStyle="#2a0a0a"; x.beginPath(); x.ellipse(mouthX,mouthY,moScale*0.14,moScale*(chomp>0?0.13:0.10),0,0,7); x.fill(); }
+      // foods
+      x.font=Math.round(moScale*0.6)+"px serif"; x.textAlign="center"; x.textBaseline="middle";
+      for(var fi=0;fi<foods.length;fi++){ if(foods[fi].eaten)continue; x.fillText(foods[fi].emoji, foods[fi].x, foods[fi].y); }
+      banner("🍽️ Drag the food to Mo's mouth!","#ffcf5a");
+    }
+    else if(mode==="fed"){ drawMo(W*0.4, floorY, false); drawCelebrate("😋 Yummy breakfast!","All eaten — Mo's full and ready!","▶ Fill water bottle"); }
+    else if(mode==="water"){
+      // faucet + sink basin on the counter
+      var sp=sinkX+39;
+      x.fillStyle="#b9c4cc"; rr(sinkX-44, floorY-74, 128, 16, 5); x.fill(); // basin rim
+      x.fillStyle="#7d8890"; rr(sinkX-38, floorY-72, 116, 12, 4); x.fill(); // basin
+      x.fillStyle="#9aa6ad"; x.fillRect(sinkX-6, sinkY, 12, floorY-74-sinkY); // vertical pipe
+      x.fillRect(sinkX-6, sinkY, 46, 12); // spout horizontal
+      x.fillStyle="#7a858c"; x.fillRect(sinkX+34, sinkY, 10, 16); // spout mouth
+      var inZone = Math.abs(bottle.x-sp)<W*0.085 && bottle.y>sinkY+16 && bottle.y<sinkY+180;
+      if(inZone && fill<1){ x.strokeStyle="#4fb3ff"; x.lineWidth=5; x.beginPath(); x.moveTo(sp,sinkY+16); x.lineTo(bottle.x, bottle.y-moScale*0.5); x.stroke();
+        for(var d=0;d<3;d++){ x.fillStyle="#7fc8ff"; var dy=sinkY+16+((anim*4+d*34)%Math.max(20,(bottle.y-moScale*0.5-sinkY-16))); x.beginPath(); x.arc(sp+(Math.random()-0.5)*6, dy, 3,0,7); x.fill(); } }
+      drawBottle(bottle.x, bottle.y, fill);
+      banner("🚰 Drag the water bottle under the sink!","#ffcf5a");
+      // fill meter
+      var mw=W*0.5,mx=W/2-mw/2,my=H*0.9; x.fillStyle="#000a"; rr(mx-3,my-3,mw+6,20,8); x.fill(); x.fillStyle="#123"; rr(mx,my,mw,14,6); x.fill(); x.fillStyle="#4fb3ff"; rr(mx,my,mw*fill,14,6); x.fill();
+      x.fillStyle="#fff"; x.font="bold 12px Trebuchet MS"; x.textAlign="center"; x.textBaseline="bottom"; x.fillText(Math.round(fill*100)+"% full", W/2, my-5);
+    }
+    else if(mode==="watered"){ drawMo(W*0.4, floorY, false); drawBottle(W*0.4+moScale*0.7, floorY-moScale*0.5, 1); drawCelebrate("💧 Water bottle filled!","Packed and ready to go!","▶ Check the clock"); }
+    else if(mode==="clockwalk"){ drawClock(clockX, clockCY, Math.min(W*0.11,70)); drawMo(moX, floorY, false, walkPhase); banner("🕹️ Walk Mo to the clock!","#ffcf5a");
+      if(!atClock){ var ax=Math.min(clockX-W*0.08, moX+W*0.16+6*Math.sin(anim*0.2)); x.fillStyle="#37e0ff"; x.font="bold 26px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("➡",ax,floorY-moScale*0.5); }
+      drawJoystick(); }
+    else if(mode==="clocktype"){ drawClock(clockX, clockCY, Math.min(W*0.11,70)); drawMo(clockX-moScale*0.95, floorY, false);
+      banner("What time is the game? Type it! ⌨️","#ffcf5a");
+      var v=(document.getElementById("word").value||""); var nd=(v.match(/\d/g)||[]).length, target="7:00";
+      x.textAlign="center"; x.textBaseline="middle"; x.font="bold 46px Trebuchet MS"; x.fillStyle="#2a3a5a"; x.fillText(target, W/2, H*0.58);
+      var shown="",dc=0; for(var i=0;i<target.length;i++){ if(/\d/.test(target[i])){ shown+=(dc<nd?target[i]:" "); dc++; } else { shown+=(nd>=1?target[i]:" "); } }
+      x.fillStyle="#37e0ff"; x.save(); rr(W/2-100,H*0.58-30,200,60,8); x.clip(); x.fillText(shown, W/2, H*0.58); x.restore(); }
+    else if(mode==="timed"){ drawClock(clockX, clockCY, Math.min(W*0.11,70)); drawMo(clockX-moScale*0.95, floorY, false); drawCelebrate("🕖 Game at 7:00!","Right on time, Mo!","▶ Pack the bag"); }
+    else if(mode==="pack"){
+      drawMo(W*0.1, floorY, false);
+      drawBag(bagX, bagY);
+      x.font=Math.round(moScale*0.6)+"px serif"; x.textAlign="center"; x.textBaseline="middle";
+      for(var bi=0;bi<bagItems.length;bi++){ var it=bagItems[bi]; if(it.packed)continue; if(it.kind==="bottle"){ drawBottle(it.x,it.y,1); } else { x.font=Math.round(moScale*0.6)+"px serif"; x.fillText(it.kind,it.x,it.y); } }
+      banner("🎒 Drag everything into Mo's bag!","#ffcf5a");
+      x.fillStyle="#cfe0ff"; x.font="bold 14px Trebuchet MS"; x.textAlign="center"; x.textBaseline="bottom"; x.fillText("Packed "+packedCount+" / "+bagItems.length, W/2, H*0.92);
+    }
+    else if(mode==="packed"){ drawMo(W*0.1, floorY, false); drawBag(bagX, bagY); drawCelebrate("🎒 Bag packed!","Water, tickets & more — let's go!","▶ Check Meow's bowls"); }
+    else if(mode==="bowls"){ drawBowls(bowlsX, floorY); drawMo(moX, floorY, false, walkPhase); banner("🕹️ Walk Mo to check Meow's bowls!","#ffcf5a");
+      if(moX<bowlsX-moScale){ var ax2=Math.min(bowlsX-W*0.08, moX+W*0.16+6*Math.sin(anim*0.2)); x.fillStyle="#37e0ff"; x.font="bold 26px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("➡",ax2,floorY-moScale*0.5); }
+      drawJoystick(); }
+    else if(mode==="bowlsdone"){ drawBowls(bowlsX, floorY); drawMo(bowlsX-moScale*1.3, floorY, false); drawCelebrate("🐱 Meow is all set!","Full food and water bowls!","▶ Make a good-luck sign"); }
+    else if(mode==="sign"){ drawPaperSign(signProg); drawPen(pen.x,pen.y); banner("✏️ Drag the pen to write GOOD LUCK CLIPS!","#ffcf5a");
+      var smw=W*0.5,smx=W/2-smw/2,smy=H*0.9; x.fillStyle="#000a"; rr(smx-3,smy-3,smw+6,18,8); x.fill(); x.fillStyle="#123"; rr(smx,smy,smw,12,6); x.fill(); x.fillStyle="#1f5fd0"; rr(smx,smy,smw*signProg,12,6); x.fill(); }
+    else if(mode==="signdone"){ drawPaperSign(1); drawCelebrate("✏️ GOOD LUCK, CLIPS!","Your good-luck sign is ready!","▶ Pick a hat"); }
+    else if(mode==="hatwalk"){ drawHatShelf(); drawMo(moX, floorY, false, walkPhase); banner("🕹️ Walk Mo to his hats!","#ffcf5a");
+      if(moX<hatX-moScale){ var ax3=Math.min(hatX-W*0.08, moX+W*0.16+6*Math.sin(anim*0.2)); x.fillStyle="#37e0ff"; x.font="bold 26px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("➡",ax3,floorY-moScale*0.5); }
+      drawJoystick(); }
+    else if(mode==="hatpick"){ drawHatShelf(); drawMo(hatX-moScale*1.2, floorY, false); banner("🧢 Tap the hat Mo wants!","#ffcf5a"); }
+    else if(mode==="hatdone"){ drawMo(W/2, floorY, false); drawCelebrate("🧢 Nice hat, Mo!","Looking sharp for the game!","▶ Count the hours"); }
+    else if(mode==="hours"){ drawClock(W*0.8, H*0.26, Math.min(W*0.11,60)); drawMo(W*0.22, floorY, false);
+      banner("How many hours until tip-off? Type it! ⌨️","#ffcf5a");
+      var v=(document.getElementById("word").value||""); var nd=(v.match(/\d/g)||[]).length, target="10";
+      x.textAlign="center"; x.textBaseline="middle"; x.font="bold 46px Trebuchet MS"; x.fillStyle="#2a3a5a"; x.fillText("10 hours", W/2, H*0.5);
+      var shown=(nd>=1?"1":" ")+(nd>=2?"0":" ")+" hours";
+      x.fillStyle="#37e0ff"; x.save(); rr(W/2-120,H*0.5-30,240,60,8); x.clip(); x.fillText(shown, W/2, H*0.5); x.restore(); }
+    else if(mode==="hoursdone"){ drawMo(W/2, floorY, false); drawCelebrate("🕙 10 hours to go!","The game is tonight at 7:00!","▶ Charge the camera"); }
+    else if(mode==="charge"){
+      x.fillStyle="#8a5a34"; rr(W*0.08,floorY-18,W*0.44,14,4); x.fill();
+      drawCamera(W*0.28, floorY-34, plugs[0].placed);
+      drawOutlet(outlet.x, outlet.y, plugs[1].placed);
+      for(var pi=0;pi<plugs.length;pi++){ var pg2=plugs[pi]; var px2=pg2.placed?pg2.tx:pg2.x, py2=pg2.placed?pg2.ty:pg2.y; drawPlug(px2,py2, pg2.placed); }
+      banner("🔌 Drag each plug into its spot!","#ffcf5a");
+      var done=(plugs[0].placed?1:0)+(plugs[1].placed?1:0);
+      x.fillStyle="#cfe0ff"; x.font="bold 14px Trebuchet MS"; x.textAlign="center"; x.textBaseline="bottom"; x.fillText("Plugged "+done+" / 2", W/2, H*0.92); }
+    else if(mode==="charged"){ drawMo(W/2, floorY, false); drawCelebrate("🔋 Camera charging!","Ready to take game photos!","▶ Head outside"); }
+  }
+  function drawCelebrate(title,sub,btn){
+    for(var i=0;i<conf.length;i++){ var c=conf[i]; x.fillStyle=c.col; x.save(); x.translate(c.x,c.y); x.rotate(c.r); x.fillRect(-4,-4,8,8); x.restore(); }
+    x.textAlign="center"; x.textBaseline="middle"; x.strokeStyle="#000"; x.lineWidth=6;
+    var pop=1+0.08*Math.sin(anim*0.3); x.fillStyle="#ffcf5a"; x.font="bold "+Math.round(38*pop)+"px Trebuchet MS";
+    x.strokeText(title,W/2,H*0.30); x.fillText(title,W/2,H*0.30);
+    x.fillStyle="#eaf3ff"; x.font="bold 16px Trebuchet MS"; x.fillText(sub,W/2,H*0.40);
+    x.fillStyle="#1f9fd8"; rr(W/2-120,H*0.85,240,48,12); x.fill(); x.fillStyle="#042033"; x.font="bold 19px Trebuchet MS"; x.fillText(btn,W/2,H*0.85+24);
+  }
+  function update(){ anim++;
+    if(chomp>0)chomp--;
+    if(snackChomp>0)snackChomp--;
+    if(mode==="gday"||mode==="tickets"||mode==="fed"){ for(var i=0;i<conf.length;i++){ var c=conf[i]; c.y+=c.vy; c.x+=c.vx; c.r+=c.vr; if(c.y>H+10){ c.y=-10; c.x=Math.random()*W; } } }
+    if(mode==="walk"){
+      moVX = joy.dx * 6.2;
+      moX += moVX; moX=Math.max(W*0.08,Math.min(fridgeX-moScale*0.7, moX));
+      if(Math.abs(moVX)>0.4){ walkPhase += 0.25; } else { walkPhase *= 0.6; }
+      if(anim%10===0 && Math.abs(moVX)>0.4) beep(160,0.04,"triangle",0.02);
+      if(!gotTickets && moX >= fridgeX-moScale*0.75-2){ gotTickets=true; win("tickets"); }
+    }
+    if(mode==="water"){ var sp=sinkX+39; var inZone=Math.abs(bottle.x-sp)<W*0.085 && bottle.y>sinkY+16 && bottle.y<sinkY+180;
+      if(inZone && fill<1){ fill=Math.min(1,fill+0.012); if(anim%6===0)beep(480+fill*320,0.05,"sine",0.03); if(fill>=1){ win("watered"); } } }
+    if(mode==="clockwalk"){ moVX=joy.dx*6.2; moX+=moVX; moX=Math.max(W*0.08,Math.min(clockX-moScale*0.7,moX));
+      if(Math.abs(moVX)>0.4){ walkPhase+=0.25; if(anim%10===0)beep(160,0.04,"triangle",0.02); } else { walkPhase*=0.6; }
+      if(!atClock && moX>=clockX-moScale*0.75-2){ atClock=true; toClockType(); } }
+    if(mode==="bowls"){ moVX=joy.dx*6.2; moX+=moVX; moX=Math.max(W*0.08,Math.min(bowlsX-moScale*0.9,moX));
+      if(Math.abs(moVX)>0.4){ walkPhase+=0.25; if(anim%10===0)beep(160,0.04,"triangle",0.02); } else { walkPhase*=0.6; }
+      if(moX>=bowlsX-moScale*0.95-2){ win("bowlsdone"); } }
+    if(mode==="street"){ moVX=joy.dx*6.2; moX+=moVX; moX=Math.max(W*0.08,Math.min(streetGoalX-moScale*0.9,moX));
+      if(Math.abs(moVX)>0.4){ walkPhase+=0.25; if(anim%10===0)beep(160,0.04,"triangle",0.02); } else { walkPhase*=0.6; }
+      if(moX>=streetGoalX-moScale*0.95-2){ win("atcar"); } }
+    if(mode==="hatwalk"){ moVX=joy.dx*6.2; moX+=moVX; moX=Math.max(W*0.08,Math.min(hatX-moScale*0.9,moX));
+      if(Math.abs(moVX)>0.4){ walkPhase+=0.25; if(anim%10===0)beep(160,0.04,"triangle",0.02); } else { walkPhase*=0.6; }
+      if(moX>=hatX-moScale*0.95-2){ mode="hatpick"; ding(); } }
+    if(mode==="elevator" && elevStage===1){ elevDoor=Math.min(1,elevDoor+0.03); if(elevDoor>=1){ elevStage=2; ding(); } }
+    if(mode==="playerdoor" && pdPhase===1){ pdDoor=Math.min(1,pdDoor+0.03); if(pdDoor>=1){ pdPhase=2; ding(); } }
+    if(mode==="stairs"){ if(stairHold){ stairProg=Math.min(1,stairProg+0.009); if(anim%10===0)beep(200+stairProg*200,0.04,"square",0.03); } else { stairProg=Math.max(0,stairProg-0.004); } if(stairProg>=1){ win("stairsdone"); } }
+    if(mode==="lockerwalk"){ moX += joy.dx*6.2; moX=Math.max(W*0.08,Math.min(lockerDoorX-moScale*0.9,moX)); if(Math.abs(joy.dx)>0.4){ walkPhase+=0.25; if(anim%10===0)beep(160,0.04,"triangle",0.02); } else { walkPhase*=0.6; } if(moX>=lockerDoorX-moScale*0.95-2){ win("lockerwalkdone"); } }
+    if(mode==="elevride"){
+      if(ridePhase===1){ if(doorHold){ teammateX += 4; if(anim%8===0)beep(300,0.03,"sine",0.02); if(teammateX>=W*0.5){ ridePhase=2; ding(); } } }
+      else if(ridePhase===2){ rideY=Math.min(3,rideY+0.013); if(anim%22===0)beep(300+rideY*120,0.05,"sine",0.03); if(rideY>=3){ ridePhase=3; ding(); } } }
+    if(mode==="garage"){ garageCarX += joy.dx*4.6; garageCarX=Math.max(W*0.1,Math.min(W*0.9,garageCarX)); if(Math.abs(joy.dx)>0.15 && anim%10===0)beep(90,0.04,"sawtooth",0.02);
+      if(Math.abs(garageCarX-garageSpotX)<moScale*0.7){ win("garagedone"); } }
+    if(mode==="driveup"){ if(driveHold){ driveProg=Math.min(1,driveProg+0.0075); if(anim%16===0)beep(80,0.05,"sawtooth",0.02); } else { driveProg=Math.max(0,driveProg-0.003); } if(driveProg>=1){ win("driveupdone"); } }
+    if(mode==="quiet"){ if(quietHold){ quietProg=Math.min(1,quietProg+0.009); if(anim%12===0)beep(200,0.04,"sine",0.02); } else { quietProg=Math.max(0,quietProg-0.005); } if(quietProg>=1){ win("quietdone"); } }
+    if(mode==="rps" && rpsShowT>0){ rpsShowT--; if(rpsShowT===0){ if(rpsWins>=2){ win("rpsdone"); } } }
+    if(mode==="colorgame"){ carSpawnT++;
+      if(carSpawnT%26===0){ var mkMine=Math.random()<0.5; var col=mkMine?myColor:COLORCHO[Math.floor(Math.random()*4)]; var lane=H*0.78+Math.floor(Math.random()*3)*moScale*0.9; carsDriving.push({x:W+40, y:lane, c:col.c, cn:col.n}); }
+      for(var di=carsDriving.length-1;di>=0;di--){ carsDriving[di].x-=3.4; if(carsDriving[di].x<-50) carsDriving.splice(di,1); } }
+  }
+  var CHALLENGES={bed:1,type:1,walk:1,eat:1,water:1,clockwalk:1,clocktype:1,pack:1,bowls:1,sign:1,hatwalk:1,hatpick:1,hours:1,charge:1,street:1,load:1,cooler:1,water5:1,flag:1,signseat:1,foam:1,jacket:1,closetrunk:1,family:1,song:1,mirrors:1,colorpick:1,colorgame:1,quiet:1,rps:1,guess:1,snackbag:1,driveup:1,followsigns:1,garage:1,elevator:1,elevride:1,stairs:1,lockerwalk:1,playerdoor:1,lockermusic:1,suitup:1};
+  function skipScene(){ switch(mode){
+    case "bed": toType(); break;
+    case "type": win("gday"); break;
+    case "walk": gotTickets=true; win("tickets"); break;
+    case "eat": win("fed"); break;
+    case "water": win("watered"); break;
+    case "clockwalk": toClockType(); break;
+    case "clocktype": win("timed"); break;
+    case "pack": win("packed"); break;
+    case "bowls": win("bowlsdone"); break;
+    case "sign": win("signdone"); break;
+    case "hatwalk": mode="hatpick"; break;
+    case "hatpick": if(moHat<0)moHat=0; win("hatdone"); break;
+    case "hours": win("hoursdone"); break;
+    case "charge": win("charged"); break;
+    case "street": win("atcar"); break;
+    case "load": win("loaded"); break;
+    case "cooler": win("coolerdone"); break;
+    case "water5": win("water5done"); break;
+    case "flag": win("flagdone"); break;
+    case "signseat": win("signseatdone"); break;
+    case "foam": win("foamdone"); break;
+    case "jacket": win("jacketdone"); break;
+    case "closetrunk": win("closetrunkdone"); break;
+    case "family": win("familydone"); break;
+    case "song": win("songdone"); break;
+    case "mirrors": win("mirrorsdone"); break;
+    case "colorpick": myColor=COLORCHO[0]; win("colordone"); break;
+    case "colorgame": win("colordone"); break;
+    case "quiet": win("quietdone"); break;
+    case "rps": rpsWins=2; win("rpsdone"); break;
+    case "guess": win("guessdone"); break;
+    case "snackbag": win("snackbagdone"); break;
+    case "driveup": win("driveupdone"); break;
+    case "followsigns": win("followsignsdone"); break;
+    case "garage": win("garagedone"); break;
+    case "elevator": toElevRide(); break;
+    case "elevride": win("elevridedone"); break;
+    case "stairs": win("stairsdone"); break;
+    case "lockerwalk": win("lockerwalkdone"); break;
+    case "playerdoor": win("playerdoordone"); break;
+    case "lockermusic": win("lockermusicdone"); break;
+    case "suitup": win("suitupdone"); break;
+  } }
+  document.getElementById("skipBtn").onclick=function(){ ac(); skipScene(); };
+  function frame(){ requestAnimationFrame(frame); update(); draw(); try{ document.getElementById("skipBtn").classList.toggle("show", !!CHALLENGES[mode]); }catch(e){} }
+  resize(); requestAnimationFrame(frame);
+
+  function pt(e){ var t=e.touches&&e.touches[0]?e.touches[0]:e; var r=cv.getBoundingClientRect(); return {x:(t.clientX-r.left)*(W/r.width), y:(t.clientY-r.top)*(H/r.height)}; }
+  function down(e){ ac(); var p=pt(e);
+    if(mode==="bed"){ if(e.cancelable)e.preventDefault(); var hx=W/2, hy=bed.y; if(Math.abs(p.x-hx)<bed.w*0.5 && Math.abs(p.y-hy)<bed.h*1.2){ dragging=true; onBed=false; moPos.x=p.x; moPos.y=p.y; beep(500,0.05,"sine",0.04); } }
+    else if(mode==="gday"){ if(hitBtn(p)){ toWalk(); } }
+    else if(mode==="tickets"){ if(hitBtn(p)){ toEat(); } }
+    else if(mode==="fed"){ if(hitBtn(p)){ toWater(); } }
+    else if(mode==="watered"){ if(hitBtn(p)){ toClockWalk(); } }
+    else if(mode==="timed"){ if(hitBtn(p)){ toPack(); } }
+    else if(mode==="packed"){ if(hitBtn(p)){ toBowls(); } }
+    else if(mode==="bowlsdone"){ if(hitBtn(p)){ toSign(); } }
+    else if(mode==="signdone"){ if(hitBtn(p)){ toHats(); } }
+    else if(mode==="hatdone"){ if(hitBtn(p)){ toHours(); } }
+    else if(mode==="hoursdone"){ if(hitBtn(p)){ toCharge(); } }
+    else if(mode==="charged"){ if(hitBtn(p)){ toStreet(); } }
+    else if(mode==="atcar"){ if(hitBtn(p)){ toLoad(); } }
+    else if(mode==="loaded"){ if(hitBtn(p)){ toCooler(); } }
+    else if(mode==="coolerdone"){ if(hitBtn(p)){ toWater5(); } }
+    else if(mode==="water5done"){ if(hitBtn(p)){ toFlag(); } }
+    else if(mode==="flagdone"){ if(hitBtn(p)){ toSignSeat(); } }
+    else if(mode==="signseatdone"){ if(hitBtn(p)){ toFoam(); } }
+    else if(mode==="foamdone"){ if(hitBtn(p)){ toJacket(); } }
+    else if(mode==="foam"){ if(e.cancelable)e.preventDefault(); if(Math.hypot(p.x-foamItem.x,p.y-foamItem.y)<moScale*0.9){ foamDrag=true; } }
+    else if(mode==="jacketdone"){ if(hitBtn(p)){ toClose(); } }
+    else if(mode==="closetrunkdone"){ if(hitBtn(p)){ toFamily(); } }
+    else if(mode==="jacket"){ if(e.cancelable)e.preventDefault(); if(Math.hypot(p.x-jacketItem.x,p.y-jacketItem.y)<moScale*0.9){ jacketDrag=true; } }
+    else if(mode==="closetrunk"){ if(e.cancelable)e.preventDefault(); trunkDrag=true; }
+    else if(mode==="familydone"){ if(hitBtn(p)){ toSong(); } }
+    else if(mode==="songdone"){ if(hitBtn(p)){ toMirrors(); } }
+    else if(mode==="mirrorsdone"){ if(hitBtn(p)){ toColorPick(); } }
+    else if(mode==="colordone"){ if(hitBtn(p)){ toQuiet(); } }
+    else if(mode==="quietdone"){ if(hitBtn(p)){ toRps(); } }
+    else if(mode==="rpsdone"){ if(hitBtn(p)){ toGuess(); } }
+    else if(mode==="guessdone"){ if(hitBtn(p)){ toSnackBag(); } }
+    else if(mode==="snackbagdone"){ if(hitBtn(p)){ toDriveUp(); } }
+    else if(mode==="driveupdone"){ if(hitBtn(p)){ toFollow(); } }
+    else if(mode==="followsignsdone"){ if(hitBtn(p)){ toGarage(); } }
+    else if(mode==="garagedone"){ if(hitBtn(p)){ toElevator(); } }
+    else if(mode==="elevatordone"){ if(hitBtn(p)){ reset(); } }
+    else if(mode==="elevridedone"){ if(hitBtn(p)){ toStairs(); } }
+    else if(mode==="stairsdone"){ if(hitBtn(p)){ toLockerWalk(); } }
+    else if(mode==="lockerwalkdone"){ if(hitBtn(p)){ toPlayerDoor(); } }
+    else if(mode==="playerdoordone"){ if(hitBtn(p)){ toLockerMusic(); } }
+    else if(mode==="lockermusicdone"){ if(hitBtn(p)){ toSuitUp(); } }
+    else if(mode==="suitupdone"){ if(hitBtn(p)){ reset(); } }
+    else if(mode==="suitup"){ if(e.cancelable)e.preventDefault(); for(var si5=dressItems.length-1;si5>=0;si5--){ if(dressItems[si5].on)continue; if(Math.hypot(p.x-dressItems[si5].x,p.y-dressItems[si5].y)<moScale*0.7){ dressItem=si5; break; } } }
+    else if(mode==="lockermusic"){ var spx=W*0.8, spy=H*0.34; if(Math.abs(p.x-spx)<moScale*0.9 && Math.abs(p.y-spy)<moScale) { beep(523,0.12,"square",0.05); setTimeout(function(){beep(659,0.12,"square",0.05);},130); setTimeout(function(){beep(784,0.14,"square",0.05);},260); setTimeout(function(){beep(1047,0.18,"square",0.05);},390); win("lockermusicdone"); } }
+    else if(mode==="playerdoor"){ var dw=W*0.5,dh=H*0.5,dx=W/2-dw/2,dy=H*0.26;
+      if(pdPhase===0){ var rx=dx+dw+30, ry=dy+dh*0.5; if(Math.abs(p.x-rx)<34 && Math.abs(p.y-ry)<44){ pdPhase=1; beep(880,0.08,"sine",0.06); setTimeout(function(){beep(1200,0.1,"sine",0.05);},90); } }
+      else if(pdPhase===2){ if(p.x>dx && p.x<dx+dw && p.y>dy && p.y<dy+dh){ beep(700,0.1,"sine",0.05); win("playerdoordone"); } } }
+    else if(mode==="stairs"){ if(e.cancelable)e.preventDefault(); stairHold=true; }
+    else if(mode==="lockerwalk"){ if(e.cancelable)e.preventDefault(); if(Math.hypot(p.x-joy.bx,p.y-joy.by)<joy.r*1.6){ joy.active=true; moveJoy(p); } }
+    else if(mode==="elevride"){
+      if(ridePhase===0){ for(var fi=0;fi<4;fi++){ var fbx=W*0.78, fby=H*0.32+fi*H*0.1; if(FLOORS[3-fi]==="LR" && Math.hypot(p.x-fbx,p.y-fby)<moScale*0.7){ ridePhase=1; teammateX=-W*0.1; ding(); } } }
+      else if(ridePhase===1){ var obx=W*0.8, oby=H*0.82; if(Math.abs(p.x-obx)<W*0.15 && Math.abs(p.y-oby)<34){ doorHold=true; } }
+      else if(ridePhase===3){ if(p.x>W*0.1 && p.x<W*0.9 && p.y>H*0.2){ beep(700,0.1,"sine",0.05); win("elevridedone"); } } }
+    else if(mode==="elevator"){ var ex=W*0.42, ey=H*0.26, ew=W*0.46, eh=H*0.5;
+      if(elevStage===0){ var bx=ex+ew+28, by=ey+eh*0.4; if(Math.hypot(p.x-bx,p.y-by)<moScale*0.7){ elevStage=1; ding(); } }
+      else if(elevStage===2){ if(p.x>ex && p.x<ex+ew && p.y>ey && p.y<ey+eh){ beep(700,0.1,"sine",0.05); toElevRide(); } } }
+    else if(mode==="garage"){ if(e.cancelable)e.preventDefault(); if(Math.hypot(p.x-joy.bx,p.y-joy.by)<joy.r*1.6){ joy.active=true; moveJoy(p); } }
+    else if(mode==="driveup"){ if(e.cancelable)e.preventDefault(); driveHold=true; }
+    else if(mode==="followsigns"){ var hitL=Math.abs(p.x-W*0.28)<W*0.17 && Math.abs(p.y-H*0.84)<40, hitR=Math.abs(p.x-W*0.72)<W*0.17 && Math.abs(p.y-H*0.84)<40; var ch=hitL?-1:(hitR?1:0); if(ch!==0){ if(ch===followDir){ followStep++; beep(600+followStep*120,0.08,"sine",0.05); if(followStep>=3){ win("followsignsdone"); } else { followDir=(Math.random()<0.5?-1:1); } } else { beep(160,0.1,"sawtooth",0.04); } } }
+    else if(mode==="snackbag"){ if(e.cancelable)e.preventDefault(); for(var bs=bagSnacks.length-1;bs>=0;bs--){ if(bagSnacks[bs].eaten)continue; if(Math.hypot(p.x-bagSnacks[bs].x,p.y-bagSnacks[bs].y)<moScale*0.5){ dragBagSnack=bs; break; } } }
+    else if(mode==="quiet"){ if(e.cancelable)e.preventDefault(); quietHold=true; }
+    else if(mode==="rps"){ if(rpsShowT>0)return; for(var ri=0;ri<3;ri++){ var rx=W*0.5-W*0.42+ri*W*0.3, ry=H*0.56, rw=W*0.26, rh=H*0.18; if(p.x>rx&&p.x<rx+rw&&p.y>ry&&p.y<ry+rh){ playRps(ri); break; } } }
+    else if(mode==="guess"){ var gv=(document.getElementById("word").value||"").replace(/\D/g,""); if(gv.length>=1 && Math.abs(p.x-W/2)<100 && Math.abs(p.y-(H*0.68+23))<28){ beep(700,0.1,"sine",0.05); win("guessdone"); } }
+    else if(mode==="mirrors"){ for(var mr=0;mr<mirrors.length;mr++){ var m=mirrors[mr]; if(m.checked)continue; if(Math.abs(p.x-m.x)<moScale*0.75 && Math.abs(p.y-m.y)<moScale*0.55){ m.checked=true; mirrorCount++; beep(500+mirrorCount*140,0.08,"sine",0.05); if(mirrorCount>=3){ win("mirrorsdone"); } break; } } }
+    else if(mode==="colorpick"){ for(var ci=0;ci<4;ci++){ var bx=W*0.5-W*0.36+(ci%2)*W*0.38, by=H*0.34+Math.floor(ci/2)*H*0.2, bw=W*0.32, bh=H*0.14; if(p.x>bx&&p.x<bx+bw&&p.y>by&&p.y<by+bh){ myColor=COLORCHO[ci]; toColorGame(); break; } } }
+    else if(mode==="colorgame"){ var w=moScale*1.6; for(var di=carsDriving.length-1;di>=0;di--){ var cr=carsDriving[di]; if(Math.abs(p.x-cr.x)<w*0.55 && Math.abs(p.y-cr.y)<moScale){ if(cr.cn===myColor.n){ colorScore++; carsDriving.splice(di,1); beep(500+colorScore*120,0.08,"sine",0.05); if(colorScore>=5){ win("colordone"); } } else { beep(150,0.1,"sawtooth",0.04); } break; } } }
+    else if(mode==="song"){ var sl=songSlots(); var rh=moScale*0.9; for(var i=0;i<sl.length;i++){ if(p.y>sl[i].y-rh/2 && p.y<sl[i].y+rh/2 && p.x>W*0.12 && p.x<W*0.88){ if(sl[i].correct){ songPicked=true; beep(523,0.12,"square",0.05); setTimeout(function(){beep(659,0.12,"square",0.05);},130); setTimeout(function(){beep(784,0.16,"square",0.05);},260); win("songdone"); } else { beep(180,0.12,"sawtooth",0.04); } break; } } }
+    else if(mode==="family" && !famTypeOn){ for(var fm=0;fm<famMembers.length;fm++){ var mb=famMembers[fm]; if(mb.tapped)continue; if(Math.hypot(p.x-mb.x,p.y-(floorY-moScale*0.5))<moScale*0.8){ mb.tapped=true; famCount++; beep(500+famCount*120,0.08,"sine",0.05); if(famCount>=famMembers.length){ famTypeOn=true; var ww=document.getElementById("word"); ww.value=""; ww.placeholder="type: 4"; ww.setAttribute("inputmode","numeric"); document.getElementById("typeWrap").classList.add("show"); setTimeout(function(){try{ww.focus();}catch(e){}},80); } break; } } }
+    else if(mode==="flag"){ if(e.cancelable)e.preventDefault(); if(Math.hypot(p.x-flag.x,p.y-flag.y)<moScale*0.9){ flagDrag=true; } }
+    else if(mode==="signseat"){ if(e.cancelable)e.preventDefault(); if(Math.hypot(p.x-seatSign.x,p.y-seatSign.y)<moScale*0.9){ seatDrag=true; } }
+    else if(mode==="water5"){ if(e.cancelable)e.preventDefault(); for(var wi=waters.length-1;wi>=0;wi--){ if(waters[wi].inHolder)continue; if(Math.hypot(p.x-waters[wi].x,p.y-waters[wi].y)<moScale*0.7){ dragWater=wi; break; } } }
+    else if(mode==="load"){ if(e.cancelable)e.preventDefault(); if(Math.hypot(p.x-loadBag.x,p.y-loadBag.y)<moScale*0.9){ loadDrag=true; } }
+    else if(mode==="cooler"){ if(e.cancelable)e.preventDefault(); for(var sc=snacks.length-1;sc>=0;sc--){ if(snacks[sc].inCooler)continue; if(Math.hypot(p.x-snacks[sc].x,p.y-snacks[sc].y)<moScale*0.5){ dragSnack=sc; break; } } }
+    else if(mode==="charge"){ if(e.cancelable)e.preventDefault(); for(var pp=plugs.length-1;pp>=0;pp--){ if(plugs[pp].placed)continue; if(Math.hypot(p.x-plugs[pp].x,p.y-plugs[pp].y)<moScale*0.5){ dragPlug=pp; break; } } }
+    else if(mode==="hatpick"){ var sl=hatSlots(); for(var hi=0;hi<3;hi++){ if(Math.hypot(p.x-sl[hi].x,p.y-sl[hi].y)<moScale*0.6){ moHat=hi; beep(700,0.08,"sine",0.05); win("hatdone"); break; } } }
+    else if(mode==="pack"){ if(e.cancelable)e.preventDefault(); for(var bi=bagItems.length-1;bi>=0;bi--){ if(bagItems[bi].packed)continue; if(Math.hypot(p.x-bagItems[bi].x,p.y-bagItems[bi].y)<moScale*0.6){ dragItem=bi; break; } } }
+    else if(mode==="sign"){ if(e.cancelable)e.preventDefault(); penDrag=true; pen.x=p.x; pen.y=p.y; }
+    else if(mode==="walk"||mode==="clockwalk"||mode==="bowls"||mode==="street"||mode==="hatwalk"){ if(e.cancelable)e.preventDefault(); if(Math.hypot(p.x-joy.bx,p.y-joy.by)<joy.r*1.6){ joy.active=true; moveJoy(p); } }
+    else if(mode==="eat"){ if(e.cancelable)e.preventDefault(); for(var fi=foods.length-1;fi>=0;fi--){ if(foods[fi].eaten)continue; if(Math.hypot(p.x-foods[fi].x,p.y-foods[fi].y)<moScale*0.5){ dragFood=fi; break; } } }
+    else if(mode==="water"){ if(e.cancelable)e.preventDefault(); if(Math.hypot(p.x-bottle.x,p.y-bottle.y)<moScale*0.8){ bottleDrag=true; } }
+  }
+  function hitBtn(p){ return Math.abs(p.x-W/2)<120 && Math.abs(p.y-(H*0.85+24))<30; }
+  function moveJoy(p){ var dx=p.x-joy.bx, dy=p.y-joy.by, d=Math.hypot(dx,dy), m=Math.min(d,joy.r); if(d>0){ joy.kx=joy.bx+dx/d*m; joy.ky=joy.by+dy/d*m; } joy.dx=(joy.kx-joy.bx)/joy.r; }
+  function move(e){ var p;
+    if(dragging && mode==="bed"){ if(e.cancelable)e.preventDefault(); p=pt(e); moPos.x=p.x; moPos.y=p.y; if(moPos.y>bed.y+bed.h+30){ dragging=false; onBed=false; beep(700,0.08,"sine",0.05); ding(); toType(); } }
+    else if(joy.active && (mode==="walk"||mode==="clockwalk"||mode==="bowls"||mode==="street"||mode==="hatwalk"||mode==="garage"||mode==="lockerwalk")){ if(e.cancelable)e.preventDefault(); moveJoy(pt(e)); }
+    else if(penDrag && mode==="sign"){ if(e.cancelable)e.preventDefault(); p=pt(e); var r=paperRect(); var tipx=pen.x, tipy=pen.y;
+      if(p.x>r.x&&p.x<r.x+r.w&&p.y>r.y&&p.y<r.y+r.h){ var dd=Math.hypot(p.x-pen.x,p.y-pen.y); signProg=Math.min(1,signProg+dd*0.0016); inkPts.push({x:p.x,y:p.y}); if(inkPts.length>400)inkPts.shift(); if(anim%5===0)beep(500+signProg*300,0.03,"sawtooth",0.02); if(signProg>=1){ win("signdone"); } }
+      pen.x=p.x; pen.y=p.y; }
+    else if(dragFood>=0 && mode==="eat"){ if(e.cancelable)e.preventDefault(); p=pt(e); foods[dragFood].x=p.x; foods[dragFood].y=p.y;
+      if(Math.hypot(p.x-mouthX,p.y-mouthY)<moScale*0.55){ foods[dragFood].eaten=true; eatenCount++; chomp=14; beep(220,0.08,"square",0.05); setTimeout(function(){beep(150,0.06,"square",0.04);},70); dragFood=-1; if(eatenCount>=foods.length){ win("fed"); } } }
+    else if(bottleDrag && mode==="water"){ if(e.cancelable)e.preventDefault(); p=pt(e); bottle.x=Math.max(W*0.08,Math.min(W*0.92,p.x)); bottle.y=Math.max(sinkY+20,Math.min(floorY-10,p.y)); }
+    else if(dressItem>=0 && mode==="suitup"){ if(e.cancelable)e.preventDefault(); p=pt(e); dressItems[dressItem].x=p.x; dressItems[dressItem].y=p.y;
+      if(Math.hypot(p.x-dressMoX,p.y-(dressMoY-moScale*0.4))<moScale*0.95){ dressItems[dressItem].on=true; if(dressItems[dressItem].kind==="jersey")dressJerseyOn=true; else dressShortsOn=true; beep(560,0.07,"sine",0.05); setTimeout(function(){beep(820,0.06,"sine",0.04);},60); dressItem=-1; if(dressJerseyOn&&dressShortsOn){ win("suitupdone"); } } }
+    else if(dragBagSnack>=0 && mode==="snackbag"){ if(e.cancelable)e.preventDefault(); p=pt(e); bagSnacks[dragBagSnack].x=p.x; bagSnacks[dragBagSnack].y=p.y;
+      if(Math.hypot(p.x-snackMouthX,p.y-snackMouthY)<moScale*0.6){ bagSnacks[dragBagSnack].eaten=true; snackChomp=16; beep(220,0.08,"square",0.05); setTimeout(function(){beep(150,0.06,"square",0.04);},70); dragBagSnack=-1; win("snackbagdone"); } }
+    else if(dragPlug>=0 && mode==="charge"){ if(e.cancelable)e.preventDefault(); p=pt(e); plugs[dragPlug].x=p.x; plugs[dragPlug].y=p.y;
+      if(Math.hypot(p.x-plugs[dragPlug].tx,p.y-plugs[dragPlug].ty)<moScale*0.65){ plugs[dragPlug].placed=true; beep(520,0.07,"sine",0.05); setTimeout(function(){beep(760,0.06,"sine",0.04);},60); dragPlug=-1; if(plugs[0].placed&&plugs[1].placed){ win("charged"); } } }
+    else if(loadDrag && mode==="load"){ if(e.cancelable)e.preventDefault(); p=pt(e); loadBag.x=p.x; loadBag.y=p.y;
+      if(Math.hypot(p.x-carLoadX,p.y-(floorY-moScale*1.0))<moScale*0.95){ loadDrag=false; beep(520,0.07,"sine",0.05); setTimeout(function(){beep(300,0.08,"square",0.04);},60); win("loaded"); } }
+    else if(dragSnack>=0 && mode==="cooler"){ if(e.cancelable)e.preventDefault(); p=pt(e); snacks[dragSnack].x=p.x; snacks[dragSnack].y=p.y;
+      if(Math.hypot(p.x-coolerX,p.y-(coolerY-moScale*0.7))<moScale*0.95){ snacks[dragSnack].inCooler=true; snackCount++; beep(620,0.06,"sine",0.05); setTimeout(function(){beep(880,0.05,"sine",0.04);},55); dragSnack=-1; if(snackCount>=snacks.length){ win("coolerdone"); } } }
+    else if(dragWater>=0 && mode==="water5"){ if(e.cancelable)e.preventDefault(); p=pt(e); waters[dragWater].x=p.x; waters[dragWater].y=p.y;
+      for(var hh=0;hh<holders.length;hh++){ if(holders[hh].filled)continue; if(Math.hypot(p.x-holders[hh].x,p.y-holders[hh].y)<moScale*0.6){ holders[hh].filled=true; waters[dragWater].inHolder=true; waterCount++; beep(600,0.06,"sine",0.05); setTimeout(function(){beep(850,0.05,"sine",0.04);},55); dragWater=-1; if(waterCount>=5){ win("water5done"); } break; } } }
+    else if(flagDrag && mode==="flag"){ if(e.cancelable)e.preventDefault(); p=pt(e); flag.x=p.x; flag.y=p.y;
+      if(Math.hypot(p.x-(flagCarX-moScale*0.35),p.y-(floorY-moScale*1.55))<moScale*0.8){ flagDrag=false; beep(560,0.07,"sine",0.05); setTimeout(function(){beep(820,0.06,"sine",0.04);},60); win("flagdone"); } }
+    else if(seatDrag && mode==="signseat"){ if(e.cancelable)e.preventDefault(); p=pt(e); seatSign.x=p.x; seatSign.y=p.y;
+      if(Math.hypot(p.x-(seatCarX-moScale*0.1),p.y-(floorY-moScale*1.4))<moScale*0.85){ seatDrag=false; beep(560,0.07,"sine",0.05); setTimeout(function(){beep(820,0.06,"sine",0.04);},60); win("signseatdone"); } }
+    else if(foamDrag && mode==="foam"){ if(e.cancelable)e.preventDefault(); p=pt(e); foamItem.x=p.x; foamItem.y=p.y;
+      if(Math.hypot(p.x-foamCarX,p.y-(floorY-moScale*0.95))<moScale*0.85){ foamDrag=false; beep(560,0.07,"sine",0.05); setTimeout(function(){beep(820,0.06,"sine",0.04);},60); win("foamdone"); } }
+    else if(jacketDrag && mode==="jacket"){ if(e.cancelable)e.preventDefault(); p=pt(e); jacketItem.x=p.x; jacketItem.y=p.y;
+      if(Math.hypot(p.x-jacketCarX,p.y-(floorY-moScale*0.95))<moScale*0.85){ jacketDrag=false; beep(560,0.07,"sine",0.05); setTimeout(function(){beep(820,0.06,"sine",0.04);},60); win("jacketdone"); } }
+    else if(trunkDrag && mode==="closetrunk"){ if(e.cancelable)e.preventDefault(); p=pt(e); var dyp=(p.y-(floorY-moScale*1.8))/(moScale*1.6); trunkProg=Math.max(0,Math.min(1,dyp)); if(anim%5===0)beep(300+trunkProg*200,0.03,"square",0.02); if(trunkProg>=1){ trunkDrag=false; beep(300,0.1,"square",0.05); win("closetrunkdone"); } }
+    else if(dragItem>=0 && mode==="pack"){ if(e.cancelable)e.preventDefault(); p=pt(e); bagItems[dragItem].x=p.x; bagItems[dragItem].y=p.y;
+      if(Math.hypot(p.x-bagX,p.y-(bagY-moScale*0.85))<moScale*0.95){ bagItems[dragItem].packed=true; packedCount++; beep(620,0.07,"sine",0.05); setTimeout(function(){beep(880,0.06,"sine",0.04);},60); dragItem=-1; if(packedCount>=bagItems.length){ win("packed"); } } }
+  }
+  function up(){ if(mode==="bed" && dragging){ dragging=false; if(moPos.y<=bed.y+bed.h+30){ onBed=true; } }
+    if(joy.active){ joy.active=false; joy.kx=joy.bx; joy.ky=joy.by; joy.dx=0; }
+    if(dragFood>=0){ foods[dragFood].x=foods[dragFood].hx; foods[dragFood].y=foods[dragFood].hy; dragFood=-1; }
+    if(bottleDrag){ bottleDrag=false; }
+    if(dragItem>=0){ bagItems[dragItem].x=bagItems[dragItem].hx; bagItems[dragItem].y=bagItems[dragItem].hy; dragItem=-1; }
+    if(penDrag){ penDrag=false; }
+    if(dragPlug>=0){ plugs[dragPlug].x=plugs[dragPlug].hx; plugs[dragPlug].y=plugs[dragPlug].hy; dragPlug=-1; }
+    if(loadDrag){ loadDrag=false; loadBag.x=W*0.28; loadBag.y=floorY-moScale*0.7; }
+    if(dragSnack>=0){ snacks[dragSnack].x=snacks[dragSnack].hx; snacks[dragSnack].y=snacks[dragSnack].hy; dragSnack=-1; }
+    if(dragWater>=0){ waters[dragWater].x=waters[dragWater].hx; waters[dragWater].y=waters[dragWater].hy; dragWater=-1; }
+    if(flagDrag){ flagDrag=false; flag.x=W*0.25; flag.y=floorY-moScale*0.8; }
+    if(seatDrag){ seatDrag=false; seatSign.x=W*0.25; seatSign.y=floorY-moScale*0.6; }
+    if(foamDrag){ foamDrag=false; foamItem.x=W*0.25; foamItem.y=floorY-moScale*0.6; }
+    if(jacketDrag){ jacketDrag=false; jacketItem.x=W*0.25; jacketItem.y=floorY-moScale*0.6; }
+    if(trunkDrag){ trunkDrag=false; }
+    if(quietHold){ quietHold=false; }
+    if(driveHold){ driveHold=false; }
+    if(doorHold){ doorHold=false; }
+    if(stairHold){ stairHold=false; }
+    if(dragBagSnack>=0){ bagSnacks[dragBagSnack].x=bagSnacks[dragBagSnack].hx; bagSnacks[dragBagSnack].y=bagSnacks[dragBagSnack].hy; dragBagSnack=-1; }
+    if(dressItem>=0){ dressItems[dressItem].x=dressItems[dressItem].hx; dressItems[dressItem].y=dressItems[dressItem].hy; dressItem=-1; } }
+  cv.addEventListener("mousedown",down); addEventListener("mousemove",move); addEventListener("mouseup",up);
+  cv.addEventListener("touchstart",down,{passive:false}); addEventListener("touchmove",move,{passive:false}); addEventListener("touchend",up);
+
+  function confetti(){ conf=[]; var cols=["#ffcf5a","#37e0ff","#e8545a","#4fbf6a","#b06ad8","#fff"]; for(var i=0;i<60;i++){ conf.push({x:Math.random()*W,y:Math.random()*-H,vy:2+Math.random()*3,vx:(Math.random()-0.5)*1.5,r:Math.random()*6,vr:(Math.random()-0.5)*0.3,col:cols[i%cols.length]}); } }
+  function startGame(){ ac(); mode="bed"; onBed=true; dragging=false; gotTickets=false; moHat=-1; document.getElementById("ui").style.display="none"; layout(); }
+  function toType(){ mode="type"; var w=document.getElementById("word"); w.value=""; w.placeholder="type: GAME DAY"; w.setAttribute("inputmode","text"); document.getElementById("typeWrap").classList.add("show"); setTimeout(function(){ try{w.focus();}catch(e){} },60); }
+  function toWalk(){ mode="walk"; moX=W*0.14; moVX=0; walkPhase=0; joy.dx=0; joy.kx=joy.bx; joy.ky=joy.by; }
+  function toEat(){ mode="eat"; moEatX=W*0.30; mouthX=moEatX; mouthY=floorY-moScale*0.84; eatenCount=0; dragFood=-1; chomp=0;
+    var items=["🥣","🍞","🍌","🍎"]; foods=[]; for(var i=0;i<items.length;i++){ var fx=W*0.60+i*W*0.095; foods.push({emoji:items[i], hx:fx, hy:floorY-44, x:fx, y:floorY-44, eaten:false}); } }
+  function toWater(){ mode="water"; fill=0; bottleDrag=false; sinkX=W*0.2; sinkY=floorY-150; bottle.x=W*0.72; bottle.y=floorY-moScale*0.7; }
+  function toClockWalk(){ mode="clockwalk"; moX=W*0.14; moVX=0; walkPhase=0; atClock=false; clockX=W*0.82; clockCY=H*0.40; joy.dx=0; joy.kx=joy.bx; joy.ky=joy.by; }
+  function toBowls(){ mode="bowls"; moX=W*0.12; moVX=0; walkPhase=0; bowlsX=W*0.8; joy.dx=0; joy.kx=joy.bx; joy.ky=joy.by; }
+  function toSign(){ mode="sign"; signProg=0; inkPts=[]; penDrag=false; pen.x=W*0.7; pen.y=H*0.32; }
+  function toHats(){ mode="hatwalk"; moX=W*0.12; moVX=0; walkPhase=0; hatX=W*0.8; joy.dx=0; joy.kx=joy.bx; joy.ky=joy.by; }
+  function toStreet(){ mode="street"; moX=W*0.1; moVX=0; walkPhase=0; streetGoalX=W*0.86; joy.dx=0; joy.kx=joy.bx; joy.ky=joy.by; }
+  function toLoad(){ mode="load"; carLoadX=W*0.7; loadDrag=false; loadBag.x=W*0.28; loadBag.y=floorY-moScale*0.7; }
+  function toCooler(){ mode="cooler"; snackCount=0; dragSnack=-1; coolerX=W*0.32; coolerY=floorY-4;
+    var items=["🍎","🍪","🥨","🧃"]; snacks=[]; for(var i=0;i<items.length;i++){ var ix=W*0.52+i*W*0.1; snacks.push({emoji:items[i], hx:ix, hy:floorY-44, x:ix, y:floorY-44, inCooler:false}); } }
+  function toFlag(){ mode="flag"; flagCarX=W*0.7; flagDrag=false; flag.x=W*0.25; flag.y=floorY-moScale*0.8; }
+  function toSignSeat(){ mode="signseat"; seatCarX=W*0.7; seatDrag=false; seatSign.x=W*0.25; seatSign.y=floorY-moScale*0.6; }
+  function toFoam(){ mode="foam"; foamCarX=W*0.7; foamDrag=false; foamItem.x=W*0.25; foamItem.y=floorY-moScale*0.6; }
+  function toJacket(){ mode="jacket"; jacketCarX=W*0.7; jacketDrag=false; jacketItem.x=W*0.25; jacketItem.y=floorY-moScale*0.6; }
+  function toClose(){ mode="closetrunk"; trunkCarX=W*0.7; trunkDrag=false; trunkProg=0; }
+  function toSong(){ mode="song"; songPicked=false; }
+  function toMirrors(){ mode="mirrors"; mirrorCount=0; mirrors=[ {x:W*0.2,y:H*0.36,label:"LEFT",checked:false}, {x:W*0.5,y:H*0.24,label:"REARVIEW",checked:false}, {x:W*0.8,y:H*0.36,label:"RIGHT",checked:false} ]; }
+  function toColorPick(){ mode="colorpick"; myColor=null; }
+  function toColorGame(){ mode="colorgame"; colorScore=0; carsDriving=[]; carSpawnT=0; }
+  function toQuiet(){ mode="quiet"; quietProg=0; quietHold=false; }
+  function toRps(){ mode="rps"; rpsWins=0; rpsCpuWins=0; rpsPlayer=-1; rpsCpu=-1; rpsResult=""; rpsShowT=0; }
+  function playRps(pick){ rpsPlayer=pick; rpsCpu=Math.floor(Math.random()*3); rpsShowT=80;
+    if(rpsPlayer===rpsCpu){ rpsResult="TIE!"; beep(400,0.1,"sine",0.04); }
+    else if((rpsPlayer===0&&rpsCpu===2)||(rpsPlayer===1&&rpsCpu===0)||(rpsPlayer===2&&rpsCpu===1)){ rpsResult="YOU WIN!"; rpsWins++; beep(700,0.1,"sine",0.05); }
+    else { rpsResult="Family wins!"; rpsCpuWins++; beep(200,0.1,"sawtooth",0.04); } }
+  function toDriveUp(){ mode="driveup"; driveProg=0; driveHold=false; }
+  function toFollow(){ mode="followsigns"; followStep=0; followDir=(Math.random()<0.5?-1:1); }
+  function toGarage(){ mode="garage"; garageCarX=W*0.15; garageSpotX=W*0.52+Math.random()*W*0.3; garageParkT=0; joy.dx=0; joy.kx=joy.bx; joy.ky=joy.by; }
+  function toElevator(){ mode="elevator"; elevStage=0; elevDoor=0; }
+  function toElevRide(){ mode="elevride"; ridePhase=0; teammateX=-W*0.1; doorHold=false; rideY=0; }
+  function toStairs(){ mode="stairs"; stairProg=0; stairHold=false; }
+  function toPlayerDoor(){ mode="playerdoor"; pdPhase=0; pdDoor=0; }
+  function toLockerMusic(){ mode="lockermusic"; }
+  function toSuitUp(){ mode="suitup"; dressJerseyOn=false; dressShortsOn=false; dressItem=-1; dressMoX=W*0.5; dressMoY=H*0.78;
+    dressItems=[{kind:"jersey",hx:W*0.16,hy:H*0.44,x:W*0.16,y:H*0.44,on:false},{kind:"shorts",hx:W*0.84,hy:H*0.44,x:W*0.84,y:H*0.44,on:false}]; }
+  function toLockerWalk(){ mode="lockerwalk"; moX=W*0.12; moVX=0; walkPhase=0; lockerDoorX=W*0.82; joy.dx=0; joy.kx=joy.bx; joy.ky=joy.by; }
+  function toSnackBag(){ mode="snackbag"; dragBagSnack=-1; snackChomp=0; snackMouthX=W*0.26; snackMouthY=floorY-moScale*0.84;
+    var items=["🍿","🍪","🥨"]; bagSnacks=[]; for(var i=0;i<items.length;i++){ var ix=W*0.66+i*W*0.08, iy=floorY-moScale*(0.9-i*0.15); bagSnacks.push({emoji:items[i], hx:ix, hy:iy, x:ix, y:iy, eaten:false}); } }
+  function toGuess(){ mode="guess"; var ww=document.getElementById("word"); ww.value=""; ww.placeholder="type your guess"; ww.setAttribute("inputmode","numeric"); document.getElementById("typeWrap").classList.add("show"); setTimeout(function(){try{ww.focus();}catch(e){}},80); }
+  function toFamily(){ mode="family"; famCount=0; famTypeOn=false; var cols=["#e8402a","#1f5fd0","#8e44ad","#2f8f5a"];
+    famMembers=[]; for(var i=0;i<4;i++){ famMembers.push({x:W*0.14+i*W*0.15, col:cols[i], tapped:false}); } }
+  function toWater5(){ mode="water5"; waterCount=0; dragWater=-1; var hy=H*0.5+moScale*0.3;
+    holders=[]; for(var i=0;i<5;i++){ holders.push({x:W*0.2+i*W*0.15, y:hy, filled:false}); }
+    waters=[]; for(var j=0;j<5;j++){ var wx=W*0.18+j*W*0.16; waters.push({hx:wx, hy:floorY-30, x:wx, y:floorY-30, inHolder:false}); } }
+  function toHours(){ mode="hours"; var ww=document.getElementById("word"); ww.value=""; ww.placeholder="type: 10"; ww.setAttribute("inputmode","numeric"); document.getElementById("typeWrap").classList.add("show"); setTimeout(function(){ try{ww.focus();}catch(e){} },60); }
+  function toCharge(){ mode="charge"; dragPlug=-1; document.getElementById("typeWrap").classList.remove("show"); try{document.getElementById("word").blur();}catch(e){}
+    outlet.x=W*0.85; outlet.y=H*0.5; camPort.x=W*0.28-moScale*0.65-8; camPort.y=floorY-34-moScale*0.45;
+    plugs=[ {kind:"cam", hx:W*0.45,hy:floorY-24, x:W*0.45,y:floorY-24, tx:camPort.x, ty:camPort.y, placed:false},
+            {kind:"wall", hx:W*0.62,hy:floorY-24, x:W*0.62,y:floorY-24, tx:outlet.x, ty:outlet.y, placed:false} ]; }
+  function toPack(){ mode="pack"; packedCount=0; dragItem=-1; bagX=W*0.33; bagY=floorY-6;
+    var kinds=["bottle","🎟️","🧢","🍎"]; bagItems=[]; for(var i=0;i<kinds.length;i++){ var ix=W*0.58+i*W*0.105; bagItems.push({kind:kinds[i], hx:ix, hy:floorY-44, x:ix, y:floorY-44, packed:false}); } }
+  function toClockType(){ mode="clocktype"; var ww=document.getElementById("word"); ww.value=""; ww.placeholder="type: 7:00"; ww.setAttribute("inputmode","numeric"); document.getElementById("typeWrap").classList.add("show"); setTimeout(function(){ try{ww.focus();}catch(e){} },60); }
+  function win(next){
+    if(next==="gday"){ mode="gday"; document.getElementById("typeWrap").classList.remove("show"); try{document.getElementById("word").blur();}catch(e){} }
+    else if(next==="tickets"){ mode="tickets"; }
+    else if(next==="fed"){ mode="fed"; }
+    else if(next==="watered"){ mode="watered"; bottleDrag=false; }
+    else if(next==="timed"){ mode="timed"; document.getElementById("typeWrap").classList.remove("show"); try{document.getElementById("word").blur();}catch(e){} }
+    else if(next==="packed"){ mode="packed"; dragItem=-1; }
+    else if(next==="bowlsdone"){ mode="bowlsdone"; }
+    else if(next==="signdone"){ mode="signdone"; penDrag=false; }
+    else if(next==="hatdone"){ mode="hatdone"; }
+    else if(next==="hoursdone"){ mode="hoursdone"; document.getElementById("typeWrap").classList.remove("show"); try{document.getElementById("word").blur();}catch(e){} }
+    else if(next==="charged"){ mode="charged"; dragPlug=-1; }
+    else if(next==="atcar"){ mode="atcar"; }
+    else if(next==="loaded"){ mode="loaded"; loadDrag=false; }
+    else if(next==="coolerdone"){ mode="coolerdone"; dragSnack=-1; }
+    else if(next==="water5done"){ mode="water5done"; dragWater=-1; }
+    else if(next==="flagdone"){ mode="flagdone"; flagDrag=false; }
+    else if(next==="signseatdone"){ mode="signseatdone"; seatDrag=false; }
+    else if(next==="foamdone"){ mode="foamdone"; foamDrag=false; }
+    else if(next==="jacketdone"){ mode="jacketdone"; jacketDrag=false; }
+    else if(next==="closetrunkdone"){ mode="closetrunkdone"; trunkDrag=false; }
+    else if(next==="familydone"){ mode="familydone"; famTypeOn=false; document.getElementById("typeWrap").classList.remove("show"); try{document.getElementById("word").blur();}catch(e){} }
+    else if(next==="songdone"){ mode="songdone"; }
+    else if(next==="mirrorsdone"){ mode="mirrorsdone"; }
+    else if(next==="colordone"){ mode="colordone"; }
+    else if(next==="quietdone"){ mode="quietdone"; quietHold=false; }
+    else if(next==="rpsdone"){ mode="rpsdone"; }
+    else if(next==="guessdone"){ mode="guessdone"; document.getElementById("typeWrap").classList.remove("show"); try{document.getElementById("word").blur();}catch(e){} }
+    else if(next==="snackbagdone"){ mode="snackbagdone"; dragBagSnack=-1; }
+    else if(next==="driveupdone"){ mode="driveupdone"; driveHold=false; }
+    else if(next==="followsignsdone"){ mode="followsignsdone"; }
+    else if(next==="garagedone"){ mode="garagedone"; }
+    else if(next==="elevatordone"){ mode="elevatordone"; }
+    else if(next==="elevridedone"){ mode="elevridedone"; doorHold=false; }
+    else if(next==="stairsdone"){ mode="stairsdone"; stairHold=false; }
+    else if(next==="lockerwalkdone"){ mode="lockerwalkdone"; }
+    else if(next==="playerdoordone"){ mode="playerdoordone"; }
+    else if(next==="lockermusicdone"){ mode="lockermusicdone"; }
+    else if(next==="suitupdone"){ mode="suitupdone"; dressItem=-1; }
+    confetti(); ding(); roar();
+  }
+  function reset(){ mode="start"; onBed=true; dragging=false; gotTickets=false; document.getElementById("ui").style.display="flex"; document.getElementById("typeWrap").classList.remove("show"); document.getElementById("word").value=""; layout(); }
+
+  document.getElementById("start").onclick=startGame;
+  var w=document.getElementById("word");
+  function norm(s){ return (s||"").toUpperCase().replace(/[^A-Z]/g,""); }
+  function normDigits(s){ return (s||"").replace(/\D/g,""); }
+  w.addEventListener("input",function(){ beep(600+Math.random()*200,0.03,"square",0.02);
+    if(mode==="type"){ if(norm(w.value)==="GAMEDAY") win("gday"); }
+    else if(mode==="clocktype"){ if(normDigits(w.value)==="700") win("timed"); }
+    else if(mode==="hours"){ if(normDigits(w.value)==="10") win("hoursdone"); }
+    else if(mode==="family" && famTypeOn){ if(normDigits(w.value)==="4") win("familydone"); } });
+  w.addEventListener("keydown",function(e){ if(e.key!=="Enter")return;
+    if(mode==="type" && norm(w.value)==="GAMEDAY") win("gday");
+    else if(mode==="clocktype" && normDigits(w.value)==="700") win("timed");
+    else if(mode==="hours" && normDigits(w.value)==="10") win("hoursdone");
+    else if(mode==="family" && famTypeOn && normDigits(w.value)==="4") win("familydone"); });
+
+  window._M={ get:function(){return {mode:mode,onBed:onBed,moX:Math.round(moX),gotTickets:gotTickets};},
+    start:startGame, pull:function(){ if(mode==="bed"){ dragging=false; onBed=false; toType(); } },
+    type:function(s){ w.value=s; w.dispatchEvent(new Event("input")); },
+    go:function(){ if(mode==="gday") toWalk(); },
+    joy:function(d){ if(mode==="walk"||mode==="clockwalk"){ joy.dx=d; } },
+    eatGo:function(){ if(mode==="tickets") toEat(); },
+    feed:function(){ if(mode==="eat"){ for(var i=0;i<foods.length;i++){foods[i].eaten=true;} eatenCount=foods.length; win("fed"); } },
+    waterGo:function(){ if(mode==="fed") toWater(); },
+    fillUp:function(){ if(mode==="water"){ bottle.x=sinkX+39; bottle.y=sinkY+60; } },
+    clockGo:function(){ if(mode==="watered") toClockWalk(); },
+    atClk:function(){ if(mode==="clockwalk"){ atClock=true; toClockType(); } },
+    typeTime:function(s){ w.value=s; w.dispatchEvent(new Event("input")); },
+    packGo:function(){ if(mode==="timed") toPack(); },
+    packAll:function(){ if(mode==="pack"){ for(var i=0;i<bagItems.length;i++){bagItems[i].packed=true;} packedCount=bagItems.length; win("packed"); } },
+    bowlsGo:function(){ if(mode==="packed") toBowls(); },
+    bowlsReach:function(){ if(mode==="bowls") win("bowlsdone"); },
+    signGo:function(){ if(mode==="bowlsdone") toSign(); },
+    signFill:function(){ if(mode==="sign"){ signProg=1; win("signdone"); } },
+    hatsGo:function(){ if(mode==="signdone") toHats(); },
+    hatReach:function(){ if(mode==="hatwalk") mode="hatpick"; },
+    pickHat:function(i){ if(mode==="hatpick"){ moHat=i; win("hatdone"); } },
+    hoursGo:function(){ if(mode==="hatdone") toHours(); },
+    typeHours:function(s){ w.value=s; w.dispatchEvent(new Event("input")); },
+    chargeGo:function(){ if(mode==="hoursdone") toCharge(); },
+    chargeAll:function(){ if(mode==="charge"){ plugs[0].placed=true; plugs[1].placed=true; win("charged"); } },
+    streetGo:function(){ if(mode==="charged") toStreet(); },
+    streetReach:function(){ if(mode==="street") win("atcar"); },
+    loadGo:function(){ if(mode==="atcar") toLoad(); },
+    loadBagIn:function(){ if(mode==="load"){ win("loaded"); } },
+    coolerGo:function(){ if(mode==="loaded") toCooler(); },
+    coolerAll:function(){ if(mode==="cooler"){ for(var i=0;i<snacks.length;i++)snacks[i].inCooler=true; snackCount=snacks.length; win("coolerdone"); } },
+    water5Go:function(){ if(mode==="coolerdone") toWater5(); },
+    water5All:function(){ if(mode==="water5"){ for(var i=0;i<5;i++){holders[i].filled=true;waters[i].inHolder=true;} waterCount=5; win("water5done"); } },
+    flagGo:function(){ if(mode==="water5done") toFlag(); },
+    flagOn:function(){ if(mode==="flag"){ win("flagdone"); } },
+    seatGo:function(){ if(mode==="flagdone") toSignSeat(); },
+    seatOn:function(){ if(mode==="signseat"){ win("signseatdone"); } },
+    foamGo:function(){ if(mode==="signseatdone") toFoam(); },
+    foamOn:function(){ if(mode==="foam"){ win("foamdone"); } },
+    jacketGo:function(){ if(mode==="foamdone") toJacket(); },
+    jacketOn:function(){ if(mode==="jacket"){ win("jacketdone"); } },
+    closeGo:function(){ if(mode==="jacketdone") toClose(); },
+    closeOn:function(){ if(mode==="closetrunk"){ win("closetrunkdone"); } },
+    familyGo:function(){ if(mode==="closetrunkdone") toFamily(); },
+    songGo:function(){ if(mode==="familydone") toSong(); },
+    pickSong:function(){ if(mode==="song"){ win("songdone"); } },
+    mirrorsGo:function(){ if(mode==="songdone") toMirrors(); },
+    checkMirrors:function(){ if(mode==="mirrors"){ win("mirrorsdone"); } },
+    colorGo:function(){ if(mode==="mirrorsdone") toColorPick(); },
+    pickColor:function(i){ if(mode==="colorpick"){ myColor=COLORCHO[i]; toColorGame(); } },
+    winColor:function(){ if(mode==="colorgame"){ colorScore=5; win("colordone"); } },
+    quietGo:function(){ if(mode==="colordone") toQuiet(); },
+    quietWin:function(){ if(mode==="quiet"){ win("quietdone"); } },
+    rpsGo:function(){ if(mode==="quietdone") toRps(); },
+    rpsPlay:function(i){ if(mode==="rps"&&rpsShowT===0) playRps(i); },
+    rpsForce:function(){ if(mode==="rps"){ rpsWins=2; rpsShowT=1; } },
+    guessGo:function(){ if(mode==="rpsdone") toGuess(); },
+    typeGuess:function(s){ w.value=s; w.dispatchEvent(new Event("input")); },
+    writeGuess:function(){ if(mode==="guess"){ win("guessdone"); } },
+    snackGo:function(){ if(mode==="guessdone") toSnackBag(); },
+    eatSnack:function(){ if(mode==="snackbag"){ win("snackbagdone"); } },
+    driveGo:function(){ if(mode==="snackbagdone") toDriveUp(); },
+    driveWin:function(){ if(mode==="driveup"){ driveProg=1; win("driveupdone"); } },
+    followGo:function(){ if(mode==="driveupdone") toFollow(); },
+    followTap:function(){ if(mode==="followsigns"){ followStep++; if(followStep>=3) win("followsignsdone"); else followDir=(Math.random()<0.5?-1:1); } },
+    garageGo:function(){ if(mode==="followsignsdone") toGarage(); },
+    garJoy:function(d){ if(mode==="garage") joy.dx=d; },
+    garPark:function(){ if(mode==="garage"){ garageCarX=garageSpotX; win("garagedone"); } },
+    elevGo:function(){ if(mode==="garagedone") toElevator(); },
+    elevBtn:function(){ if(mode==="elevator"&&elevStage===0){ elevStage=1; } },
+    elevStep:function(){ if(mode==="elevator"&&elevStage===2){ toElevRide(); } },
+    elevState:function(){ return elevStage+"/"+elevDoor.toFixed(2); },
+    ridePick:function(){ if(mode==="elevride"&&ridePhase===0){ ridePhase=1; teammateX=-W*0.1; } },
+    rideHold:function(b){ if(mode==="elevride"&&ridePhase===1){ doorHold=b; } },
+    rideOut:function(){ if(mode==="elevride"&&ridePhase===3){ win("elevridedone"); } },
+    rideState:function(){ return ridePhase+"/"+rideY.toFixed(2); },
+    stairsGo:function(){ if(mode==="elevridedone") toStairs(); },
+    stairsWin:function(){ if(mode==="stairs"){ stairProg=1; win("stairsdone"); } },
+    lockerGo:function(){ if(mode==="stairsdone") toLockerWalk(); },
+    lockerJoy:function(d){ if(mode==="lockerwalk") joy.dx=d; },
+    lockerWin:function(){ if(mode==="lockerwalk"){ moX=lockerDoorX; win("lockerwalkdone"); } },
+    pdoorGo:function(){ if(mode==="lockerwalkdone") toPlayerDoor(); },
+    pdoorBadge:function(){ if(mode==="playerdoor"&&pdPhase===0){ pdPhase=1; } },
+    pdoorStep:function(){ if(mode==="playerdoor"&&pdPhase===2){ win("playerdoordone"); } },
+    pdoorState:function(){ return pdPhase+"/"+pdDoor.toFixed(2); },
+    musicGo:function(){ if(mode==="playerdoordone") toLockerMusic(); },
+    musicPlay:function(){ if(mode==="lockermusic"){ win("lockermusicdone"); } },
+    suitGo:function(){ if(mode==="lockermusicdone") toSuitUp(); },
+    suitAll:function(){ if(mode==="suitup"){ dressJerseyOn=true; dressShortsOn=true; win("suitupdone"); } },
+    tapFam:function(i){ if(mode==="family"&&!famMembers[i].tapped){ famMembers[i].tapped=true; famCount++; if(famCount>=4){ famTypeOn=true; var ww=document.getElementById("word"); ww.value=""; ww.placeholder="type: 4"; document.getElementById("typeWrap").classList.add("show"); } } },
+    typeFam:function(s){ w.value=s; w.dispatchEvent(new Event("input")); },
+    get2:function(){ return {mode:mode, moHat:moHat}; } };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>MO INTUIT DOME</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#060a1c;font-family:'Trebuchet MS',system-ui,sans-serif;color:#fff;touch-action:none;}
+  #c{position:fixed;inset:0;display:block;}
+  a.back{position:fixed;top:8px;left:10px;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;z-index:9;text-shadow:0 1px 3px #000;background:#00000066;padding:6px 10px;border-radius:10px;}
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;z-index:10;background:#060a1ccc;}
+  .overlay.hide{display:none;}
+  .card{background:#111f3ee6;border:3px solid #37e0ff;border-radius:20px;padding:22px 26px;max-width:92%;box-shadow:0 0 40px #37e0ff55,0 18px 50px #000a;}
+  .card h1{margin:0 0 8px;font-size:28px;color:#ffcf5a;letter-spacing:1px;text-shadow:0 0 14px #ffcf5a66;}
+  .card p{margin:8px 0;line-height:1.35;font-size:16px;color:#cfe0ff;}
+  .big{margin-top:14px;padding:14px 30px;font-size:22px;font-weight:900;background:linear-gradient(#5fe9ff,#1f9fd8);color:#042033;border:none;border-radius:14px;box-shadow:0 5px 0 #1477a8;cursor:pointer;}
+  .big:active{transform:translateY(4px);box-shadow:0 1px 0 #1477a8;}
+</style>
+</head>
+<body>
+<a class="back" href="../index.html">&#11013; Arcade</a>
+<canvas id="c"></canvas>
+<div class="overlay" id="startOv">
+  <div class="card">
+    <h1>🏀 MO INTUIT DOME</h1>
+    <p><b>L.A. CLIPS</b> &nbsp;vs&nbsp; <b id="oppName0">BAY WAVES</b> — 5 on 5!</p>
+    <p id="preLine" style="font-size:13px;opacity:.85;margin-top:0">Preseason game 1</p>
+    <p style="font-size:14px;opacity:.95"><b>Hold</b> to fill the <b>power bar</b>, <b>let go</b> on the <b>green spot</b> to swish for the CLIPS!<br>Then the other team takes their shot. Play all <b>4 quarters</b> — most points at the final buzzer wins! 🏆</p>
+    <button class="big" id="startBtn">▶ TIP OFF!</button>
+  </div>
+</div>
+<div class="overlay hide" id="endOv">
+  <div class="card">
+    <h1 id="endTitle">🏆 CLIPS WIN!</h1>
+    <p id="endMsg"></p>
+    <button class="big" id="againBtn">🔁 Play again</button>
+  </div>
+</div>
+<script>
+"use strict";
+(function(){
+  var cv=document.getElementById("c"), x=cv.getContext("2d");
+  var W=0,H=0,DPR=1,fy=0;
+  function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); cv.style.width=W+"px"; cv.style.height=H+"px"; x.setTransform(DPR,0,0,DPR,0,0); fy=H*0.74; place(); }
+  addEventListener("resize",resize);
+
+  var AC=null; function ac(){ if(!AC){ try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+  function beep(f,d,t,v){ var a=ac(); if(!a)return; var o=a.createOscillator(),g=a.createGain(); o.type=t||"sine"; o.frequency.value=f; g.gain.value=v||0.06; o.connect(g); g.connect(a.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+(d||0.1)); o.stop(a.currentTime+(d||0.1)+0.02); }
+  function swish(){ beep(1200,0.08,"sine",0.06); setTimeout(function(){beep(1600,0.1,"sine",0.05);},70); }
+  function roar(){ for(var i=0;i<10;i++){ (function(j){ setTimeout(function(){ beep(200+Math.random()*500,0.12,"sawtooth",0.02); }, j*40); })(i); } }
+  function clang(){ beep(300,0.07,"square",0.05); }
+  function miss(){ beep(220,0.13,"sawtooth",0.04); }
+
+  var CLIP="#e8542a";
+  var OPP=[{n:"BAY WAVES",c:"#2a6cf0"},{n:"HARBOR SHARKS",c:"#13a89e"},{n:"MOTOR GEARS",c:"#8e44ad"},{n:"PINE MOOSE",c:"#2e8b57"},{n:"DESERT COYOTES",c:"#e0a52a"}];
+  var preIx=0; try{preIx=+localStorage.getItem("moPreseason")||0;}catch(e){}
+  function opp(){ return OPP[preIx%OPP.length]; }
+  var SPOTS=[{f:0.40,p:2},{f:0.32,p:3},{f:0.24,p:3},{f:0.36,p:2}];
+  var mode="start", spotIx=0, ball, hoop, launchPt, cheer=0, conf=[], crowd=[], resetT=0, shake=0;
+  var charging=false, meter=0, mdir=1, MSPEED=0.026, KMIN=0.80, KMAX=1.20, ZLO=0.42, ZHI=0.54, GRAV=0.42;
+  var possession="clips", clipsScore=0, rivalScore=0, mates=[], rivals=[], rivalTimer=0, banner="";
+  var cdT=0, lastCd=99, POSS_EACH=8, clipsPoss=0, rivalPoss=0;
+
+  function place(){ hoop={x:W*0.80, y:H*0.46, r:Math.max(18,W*0.052)}; setSpot(); buildCrowd(); buildTeams(); }
+  function setSpot(){ var s=SPOTS[spotIx%SPOTS.length]; launchPt={x:W*s.f, y:fy-6}; if(!ball||!ball.flying){ ball={x:launchPt.x, y:launchPt.y-18, vx:0,vy:0,flying:false,scored:false,passedY:false,team:"clips", r:Math.max(11,W*0.03)}; } }
+  function buildTeams(){
+    mates=[{x:W*0.13,y:fy+(H-fy)*0.35},{x:W*0.24,y:fy+(H-fy)*0.75},{x:W*0.46,y:fy+(H-fy)*0.5},{x:W*0.10,y:fy+(H-fy)*0.9}];
+    rivals=[{x:W*0.60,y:fy+(H-fy)*0.3},{x:W*0.67,y:fy+(H-fy)*0.75},{x:W*0.55,y:fy+(H-fy)*0.95},{x:W*0.72,y:fy+(H-fy)*0.5},{x:W*0.63,y:fy+(H-fy)*0.55}];
+  }
+  function buildCrowd(){ crowd=[]; var cols=["#e8545a","#4f90e8","#f2c04a","#4fbf6a","#b06ad8","#ff8a3a","#fff","#37e0ff"];
+    for(var row=0; row<6; row++){ var yy=H*0.17+row*H*0.028; var n=Math.floor(W/24);
+      for(var i=0;i<n;i++){ crowd.push({x:10+i*24+(row%2?11:0), y:yy, c:cols[(i*3+row)%cols.length], ph:Math.random()*6}); } } }
+  function reset(){ clipsScore=0; rivalScore=0; clipsPoss=0; rivalPoss=0; possession="clips"; cheer=0; conf=[]; resetT=0; shake=0; spotIx=0; charging=false; meter=0; rivalTimer=0; banner=""; place(); ball.flying=false; }
+  function quarter(){ return Math.min(4, Math.floor(clipsPoss/(POSS_EACH/4))+1); }
+
+  function pt(e){ var t=e.touches&&e.touches[0]?e.touches[0]:e; var r=cv.getBoundingClientRect(); return {x:(t.clientX-r.left)*(W/r.width), y:(t.clientY-r.top)*(H/r.height)}; }
+  function canShoot(){ return mode==="play" && possession==="clips" && !ball.flying && resetT<=0; }
+  function down(e){ ac(); if(!canShoot())return; if(e.cancelable)e.preventDefault(); charging=true; meter=0; mdir=1; }
+  function up(){ if(!charging)return; charging=false; shootPower(meter); }
+  cv.addEventListener("mousedown",down); addEventListener("mouseup",up);
+  cv.addEventListener("touchstart",down,{passive:false}); addEventListener("touchend",up); addEventListener("touchcancel",up);
+
+  function computeIdeal(lx,ly){ var hx=hoop.x, hy=hoop.y;
+    var apexRise=(ly-hy)+H*0.14; var vy0=-Math.sqrt(2*GRAV*Math.max(10,apexRise));
+    var a=0.5*GRAV, bq=vy0, cq=(ly-hy); var disc=bq*bq-4*a*cq; if(disc<0)disc=0; var t=(-bq+Math.sqrt(disc))/(2*a);
+    return {vx:(hx-lx)/t, vy:vy0}; }
+  function shootPower(p){ var k=KMIN+(KMAX-KMIN)*p; var v=computeIdeal(ball.x,ball.y); ball.team="clips"; ball.vx=v.vx*k; ball.vy=v.vy*k; ball.flying=true; ball.scored=false; ball.passedY=false; beep(430,0.05,"triangle",0.05); }
+
+  function startRivals(){ possession="rivals"; rivalTimer=60; } // short delay then they shoot
+  function rivalShoot(){ var r=rivals[Math.floor(Math.random()*rivals.length)]; // a shooter
+    ball.x=Math.min(r.x, hoop.x-W*0.12); ball.y=fy-6-18; ball.team="rivals"; ball.scored=false; ball.passedY=false;
+    // make -> k≈1 (ideal arc scores from ANY spot); miss -> k far from 1
+    var make=Math.random()<0.46; var k = make ? (0.99+Math.random()*0.02) : (Math.random()<0.5? 0.84+Math.random()*0.05 : 1.14+Math.random()*0.05);
+    var v=computeIdeal(ball.x,ball.y); ball.vx=v.vx*k; ball.vy=v.vy*k; ball.flying=true; beep(380,0.05,"triangle",0.04); }
+  function startClips(){ possession="clips"; spotIx++; setSpot(); ball.x=launchPt.x; ball.y=launchPt.y-18; ball.vx=0; ball.vy=0; ball.flying=false; ball.scored=false; ball.passedY=false; }
+
+  function madeBy(team){ if(team==="clips"){ var pts=SPOTS[spotIx%SPOTS.length].p; clipsScore+=pts; banner="CLIPS SCORE!"; cheer=70; swish(); roar();
+      for(var i=0;i<30;i++) conf.push({x:hoop.x+(Math.random()-0.5)*60,y:hoop.y,vx:(Math.random()-0.5)*6,vy:-Math.random()*6-2,life:64,c:["#ffcf5a","#e8542a","#37e0ff","#fff"][i%4]});
+    } else { rivalScore+=2; banner=opp().n+" score"; cheer=22; beep(500,0.1,"sine",0.05); }
+    resetT=34; ball.flying=false; }
+  function missedBy(team){ banner = team==="clips"?"CLIPS miss":"Rivals miss"; if(team==="clips"){ shake=8; } miss(); resetT=22; ball.flying=false; }
+  function afterBall(){ // called when resetT hits 0
+    if(mode!=="play")return;
+    if(possession==="clips"){ clipsPoss++; startRivals(); }
+    else { rivalPoss++; if(rivalPoss>=POSS_EACH){ endGame(); return; } startClips(); } }
+  function endGame(){ mode="end"; var win=clipsScore>rivalScore, tie=clipsScore===rivalScore; var beat=opp().n;
+    if(win){ preIx++; try{localStorage.setItem("moPreseason",preIx);}catch(e){} }
+    document.getElementById("endTitle").textContent = win?"🏆 L.A. CLIPS WIN!":(tie?"🤝 It's a tie!":("🏀 "+beat+" win"));
+    document.getElementById("endMsg").textContent = "FINAL: L.A. CLIPS "+clipsScore+" — "+rivalScore+" "+beat+".  "+(win?("Next preseason game: vs "+opp().n+"! 🎉"):(tie?"So close — play again!":"So close — run it back!"));
+    document.getElementById("endOv").classList.remove("hide"); }
+
+  function tipOff(){ cdT=0; lastCd=99; mode="countdown"; }
+  document.getElementById("startBtn").onclick=function(){ ac(); resize(); reset(); tipOff(); document.getElementById("startOv").classList.add("hide"); document.getElementById("endOv").classList.add("hide"); };
+  document.getElementById("againBtn").onclick=function(){ ac(); reset(); tipOff(); document.getElementById("endOv").classList.add("hide"); };
+
+  function update(){ if(cheer>0)cheer--; if(shake>0)shake--;
+    if(charging){ meter+=mdir*MSPEED; if(meter>=1){meter=1;mdir=-1;} if(meter<=0){meter=0;mdir=1;} }
+    if(possession==="rivals" && !ball.flying && resetT<=0 && rivalTimer>0){ rivalTimer--; if(rivalTimer===0) rivalShoot(); }
+    if(ball.flying){ ball.x+=ball.vx; ball.y+=ball.vy; ball.vy+=GRAV;
+      if(!ball.scored){ if(ball.vy>0 && !ball.passedY && ball.y>=hoop.y && ball.y-ball.vy<hoop.y){ ball.passedY=true; if(Math.abs(ball.x-hoop.x) < Math.max(hoop.r*0.9, Math.abs(ball.vx)*0.55)){ ball.scored=true; madeBy(ball.team); } }
+        if(ball.x>hoop.x+hoop.r*1.1 && ball.x-ball.vx<=hoop.x+hoop.r*1.1 && ball.y<hoop.y+10 && ball.y>hoop.y-hoop.r*2.2){ ball.vx*=-0.4; clang(); } }
+      if(!ball.scored && (ball.y>fy+8 || ball.x>W+40 || ball.x<-40)){ missedBy(ball.team); } }
+    if(resetT>0){ resetT--; if(resetT===0){ afterBall(); } }
+    for(var i=conf.length-1;i>=0;i--){ var c=conf[i]; c.x+=c.vx; c.y+=c.vy; c.vy+=0.14; c.life--; if(c.life<=0)conf.splice(i,1); }
+  }
+
+  function skC(){ try{return localStorage.getItem("moSkin")||"#f6c48a";}catch(e){return "#f6c48a";} }
+  function hrC(){ try{return localStorage.getItem("moHair")||"#2a2018";}catch(e){return "#2a2018";} }
+  function rr(a,b,c,d,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+c,b,a+c,b+d,r); x.arcTo(a+c,b+d,a,b+d,r); x.arcTo(a,b+d,a,b,r); x.arcTo(a,b,a+c,b,r); x.closePath(); }
+
+  function draw(){
+    var sx = shake>0? (Math.random()-0.5)*shake*0.6:0; x.save(); x.translate(sx,0);
+    var g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#0b1430"); g.addColorStop(0.6,"#0a1026"); g.addColorStop(1,"#06203a"); x.fillStyle=g; x.fillRect(-10,0,W+20,H);
+    for(var a2=0;a2<7;a2++){ var rr2=W*0.30+a2*W*0.12; x.beginPath(); x.arc(W/2,-H*0.06,rr2, Math.PI*1.02, Math.PI*1.98); x.strokeStyle=a2===0?"#37e0ff":"rgba(90,130,200,"+(0.35-a2*0.03)+")"; x.lineWidth=a2===0?3:2; x.stroke(); }
+    for(var i=0;i<crowd.length;i++){ var p=crowd[i]; var jy=(cheer>0? Math.abs(Math.sin((cheer*0.4)+p.ph))*-4 : Math.sin((Date.now()*0.002)+p.ph)*0.6); x.fillStyle=p.c; x.globalAlpha=0.92; x.beginPath(); x.arc(p.x,p.y+jy,4,0,7); x.fill(); } x.globalAlpha=1;
+    // HALO SCREEN with scoreboard
+    var hw=W*0.74, hh=H*0.12, hx=W/2-hw/2, hy=H*0.015;
+    x.save(); x.shadowColor="#37e0ff"; x.shadowBlur=22; x.fillStyle="#05101e"; rr(hx,hy,hw,hh,hh*0.5); x.fill(); x.restore();
+    x.strokeStyle="#37e0ff"; x.lineWidth=3; rr(hx,hy,hw,hh,hh*0.5); x.stroke();
+    x.textAlign="center"; x.textBaseline="middle";
+    x.font="bold "+Math.round(hh*0.2)+"px Trebuchet MS";
+    x.fillStyle="#ff9a6a"; x.fillText("L.A. CLIPS", W*0.28, hy+hh*0.3);
+    x.fillStyle=opp().c; x.fillText(opp().n, W*0.72, hy+hh*0.3);
+    x.fillStyle="#fff"; x.font="bold "+Math.round(hh*0.46)+"px Trebuchet MS"; x.fillText(clipsScore+"  -  "+rivalScore, W/2, hy+hh*0.68);
+    // PRESEASON badge under the halo
+    x.fillStyle="#ffcf5a22"; rr(W/2-78,hy+hh+6,156,22,11); x.fill(); x.fillStyle="#ffcf5a"; x.font="bold 13px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("🏀 PRESEASON · GAME "+((preIx%OPP.length)+1)+"/"+OPP.length, W/2, hy+hh+17);
+    // court
+    var fg=x.createLinearGradient(0,fy,0,H); fg.addColorStop(0,"#caa05a"); fg.addColorStop(1,"#a97e3c"); x.fillStyle=fg; x.fillRect(-10,fy,W+20,H-fy);
+    x.fillStyle="#1a2a4a"; x.fillRect(-10,fy-4,W+20,6);
+    x.strokeStyle="#37e0ff"; x.lineWidth=4; x.globalAlpha=0.8; x.beginPath(); x.arc(W*0.9, fy+(H-fy)*0.32, W*0.6, Math.PI*0.74, Math.PI*1.26); x.stroke(); x.globalAlpha=1;
+    // players: rivals (behind), mates, then shooter
+    for(var ri=0;ri<rivals.length;ri++) drawPlayer(rivals[ri].x, rivals[ri].y, opp().c, "");
+    for(var mi=0;mi<mates.length;mi++) drawPlayer(mates[mi].x, mates[mi].y, CLIP, "");
+    // hoop
+    x.strokeStyle="#cfd6e4"; x.lineWidth=7; x.beginPath(); x.moveTo(hoop.x+hoop.r*1.5,hoop.y-hoop.r*1.2); x.lineTo(hoop.x+hoop.r*1.9,fy); x.stroke();
+    x.fillStyle="#eef2fb"; rr(hoop.x+hoop.r*0.8,hoop.y-hoop.r*1.3,hoop.r*0.9,hoop.r*1.6,4); x.fill(); x.strokeStyle="#c23"; x.lineWidth=3; x.strokeRect(hoop.x+hoop.r*1.0,hoop.y-hoop.r*0.6,hoop.r*0.5,hoop.r*0.5);
+    x.strokeStyle="#ff7a2a"; x.lineWidth=5; x.beginPath(); x.ellipse(hoop.x,hoop.y,hoop.r*0.7,hoop.r*0.22,0,0,7); x.stroke();
+    x.strokeStyle="#ffffffcc"; x.lineWidth=1.5; for(var n=0;n<7;n++){ var a3=-hoop.r*0.6+n*hoop.r*0.2; x.beginPath(); x.moveTo(hoop.x+a3,hoop.y); x.lineTo(hoop.x+a3*0.5,hoop.y+hoop.r*0.9); x.stroke(); }
+    // Mo (shooter) when CLIPS possession
+    if(possession==="clips") drawMo(launchPt.x, launchPt.y);
+    // power meter + ideal guide (only when Mo can shoot)
+    if(canShoot()){
+      var v=computeIdeal(ball.x,ball.y); var tx=ball.x,ty=ball.y,tvx=v.vx,tvy=v.vy;
+      x.fillStyle="#fff"; for(var s2=0;s2<70;s2++){ tx+=tvx; ty+=tvy; tvy+=GRAV; if(s2%4===0){ x.globalAlpha=Math.max(0.08,0.4-s2/120); x.beginPath(); x.arc(tx,ty,2.5,0,7); x.fill(); } if(ty>H)break; } x.globalAlpha=1;
+      var mx=20, mtop=H*0.44, mh=H*0.34, mw=20;
+      x.fillStyle="#000a"; rr(mx-3,mtop-3,mw+6,mh+6,8); x.fill(); x.fillStyle="#13213a"; rr(mx,mtop,mw,mh,5); x.fill();
+      var zy1=mtop+mh*(1-ZHI), zy0=mtop+mh*(1-ZLO); x.fillStyle="#3fd06a"; rr(mx,zy1,mw,zy0-zy1,3); x.fill();
+      var iy=mtop+mh*(1-meter); if(charging){ x.fillStyle="#ffd24a"; rr(mx,iy,mw,mtop+mh-iy,3); x.fill(); x.fillStyle="#fff"; x.fillRect(mx-4,iy-2,mw+8,4); }
+      x.fillStyle="#fff"; x.font="bold 12px Trebuchet MS"; x.textAlign="center"; x.textBaseline="bottom"; x.fillText("POWER", mx+mw/2, mtop-6);
+      if(!charging){ x.fillStyle="#37e0ff"; x.font="bold 13px Trebuchet MS"; x.textBaseline="top"; x.fillText("hold!", mx+mw/2, mtop+mh+6); }
+    }
+    if(!(resetT>0 && !ball.flying)) drawBall(ball.x,ball.y,ball.r);
+    if(cheer>44 && banner){ x.fillStyle=possession==="clips"?"#ffcf5a":"#7ab0ff"; x.font="bold 30px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.strokeStyle="#000"; x.lineWidth=5; x.strokeText(banner,W/2,H*0.58); x.fillText(banner,W/2,H*0.58); }
+    for(var i2=0;i2<conf.length;i2++){ var c=conf[i2]; x.fillStyle=c.c; x.fillRect(c.x,c.y,5,5); }
+    x.restore();
+    // possession hint
+    if(mode==="play"){ x.fillStyle="#000a"; rr(W/2-124,H-38,248,28,8); x.fill(); x.fillStyle=possession==="clips"?"#ff9a6a":opp().c; x.font="bold 14px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle";
+      x.fillText("Q"+quarter()+" · "+(possession==="clips"?"🟠 CLIPS ball — your shot!":(opp().n+" ball…")), W/2, H-24); }
+    // TIP-OFF COUNTDOWN overlay
+    if(mode==="countdown"){ x.fillStyle="rgba(4,8,20,0.55)"; x.fillRect(0,0,W,H); var n=3-Math.floor(cdT/50); x.textAlign="center"; x.textBaseline="middle"; x.strokeStyle="#000"; x.lineWidth=7;
+      if(n>0){ var pop=1+0.45*Math.sin((cdT%50)*0.13); x.fillStyle="#ffcf5a"; x.font="bold "+Math.round(120*pop)+"px Trebuchet MS"; x.strokeText(n,W/2,H*0.45); x.fillText(n,W/2,H*0.45); }
+      else { var pop2=1+0.12*Math.sin(cdT*0.3); x.fillStyle="#37e0ff"; x.font="bold "+Math.round(58*pop2)+"px Trebuchet MS"; x.strokeText("🏀 TIP OFF!",W/2,H*0.45); x.fillText("🏀 TIP OFF!",W/2,H*0.45); }
+      x.fillStyle="#cfe0ff"; x.font="bold 16px Trebuchet MS"; x.fillText("L.A. CLIPS vs "+opp().n, W/2, H*0.57); }
+  }
+  function drawPlayer(cx,cy,col,lbl){ var s=Math.max(18,W*0.05);
+    x.fillStyle="#223"; x.fillRect(cx-s*0.26,cy,s*0.22,s*0.55); x.fillRect(cx+s*0.04,cy,s*0.22,s*0.55);
+    x.fillStyle=col; rr(cx-s*0.36,cy-s*0.6,s*0.72,s*0.68,6); x.fill();
+    x.fillStyle=skC(); x.beginPath(); x.arc(cx,cy-s*0.8,s*0.25,0,7); x.fill();
+    x.fillStyle="#201008"; x.beginPath(); x.arc(cx,cy-s*0.86,s*0.25,Math.PI*1.03,Math.PI*1.97); x.fill();
+  }
+  function drawMo(cx,cy){ var s=Math.max(26,W*0.07), skin=skC(), hair=hrC();
+    x.fillStyle="#243a66"; x.fillRect(cx-s*0.3,cy,s*0.26,s*0.7); x.fillRect(cx+s*0.04,cy,s*0.26,s*0.7);
+    x.fillStyle=CLIP; rr(cx-s*0.42,cy-s*0.7,s*0.84,s*0.8,8); x.fill();
+    x.fillStyle="#fff"; x.font="bold "+Math.round(s*0.3)+"px Trebuchet MS"; x.textAlign="center"; x.textBaseline="middle"; x.fillText("MO",cx,cy-s*0.3);
+    x.fillStyle="#d84a1e"; x.fillRect(cx+s*0.4,cy-s*0.9,s*0.16,s*0.5);
+    x.fillStyle=skin; x.beginPath(); x.arc(cx,cy-s*0.95,s*0.3,0,7); x.fill();
+    x.fillStyle=hair; x.beginPath(); x.arc(cx,cy-s*1.02,s*0.3,Math.PI*1.03,Math.PI*1.97); x.fill();
+    x.fillStyle="#201008"; x.beginPath(); x.arc(cx-s*0.1,cy-s*0.95,s*0.045,0,7); x.arc(cx+s*0.1,cy-s*0.95,s*0.045,0,7); x.fill();
+    x.strokeStyle="#201008"; x.lineWidth=2; x.beginPath(); x.arc(cx,cy-s*0.88,s*0.1,0.15*Math.PI,0.85*Math.PI); x.stroke();
+  }
+  function drawBall(cx,cy,r){ x.fillStyle="#e8812a"; x.beginPath(); x.arc(cx,cy,r,0,7); x.fill(); x.strokeStyle="#7a3a10"; x.lineWidth=2; x.beginPath(); x.arc(cx,cy,r,0,7); x.moveTo(cx-r,cy); x.lineTo(cx+r,cy); x.moveTo(cx,cy-r); x.lineTo(cx,cy+r); x.stroke(); }
+
+  try{ var o0=document.getElementById("oppName0"); o0.textContent=opp().n; o0.style.color=opp().c;
+    document.getElementById("preLine").textContent="Preseason game "+((preIx%OPP.length)+1)+" of "+OPP.length; }catch(e){}
+
+  function frame(){ requestAnimationFrame(frame);
+    if(mode==="countdown"){ cdT++; var n=3-Math.floor(cdT/50); if(n!==lastCd){ lastCd=n; if(n>0)beep(600,0.14,"square",0.06); else { beep(950,0.2,"sine",0.07); roar(); } } if(cdT>=210){ mode="play"; } }
+    if(mode==="play")update(); draw(); }
+  resize(); requestAnimationFrame(frame);
+
+  window._D={ get:function(){ return {mode:mode, clips:clipsScore, rivals:rivalScore, possession:possession, meter:meter, flying:ball?ball.flying:false }; },
+    shootPower:function(p){ if(!canShoot())return; shootPower(p); } };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>MOZRICE</title>
+<style>
+ *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+ html,body{margin:0;height:100%;overflow:hidden;font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;background:#0c1020;color:#fff;}
+ #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#1a2340;}
+ canvas{touch-action:none;display:block;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<script>
+(function(){
+var cv=document.getElementById('cv'), cx=cv.getContext('2d');
+var W=400,H=640, DPR=Math.min(window.devicePixelRatio||1,2), scale=1;
+function fit(){ var ww=window.innerWidth, wh=window.innerHeight; scale=Math.min(ww/W,wh/H); cv.style.width=(W*scale)+'px'; cv.style.height=(H*scale)+'px'; cv.width=W*DPR; cv.height=H*DPR; cx.setTransform(DPR,0,0,DPR,0,0); }
+window.addEventListener('resize',fit); fit();
+function rr(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
+function emoji(ch,x,y,sz){ cx.font=(sz||30)+'px serif'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(ch,x,y); cx.textBaseline='alphabetic'; }
+function inR(p,r){ return p.x>=r.x && p.x<=r.x+r.w && p.y>=r.y && p.y<=r.y+r.h; }
+function pt(e){ var r=cv.getBoundingClientRect(); var t=e.touches?e.touches[0]:e; return {x:(t.clientX-r.left)/scale,y:(t.clientY-r.top)/scale}; }
+var AC=null; function ac(){ if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} return AC; }
+function bp(f,dd,t,v){ var a=ac(); if(!a)return; if(a.state==='suspended')a.resume(); var o=a.createOscillator(),g=a.createGain(); o.type=t||'sine'; o.frequency.setValueAtTime(f,a.currentTime); g.gain.setValueAtTime(v||0.1,a.currentTime); g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+(dd||0.08)); o.connect(g);g.connect(a.destination); o.start(); o.stop(a.currentTime+(dd||0.08)+0.02); }
+function placeS(){ bp(520,0.05,'square',0.08); }
+function breakS(){ bp(240,0.06,'square',0.08); }
+function buyS(){ bp(880,0.06,'triangle',0.12); setTimeout(function(){bp(1250,0.08,'triangle',0.11);},55); }
+function nope(){ bp(180,0.09,'square',0.08); }
+
+var COLS=16, ROWS=18, CELL=22, GX=24, GY=70;
+var BLOCKS=[
+ {n:'grass',c:'#6fae54',price:0},{n:'dirt',c:'#8a5a34',price:0},{n:'stone',c:'#9a9a9a',price:0},{n:'wood',c:'#a0743e',price:0},
+ {n:'brick',c:'#b0453a',price:0},{n:'sand',c:'#e6d5a0',price:0},
+ {n:'water',c:'#3a9edb',price:6},{n:'glass',c:'rgba(190,225,255,.55)',price:8},{n:'leaf',c:'#3a8a3a',price:6},
+ {n:'snow',c:'#f2f6fa',price:8},{n:'gold',c:'#ffd23f',price:20},{n:'lava',c:'#e0552a',price:22},
+ {n:'ball',c:'#e07a2a',e:'🏀',price:12},{n:'tree',c:'#2f7a3a',e:'🌳',price:15},{n:'star',c:'#ffe08a',e:'⭐',price:25},
+ {n:'door',c:'#7a4a2a',e:'🚪',price:12},{n:'window',c:'#bfe3ff',e:'🪟',price:12},{n:'flower',c:'#7cc85a',e:'🌸',price:10}
+];
+var grid=[]; for(var r=0;r<ROWS;r++){ grid.push([]); for(var c=0;c<COLS;c++)grid[r].push(-1); }
+var own=[]; for(var i=0;i<BLOCKS.length;i++)own.push(BLOCKS[i].price===0);
+var sel=0, tool='place', night=false, scene='title', painting=false, msg='', msgT=0, coins=0, shopOpen=false;
+var PLAYBTN={x:W/2-90,y:H/2+56,w:180,h:52};
+var GAMESBTN={x:W/2-90,y:H/2+118,w:180,h:44};
+var BACKB={x:12,y:12,w:84,h:30};
+var GAMES=[ {e:'🏀',n:'MO Ball 2K',u:'../mo-ball2k/mo-ball2k.html'},{e:'🚆',n:'Subway MVP',u:'../mo-subway-mvp/mo-subway-mvp.html'},{e:'🏙️',n:'MO & Arff City',u:'../mo-and-arff/mo-and-arff.html'},{e:'🏨',n:'MO Hotel',u:'../mo-hotel/mo-hotel.html'},{e:'⚽',n:'Rocket Ball',u:'../mo-rocketball/mo-rocketball.html'},{e:'🎮',n:'ALL GAMES',u:'../games.html'} ];
+function gameCard(i){ var col=i%2,row=(i/2)|0; return {x:38+col*168,y:150+row*118,w:152,h:104}; }
+function go(u){ try{ window.location.href=u; }catch(e){} }
+var TOOLY=H-150;
+var TB=[]; var tw=(W-24)/5; for(var i=0;i<5;i++)TB.push({x:12+i*tw, y:H-40, w:tw-6, h:30});
+// TB: 0 PLACE 1 BREAK 2 SHOP 3 DAY 4 CLEAR
+
+function showMsg(t){ msg=t; msgT=1.6; }
+function save(){ try{ localStorage.setItem('mozrice', JSON.stringify({g:grid,coins:coins,own:own})); }catch(e){} }
+function load(){ try{ var s=localStorage.getItem('mozrice'); if(s){ var d=JSON.parse(s); if(d.g&&d.g.length===ROWS&&d.g[0].length===COLS)grid=d.g; if(typeof d.coins==='number')coins=d.coins; if(d.own&&d.own.length===BLOCKS.length)own=d.own; } }catch(e){} }
+load();
+function count(){ var n=0; for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++)if(grid[r][c]>=0)n++; return n; }
+function cellAt(p){ var c=Math.floor((p.x-GX)/CELL), r=Math.floor((p.y-GY)/CELL); if(c<0||c>=COLS||r<0||r>=ROWS)return null; return {c:c,r:r}; }
+function applyAt(p){ var cr=cellAt(p); if(!cr)return; if(tool==='place'){ if(grid[cr.r][cr.c]===-1){ grid[cr.r][cr.c]=sel; coins++; placeS(); save(); } else if(grid[cr.r][cr.c]!==sel){ grid[cr.r][cr.c]=sel; placeS(); save(); } } else { if(grid[cr.r][cr.c]>=0){ grid[cr.r][cr.c]=-1; breakS(); save(); } } }
+function clearAll(){ for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++)grid[r][c]=-1; save(); showMsg('Cleared! Build a new world 🧱'); }
+function buy(i){ if(own[i])return; if(coins>=BLOCKS[i].price){ coins-=BLOCKS[i].price; own[i]=true; sel=i; tool='place'; buyS(); save(); showMsg('Unlocked '+BLOCKS[i].n+'! 🎉'); } else { nope(); showMsg('Need 💰'+BLOCKS[i].price+' — build more to earn!'); } }
+
+function paletteRect(i){ var per=6, col=i%per, row=(i/per)|0; return {x:14+col*(W-28)/per, y:TOOLY+row*32, w:(W-28)/per-4, h:28}; }
+function shopRect(i){ var per=3, col=i%per, row=(i/per)|0; return {x:40+col*108, y:150+row*74, w:96, h:64}; }
+var lockedList=function(){ var a=[]; for(var i=0;i<BLOCKS.length;i++)if(!own[i])a.push(i); return a; };
+
+cv.addEventListener('pointerdown',function(e){ if(ac()&&ac().state==='suspended')ac().resume(); var p=pt(e);
+  if(scene==='title'){ if(inR(p,PLAYBTN)){ scene='build'; } else if(inR(p,GAMESBTN)){ scene='games'; } return; }
+  if(scene==='games'){ if(inR(p,BACKB)){ scene='title'; return; } for(var i=0;i<GAMES.length;i++){ if(inR(p,gameCard(i))){ go(GAMES[i].u); return; } } return; }
+  if(shopOpen){ var L=lockedList(); for(var j=0;j<L.length;j++){ if(inR(p,shopRect(j))){ buy(L[j]); return; } } if(p.y<120||p.y>150+Math.ceil(L.length/3)*74){ shopOpen=false; } return; }
+  if(inR(p,TB[0])){ tool='place'; return; }
+  if(inR(p,TB[1])){ tool='break'; return; }
+  if(inR(p,TB[2])){ shopOpen=true; return; }
+  if(inR(p,TB[3])){ night=!night; return; }
+  if(inR(p,TB[4])){ clearAll(); return; }
+  for(var i=0;i<BLOCKS.length;i++){ if(inR(p,paletteRect(i))){ if(own[i]){ sel=i; tool='place'; } else { shopOpen=true; showMsg('Buy it in the SHOP! 💰'); } return; } }
+  if(p.y>=GY && p.y<GY+ROWS*CELL){ painting=true; applyAt(p); }
+});
+cv.addEventListener('pointermove',function(e){ if(!painting||shopOpen)return; applyAt(pt(e)); });
+function endP(){ painting=false; } cv.addEventListener('pointerup',endP); cv.addEventListener('pointercancel',endP);
+
+function draw(){
+  if(msgT>0)msgT-=0.016;
+  if(scene==='title'){ drawTitle(); return; }
+  if(scene==='games'){ drawGames(); return; }
+  var g=cx.createLinearGradient(0,0,0,H); if(night){ g.addColorStop(0,'#1a1a4a'); g.addColorStop(1,'#0a0a20'); } else { g.addColorStop(0,'#8fd0ff'); g.addColorStop(1,'#d9f0ff'); } cx.fillStyle=g; cx.fillRect(0,0,W,H);
+  if(night){ for(var i=0;i<20;i++){ cx.fillStyle='#fff'; cx.globalAlpha=0.6; cx.fillRect((i*53)%W,(i*29)%GY,2,2);} cx.globalAlpha=1; emoji('🌙',360,34,24); } else { emoji('☀️',360,32,26); emoji('☁️',80,40,24); }
+  // header
+  cx.fillStyle='#20305a'; rr(8,6,W-16,52,10); cx.fill();
+  cx.fillStyle='#ffd23f'; cx.font='bold 20px Trebuchet MS'; cx.textAlign='left'; cx.fillText('🏙️ MOZRICE',14,30);
+  cx.fillStyle='#9dff6a'; cx.font='bold 14px Trebuchet MS'; cx.textAlign='right'; cx.fillText('💰 '+coins,W-14,26);
+  cx.fillStyle='#fff'; cx.font='bold 10px Trebuchet MS'; cx.textAlign='left'; cx.fillText('Place blocks to earn 💰 — spend in the 🛒 SHOP!',14,48);
+  // grid
+  for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){ var x=GX+c*CELL, y=GY+r*CELL, b=grid[r][c];
+    if(b>=0){ var bl=BLOCKS[b]; cx.fillStyle=bl.c; rr(x+1,y+1,CELL-2,CELL-2,3); cx.fill(); cx.strokeStyle='rgba(0,0,0,.18)'; cx.lineWidth=1; rr(x+1,y+1,CELL-2,CELL-2,3); cx.stroke(); if(bl.e)emoji(bl.e,x+CELL/2,y+CELL/2,15); }
+  }
+  cx.strokeStyle='rgba(0,0,0,.08)'; cx.lineWidth=1; for(var c=0;c<=COLS;c++){ cx.beginPath(); cx.moveTo(GX+c*CELL,GY); cx.lineTo(GX+c*CELL,GY+ROWS*CELL); cx.stroke(); } for(var r=0;r<=ROWS;r++){ cx.beginPath(); cx.moveTo(GX,GY+r*CELL); cx.lineTo(GX+COLS*CELL,GY+r*CELL); cx.stroke(); }
+  cx.strokeStyle='rgba(32,48,90,.5)'; cx.lineWidth=2; cx.strokeRect(GX,GY,COLS*CELL,ROWS*CELL);
+  // palette
+  cx.fillStyle='rgba(20,30,60,.92)'; rr(8,TOOLY-6,W-16,74,10); cx.fill();
+  for(var i=0;i<BLOCKS.length;i++){ var r0=paletteRect(i), bl=BLOCKS[i]; cx.fillStyle=bl.c; rr(r0.x,r0.y,r0.w,r0.h,5); cx.fill(); if(bl.e)emoji(bl.e,r0.x+r0.w/2,r0.y+r0.h/2,14); if(!own[i]){ cx.fillStyle='rgba(0,0,0,.5)'; rr(r0.x,r0.y,r0.w,r0.h,5); cx.fill(); emoji('🔒',r0.x+r0.w/2,r0.y+r0.h/2,13); } if(i===sel && tool==='place' && own[i]){ cx.strokeStyle='#ffd23f'; cx.lineWidth=3; rr(r0.x,r0.y,r0.w,r0.h,5); cx.stroke(); } }
+  // tool buttons
+  tbtn(TB[0],'🧱', tool==='place'?'#39c46a':'#3a4a6a');
+  tbtn(TB[1],'⛏', tool==='break'?'#c0392b':'#3a4a6a');
+  tbtn(TB[2],'🛒 SHOP','#2f9e5a');
+  tbtn(TB[3], night?'🌙':'☀️','#2f6ad0');
+  tbtn(TB[4],'🗑','#e0a040');
+  if(msgT>0){ cx.globalAlpha=Math.min(1,msgT*1.4); cx.textAlign='center'; cx.fillStyle=night?'#fff':'#20305a'; cx.font='bold 13px Trebuchet MS'; cx.fillText(msg,W/2,GY+ROWS*CELL+16); cx.globalAlpha=1; }
+  if(shopOpen) drawShop();
+}
+function tbtn(r,label,col){ cx.fillStyle=col; rr(r.x,r.y,r.w,r.h,7); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 12px Trebuchet MS'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(label,r.x+r.w/2,r.y+r.h/2); cx.textBaseline='alphabetic'; }
+function drawShop(){ cx.fillStyle='rgba(10,14,32,.86)'; cx.fillRect(0,0,W,H); cx.textAlign='center'; cx.fillStyle='#ffd23f'; cx.font='bold 26px Trebuchet MS'; cx.fillText('🛒 BLOCK SHOP',W/2,60); cx.fillStyle='#9dff6a'; cx.font='bold 16px Trebuchet MS'; cx.fillText('💰 '+coins,W/2,88); cx.fillStyle='rgba(255,255,255,.7)'; cx.font='11px Trebuchet MS'; cx.fillText('Tap a block to buy it.  Tap outside to close.',W/2,110);
+  var L=lockedList(); if(L.length===0){ cx.fillStyle='#fff'; cx.font='bold 16px Trebuchet MS'; cx.fillText('🎉 You own every block!',W/2,200); }
+  for(var j=0;j<L.length;j++){ var i=L[j], r=shopRect(j), bl=BLOCKS[i]; var can=coins>=bl.price; cx.fillStyle=bl.c; rr(r.x,r.y,r.w,r.h,10); cx.fill(); cx.strokeStyle=can?'#ffd23f':'rgba(255,255,255,.3)'; cx.lineWidth=2; rr(r.x,r.y,r.w,r.h,10); cx.stroke(); if(bl.e)emoji(bl.e,r.x+r.w/2,r.y+22,22); cx.fillStyle='#20204a'; cx.fillRect(r.x,r.y+r.h-20,r.w,20); cx.fillStyle=can?'#9dff6a':'#ff9a9a'; cx.font='bold 12px Trebuchet MS'; cx.textAlign='center'; cx.fillText('💰'+bl.price,r.x+r.w/2,r.y+r.h-6); cx.fillStyle='#fff'; cx.font='bold 9px Trebuchet MS'; cx.fillText(bl.n,r.x+r.w/2,r.y+40); }
+}
+function drawTitle(){ var g=cx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#2f6ad0'); g.addColorStop(1,'#12183a'); cx.fillStyle=g; cx.fillRect(0,0,W,H);
+  cx.textAlign='center'; emoji('🧱',W/2-52,150,44); emoji('🏙️',W/2,144,50); emoji('🌳',W/2+54,150,42);
+  cx.fillStyle='#ffd23f'; cx.font='bold 42px Trebuchet MS'; cx.fillText('MOZRICE',W/2,H/2-40);
+  cx.fillStyle='#fff'; cx.font='bold 13px Trebuchet MS'; cx.fillText('Build your own world, block by block! 🧱🏙️',W/2,H/2-12);
+  cx.fillStyle='rgba(255,255,255,.85)'; cx.font='11px Trebuchet MS'; cx.fillText('Placing blocks earns 💰 — spend it in the 🛒 SHOP',W/2,H/2+10); cx.fillText('Switch ☀️ DAY / 🌙 NIGHT.  It saves your world! 💾',W/2,H/2+28);
+  cx.fillStyle='#39c46a'; rr(PLAYBTN.x,PLAYBTN.y,PLAYBTN.w,PLAYBTN.h,16); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 24px Trebuchet MS'; cx.textBaseline='middle'; cx.fillText('▶ BUILD',W/2,PLAYBTN.y+PLAYBTN.h/2); cx.textBaseline='alphabetic';
+  cx.fillStyle='#e0a040'; rr(GAMESBTN.x,GAMESBTN.y,GAMESBTN.w,GAMESBTN.h,14); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 18px Trebuchet MS'; cx.textBaseline='middle'; cx.fillText('🎮 ALL MO GAMES',W/2,GAMESBTN.y+GAMESBTN.h/2); cx.textBaseline='alphabetic';
+}
+function drawGames(){ var g=cx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#3a2a7a'); g.addColorStop(1,'#12102a'); cx.fillStyle=g; cx.fillRect(0,0,W,H);
+  cx.textAlign='center'; cx.fillStyle='#ffd23f'; cx.font='bold 26px Trebuchet MS'; cx.fillText('🎮 ALL MO GAMES',W/2,58); cx.fillStyle='rgba(255,255,255,.8)'; cx.font='11px Trebuchet MS'; cx.fillText('Tap a game to play it!',W/2,80);
+  var cols=['#e0563b','#2f6ad0','#2f9e5a','#8a5ad0','#c0392b','#e0a040'];
+  for(var i=0;i<GAMES.length;i++){ var r=gameCard(i), gm=GAMES[i]; cx.fillStyle=cols[i%cols.length]; rr(r.x,r.y,r.w,r.h,14); cx.fill(); cx.strokeStyle='rgba(255,255,255,.3)'; cx.lineWidth=2; rr(r.x,r.y,r.w,r.h,14); cx.stroke(); emoji(gm.e,r.x+r.w/2,r.y+42,40); cx.fillStyle='#fff'; cx.font='bold 13px Trebuchet MS'; cx.textAlign='center'; cx.fillText(gm.n,r.x+r.w/2,r.y+r.h-14); }
+  cx.fillStyle='#c0392b'; rr(BACKB.x,BACKB.y,BACKB.w,BACKB.h,8); cx.fill(); cx.fillStyle='#fff'; cx.font='bold 12px Trebuchet MS'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('⬅ BACK',BACKB.x+BACKB.w/2,BACKB.y+BACKB.h/2); cx.textBaseline='alphabetic';
+}
+function frame(){ draw(); requestAnimationFrame(frame); }
+requestAnimationFrame(frame);
+window._MZ={ get scene(){return scene;}, play:function(){scene='build';}, get count(){return count();}, get coins(){return coins;}, addCoins:function(n){coins+=n;}, get night(){return night;}, toggleNight:function(){night=!night;}, select:function(i){ if(own[i]){sel=i;tool='place';} }, setTool:function(t){tool=t;}, get tool(){return tool;}, owned:function(i){return own[i];}, buy:function(i){buy(i);}, get shopOpen(){return shopOpen;}, openShop:function(){shopOpen=true;}, closeShop:function(){shopOpen=false;}, placeCell:function(c,r){ if(grid[r]&&grid[r][c]!==undefined){ if(tool==='place'){ if(grid[r][c]===-1)coins++; grid[r][c]=sel; } else grid[r][c]=-1; save(); } }, cellVal:function(c,r){return grid[r]?grid[r][c]:null;}, clearAll:function(){clearAll();}, get blocks(){return BLOCKS.length;}, price:function(i){return BLOCKS[i].price;}, openGames:function(){scene='games';}, get gamesCount(){return GAMES.length;}, cardUrl:function(i){return GAMES[i]?GAMES[i].u:null;} };
+})();
+</script>
+</body>
+</html>
